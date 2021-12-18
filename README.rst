@@ -1,5 +1,5 @@
 =====================
-Hyundai / Kia Connect
+Hyundai / Kia Connect API
 =====================
 
 
