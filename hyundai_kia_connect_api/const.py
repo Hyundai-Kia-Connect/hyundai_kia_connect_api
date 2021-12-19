@@ -1,3 +1,5 @@
+from enum import Enum
+
 DOMAIN: str = "kia_uvo"
 
 BRAND_KIA = "Kia"

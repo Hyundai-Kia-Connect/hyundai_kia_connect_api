@@ -104,6 +104,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         self.authorization_code = None
         try:
             self.authorization_code = self.get_authorization_code_with_redirect_url()
+            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
         except Exception as ex1:
             self.authorization_code = self.get_authorization_code_with_form()
 
