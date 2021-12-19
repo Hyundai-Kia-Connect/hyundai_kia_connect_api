@@ -47,6 +47,7 @@ jobs:
           draft: false
           prerelease: false
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
