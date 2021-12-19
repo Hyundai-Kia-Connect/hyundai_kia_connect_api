@@ -17,7 +17,7 @@ class VehicleManager:
     def __init__(self):
         self.vehicles = {}
 
-    def add(self, token, kia_uvo_api)
+    def add(self, token, kia_uvo_api):
         vehicle: Vehicle = Vehicle(token.vehicle_name, token.vehicle_model, token.vehicle_id, token.vehicle_registration_date)
         vehicle_manager_entry: VehicleManagerEntry = VehicleManagerEntry(token, kia_uvo_api, vehicle)
         self.vehicles[token.vehicle_id] = vehicle_manager_entry

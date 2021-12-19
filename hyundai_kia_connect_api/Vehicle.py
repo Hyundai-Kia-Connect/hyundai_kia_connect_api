@@ -11,10 +11,10 @@ _LOGGER = logging.getLogger(__name__)
 class Vehicle:
     def __init__(self, name, model, id, registration_date):
         # Init fields
-        self.name = token.vehicle_name
-        self.model = token.vehicle_model
-        self.id = token.vehicle_id
-        self.registration_date = token.vehicle_registration_date
+        self.name = name
+        self.model = model
+        self.id = id
+        self.registration_date = registration_date
 
         # Shared
         self.engine_type = None
@@ -34,7 +34,6 @@ class Vehicle:
         self.fuel_driving_distance = None
 
         self.last_updated: datetime = datetime.min
-        _LOGGER.debug(f"{DOMAIN} - Received token into Vehicle Object {vars(token)}")
 
     def get_child_value(self, data, key):
         value = data
@@ -46,7 +45,7 @@ class Vehicle:
                     value = value[int(x)]
                 except:
                     value = None
-        return 
+        return
 
     def set_state(self, state):
         self.odometer = get_child_value(state, "odometer.value")
