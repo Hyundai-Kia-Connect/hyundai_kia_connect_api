@@ -19,7 +19,7 @@ jobs:
         if: ${{steps.semantic_release_info.outputs.version != ''}}
         run: |
           echo "Version: ${{steps.semantic_release_info.outputs.version}}"
-          sed -i "s/version='.*',/version=\"${{steps.semantic_release_info.outputs.version}}\",/g" setup.py
+          sed -i "s/version='.*',/version=\'${{steps.semantic_release_info.outputs.version}}\',/g" setup.py
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add -A
