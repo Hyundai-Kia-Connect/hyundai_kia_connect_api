@@ -39,6 +39,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/fuatakgun/hyundai_kia_connect_api',
-    version='0.1.3',
+    version='0.1.4',
     zip_safe=False,
 )
