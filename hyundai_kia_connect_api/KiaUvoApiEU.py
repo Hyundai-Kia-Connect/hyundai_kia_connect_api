@@ -108,6 +108,9 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         except Exception as ex1:
             self.authorization_code = self.get_authorization_code_with_form()
 
+        if self.authorization_code is None:
+            return None
+
         (
             self.access_token,
             self.access_token,
