@@ -10,6 +10,8 @@ name: Upload Python Package
 
 on:
   release:
+    types: # This configuration does not affect the page_build event above
+      - created
 
 jobs:
   deploy:
