@@ -1,8 +1,7 @@
 import logging
 
+import datetime as dt
 import requests
-
-from homeassistant.util import dt as dt_util
 
 from .const import *
 from .Token import Token
@@ -79,13 +78,13 @@ class KiaUvoApiImpl:
     def set_charge_limits(self, token: Token, ac_limit: int, dc_limit: int):
         pass
 
-    def get_timezone_by_region(self) -> tzinfo:
+    def get_timezone_by_region(self) -> dt.tzinfo:
         if REGIONS[self.region] == REGION_CANADA:
-            return dt_util.UTC
+            return dt.timezone.utc
         elif REGIONS[self.region] == REGION_EUROPE:
             return TIME_ZONE_EUROPE
         elif REGIONS[self.region] == REGION_USA:
-            return dt_util.UTC
+            return dt.timezone.utc
 
     def get_temperature_range_by_region(self):
         if REGIONS[self.region] == REGION_CANADA:
