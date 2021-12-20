@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import uuid
 import traceback
 
-from .const import BRANDS, BRAND_HYUNDAI, BRAND_KIA, DOMAIN, DATE_FORMAT
+from .const import BRANDS, BRAND_HYUNDAI, BRAND_KIA, DOMAIN, DATE_FORMAT, TIME_ZONE_EUROPE
 from .KiaUvoApiImpl import KiaUvoApiImpl
 from .Token import Token
 
@@ -34,6 +34,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         super().__init__(
             username, password, region, brand, use_email_with_geocode_api, pin
         )
+        self.data_timezone = TIME_ZONE_EUROPE
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"

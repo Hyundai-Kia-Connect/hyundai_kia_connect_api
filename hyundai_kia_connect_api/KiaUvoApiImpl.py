@@ -28,6 +28,8 @@ class KiaUvoApiImpl:
         self.brand = brand
         self.last_action_tracked = False
         self.supports_soc_range = True
+        self.data_timezone = dt.timezone.utc
+        self.data_date_format = DATE_FORMAT
 
     def login(self) -> Token:
         pass
@@ -77,14 +79,6 @@ class KiaUvoApiImpl:
 
     def set_charge_limits(self, token: Token, ac_limit: int, dc_limit: int):
         pass
-
-    def get_timezone_by_region(self) -> dt.tzinfo:
-        if REGIONS[self.region] == REGION_CANADA:
-            return dt.timezone.utc
-        elif REGIONS[self.region] == REGION_EUROPE:
-            return TIME_ZONE_EUROPE
-        elif REGIONS[self.region] == REGION_USA:
-            return dt.timezone.utc
 
     def get_temperature_range_by_region(self):
         if REGIONS[self.region] == REGION_CANADA:
