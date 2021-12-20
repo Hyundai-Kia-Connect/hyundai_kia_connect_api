@@ -37,3 +37,16 @@ def get_implementation_by_region_brand(
         return KiaUvoAPIUSA(
             username, password, region, brand, pin
         )
+
+
+def get_child_value(data, key):
+    value = data
+    for x in key.split("."):
+        try:
+            value = value[x]
+        except:
+            try:
+                value = value[int(x)]
+            except:
+                value = None
+    return value
