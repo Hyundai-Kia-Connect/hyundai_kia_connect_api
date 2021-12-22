@@ -1,15 +1,16 @@
 import logging
-
-from bs4 import BeautifulSoup
-from datetime import timedelta, datetime
-import push_receiver
 import random
-import requests
-from urllib.parse import parse_qs, urlparse
-import uuid
 import traceback
+import uuid
+from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 
-from .const import BRANDS, BRAND_HYUNDAI, BRAND_KIA, DOMAIN, DATE_FORMAT, TIME_ZONE_EUROPE
+import push_receiver
+import requests
+from bs4 import BeautifulSoup
+
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
+                    TIME_ZONE_EUROPE)
 from .KiaUvoApiImpl import KiaUvoApiImpl
 from .Token import Token
 

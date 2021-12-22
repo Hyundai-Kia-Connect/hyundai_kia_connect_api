@@ -1,6 +1,6 @@
+import datetime as dt
 import logging
 
-import datetime as dt
 import requests
 
 from .const import *

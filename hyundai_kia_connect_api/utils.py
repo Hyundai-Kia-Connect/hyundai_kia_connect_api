@@ -1,18 +1,11 @@
-from .const import (
-    REGIONS,
-    REGION_CANADA,
-    REGION_EUROPE,
-    REGION_USA,
-    BRANDS,
-    BRAND_KIA,
-    BRAND_HYUNDAI,
-)
-
-from .KiaUvoApiImpl import KiaUvoApiImpl
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, REGION_CANADA,
+                    REGION_EUROPE, REGION_USA, REGIONS)
+from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
+from .KiaUvoApiImpl import KiaUvoApiImpl
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
-from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
+
 
 def get_implementation_by_region_brand(
     region: int,
