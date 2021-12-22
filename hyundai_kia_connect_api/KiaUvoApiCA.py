@@ -1,16 +1,10 @@
-import logging
-
-from datetime import timedelta, datetime
 import json
+import logging
+from datetime import datetime, timedelta
+
 import requests
 
-from .const import (
-    DOMAIN,
-    BRANDS,
-    BRAND_HYUNDAI,
-    BRAND_KIA,
-    DATE_FORMAT,
-)
+from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN
 from .KiaUvoApiImpl import KiaUvoApiImpl
 from .Token import Token
 
