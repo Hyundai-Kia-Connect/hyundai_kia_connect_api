@@ -153,6 +153,15 @@ class KiaUvoApiCA(KiaUvoApiImpl):
 
         vehicle_status = {}
         vehicle_status["vehicleStatus"] = response
+        
+        #Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F. 
+        
+        value = vehicle_status["vehicleStatus"]["airTemp"]["value"]
+        value = value.replace("H", "")
+        value = value.replace("C", "")
+        value = "0x" + value
+        vehicle_status["vehicleStatus"]["airTemp"]["value"] = temp_range[int(value, 16)]
+        
         vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
 
         # Service Status Call
