@@ -436,9 +436,10 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         tempIndex = get_hex_temp_into_index(
             vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
         )
-        vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
-            tempIndex
-        ]
+        if(vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["unit"]) == 0:
+            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
+                tempIndex
+            ]
         return response["resMsg"]["vehicleStatusInfo"]
 
     def get_geocoded_location(self, lat, lon):
