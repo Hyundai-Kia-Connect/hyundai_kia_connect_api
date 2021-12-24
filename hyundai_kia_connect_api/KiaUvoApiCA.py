@@ -29,41 +29,7 @@ class KiaUvoApiCA(KiaUvoApiImpl):
         self.last_action_xid = None
         self.last_action_completed = False
         self.last_action_pin_auth = None
-        self.temp_range_celsius = [
-            16,
-            16.5,
-            17,
-            17.5,
-            18,
-            18.5,
-            19,
-            19.5,
-            20,
-            20.5,
-            21,
-            21.5,
-            22,
-            22.5,
-            23,
-            23.5,
-            24,
-            24.5,
-            25,
-            25.5,
-            26,
-            26.5,
-            27,
-            27.5,
-            28,
-            28.5,
-            29,
-            29.5,
-            30,
-            30.5,
-            31,
-            31.5,
-            32,
-        ]
+        self.temperature_range = [x * 0.5 for x in range(32, 65)]
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
@@ -160,7 +126,7 @@ class KiaUvoApiCA(KiaUvoApiImpl):
         value = value.replace("H", "")
         value = value.replace("C", "")
         value = "0x" + value
-        vehicle_status["vehicleStatus"]["airTemp"]["value"] = self.temp_range_celsius[int(value, 16)]
+        vehicle_status["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[int(value, 16)]
         
         vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
 
