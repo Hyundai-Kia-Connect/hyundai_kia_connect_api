@@ -1,11 +1,7 @@
 from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, REGION_CANADA,
                     REGION_EUROPE, REGION_USA, REGIONS)
-from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
-from .KiaUvoApiCA import KiaUvoApiCA
-from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoApiImpl import KiaUvoApiImpl
-from .KiaUvoAPIUSA import KiaUvoAPIUSA
 
+from .KiaUvoApiImpl import KiaUvoApiImpl
 
 def get_implementation_by_region_brand(
     region: int,
@@ -43,3 +39,11 @@ def get_child_value(data, key):
             except:
                 value = None
     return value
+
+def get_hex_temp_into_index(value):
+    value = value.replace("H", "")
+    value = value.replace("C", "")
+    value = "0x" + value
+    value = int(value, 16)
+    return value
+

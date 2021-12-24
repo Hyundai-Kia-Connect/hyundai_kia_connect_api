@@ -13,6 +13,7 @@ from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     TIME_ZONE_EUROPE)
 from .KiaUvoApiImpl import KiaUvoApiImpl
 from .Token import Token
+from .utils import get_hex_temp_into_index
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
             username, password, region, brand, use_email_with_geocode_api, pin
         )
         self.data_timezone = TIME_ZONE_EUROPE
+        self.temperature_range = [x * 0.5 for x in range(32, 65)]
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -430,6 +432,14 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+        # Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F.
+        tempIndex = get_hex_temp_into_index(
+            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
+        )
+        if(vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["unit"]) == 0:
+            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
+                tempIndex
+            ]
         return response["resMsg"]["vehicleStatusInfo"]
 
     def get_geocoded_location(self, lat, lon):
