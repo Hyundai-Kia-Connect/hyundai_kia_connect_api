@@ -86,6 +86,7 @@ class KiaUvoAPIUSA(KiaUvoApiImpl):
         self.last_action_tracked = True
         self.last_action_xid = None
         self.last_action_completed = False
+        self.temperature_range = range(62, 82)
 
         self.supports_soc_range = False
 

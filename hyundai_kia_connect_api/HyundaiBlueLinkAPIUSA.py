@@ -60,7 +60,8 @@ class HyundaiBlueLinkAPIUSA(KiaUvoApiImpl):
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
-
+        self.temperature_range = range(62, 82)
+        
         ts = time.time()
         utc_offset = (
             datetime.fromtimestamp(ts) - datetime.utcfromtimestamp(ts)
