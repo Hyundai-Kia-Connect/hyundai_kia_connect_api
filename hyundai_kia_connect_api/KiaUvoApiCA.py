@@ -125,9 +125,10 @@ class KiaUvoApiCA(KiaUvoApiImpl):
         tempIndex = get_hex_temp_into_index(
             vehicle_status["vehicleStatus"]["airTemp"]["value"]
         )
-        vehicle_status["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
-            tempIndex
-        ]
+        if(vehicle_status["vehicleStatus"]["airTemp"]["unit"]) == 0:
+            vehicle_status["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
+                tempIndex
+            ]
         
         vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
 
