@@ -36,41 +36,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
             username, password, region, brand, use_email_with_geocode_api, pin
         )
         self.data_timezone = TIME_ZONE_EUROPE
-        self.temp_range_celsius = [
-            14,
-            14.5,
-            15,
-            15.5,
-            16,
-            16.5,
-            17,
-            17.5,
-            18,
-            18.5,
-            19,
-            19.5,
-            20,
-            20.5,
-            21,
-            21.5,
-            22,
-            22.5,
-            23,
-            23.5,
-            24,
-            24.5,
-            25,
-            25.5,
-            26,
-            26.5,
-            27,
-            27.5,
-            28,
-            28.5,
-            29,
-            29.5,
-            30,
-        ]
+        self.temperature_range = [x * 0.5 for x in range(32, 65)]
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -470,7 +436,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         value = value.replace("H", "")
         value = value.replace("C", "")
         value = "0x" + value
-        response["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temp_range_celsius[
+        response["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
             int(value, 16)
         ]
         return response["resMsg"]["vehicleStatusInfo"]
