@@ -13,6 +13,7 @@ from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     TIME_ZONE_EUROPE)
 from .KiaUvoApiImpl import KiaUvoApiImpl
 from .Token import Token
+from .utils import get_hex_temp_into_index
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -432,12 +433,11 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
         # Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F.
-        value = vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
-        value = value.replace("H", "")
-        value = value.replace("C", "")
-        value = "0x" + value
-        response["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
-            int(value, 16)
+        tempIndex = get_hex_temp_into_index(
+            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
+        )
+        vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
+            tempIndex
         ]
         return response["resMsg"]["vehicleStatusInfo"]
 
