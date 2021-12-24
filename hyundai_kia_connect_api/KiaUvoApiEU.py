@@ -465,6 +465,14 @@ class KiaUvoApiEU(KiaUvoApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+        # Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F.
+        value = vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
+        value = value.replace("H", "")
+        value = value.replace("C", "")
+        value = "0x" + value
+        response["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temp_range_celsius[
+            int(value, 16)
+        ]
         return response["resMsg"]["vehicleStatusInfo"]
 
     def get_geocoded_location(self, lat, lon):
