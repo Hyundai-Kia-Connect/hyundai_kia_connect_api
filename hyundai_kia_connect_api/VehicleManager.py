@@ -4,7 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .const import DOMAIN
+from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
+from .KiaUvoApiCA import KiaUvoApiCA
+from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiImpl import KiaUvoApiImpl
+from .KiaUvoAPIUSA import KiaUvoAPIUSA
+
 from .Token import Token
 from .Vehicle import Vehicle
 
