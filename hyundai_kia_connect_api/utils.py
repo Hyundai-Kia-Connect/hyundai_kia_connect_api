@@ -12,8 +12,6 @@ def get_child_value(data, key):
 
 def get_hex_temp_into_index(value):
     value = value.replace("H", "")
-    value = value.replace("C", "")
-    value = "0x" + value
     value = int(value, 16)
     return value
 
