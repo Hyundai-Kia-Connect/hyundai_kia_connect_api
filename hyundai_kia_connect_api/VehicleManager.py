@@ -3,7 +3,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
-from .const import DOMAIN
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, REGION_CANADA,
+                    REGION_EUROPE, REGION_USA, REGIONS, DOMAIN)
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
@@ -55,6 +56,7 @@ class VehicleManager:
         return False
     
     def get_implementation_by_region_brand(
+        self,
         region: int,
         brand: int,
         username: str,
