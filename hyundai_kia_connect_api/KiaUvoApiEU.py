@@ -37,7 +37,7 @@ class KiaUvoApiEU(KiaUvoApiImpl):
             username, password, region, brand, use_email_with_geocode_api, pin
         )
         self.data_timezone = TIME_ZONE_EUROPE
-        self.temperature_range = [x * 0.5 for x in range(32, 65)]
+        self.temperature_range = [x * 0.5 for x in range(28, 60)]
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
