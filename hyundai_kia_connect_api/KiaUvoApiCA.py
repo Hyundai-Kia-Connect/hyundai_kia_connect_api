@@ -30,7 +30,7 @@ class KiaUvoApiCA(KiaUvoApiImpl):
         self.last_action_xid = None
         self.last_action_completed = False
         self.last_action_pin_auth = None
-        self.temperature_range = [x * 0.5 for x in range(32, 65)]
+        self.temperature_range = [x * 0.5 for x in range(32, 64)]
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
