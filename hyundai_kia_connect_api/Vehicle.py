@@ -25,6 +25,7 @@ class Vehicle:
         self.total_driving_distance = None
         self.odometer = None
         self.car_battery = None
+        self.model_year = None
 
         # EV fields
         self.ev_battery_percentage = None
