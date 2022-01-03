@@ -30,6 +30,7 @@ class Vehicle:
     _engine_is_running: bool = None
     _distance_unit: str = None
     _temperature_unit: str = None
+    _total_available_range: float = None
     _last_updated_at: datetime.datetime = datetime.datetime.min
     ## Climate
     _air_temperature: float = None
@@ -43,6 +44,7 @@ class Vehicle:
     _rear_right_heater_is_on: bool = None
     ## Door Status
     _is_locked: bool = None
+    _hood_is_open: bool = None
     _front_left_door_is_open: bool = None
     _front_right_door_is_open: bool = None
     _back_left_door_is_open: bool = None
@@ -52,15 +54,21 @@ class Vehicle:
     # EV fields (EV/PHEV)
     _ev_battery_percentage: int = None
     _ev_battery_is_charging: bool = None
-    _ev_battery_is_charging: bool = None
-    _ev_driving_distance: float = None
+    _ev_driving_range: float = None
     _ev_estimated_current_charge_duration: int = None
     _ev_estimated_fast_charge_duration: int = None
     _ev_estimated_portable_charge_duration: int = None
     _ev_estimated_station_charge_duration: int = None
 
+    # Tire Pressure
+    _tire_pressure_all_warning_is_on: bool = None
+    _tire_pressure_rear_left_warning_is_on: bool = None
+    _tire_pressure_front_left_warning_is_on: bool = None
+    _tire_pressure_front_right_warning_is_on: bool = None
+    _tire_pressure_rear_right_warning_is_on: bool = None
+        
     # IC fields (PHEV/HEV/IC)
-    _fuel_driving_distance: float = None
+    _fuel_driving_range: float = None
     _fuel_level_is_low: bool = None
 
     # Service Data
