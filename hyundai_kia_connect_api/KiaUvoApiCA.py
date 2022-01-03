@@ -106,6 +106,16 @@ class KiaUvoApiCA(ApiImpl):
 
         return token
 
+    def get_vehicles(self, token: Token):
+        url = self.API_URL + "vhcllst"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        response = requests.post(url, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        response = response.json()
+        response = response["result"]
+        return response
+    
     def get_cached_vehicle_status(self, token: Token):
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
