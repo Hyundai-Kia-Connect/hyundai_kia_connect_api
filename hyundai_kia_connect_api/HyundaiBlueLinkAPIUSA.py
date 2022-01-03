@@ -14,7 +14,7 @@ from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     VEHICLE_LOCK_ACTION)
-from .KiaUvoApiImpl import KiaUvoApiImpl
+from .ApiImpl import ApiImpl
 from .Token import Token
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -38,7 +38,7 @@ class cipherAdapter(HTTPAdapter):
         return super().proxy_manager_for(*args, **kwargs)
 
 
-class HyundaiBlueLinkAPIUSA(KiaUvoApiImpl):
+class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     old_vehicle_status = None
     # initialize with a timestamp which will allow the first fetch to occur

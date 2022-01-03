@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 
 from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     TIME_ZONE_EUROPE)
-from .KiaUvoApiImpl import KiaUvoApiImpl
+from .ApiImpl import ApiImpl
 from .Token import Token
 from .utils import get_hex_temp_into_index
 
@@ -23,7 +23,7 @@ USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
 
 
-class KiaUvoApiEU(KiaUvoApiImpl):
+class KiaUvoApiEU(ApiImpl):
     def __init__(
         self,
         username: str,

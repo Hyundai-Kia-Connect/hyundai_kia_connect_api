@@ -9,7 +9,7 @@ from .Token import Token
 _LOGGER = logging.getLogger(__name__)
 
 
-class KiaUvoApiImpl:
+class ApiImpl:
     def __init__(
         self,
         username: str,
