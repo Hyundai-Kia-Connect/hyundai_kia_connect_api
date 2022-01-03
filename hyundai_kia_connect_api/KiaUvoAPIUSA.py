@@ -10,7 +10,7 @@ import requests
 from requests import RequestException, Response
 
 from .const import DATE_FORMAT, DOMAIN
-from .KiaUvoApiImpl import KiaUvoApiImpl
+from .ApiImpl import ApiImpl
 from .Token import Token
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ def request_with_logging(func):
     return request_with_logging_wrapper
 
 
-class KiaUvoAPIUSA(KiaUvoApiImpl):
+class KiaUvoAPIUSA(ApiImpl):
     def __init__(
         self,
         username: str,

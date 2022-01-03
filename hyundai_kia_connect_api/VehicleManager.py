@@ -8,7 +8,7 @@ from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, REGION_CANADA,
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoApiImpl import KiaUvoApiImpl
+from .ApiImpl import ApiImpl
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 
 from .Token import Token
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass
 class VehicleManagerEntry:
     token: Token
-    api: KiaUvoApiImpl
+    api: ApiImpl
     vehicle: Vehicle
 
 class VehicleManager:
@@ -62,7 +62,7 @@ class VehicleManager:
         username: str,
         password: str,
         pin: str = "",
-    ) -> KiaUvoApiImpl:  # pylint: disable=too-many-arguments
+    ) -> ApiImpl:  # pylint: disable=too-many-arguments
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(
                 username, password, region, brand, pin
