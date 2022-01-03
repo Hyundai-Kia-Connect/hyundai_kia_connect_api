@@ -28,6 +28,8 @@ class Vehicle:
     _odometer: float = None
     _car_battery_percentage: int = None
     _engine_is_running: bool = None
+    _distance_unit: str = None
+    _temperature_unit: str = None
     _last_updated_at: datetime.datetime = datetime.datetime.min
     ## Climate
     _air_temperature: float = None
@@ -60,6 +62,11 @@ class Vehicle:
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_distance: float = None
     _fuel_level_is_low: bool = None
+
+    # Service Data
+    _next_service_distance: float = None
+    _last_service_distance: float = None
+
 
     # Calculated fields
     _engine_type = None
