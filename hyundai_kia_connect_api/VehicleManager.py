@@ -40,7 +40,7 @@ class VehicleManager:
 
     def update_vehicle(self, vehicle_id):
         entry: VehicleManagerEntry = self.vehicles[vehicle_id]
-        entry.vehicle.set_state(entry.api.get_cached_vehicle_status(entry.token))
+        entry.vehicle.set_state(entry.api.get_cached_vehicle_status(entry.token), entry.api.data_map)
 
     def force_update_vehicle(self, vehicle_id):
         entry: VehicleManagerEntry = self.vehicles[vehicle_id]

@@ -9,11 +9,12 @@ import push_receiver
 import requests
 from bs4 import BeautifulSoup
 
+from .ApiImpl import ApiImpl
 from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     TIME_ZONE_EUROPE)
-from .ApiImpl import ApiImpl
 from .Token import Token
 from .utils import get_hex_temp_into_index
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +39,13 @@ class KiaUvoApiEU(ApiImpl):
         )
         self.data_timezone = TIME_ZONE_EUROPE
         self.temperature_range = [x * 0.5 for x in range(28, 60)]
+        self.data_map = {
+            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            Vehicle.odometer: "odometer.value",
+            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
+            Vehicle.engine_is_running: "vehicleStatus.engine",
+            Vehicle.last_updated_at: "vehicleStatus.time",
+        }
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
