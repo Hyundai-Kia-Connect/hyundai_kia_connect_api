@@ -32,7 +32,7 @@ class KiaUvoApiCA(ApiImpl):
         self.last_action_completed = False
         self.last_action_pin_auth = None
         self.temperature_range = [x * 0.5 for x in range(32, 64)]
-        #Will need to remove mapping from update command and shift to here.
+        # Will need to remove mapping from update command and shift to here.
         self.data_map = {
             Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             Vehicle.odometer: "odometer.value",
@@ -152,7 +152,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
 
         # Service Status Call
-        response = get_next_service(token)
+        response = self.get_next_service(token)
 
         vehicle_status["odometer"] = {}
         vehicle_status["odometer"]["unit"] = response["currentOdometerUnit"]
