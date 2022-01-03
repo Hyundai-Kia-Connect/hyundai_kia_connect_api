@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 
 import requests
 
-from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN
 from .ApiImpl import ApiImpl
+from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN
 from .Token import Token
 from .utils import get_hex_temp_into_index
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +32,14 @@ class KiaUvoApiCA(ApiImpl):
         self.last_action_completed = False
         self.last_action_pin_auth = None
         self.temperature_range = [x * 0.5 for x in range(32, 64)]
+        #Will need to remove mapping from update command and shift to here.
+        self.data_map = {
+            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            Vehicle.odometer: "odometer.value",
+            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
+            Vehicle.engine_is_running: "vehicleStatus.engine",
+            Vehicle.last_updated_at: "vehicleStatus.time",
+        }
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
@@ -115,7 +124,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         response = response["result"]
         return response
-    
+
     def get_cached_vehicle_status(self, token: Token):
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
@@ -130,16 +139,16 @@ class KiaUvoApiCA(ApiImpl):
 
         vehicle_status = {}
         vehicle_status["vehicleStatus"] = response
-        
-        #Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F. 
+
+        # Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(
             vehicle_status["vehicleStatus"]["airTemp"]["value"]
         )
-        if(vehicle_status["vehicleStatus"]["airTemp"]["unit"]) == 0:
-            vehicle_status["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
-                tempIndex
-            ]
-        
+        if (vehicle_status["vehicleStatus"]["airTemp"]["unit"]) == 0:
+            vehicle_status["vehicleStatus"]["airTemp"][
+                "value"
+            ] = self.temperature_range[tempIndex]
+
         vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
 
         # Service Status Call
