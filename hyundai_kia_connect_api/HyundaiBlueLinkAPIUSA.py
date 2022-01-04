@@ -16,6 +16,7 @@ from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
                     VEHICLE_LOCK_ACTION)
 from .ApiImpl import ApiImpl
 from .Token import Token
+from .Vehicle import Vehicle
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
@@ -61,6 +62,13 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
         self.temperature_range = range(62, 82)
+        self.data_map = {
+            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            Vehicle.odometer: "odometer.value",
+            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
+            Vehicle.engine_is_running: "vehicleStatus.engine",
+            Vehicle.last_updated_at: "vehicleStatus.time",
+        }
         
         ts = time.time()
         utc_offset = (
