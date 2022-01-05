@@ -23,7 +23,7 @@ class Vehicle:
     data_timezone: datetime.tzinfo = None
 
     # Shared (EV/PHEV/HEV/IC)
-    ## General
+    ## General 
     _total_driving_distance: float = None
     _odometer: float = None
     _car_battery_percentage: int = None
