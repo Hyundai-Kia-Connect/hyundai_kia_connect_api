@@ -1,81 +1,79 @@
 import asyncio
+import datetime as dt
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, REGION_CANADA,
-                    REGION_EUROPE, REGION_USA, REGIONS, DOMAIN)
+import pytz
+
+from .ApiImpl import ApiImpl
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN, REGION_CANADA,
+                    REGION_EUROPE, REGION_USA, REGIONS)
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
-from .ApiImpl import ApiImpl
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
-
-from .Token import Token
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
-@dataclass
-class VehicleManagerEntry:
-    token: Token
-    api: ApiImpl
-    vehicle: Vehicle
 
 class VehicleManager:
-    def __init__(self):
-        self.vehicles = {}
+    def __init__(self, region: int, brand: int, username: str, password: str, pin: str):
+        self.region: int = region
+        self.brand: int = brand
+        self.username: str = username
+        self.password: str = password
+        self.pin: str = pin
 
-    def add(self, token, api):
-        vehicle: Vehicle = Vehicle(token.vehicle_name, token.vehicle_model, token.vehicle_id, token.vehicle_registration_date, api.data_timezone, api.region, api.brand)
-        entry: VehicleManagerEntry = VehicleManagerEntry(token=token, api=api, vehicle=vehicle)
-        self.vehicles[token.vehicle_id] = entry
-        return vehicle
+        self.api: ApiImpl = self.get_implementation_by_region_brand(
+            self.region, self.brand
+        )
 
-    def get_vehicle(self, vehicle_id):
-        return self.vehicles[vehicle_id].vehicle
+        self.token: token = None
+        self.vehicles: dict = {}
 
-    def get_token(self, vehicle_id):
-        return self.vehicles[vehicle_id].token
+    def initialize(self) -> None:
+        self.token: Token = self.api.login(self.username, self.password)
+        vehicles = self.api.get_vehicles(self.token)
+        for vehicle in vehicles:
+            self.vehicles[vehicle.id] = vehicle
 
-    def update_vehicle(self, vehicle_id):
-        entry: VehicleManagerEntry = self.vehicles[vehicle_id]
-        entry.vehicle.set_state(entry.api.get_cached_vehicle_status(entry.token), entry.api.data_map)
+    def get_vehicle(self, vehicle_id) -> Vehicle:
+        return self.vehicles[vehicle_id]
 
-    def force_update_vehicle(self, vehicle_id):
-        entry: VehicleManagerEntry = self.vehicles[vehicle_id]
-        entry.api.update_vehicle_status(entry.token)
-        self.update_vehicle(vehicle_id)
+    def update_all_vehicles_with_cached_state(self) -> None:
+        for vehicle_id in self.vehicles.keys():
+            self.update_vehicle_with_cached_state(vehicle_id)
 
-    def check_and_refresh_token(self, vehicle_id):
-        entry: VehicleManagerEntry = self.vehicles[vehicle_id]
-        if entry.token.valid_until <= datetime.now().strftime(entry.api.data_date_format):
+    def update_vehicle_with_cached_state(self, vehicle_id) -> None:
+        self.api.update_vehicle_with_cached_state(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def force_refresh_all_vehicles_states(self, vehicle_id) -> None:
+        for vehicle_id in self.vehicles.keys():
+            self.force_refresh_vehicle_state(vehicle_id)
+        self.update_all_vehicles_with_cached_state()
+
+    def force_refresh_vehicle_state(self, vehicle_id) -> None:
+        self.api.force_refresh_vehicle_state(token, vehicle_id)
+
+    def check_and_refresh_token(self) -> bool:
+        if self.token is None:
+            self.initialize()
+        if self.token.valid_until <= dt.datetime.now(pytz.utc):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            entry.token = entry.api.login()
+            self.token = self.api.login(self.username, self.password)
             return True
         return False
-    
-    def get_implementation_by_region_brand(
-        self,
-        region: int,
-        brand: int,
-        username: str,
-        password: str,
-        pin: str = "",
-    ) -> ApiImpl:  # pylint: disable=too-many-arguments
+
+    @staticmethod
+    def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
         if REGIONS[region] == REGION_CANADA:
-            return KiaUvoApiCA(
-                username, password, region, brand, pin
-            )
+            return KiaUvoApiCA(region, brand)
         elif REGIONS[region] == REGION_EUROPE:
-            return KiaUvoApiEU(
-                username, password, region, brand, pin
-            )
+            return KiaUvoApiEU(region, brand)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_HYUNDAI:
-            return HyundaiBlueLinkAPIUSA(
-                username, password, region, brand, pin
-            )
+            return HyundaiBlueLinkAPIUSA(region, brand)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
-            return KiaUvoAPIUSA(
-                username, password, region, brand, pin
-            )
+            return KiaUvoAPIUSA(region, brand)
