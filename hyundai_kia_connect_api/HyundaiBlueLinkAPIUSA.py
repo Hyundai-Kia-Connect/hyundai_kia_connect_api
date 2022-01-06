@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN,
                     VEHICLE_LOCK_ACTION)
 from .ApiImpl import ApiImpl
 from .Token import Token
@@ -135,9 +135,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle_model = vehicle_details["modelCode"]
         vehicle_registration_date = vehicle_details["enrollmentDate"]
 
-        valid_until = (datetime.now() + timedelta(seconds=expires_in)).strftime(
-            DATE_FORMAT
-        )
+        valid_until = (datetime.now() + timedelta(seconds=expires_in))
 
         token = Token({})
         token.set(

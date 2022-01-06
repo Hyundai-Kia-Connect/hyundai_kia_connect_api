@@ -9,7 +9,7 @@ import pytz
 import requests
 from requests import RequestException, Response
 
-from .const import DATE_FORMAT, DOMAIN
+from .const import DOMAIN
 from .ApiImpl import ApiImpl
 from .Token import Token
 from .Vehicle import Vehicle
@@ -197,7 +197,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle_model = vehicle_summary["modelName"]
         vehicle_registration_date = vehicle_summary.get("enrollmentDate", "missing")
 
-        valid_until = (datetime.now() + timedelta(hours=1)).strftime(DATE_FORMAT)
+        valid_until = (datetime.now() + timedelta(hours=1))
 
         # using vehicle_VIN as device ID
         # using vehicle_key as vehicle_regid
