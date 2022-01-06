@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import requests
 
 from .ApiImpl import ApiImpl
-from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN
+from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN
 from .Token import Token
 from .utils import get_hex_temp_into_index
 from .Vehicle import Vehicle
@@ -97,7 +97,7 @@ class KiaUvoApiCA(ApiImpl):
             "enrollmentDate", "missing"
         )
 
-        valid_until = (datetime.now() + timedelta(hours=23)).strftime(DATE_FORMAT)
+        valid_until = (datetime.now() + timedelta(hours=23))
 
         token = Token({})
         token.set(
