@@ -3,10 +3,8 @@ import logging
 import dataclasses
 import datetime
 import re
-import traceback
 
 from .const import *
-from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,53 +14,77 @@ class Vehicle:
     id: str = None
     name: str = None
     model: str = None
-    year: int = None
     registration_date: str = None
-    region: int = None
-    brand: int = None
-    data_timezone: datetime.tzinfo = None
+    year: int = None
 
     # Shared (EV/PHEV/HEV/IC)
     ## General
     _total_driving_distance: float = None
+    _total_driving_distance_value: float = None
+    _total_driving_distance_unit: str = None
+
     _odometer: float = None
-    _car_battery_percentage: int = None
-    _engine_is_running: bool = None
-    _last_updated_at: datetime.datetime = datetime.datetime.min
+    _odometer_value: float = None
+    _odometer_unit: str = None
+
+    car_battery_percentage: int = None
+    engine_is_running: bool = None
+    last_updated_at: datetime.datetime = datetime.datetime.min
     ## Climate
     _air_temperature: float = None
-    _defrost_is_on: bool = None
-    _steering_wheel_heater_is_on: bool = None
-    _back_window_heater_is_on: bool = None
-    _side_mirror_heater_is_on: bool = None
-    _front_left_heater_is_on: bool = None
-    _front_right_heater_is_on: bool = None
-    _rear_left_heater_is_on: bool = None
-    _rear_right_heater_is_on: bool = None
+    _air_temperature_value: float = None
+    _air_temperature_unit: str = None
+
+    defrost_is_on: bool = None
+    steering_wheel_heater_is_on: bool = None
+    back_window_heater_is_on: bool = None
+    side_mirror_heater_is_on: bool = None
+    front_left_seat_heater_is_on: bool = None
+    front_right_seat_heater_is_on: bool = None
+    rear_left_seat_heater_is_on: bool = None
+    rear_right_seat_heater_is_on: bool = None
     ## Door Status
-    _is_locked: bool = None
-    _front_left_door_is_open: bool = None
-    _front_right_door_is_open: bool = None
-    _back_left_door_is_open: bool = None
-    _back_right_door_is_open: bool = None
-    _trunk_is_open: bool = None
+    is_locked: bool = None
+    front_left_door_is_open: bool = None
+    front_right_door_is_open: bool = None
+    back_left_door_is_open: bool = None
+    back_right_door_is_open: bool = None
+    trunk_is_open: bool = None
 
     # EV fields (EV/PHEV)
-    _ev_battery_percentage: int = None
-    _ev_battery_is_charging: bool = None
-    _ev_battery_is_charging: bool = None
+    ev_battery_percentage: int = None
+    ev_battery_is_charging: bool = None
+    ev_battery_is_plugged_in: bool = None
+
     _ev_driving_distance: float = None
+    _ev_driving_distance_value: float = None
+    _ev_driving_distance_unit: str = None
+
     _ev_estimated_current_charge_duration: int = None
+    _ev_estimated_current_charge_duration_value: int = None
+    _ev_estimated_current_charge_duration_unit: str = None
+
     _ev_estimated_fast_charge_duration: int = None
+    _ev_estimated_fast_charge_duration_value: int = None
+    _ev_estimated_fast_charge_duration_unit: str = None
+
     _ev_estimated_portable_charge_duration: int = None
+    _ev_estimated_portable_charge_duration_value: int = None
+    _ev_estimated_portable_charge_duration_unit: str = None
+
     _ev_estimated_station_charge_duration: int = None
+    _ev_estimated_station_charge_duration_value: int = None
+    _ev_estimated_station_charge_duration_unit: str = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_distance: float = None
-    _fuel_level_is_low: bool = None
+    _fuel_driving_distance_value: float = None
+    _fuel_driving_distance_unit: str = None
+
+    fuel_level_is_low: bool = None
 
     # Calculated fields
-    _engine_type = None
+    engine_type = None
 
     @property
     def total_driving_distance(self):
@@ -70,7 +92,9 @@ class Vehicle:
 
     @total_driving_distance.setter
     def total_driving_distance(self, value):
-        self._total_driving_distance = value
+        self._total_driving_distance_value = value[0]
+        self._total_driving_distance_unit = value[1]
+        self._total_driving_distance = value[0]
 
     @property
     def odometer(self):
@@ -78,45 +102,76 @@ class Vehicle:
 
     @odometer.setter
     def odometer(self, value):
-        self._odometer = value
+        self._odometer_value = value[0]
+        self._odometer_unit = value[1]
+        self._odometer = value[0]
 
     @property
-    def car_battery_percentage(self):
-        return self._car_battery_percentage
+    def air_temperature(self):
+        return self._air_temperature
 
-    @car_battery_percentage.setter
-    def car_battery_percentage(self, value):
-        self._car_battery_percentage = value
-
-    @property
-    def engine_is_running(self):
-        return self._engine_is_running
-
-    @engine_is_running.setter
-    def engine_is_running(self, value):
-        self._engine_is_running = value
+    @air_temperature.setter
+    def air_temperature(self, value):
+        self._air_temperature_value = value[0]
+        self._air_temperature_unit = value[1]
+        self._air_temperature = value[0]
 
     @property
-    def last_updated_at(self):
-        return self._last_updated_at
+    def ev_driving_distance(self):
+        return self._ev_driving_distance
 
-    @last_updated_at.setter
-    def last_updated_at(self, value):
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at {value}")
-        value = datetime.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=self.data_timezone,
-        )
-        self._last_updated_at = value
+    @ev_driving_distance.setter
+    def ev_driving_distance(self, value):
+        self._ev_driving_distance_value = value[0]
+        self._ev_driving_distance_unit = value[1]
+        self._ev_driving_distance = value[0]
 
-    def set_state(self, state, data_map):
-        for key in data_map.keys():
-            setattr(self, key.fset.__name__, get_child_value(state, data_map[key]))
-        # self.odometer = get_child_value(state, "odometer.value")
-        # self.last_updated_at(get_child_value(state, "vehicleStatus.time"))
+    @property
+    def ev_estimated_current_charge_duration(self):
+        return self._ev_estimated_current_charge_duration
+
+    @ev_estimated_current_charge_duration.setter
+    def ev_estimated_current_charge_duration(self, value):
+        self._ev_estimated_current_charge_duration_value = value[0]
+        self._ev_estimated_current_charge_duration_unit = value[1]
+        self._ev_estimated_current_charge_duration = value[0]
+
+    @property
+    def ev_estimated_fast_charge_duration(self):
+        return self._ev_estimated_fast_charge_duration
+
+    @ev_estimated_fast_charge_duration.setter
+    def ev_estimated_fast_charge_duration(self, value):
+        self._ev_estimated_fast_charge_duration_value = value[0]
+        self._ev_estimated_fast_charge_duration_unit = value[1]
+        self._ev_estimated_fast_charge_duration = value[0]
+
+    @property
+    def ev_estimated_portable_charge_duration(self):
+        return self._ev_estimated_portable_charge_duration
+
+    @ev_estimated_portable_charge_duration.setter
+    def ev_estimated_portable_charge_duration(self, value):
+        self._ev_estimated_portable_charge_duration_value = value[0]
+        self._ev_estimated_portable_charge_duration_unit = value[1]
+        self._ev_estimated_portable_charge_duration = value[0]
+
+    @property
+    def ev_estimated_station_charge_duration(self):
+        return self._ev_estimated_station_charge_duration
+
+    @ev_estimated_station_charge_duration.setter
+    def ev_estimated_station_charge_duration(self, value):
+        self._ev_estimated_station_charge_duration_value = value[0]
+        self._ev_estimated_station_charge_duration_unit = value[1]
+        self._ev_estimated_station_charge_duration = value[0]
+
+    @property
+    def fuel_driving_distance(self):
+        return self._fuel_driving_distance
+
+    @fuel_driving_distance.setter
+    def fuel_driving_distance(self, value):
+        self._fuel_driving_distance_value = value[0]
+        self._fuel_driving_distance_unit = value[1]
+        self._fuel_driving_distance = value[0]

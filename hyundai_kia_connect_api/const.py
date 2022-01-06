@@ -1,7 +1,6 @@
-from dateutil import tz
 from enum import Enum
 
-DOMAIN: str = "kia_uvo"
+DOMAIN: str = "hyundai_kia_connect_api"
 
 BRAND_KIA = "Kia"
 BRAND_HYUNDAI = "Hyundai"
@@ -12,9 +11,6 @@ REGION_CANADA = "Canada"
 REGION_USA = "USA"
 REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA}
 
-DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S.%f"
-
-TIME_ZONE_EUROPE = tz.gettz("Europe/Berlin")
 
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"

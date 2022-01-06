@@ -1,19 +1,19 @@
+import datetime as dt
 import logging
 import random
-import traceback
+import re
 import uuid
-from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
-import push_receiver
+import pytz
 import requests
 from bs4 import BeautifulSoup
+from dateutil import tz
 
 from .ApiImpl import ApiImpl
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DATE_FORMAT, DOMAIN,
-                    TIME_ZONE_EUROPE)
+from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN
 from .Token import Token
-from .utils import get_hex_temp_into_index
+from .utils import get_child_value, get_hex_temp_into_index
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,27 +25,11 @@ ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,
 
 
 class KiaUvoApiEU(ApiImpl):
-    def __init__(
-        self,
-        username: str,
-        password: str,
-        region: int,
-        brand: int,
-        use_email_with_geocode_api: bool = False,
-        pin: str = "",
-    ):
-        super().__init__(
-            username, password, region, brand, use_email_with_geocode_api, pin
-        )
-        self.data_timezone = TIME_ZONE_EUROPE
-        self.temperature_range = [x * 0.5 for x in range(28, 60)]
-        self.data_map = {
-            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            Vehicle.odometer: "odometer.value",
-            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
-            Vehicle.engine_is_running: "vehicleStatus.engine",
-            Vehicle.last_updated_at: "vehicleStatus.time",
-        }
+    data_timezone = tz.gettz("Europe/Berlin")
+    temperature_range = [x * 0.5 for x in range(28, 60)]
+
+    def __init__(self, region: int, brand: int) -> None:
+        self.stamps = None
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -95,7 +79,330 @@ class KiaUvoApiEU(ApiImpl):
             + ".json"
         )
 
-    def get_stamps_from_bluelinky(self) -> list:
+    def login(self, username: str, password: str) -> Token:
+
+        if self.stamps is None:
+            self.stamps = self._get_stamps_from_bluelinky()
+
+        device_id, stamp = self._get_device_id()
+        cookies = self._get_cookies()
+        self._set_session_language(cookies)
+        authorization_code = None
+        try:
+            authorization_code = self._get_authorization_code_with_redirect_url(
+                username, password, cookies
+            )
+            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
+        except Exception as ex1:
+            authorization_code = self._get_authorization_code_with_form()
+
+        if authorization_code is None:
+            return None
+
+        (
+            token_type,
+            access_token,
+            authorization_code,
+        ) = self._get_access_token(stamp, authorization_code)
+
+        token_type, refresh_token = self._get_refresh_token(stamp, authorization_code)
+        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            device_id=device_id,
+            stamp=stamp,
+            valid_until=valid_until,
+        )
+
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        url = self.SPA_API_URL + "vehicles"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        response = requests.get(url, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
+        result = []
+        for entry in response["resMsg"]["vehicles"]:
+            vehicle: Vehicle = Vehicle(
+                id=entry["vehicleId"],
+                name=entry["nickname"],
+                model=entry["vehicleName"],
+                registration_date=entry["regDate"],
+            )
+            result.append(vehicle)
+        return result
+
+    def get_last_updated_at(self, value) -> dt.datetime:
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
+        value = dt.datetime(
+            year=int(m.group(1)),
+            month=int(m.group(2)),
+            day=int(m.group(3)),
+            hour=int(m.group(4)),
+            minute=int(m.group(5)),
+            second=int(m.group(6)),
+            tzinfo=self.data_timezone,
+        )
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+        return value
+
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_cached_vehicle_state(token, vehicle.id)
+        vehicle.last_updated_at = self.get_last_updated_at(
+            get_child_value(state, "vehicleStatus.time")
+        )
+        vehicle.total_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            ),
+            "km",
+        )
+        vehicle.odometer = (
+            get_child_value(state, "odometer.value"),
+            "km",
+        )
+        vehicle.car_battery_percentage = get_child_value(
+            state, "vehicleStatus.battery.batSoc"
+        )
+        vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        vehicle.air_temperature = (
+            get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
+            "c",
+        )
+        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
+        vehicle.steering_wheel_heater_is_on = get_child_value(
+            state, "vehicleStatus.steerWheelHeat"
+        )
+        vehicle.back_window_heater_is_on = get_child_value(
+            state, "vehicleStatus.sideBackWindowHeat"
+        )
+        vehicle.side_mirror_heater_is_on = get_child_value(
+            state, "vehicleStatus.sideMirrorHeat"
+        )
+        vehicle.front_left_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
+        )
+        vehicle.front_right_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
+        )
+        vehicle.rear_left_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
+        )
+        vehicle.rear_right_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
+        )
+        vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.frontLeft"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.frontRight"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.backLeft"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.backRight"
+        )
+        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
+        vehicle.ev_battery_percentage = get_child_value(
+            state, "vehicleStatus.evStatus.batteryStatus"
+        )
+        vehicle.ev_battery_is_charging = get_child_value(
+            state, "vehicleStatus.trunkOpen"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "vehicleStatus.trunkOpen"
+        )
+        vehicle.ev_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+            ),
+            "km",
+        )
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
+            "m",
+        )
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
+            "m",
+        )
+        vehicle.fuel_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+            ),
+            "km",
+        )
+        vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+
+    def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/status/latest"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        response = requests.get(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+        return response["resMsg"]["vehicleStatusInfo"]
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle_id: str) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/status"
+        headers = {
+            "Authorization": token.refresh_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        response = requests.get(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+
+    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/door"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        payload = {"action": action, "deviceId": token.device_id}
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Request {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
+
+    def start_climate(
+        self, token: Token, vehicle_id, set_temp, duration, defrost, climate, heating
+    ) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/temperature"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        set_temp = self.temperature_range.index(set_temp)
+        set_temp = hex(set_temp).split("x")
+        set_temp = set_temp[1] + "H"
+        set_temp = set_temp.zfill(3).upper()
+
+        payload = {
+            "action": "start",
+            "hvacType": 0,
+            "options": {
+                "defrost": defrost,
+                "heating1": int(heating),
+            },
+            "tempCode": set_temp,
+            "unit": "C",
+        }
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response {response}")
+
+    def stop_climate(self, token: Token, vehicle_id: str) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/temperature"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        payload = {
+            "action": "stop",
+            "hvacType": 0,
+            "options": {
+                "defrost": True,
+                "heating1": 1,
+            },
+            "tempCode": "10H",
+            "unit": "C",
+        }
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response {response}")
+
+    def start_charge(self, token: Token, vehicle_id: str) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/charge"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        payload = {"action": "start", "deviceId": token.device_id}
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response {response}")
+
+    def stop_charge(self, token: Token, vehicle_id: str) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/charge"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        payload = {"action": "stop", "deviceId": token.device_id}
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
+
+    def _get_stamps_from_bluelinky(self) -> list:
         stamps = []
         response = requests.get(self.stamps_url)
         stampsAsText = response.text
@@ -105,62 +412,8 @@ class KiaUvoApiEU(ApiImpl):
                 stamps.append(stamp)
         return stamps
 
-    def login(self) -> Token:
-
-        if self.stamps is None:
-            self.stamps = self.get_stamps_from_bluelinky()
-
-        self.device_id, self.stamp = self.get_device_id()
-        self.cookies = self.get_cookies()
-        self.set_session_language()
-        self.authorization_code = None
-        try:
-            self.authorization_code = self.get_authorization_code_with_redirect_url()
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
-        except Exception as ex1:
-            self.authorization_code = self.get_authorization_code_with_form()
-
-        if self.authorization_code is None:
-            return None
-
-        (
-            self.access_token,
-            self.access_token,
-            self.authorization_code,
-        ) = self.get_access_token()
-
-        self.token_type, self.refresh_token = self.get_refresh_token()
-
-        response = self.get_vehicle()
-        vehicle_name = response["vehicles"][0]["nickname"]
-        vehicle_id = response["vehicles"][0]["vehicleId"]
-        vehicle_model = response["vehicles"][0]["vehicleName"]
-        vehicle_registration_date = response["vehicles"][0]["regDate"]
-        valid_until = (datetime.now() + timedelta(hours=23)).strftime(DATE_FORMAT)
-
-        token = Token({})
-        token.set(
-            self.access_token,
-            self.refresh_token,
-            self.device_id,
-            vehicle_name,
-            vehicle_id,
-            None,
-            vehicle_model,
-            vehicle_registration_date,
-            valid_until,
-            self.stamp,
-        )
-
-        return token
-
-    def get_device_id(self):
+    def _get_device_id(self):
         registration_id = 1
-        try:
-            credentials = push_receiver.register(sender_id=self.GCM_SENDER_ID)
-            registration_id = credentials["gcm"]["token"]
-        except:
-            pass
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "pushRegId": registration_id,
@@ -191,7 +444,7 @@ class KiaUvoApiEU(ApiImpl):
         device_id = response["resMsg"]["deviceId"]
         return device_id, stamp
 
-    def get_cookies(self):
+    def _get_cookies(self) -> dict:
         ### Get Cookies ###
         url = (
             self.USER_API_URL
@@ -224,32 +477,32 @@ class KiaUvoApiEU(ApiImpl):
         return session.cookies.get_dict()
         # return session
 
-    def set_session_language(self):
+    def _set_session_language(self, cookies) -> None:
         ### Set Language for Session ###
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
         payload = {"lang": "en"}
-        response = requests.post(
-            url, json=payload, headers=headers, cookies=self.cookies
-        )
+        response = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
-    def get_authorization_code_with_redirect_url(self):
+    def _get_authorization_code_with_redirect_url(
+        self, username, password, cookies
+    ) -> str:
         url = self.USER_API_URL + "signin"
         headers = {"Content-type": "application/json"}
-        data = {"email": self.username, "password": self.password}
+        data = {"email": username, "password": password}
         response = requests.post(
-            url, json=data, headers=headers, cookies=self.cookies
+            url, json=data, headers=headers, cookies=cookies
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response}")
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
 
-    def get_authorization_code_with_form(self):
+    def _get_authorization_code_with_form(self, username, password, cookies) -> str:
         url = self.USER_API_URL + "integrationinfo"
         headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(url, headers=headers, cookies=self.cookies)
-        self.cookies = self.cookies | response.cookies.get_dict()
+        response = requests.get(url, headers=headers, cookies=cookies)
+        cookies = cookies | response.cookies.get_dict()
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - IntegrationInfo Response {response}")
         user_id = response["userId"]
@@ -259,8 +512,8 @@ class KiaUvoApiEU(ApiImpl):
         login_form_url = login_form_url.replace("$service_id", service_id)
         login_form_url = login_form_url.replace("$user_id", user_id)
 
-        response = requests.get(login_form_url, headers=headers, cookies=self.cookies)
-        self.cookies = self.cookies | response.cookies.get_dict()
+        response = requests.get(login_form_url, headers=headers, cookies=cookies)
+        cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
             f"{DOMAIN} - LoginForm {login_form_url} - Response {response.text}"
         )
@@ -268,8 +521,8 @@ class KiaUvoApiEU(ApiImpl):
         login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
 
         data = {
-            "username": self.username,
-            "password": self.password,
+            "username": username,
+            "password": password,
             "credentialId": "",
             "rememberMe": "on",
         }
@@ -282,9 +535,9 @@ class KiaUvoApiEU(ApiImpl):
             data=data,
             headers=headers,
             allow_redirects=False,
-            cookies=self.cookies,
+            cookies=cookies,
         )
-        self.cookies = self.cookies | response.cookies.get_dict()
+        cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
             f"{DOMAIN} - LoginFormSubmit {login_form_action_url} - Response {response.status_code} - {response.headers}"
         )
@@ -296,8 +549,8 @@ class KiaUvoApiEU(ApiImpl):
 
         redirect_url = response.headers["Location"]
         headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(redirect_url, headers=headers, cookies=self.cookies)
-        self.cookies = self.cookies | response.cookies.get_dict()
+        response = requests.get(redirect_url, headers=headers, cookies=cookies)
+        cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
             f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"
         )
@@ -316,7 +569,7 @@ class KiaUvoApiEU(ApiImpl):
                 data=data,
                 headers=headers,
                 allow_redirects=False,
-                cookies=self.cookies,
+                cookies=cookies,
             )
 
             if response.status_code != 302:
@@ -325,10 +578,10 @@ class KiaUvoApiEU(ApiImpl):
                 )
                 return
 
-            self.cookies = self.cookies | response.cookies.get_dict()
+            cookies = cookies | response.cookies.get_dict()
             redirect_url = response.headers["Location"]
             headers = {"User-Agent": USER_AGENT_MOZILLA}
-            response = requests.get(redirect_url, headers=headers, cookies=self.cookies)
+            response = requests.get(redirect_url, headers=headers, cookies=cookies)
             _LOGGER.debug(
                 f"{DOMAIN} - Redirect User Id 2 {redirect_url} - Response {response.url}"
             )
@@ -345,19 +598,19 @@ class KiaUvoApiEU(ApiImpl):
             "ccsp-service-id": self.CCSP_SERVICE_ID,
         }
         response = requests.post(
-            url, headers=headers, json={"intUserId": intUserId}, cookies=self.cookies
+            url, headers=headers, json={"intUserId": intUserId}, cookies=cookies
         ).json()
         _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
 
-    def get_access_token(self):
+    def _get_access_token(self, stamp, authorization_code):
         ### Get Access Token ###
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": self.stamp,
+            "Stamp": stamp,
             "Content-type": "application/x-www-form-urlencoded",
             "Host": self.BASE_URL,
             "Connection": "close",
@@ -369,7 +622,7 @@ class KiaUvoApiEU(ApiImpl):
             "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
             + self.BASE_DOMAIN
             + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
-            + self.authorization_code
+            + authorization_code
         )
         _LOGGER.debug(f"{DOMAIN} - Get Access Token Data {headers }{data}")
         response = requests.post(url, data=data, headers=headers)
@@ -382,12 +635,12 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         return token_type, access_token, authorization_code
 
-    def get_refresh_token(self):
+    def _get_refresh_token(self, stamp, authorization_code):
         ### Get Refresh Token ###
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": self.stamp,
+            "Stamp": stamp,
             "Content-type": "application/x-www-form-urlencoded",
             "Host": self.BASE_URL,
             "Connection": "close",
@@ -397,7 +650,7 @@ class KiaUvoApiEU(ApiImpl):
 
         data = (
             "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
-            + self.authorization_code
+            + authorization_code
         )
         _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data {data}")
         response = requests.post(url, data=data, headers=headers)
@@ -406,189 +659,3 @@ class KiaUvoApiEU(ApiImpl):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-
-    def get_vehicle(self):
-        ### Get Vehicles ###
-        url = self.SPA_API_URL + "vehicles"
-        headers = {
-            "Authorization": self.access_token,
-            "Stamp": self.stamp,
-            "ccsp-device-id": self.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = requests.get(url, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
-        response = response["resMsg"]
-        return response
-
-    def get_cached_vehicle_status(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/status/latest"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = requests.get(url, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
-        # Coverts temp to usable number.  Currently only support celsius. Future to do is check unit in case the care itself is set to F.
-        tempIndex = get_hex_temp_into_index(
-            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"]
-        )
-        if(vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["unit"]) == 0:
-            vehicle_status["resMsg"]["vehicleStatusInfo"]["vehicleStatus"]["airTemp"]["value"] = self.temperature_range[
-                tempIndex
-            ]
-        return response["resMsg"]["vehicleStatusInfo"]
-
-    def get_geocoded_location(self, lat, lon):
-        email_parameter = ""
-        if self.use_email_with_geocode_api == True:
-            email_parameter = "&email=" + self.username
-
-        url = (
-            "https://nominatim.openstreetmap.org/reverse?lat="
-            + str(lat)
-            + "&lon="
-            + str(lon)
-            + "&format=json&addressdetails=1&zoom=18"
-            + email_parameter
-        )
-        response = requests.get(url)
-        response = response.json()
-        return response
-
-    def update_vehicle_status(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/status"
-        headers = {
-            "Authorization": token.refresh_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = requests.get(url, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
-
-    def lock_action(self, token: Token, action):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/control/door"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        payload = {"action": action, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
-
-    def start_climate(
-        self, token: Token, set_temp, duration, defrost, climate, heating
-    ):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/control/temperature"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        set_temp = self.get_temperature_range_by_region().index(set_temp)
-        set_temp = hex(set_temp).split("x")
-        set_temp = set_temp[1] + "H"
-        set_temp = set_temp.zfill(3).upper()
-
-        payload = {
-            "action": "start",
-            "hvacType": 0,
-            "options": {
-                "defrost": defrost,
-                "heating1": int(heating),
-            },
-            "tempCode": set_temp,
-            "unit": "C",
-        }
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response {response}")
-
-    def stop_climate(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/control/temperature"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        payload = {
-            "action": "stop",
-            "hvacType": 0,
-            "options": {
-                "defrost": True,
-                "heating1": 1,
-            },
-            "tempCode": "10H",
-            "unit": "C",
-        }
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response {response}")
-
-    def start_charge(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/control/charge"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        payload = {"action": "start", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response {response}")
-
-    def stop_charge(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/control/charge"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        payload = {"action": "stop", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
