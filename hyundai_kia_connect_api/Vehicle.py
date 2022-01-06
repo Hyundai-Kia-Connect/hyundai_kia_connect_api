@@ -86,6 +86,9 @@ class Vehicle:
     # Calculated fields
     engine_type = None
 
+    # Debug fields
+    data: dict = None
+
     @property
     def total_driving_distance(self):
         return self._total_driving_distance

@@ -258,6 +258,7 @@ class KiaUvoApiEU(ApiImpl):
             "km",
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+        vehicle.data = state
 
     def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/status/latest"
