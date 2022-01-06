@@ -90,8 +90,16 @@ class KiaUvoApiCA(ApiImpl):
         response = requests.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        response = response["result"]["vehicles"]
-        return response
+        result = []
+        for entry in response["result"]["vehicles"]:
+            vehicle: Vehicle = Vehicle(
+                id=entry["vehicleId"],
+                name=entry["nickName"],
+                model=entry["modelName"],
+                registration_date=None,
+            )
+            result.append(vehicle)
+        return result
 
     def get_cached_vehicle_status(self, token: Token):
         # Vehicle Status Call
