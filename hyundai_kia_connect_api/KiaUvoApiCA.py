@@ -14,18 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class KiaUvoApiCA(ApiImpl):
-    def __init__(
-        self,
-        username: str,
-        password: str,
-        region: int,
-        brand: int,
-        use_email_with_geocode_api: bool = False,
-        pin: str = "",
-    ):
-        super().__init__(
-            username, password, region, brand, use_email_with_geocode_api, pin
-        )
+    def __init__(self, region: int, brand: int) -> None:
 
         self.last_action_tracked = True
         self.last_action_xid = None
@@ -64,9 +53,7 @@ class KiaUvoApiCA(ApiImpl):
             "sec-fetch-site": "same-origin",
         }
 
-    def login(self) -> Token:
-        username = self.username
-        password = self.password
+    def login(self, username: str, password: str) -> Token:
 
         # Sign In with Email and Password and Get Authorization Code
 
@@ -82,35 +69,16 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
-        # Get Vehicles
-        url = self.API_URL + "vhcllst"
-        headers = self.API_HEADERS
-        headers["accessToken"] = access_token
-        response = requests.post(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        response = response["result"]
-        vehicle_name = response["vehicles"][0]["nickName"]
-        vehicle_id = response["vehicles"][0]["vehicleId"]
-        vehicle_model = response["vehicles"][0]["nickName"]
-        vehicle_registration_date = response["vehicles"][0].get(
-            "enrollmentDate", "missing"
-        )
+        valid_until = datetime.now() + timedelta(hours=23)
 
-        valid_until = (datetime.now() + timedelta(hours=23))
-
-        token = Token({})
-        token.set(
-            access_token,
-            refresh_token,
-            None,
-            vehicle_name,
-            vehicle_id,
-            None,
-            vehicle_model,
-            vehicle_registration_date,
-            valid_until,
-            "NoStamp",
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            device_id=None,
+            stamp=None,
+            valid_until=valid_until,
         )
 
         return token
@@ -122,7 +90,7 @@ class KiaUvoApiCA(ApiImpl):
         response = requests.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        response = response["result"]
+        response = response["result"]["vehicles"]
         return response
 
     def get_cached_vehicle_status(self, token: Token):
