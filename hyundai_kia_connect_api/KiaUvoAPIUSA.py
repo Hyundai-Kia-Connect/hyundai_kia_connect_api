@@ -12,6 +12,7 @@ from requests import RequestException, Response
 from .const import DATE_FORMAT, DOMAIN
 from .ApiImpl import ApiImpl
 from .Token import Token
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,6 +88,13 @@ class KiaUvoAPIUSA(ApiImpl):
         self.last_action_xid = None
         self.last_action_completed = False
         self.temperature_range = range(62, 82)
+        self.data_map = {
+            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            Vehicle.odometer: "odometer.value",
+            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
+            Vehicle.engine_is_running: "vehicleStatus.engine",
+            Vehicle.last_updated_at: "vehicleStatus.time",
+        }
 
         self.supports_soc_range = False
 

@@ -18,7 +18,7 @@ class Vehicle:
     year: int = None
 
     # Shared (EV/PHEV/HEV/IC)
-    ## General
+    ## General 
     _total_driving_distance: float = None
     _total_driving_distance_value: float = None
     _total_driving_distance_unit: str = None
