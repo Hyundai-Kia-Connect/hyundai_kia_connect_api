@@ -51,6 +51,13 @@ class Vehicle:
     back_right_door_is_open: bool = None
     trunk_is_open: bool = None
     hood_is_open: bool = None
+        
+    # Tire Pressure
+    tire_pressure_all_warning_is_on: bool = None
+    tire_pressure_rear_left_warning_is_on: bool = None
+    tire_pressure_front_left_warning_is_on: bool = None
+    tire_pressure_front_right_warning_is_on: bool = None
+    tire_pressure_rear_right_warning_is_on: bool = None
 
     # EV fields (EV/PHEV)
     ev_battery_percentage: int = None
