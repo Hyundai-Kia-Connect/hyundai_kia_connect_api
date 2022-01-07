@@ -112,11 +112,11 @@ class KiaUvoApiCA(ApiImpl):
             "km",
         )
         vehicle.next_service_distance = (
-            get_child_value(state, "service.value.imatServiceOdometer"),
+            get_child_value(state, "service.imatServiceOdometer"),
             "km",
         )
         vehicle.last_service_distance = (
-            get_child_value(state, "service.value.msopServiceOdometer"),
+            get_child_value(state, "service.msopServiceOdometer"),
             "km",
         )
         vehicle.car_battery_percentage = get_child_value(
@@ -255,7 +255,7 @@ class KiaUvoApiCA(ApiImpl):
                 vehicle_status["service"]["currentOdometer"]
                 > self.old_vehicle_status["service"]["currentOdometer"]
             ):
-                vehicle_status["vehicleLocation"] = self.get_location(token)
+                vehicle_status["vehicleLocation"] = self.get_location(token, vehicle_id)
             else:
                 vehicle_status["vehicleLocation"] = self.old_vehicle_status[
                     "vehicleLocation"
