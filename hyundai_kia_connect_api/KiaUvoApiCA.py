@@ -98,7 +98,7 @@ class KiaUvoApiCA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle.id)
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.time")
+            get_child_value(state, "vehicleStatus.lastStatusDate")
         )
         vehicle.total_driving_distance = (
             get_child_value(
@@ -108,7 +108,15 @@ class KiaUvoApiCA(ApiImpl):
             "km",
         )
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
+            get_child_value(state, "service.currentOdometer"),
+            "km",
+        )
+        vehicle.next_service_distance = (
+            get_child_value(state, "service.value.imatServiceOdometer"),
+            "km",
+        )
+        vehicle.last_service_distance = (
+            get_child_value(state, "service.value.msopServiceOdometer"),
             "km",
         )
         vehicle.car_battery_percentage = get_child_value(
@@ -116,7 +124,7 @@ class KiaUvoApiCA(ApiImpl):
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
-            get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
+            get_child_value(state, "vehicleStatus.airTemp.value"),
             "c",
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
@@ -154,9 +162,8 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.back_right_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.backRight"
         )
-        vehicle.hoodOpen = get_child_value(
-            state, "vehicleStatus.hoodOpen"
-        )
+        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
+
         vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
@@ -240,28 +247,13 @@ class KiaUvoApiCA(ApiImpl):
                 "value"
             ] = self.temperature_range[tempIndex]
 
-        vehicle_status["vehicleStatus"]["time"] = response["lastStatusDate"]
-
         # Service Status Call
-        response = self.get_next_service(token, vehicle_id)
-
-        vehicle_status["odometer"] = {}
-        vehicle_status["odometer"]["unit"] = response["currentOdometerUnit"]
-        vehicle_status["odometer"]["value"] = response["currentOdometer"]
-        vehicle_status["nextService"] = {}
-        vehicle_status["nextService"]["unit"] = response["imatServiceOdometerUnit"]
-        vehicle_status["nextService"]["value"] = response["imatServiceOdometer"]
-
-        # Handles cars that have never had service
-        if response.get("msopServiceOdometer"):
-            vehicle_status["lastService"] = {}
-            vehicle_status["lastService"]["unit"] = response["msopServiceOdometerUnit"]
-            vehicle_status["lastService"]["value"] = response["msopServiceOdometer"]
+        vehicle_status["service"] = self._get_next_service(token, vehicle_id)
 
         if not self.old_vehicle_status == {}:
             if (
-                vehicle_status["odometer"]["value"]
-                > self.old_vehicle_status["odometer"]["value"]
+                vehicle_status["service"]["currentOdometer"]
+                > self.old_vehicle_status["service"]["currentOdometer"]
             ):
                 vehicle_status["vehicleLocation"] = self.get_location(token)
             else:
@@ -274,7 +266,7 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = vehicle_status
         return vehicle_status
 
-    def get_next_service(self, token: Token, vehicle_id: str) -> None:
+    def _get_next_service(self, token: Token, vehicle_id: str) -> None:
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
@@ -308,7 +300,7 @@ class KiaUvoApiCA(ApiImpl):
         else:
             return response["result"]
 
-    def get_pin_token(self, token: Token, vehicle_id: str) -> None:
+    def _get_pin_token(self, token: Token, vehicle_id: str) -> None:
         url = self.API_URL + "vrfypin"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -343,7 +335,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
-        headers["pAuth"] = self.get_pin_token(token, vehicle_id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle_id)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": self.pin})
@@ -362,7 +354,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
-        headers["pAuth"] = self.get_pin_token(token)
+        headers["pAuth"] = self._get_pin_token(token)
 
         set_temp = self.get_temperature_range_by_region().index(set_temp)
         set_temp = hex(set_temp).split("x")
@@ -399,7 +391,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
-        headers["pAuth"] = self.get_pin_token(token, vehicle_id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle_id)
 
         set_temp = self.get_temperature_range_by_region().index(set_temp)
         set_temp = hex(set_temp).split("x")
@@ -454,7 +446,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
-        headers["pAuth"] = self.get_pin_token(token, vehicle_id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle_id)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": self.pin})
@@ -490,7 +482,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle_id
-        headers["pAuth"] = self.get_pin_token(token, vehicle_id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle_id)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": self.pin})
