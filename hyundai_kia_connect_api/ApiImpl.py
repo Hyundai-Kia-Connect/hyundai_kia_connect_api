@@ -58,22 +58,22 @@ class ApiImpl:
         response = response.json()
         return response
 
-    def lock_action(self, token: Token, action) -> None:
+    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
         pass
 
     def start_climate(
-        self, token: Token, set_temp, duration, defrost, climate, heating
+        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
     ) -> None:
         pass
 
-    def stop_climate(self, token: Token) -> None:
+    def stop_climate(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def start_charge(self, token: Token) -> None:
+    def start_charge(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def stop_charge(self, token: Token) -> None:
+    def stop_charge(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def set_charge_limits(self, token: Token, ac_limit: int, dc_limit: int) -> None:
+    def set_charge_limits(self, token: Token, vehicle_id: str, ac_limit: int, dc_limit: int) -> None:
         pass
