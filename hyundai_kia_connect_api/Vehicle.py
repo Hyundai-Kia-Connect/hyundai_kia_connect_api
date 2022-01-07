@@ -50,6 +50,7 @@ class Vehicle:
     back_left_door_is_open: bool = None
     back_right_door_is_open: bool = None
     trunk_is_open: bool = None
+    hood_is_open: bool = None
 
     # EV fields (EV/PHEV)
     ev_battery_percentage: int = None
