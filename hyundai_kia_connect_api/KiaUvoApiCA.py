@@ -1,6 +1,7 @@
 import json
 import logging
 import datetime as dt
+import re
 
 import requests
 import pytz
@@ -195,6 +196,22 @@ class KiaUvoApiCA(ApiImpl):
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
+
+    def get_last_updated_at(self, value) -> dt.datetime:
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
+        value = dt.datetime(
+            year=int(m.group(1)),
+            month=int(m.group(2)),
+            day=int(m.group(3)),
+            hour=int(m.group(4)),
+            minute=int(m.group(5)),
+            second=int(m.group(6)),
+            tzinfo=self.data_timezone,
+        )
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+
+        return value
 
     def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
         # Vehicle Status Call
