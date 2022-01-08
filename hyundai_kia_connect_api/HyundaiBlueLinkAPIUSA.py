@@ -14,6 +14,7 @@ from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN,
                     VEHICLE_LOCK_ACTION)
+from .utils import get_child_value
 from .ApiImpl import ApiImpl
 from .Token import Token
 from .Vehicle import Vehicle
@@ -125,42 +126,25 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
-        ### Get Vehicles ###
-        response = self.get_vehicle(access_token)
-        vehicle_details = response["enrolledVehicleDetails"][0]["vehicleDetails"]
-        vehicle_name = vehicle_details["nickName"]
-        vehicle_id = vehicle_details["vin"]
-        vehicle_regid = vehicle_details["regid"]
-        _LOGGER.debug(f"{DOMAIN} - vehicle_regid={vehicle_regid}")
-        vehicle_model = vehicle_details["modelCode"]
-        vehicle_registration_date = vehicle_details["enrollmentDate"]
 
         valid_until = (datetime.now() + timedelta(seconds=expires_in))
 
-        token = Token({})
-        token.set(
-            access_token,
-            refresh_token,
-            None,
-            vehicle_name,
-            vehicle_id,
-            vehicle_regid,
-            vehicle_model,
-            vehicle_registration_date,
-            valid_until,
-            "NoStamp",
-        )
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            device_id=None,
+            stamp=None,
+            valid_until=valid_until,
+        )  
 
-        _LOGGER.debug(f"{DOMAIN} - updated API headers: {self.API_HEADERS}")
-
-        return token
-
-    def get_cached_vehicle_status(self, token: Token):
+    def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = token.vehicle_id
+        headers["vin"] = vehicle_id
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
 
@@ -230,7 +214,109 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         HyundaiBlueLinkAPIUSA.old_vehicle_status = vehicle_status
         return vehicle_status
 
-    def get_location(self, token: Token, current_odometer):
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_cached_vehicle_state(token, vehicle.id)
+        vehicle.last_updated_at = self.get_last_updated_at(
+            get_child_value(state, "vehicleStatus.time")
+        )
+        vehicle.total_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            ),
+            "km",
+        )
+        vehicle.odometer = (
+            get_child_value(state, "odometer.value"),
+            "km",
+        )
+        vehicle.car_battery_percentage = get_child_value(
+            state, "vehicleStatus.battery.batSoc"
+        )
+        vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        vehicle.air_temperature = (
+            get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
+            "c",
+        )
+        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
+        vehicle.steering_wheel_heater_is_on = get_child_value(
+            state, "vehicleStatus.steerWheelHeat"
+        )
+        vehicle.back_window_heater_is_on = get_child_value(
+            state, "vehicleStatus.sideBackWindowHeat"
+        )
+        vehicle.side_mirror_heater_is_on = get_child_value(
+            state, "vehicleStatus.sideMirrorHeat"
+        )
+        vehicle.front_left_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
+        )
+        vehicle.front_right_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
+        )
+        vehicle.rear_left_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
+        )
+        vehicle.rear_right_seat_heater_is_on = get_child_value(
+            state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
+        )
+        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLock"))
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.frontLeft"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.frontRight"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.backLeft"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "vehicleStatus.doorOpen.backRight"
+        )
+        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
+        vehicle.ev_battery_percentage = get_child_value(
+            state, "vehicleStatus.evStatus.batteryStatus"
+        )
+        vehicle.ev_battery_is_charging = get_child_value(
+            state, "vehicleStatus.evStatus.batteryCharge"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "vehicleStatus.evStatus.batteryPlugin"
+        )
+        vehicle.ev_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+            ),
+            "km",
+        )
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
+            "m",
+        )
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
+            "m",
+        )
+        vehicle.fuel_driving_distance = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+            ),
+            "km",
+        )
+        vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+        vehicle.data = state
+        
+    def get_location(self, token: Token, vehicle_id: str, current_odometer):
         r"""
         Get the location of the vehicle
 
@@ -242,8 +328,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = token.vehicle_id
-        headers["pAuth"] = self.get_pin_token(token)
+        headers["vehicleId"] = vehicle_id
+        #Not used, not sure why it is here? 
+        #headers["pAuth"] = self.get_pin_token(token)
         prev_odometer = "0"
         if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
             prev_odometer = HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
@@ -302,18 +389,24 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         elif HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
             return HyundaiBlueLinkAPIUSA.old_vehicle_status.get("vehicleLocation")
 
-    def get_vehicle(self, access_token):
-        username = self.username
-        password = self.password
-
-        url = self.API_URL + "enrollment/details/" + username
+    def get_vehicles(self, token: Token):
+        url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
-        headers["accessToken"] = access_token
+        headers["accessToken"] = token.access_token
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        result = []
+        for entry in response["result"]["vehicles"]:
+            vehicle: Vehicle = Vehicle(
+                id=entry["vehicleId"],
+                name=entry["nickName"],
+                model=entry["modelName"],
+                registration_date=None,
+            )
+            result.append(vehicle)
 
-        return response
+        return result
 
     def get_pin_token(self, token: Token):
         pass
@@ -321,7 +414,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def update_vehicle_status(self, token: Token):
         pass
 
-    def lock_action(self, token: Token, action):
+    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
         if action == "close":
@@ -350,8 +443,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def start_climate(
-        self, token: Token, set_temp, duration, defrost, climate, heating
-    ):
+        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
+    ) -> None:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
 
         url = self.API_URL + "rcs/rsc/start"
@@ -383,7 +476,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token):
+    def stop_climate(self, token: Token, vehicle_id: str) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         url = self.API_URL + "rcs/rsc/stop"
@@ -401,8 +494,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token):
+    def start_charge(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def stop_charge(self, token: Token):
+    def stop_charge(self, token: Token, vehicle_id: str) -> None:
         pass
