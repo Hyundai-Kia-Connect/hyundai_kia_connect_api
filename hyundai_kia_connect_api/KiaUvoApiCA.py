@@ -70,14 +70,10 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
-            device_id=None,
-            stamp=None,
             valid_until=valid_until,
         )
 
-        return token
-
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -385,7 +381,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
 
     def start_climate_ev(
-        self, token: Token, vehicle_id, set_temp, duration, defrost, climate, heating
+        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
     ) -> None:
         url = self.API_URL + "evc/rfon"
         headers = self.API_HEADERS
