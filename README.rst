@@ -22,7 +22,8 @@ Key values for the int exist in the constant(https://github.com/fuatakgun/hyunda
 REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA}
 BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI}
 An example of this would be
-``
+
+
 
         self.vehicle_manager = VehicleManager(
             region=2,
@@ -32,7 +33,7 @@ An example of this would be
             pin="1234",
         )
 
-``
+=
 Once this is done you can now make the following calls against the vehicle manager: 
 
  get_vehicle(self, vehicle_id)
@@ -41,10 +42,10 @@ Once this is done you can now make the following calls against the vehicle manag
  force_refresh_all_vehicles_states(self, vehicle_id)
  force_refresh_vehicles_states(self, vehicle_id)
  check_and_refresh_token(self)
- 
- An example call would be 
-``
+
+An example call would be:
+
     vehicle_id = vehicle_manager.vehicles[0].id
     vehicle = self.vehicle_manager.get_vehicle(vehicle_id)
 
-``
+
