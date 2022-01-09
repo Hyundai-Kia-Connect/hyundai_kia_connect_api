@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN,
+from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
                     VEHICLE_LOCK_ACTION)
 from .utils import get_child_value
 from .ApiImpl import ApiImpl
@@ -48,28 +48,13 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def __init__(
         self,
-        username: str,
-        password: str,
         region: int,
         brand: int,
-        use_email_with_geocode_api: bool = False,
-        pin: str = "",
     ):
-        super().__init__(
-            username, password, region, brand, use_email_with_geocode_api, pin
-        )
-
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
         self.temperature_range = range(62, 82)
-        self.data_map = {
-            Vehicle.total_driving_distance: "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            Vehicle.odometer: "odometer.value",
-            Vehicle.car_battery_percentage: "vehicleStatus.battery.batSoc",
-            Vehicle.engine_is_running: "vehicleStatus.engine",
-            Vehicle.last_updated_at: "vehicleStatus.time",
-        }
         
         ts = time.time()
         utc_offset = (
@@ -107,9 +92,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
-    def login(self) -> Token:
-        username = self.username
-        password = self.password
+    def login(self, username: str, password: str) -> Token:
 
         ### Sign In with Email and Password and Get Authorization Code ###
 
@@ -134,8 +117,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
-            device_id=None,
-            stamp=None,
             valid_until=valid_until,
         )  
 
