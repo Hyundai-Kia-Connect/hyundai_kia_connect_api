@@ -15,11 +15,8 @@ def get_hex_temp_into_index(value):
     value = int(value, 16)
     return value
 
-def convert_int_to_distance_unit(value: int):
-    if value == 1:
-        return "km"
-    #Unknown if 2 is miles at this point.  I am assuming. 
-    elif value == 2:
-        return "mi"
-
-
+def get_index_into_hex_temp(value):
+    value = hex(value).split("x")
+    value = value[1] + "H"
+    value = value.zfill(3).upper()
+    return value
