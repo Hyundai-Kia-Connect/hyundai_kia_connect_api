@@ -10,8 +10,15 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import tz
 
-from .ApiImpl import ApiImpl
-from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN
+from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    DOMAIN,
+    DISTANCE_UNITS,
+    TEMPERATURE_UNITS,
+)
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index
 from .Vehicle import Vehicle
@@ -94,7 +101,9 @@ class KiaUvoApiEU(ApiImpl):
             )
             _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
         except Exception as ex1:
-            authorization_code = self._get_authorization_code_with_form(username, password, cookies)
+            authorization_code = self._get_authorization_code_with_form(
+                username, password, cookies
+            )
 
         if authorization_code is None:
             return None
@@ -159,7 +168,7 @@ class KiaUvoApiEU(ApiImpl):
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle.id)
+        state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.time")
         )
@@ -168,19 +177,34 @@ class KiaUvoApiEU(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "km",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
         )
         vehicle.odometer = (
             get_child_value(state, "odometer.value"),
-            "km",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "odometer.unit",
+                )
+            ],
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
-            get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
-            "c",
+            get_child_value(state, "vehicleStatus.airTemp.value"),
+            TEMPERATURE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.airTemp.unit",
+                )
+            ],
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -204,7 +228,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.rear_right_seat_heater_is_on = get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )
-        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLock"))
+        vehicle.is_locked = not get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
@@ -232,7 +256,12 @@ class KiaUvoApiEU(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "km",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                )
+            ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -255,13 +284,18 @@ class KiaUvoApiEU(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
             ),
-            "km",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                )
+            ],
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/status/latest"
+    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,
@@ -277,8 +311,8 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
         return response["resMsg"]["vehicleStatusInfo"]
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle_id: str) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/status"
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         headers = {
             "Authorization": token.refresh_token,
             "Stamp": token.stamp,
@@ -293,8 +327,8 @@ class KiaUvoApiEU(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/door"
+    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,
@@ -311,9 +345,9 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
 
     def start_climate(
-        self, token: Token, vehicle_id, set_temp, duration, defrost, climate, heating
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/temperature"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,
@@ -324,27 +358,26 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-        set_temp = self.temperature_range.index(set_temp)
-        set_temp = hex(set_temp).split("x")
-        set_temp = set_temp[1] + "H"
-        set_temp = set_temp.zfill(3).upper()
+        hex_set_temp = get_index_into_hex_temp(
+            self.temperature_range.index(options.set_temp)
+        )
 
         payload = {
             "action": "start",
             "hvacType": 0,
             "options": {
-                "defrost": defrost,
-                "heating1": int(heating),
+                "defrost": options.defrost,
+                "heating1": int(options.heating),
             },
-            "tempCode": set_temp,
+            "tempCode": hex_set_temp,
             "unit": "C",
         }
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request {payload}")
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response {response}")
 
-    def stop_climate(self, token: Token, vehicle_id: str) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/temperature"
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,
@@ -369,8 +402,8 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response {response}")
 
-    def start_charge(self, token: Token, vehicle_id: str) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/charge"
+    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,
@@ -386,8 +419,8 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response {response}")
 
-    def stop_charge(self, token: Token, vehicle_id: str) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle_id + "/control/charge"
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
         headers = {
             "Authorization": token.access_token,
             "Stamp": token.stamp,

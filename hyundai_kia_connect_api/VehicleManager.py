@@ -6,8 +6,16 @@ from dataclasses import dataclass
 import pytz
 
 from .ApiImpl import ApiImpl
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN, REGION_CANADA,
-                    REGION_EUROPE, REGION_USA, REGIONS)
+from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    DOMAIN,
+    REGION_CANADA,
+    REGION_EUROPE,
+    REGION_USA,
+    REGIONS,
+)
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
@@ -34,6 +42,7 @@ class VehicleManager:
 
     def initialize(self) -> None:
         self.token: Token = self.api.login(self.username, self.password)
+        self.token.pin = self.pin
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
@@ -43,20 +52,31 @@ class VehicleManager:
 
     def update_all_vehicles_with_cached_state(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.update_vehicle_with_cached_state(vehicle_id)
+            self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id))
 
-    def update_vehicle_with_cached_state(self, vehicle_id) -> None:
-        self.api.update_vehicle_with_cached_state(
-            self.token, self.get_vehicle(vehicle_id)
-        )
+    def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
+        self.api.update_vehicle_with_cached_state(self.token, vehicle)
+
+    def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
+        started_at_utc: datetime = dt.datetime.now(pytz.utc)
+        for vehicle_id in self.vehicles.keys():
+            vehicle: Vehicle = self.get_vehicle(vehicle_id)
+            _LOGGER.debug(
+                f"time diff - {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
+            )
+            if (
+                started_at_utc - vehicle.last_updated_at
+            ).total_seconds() > force_refresh_interval:
+                self.force_refresh_vehicle_state(vehicle)
+                self.update_vehicle_with_cached_state(vehicle)
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.force_refresh_vehicle_state(vehicle_id)
+            self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
         self.update_all_vehicles_with_cached_state()
 
-    def force_refresh_vehicle_state(self, vehicle_id) -> None:
-        self.api.force_refresh_vehicle_state(token, vehicle_id)
+    def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
+        self.api.force_refresh_vehicle_state(self.token, vehicle)
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
