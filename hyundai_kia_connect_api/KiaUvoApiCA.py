@@ -9,7 +9,11 @@ import pytz
 from .ApiImpl import ApiImpl
 from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, convert_int_to_distance_unit
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    convert_int_to_distance_unit,
+)
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -86,7 +90,8 @@ class KiaUvoApiCA(ApiImpl):
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry["modelName"],
-                registration_date=None,
+                year=entry["modelYear"],
+                VIN=entry["vin"],
             )
             result.append(vehicle)
         return result
@@ -100,19 +105,28 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            convert_int_to_distance_unit(get_child_value(state, "service.msopServiceOdometerUnit")),
+            ),
+            convert_int_to_distance_unit(
+                get_child_value(state, "service.msopServiceOdometerUnit")
+            ),
         )
         vehicle.odometer = (
             get_child_value(state, "service.currentOdometer"),
-            convert_int_to_distance_unit(get_child_value(state, "service.currentOdometerUnit")),
+            convert_int_to_distance_unit(
+                get_child_value(state, "service.currentOdometerUnit")
+            ),
         )
         vehicle.next_service_distance = (
             get_child_value(state, "service.imatServiceOdometer"),
-            convert_int_to_distance_unit(get_child_value(state, "service.imatServiceOdometerUnit")),
+            convert_int_to_distance_unit(
+                get_child_value(state, "service.imatServiceOdometerUnit")
+            ),
         )
         vehicle.last_service_distance = (
             get_child_value(state, "service.msopServiceOdometer"),
-            convert_int_to_distance_unit(get_child_value(state, "service.msopServiceOdometerUnit")),
+            convert_int_to_distance_unit(
+                get_child_value(state, "service.msopServiceOdometerUnit")
+            ),
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -174,7 +188,12 @@ class KiaUvoApiCA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            convert_int_to_distance_unit(get_child_value(state, "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit")),
+            convert_int_to_distance_unit(
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                )
+            ),
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -197,7 +216,9 @@ class KiaUvoApiCA(ApiImpl):
                 state,
                 "vehicleStatus.dte.value",
             ),
-            convert_int_to_distance_unit(get_child_value(state, "vehicleStatus.dte.unit")),
+            convert_int_to_distance_unit(
+                get_child_value(state, "vehicleStatus.dte.unit")
+            ),
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
@@ -380,7 +401,14 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
 
     def start_climate_ev(
-        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
+        self,
+        token: Token,
+        vehicle_id: str,
+        set_temp,
+        duration,
+        defrost,
+        climate,
+        heating,
     ) -> None:
         url = self.API_URL + "evc/rfon"
         headers = self.API_HEADERS
