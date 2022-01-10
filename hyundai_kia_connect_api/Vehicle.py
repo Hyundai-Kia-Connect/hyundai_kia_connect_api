@@ -16,9 +16,11 @@ class Vehicle:
     model: str = None
     registration_date: str = None
     year: int = None
+    VIN: str = None
+    key: str = None
 
     # Shared (EV/PHEV/HEV/IC)
-    ## General 
+    ## General
     _total_driving_distance: float = None
     _total_driving_distance_value: float = None
     _total_driving_distance_unit: str = None
@@ -51,7 +53,7 @@ class Vehicle:
     back_right_door_is_open: bool = None
     trunk_is_open: bool = None
     hood_is_open: bool = None
-        
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None
@@ -117,17 +119,17 @@ class Vehicle:
     @property
     def next_service_distance(self):
         return self._next_service_distance
-    
+
     @next_service_distance.setter
     def next_service_distance(self, value):
         self._next_service_distance_value = value[0]
         self._next_service_distance_unit = value[1]
         self._next_service_distance = value[0]
-        
+
     @property
     def last_service_distance(self):
-        return self._last_service_distance   
-    
+        return self._last_service_distance
+
     @last_service_distance.setter
     def last_service_distance(self, value):
         self._last_service_distance_value = value[0]
