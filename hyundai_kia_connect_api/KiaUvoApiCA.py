@@ -9,7 +9,7 @@ import pytz
 from .ApiImpl import ApiImpl
 from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS, DOMAIN
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index
+from .utils import get_child_value, get_hex_temp_into_index, convert_int_to_distance_unit
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,20 +100,19 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            ),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "service.msopServiceOdometerUnit")),
         )
         vehicle.odometer = (
             get_child_value(state, "service.currentOdometer"),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "service.currentOdometerUnit")),
         )
         vehicle.next_service_distance = (
             get_child_value(state, "service.imatServiceOdometer"),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "service.imatServiceOdometerUnit")),
         )
         vehicle.last_service_distance = (
             get_child_value(state, "service.msopServiceOdometer"),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "service.msopServiceOdometerUnit")),
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -175,7 +174,7 @@ class KiaUvoApiCA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit")),
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -196,9 +195,9 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                "vehicleStatus.dte.value",
             ),
-            "km",
+            convert_int_to_distance_unit(get_child_value(state, "vehicleStatus.dte.unit")),
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state

@@ -15,3 +15,11 @@ def get_hex_temp_into_index(value):
     value = int(value, 16)
     return value
 
+def convert_int_to_distance_unit(value: int):
+    if value == 1:
+        return "km"
+    #Unknown if 2 is miles at this point.  I am assuming. 
+    elif value == 2:
+        return "mi"
+
+
