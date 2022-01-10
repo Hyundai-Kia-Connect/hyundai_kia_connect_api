@@ -11,3 +11,4 @@ class Token:
     device_id: str = None
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
+    pin: str = None

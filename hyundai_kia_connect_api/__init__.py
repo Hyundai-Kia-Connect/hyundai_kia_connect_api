@@ -1,6 +1,6 @@
 """Top-level package for Hyundai / Kia Connect."""
 
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU

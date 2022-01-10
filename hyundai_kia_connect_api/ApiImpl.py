@@ -1,5 +1,6 @@
 import datetime as dt
 import logging
+from dataclasses import dataclass
 
 import requests
 
@@ -8,6 +9,16 @@ from .Token import Token
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
+
+
+
+@dataclass
+class ClimateRequestOptions:
+    set_temp: str = None
+    duration: int = None
+    defrost = None
+    climate: int = None
+    heating: int = None
 
 
 class ApiImpl:
@@ -35,10 +46,10 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
-    def get_fresh_vehicle_state(self, token: Token, vehicle_id: str) -> None:
+    def get_fresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def check_last_action_status(self, token: Token, vehicle_id: str):
+    def check_last_action_status(self, token: Token, vehicle: Vehicle):
         pass
 
     def get_geocoded_location(self, lat, lon) -> dict:
@@ -58,22 +69,27 @@ class ApiImpl:
         response = response.json()
         return response
 
-    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         pass
 
     def start_climate(
-        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions
     ) -> None:
         pass
 
-    def stop_climate(self, token: Token, vehicle_id: str) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def start_charge(self, token: Token, vehicle_id: str) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def stop_charge(self, token: Token, vehicle_id: str) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def set_charge_limits(self, token: Token, vehicle_id: str, ac_limit: int, dc_limit: int) -> None:
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int
+    ) -> None:
         pass
