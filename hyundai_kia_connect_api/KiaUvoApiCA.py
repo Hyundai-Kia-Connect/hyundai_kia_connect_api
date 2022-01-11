@@ -225,7 +225,6 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.data = state
 
     def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - value {value}")
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
         value = dt.datetime(
