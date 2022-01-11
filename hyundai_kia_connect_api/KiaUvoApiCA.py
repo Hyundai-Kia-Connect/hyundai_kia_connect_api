@@ -259,11 +259,13 @@ class KiaUvoApiCA(ApiImpl):
 
         # Service Status Call
         status["service"] = self._get_next_service(token, vehicle)
-
-        if vehicle.odometer < get_child_value(status, "service.currentOdometer"):
-            status["vehicleLocation"] = self.get_location(token, vehicle)
+        if vehicle.odometer:
+            if vehicle.odometer < get_child_value(status, "service.currentOdometer"):
+                status["vehicleLocation"] = self.get_location(token, vehicle)
+            else:
+                status["vehicleLocation"] = None
         else:
-            status["vehicleLocation"] = None
+            status["vehicleLocation"] = self.get_location(token, vehicle)
 
         return status
 
