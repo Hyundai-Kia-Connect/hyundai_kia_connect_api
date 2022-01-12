@@ -124,7 +124,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.id
+        headers["vin"] = vehicle.vin
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
 
@@ -345,12 +345,14 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         result = []
-        for entry in response["result"]["vehicles"]:
+        for entry in response["enrolledVehicleDetails"]:
+            entry = entry["vehicleDetails"]
             vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
+                id=entry["regid"],
                 name=entry["nickName"],
-                model=entry["modelName"],
-                registration_date=None,
+                VIN=entry["vin"],
+                model=entry["modelCode"],
+                registration_date=["enrollmentDate"],
             )
             result.append(vehicle)
 
@@ -374,11 +376,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.id
-        headers["registrationId"] = vehicle.vehicle_regid
-        headers["APPCLOUD-VIN"] = vehicle.id
+        headers["vin"] = vehicle.vin
+        headers["registrationId"] = vehicle.id
+        headers["APPCLOUD-VIN"] = vehicle.vin
 
-        data = {"userName": self.username, "vin": vehicle.id}
+        data = {"userName": self.username, "vin": vehicle.vin}
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
@@ -399,8 +401,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.id
-        headers["registrationId"] = token.vehicle_regid
+        headers["vin"] = vehicle.vin
+        headers["registrationId"] = vehicle.id
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         data = {
@@ -431,8 +433,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.id
-        headers["registrationId"] = token.vehicle_regid
+        headers["vin"] = vehicle.vin
+        headers["registrationId"] = vehicle.id
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
