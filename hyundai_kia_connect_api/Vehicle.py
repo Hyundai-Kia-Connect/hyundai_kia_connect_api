@@ -32,6 +32,11 @@ class Vehicle:
     car_battery_percentage: int = None
     engine_is_running: bool = None
     last_updated_at: datetime.datetime = datetime.datetime.min
+
+    smart_key_battery_warning_is_on: bool = None
+    washer_fluid_warning_is_on: bool = None
+    brake_fluid_warning_is_on: bool = None
+
     ## Climate
     _air_temperature: float = None
     _air_temperature_value: float = None
@@ -97,6 +102,8 @@ class Vehicle:
     _fuel_driving_distance: float = None
     _fuel_driving_distance_value: float = None
     _fuel_driving_distance_unit: str = None
+    fuel_level: float = None
+
 
     fuel_level_is_low: bool = None
 
