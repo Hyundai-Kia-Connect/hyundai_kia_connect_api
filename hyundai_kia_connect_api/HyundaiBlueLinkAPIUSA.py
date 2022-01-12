@@ -42,7 +42,6 @@ class cipherAdapter(HTTPAdapter):
 
 class HyundaiBlueLinkAPIUSA(ApiImpl):
 
-    old_vehicle_status = None
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = datetime.now() - timedelta(hours=3)
 
@@ -120,12 +119,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             valid_until=valid_until,
         )  
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
+    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle_id
+        headers["vin"] = vehicle.id
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
 
@@ -143,62 +142,27 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             .replace(":", "")
             .replace("Z", "")
         )
-        vehicle_status["vehicleStatus"]["time"] = vehicle_status["vehicleStatus"][
-            "dateTime"
-        ]
-        vehicle_status["vehicleStatus"]["date"] = vehicle_status["vehicleStatus"][
-            "dateTime"
-        ]
-        vehicle_status["vehicleStatus"]["doorLock"] = vehicle_status["vehicleStatus"][
-            "doorLockStatus"
-        ]
         vehicle_status["vehicleLocation"] = vehicle_status["vehicleStatus"][
             "vehicleLocation"
         ]
-        if vehicle_status["vehicleStatus"].get("tirePressureLamp"):
-            vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureLampAll"
-            ] = vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureWarningLampAll"
-            ]
-            vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureLampFL"
-            ] = vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureWarningLampFrontLeft"
-            ]
-            vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureLampFR"
-            ] = vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureWarningLampFrontRight"
-            ]
-            vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureLampRR"
-            ] = vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureWarningLampRearRight"
-            ]
-            vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureLampRL"
-            ] = vehicle_status["vehicleStatus"]["tirePressureLamp"][
-                "tirePressureWarningLampRearLeft"
-            ]
-        # Get Odomoter Details
-        response = self.get_vehicle(token.access_token)
-        vehicle_status["odometer"] = {}
-        vehicle_status["odometer"]["unit"] = 3
-        vehicle_status["odometer"]["value"] = response["enrolledVehicleDetails"][0][
-            "vehicleDetails"
-        ]["odometer"]
 
-        vehicle_status["vehicleLocation"] = self.get_location(
-            token, vehicle_status["odometer"]["value"]
-        )
-        HyundaiBlueLinkAPIUSA.old_vehicle_status = vehicle_status
+        # Get Odomoter Details - Needs to be refactored
+        #response = self.get_vehicle(token.access_token)
+        #vehicle_status["odometer"] = {}
+        #vehicle_status["odometer"]["unit"] = 3
+        #vehicle_status["odometer"]["value"] = response["enrolledVehicleDetails"][0][
+        #    "vehicleDetails"
+        #]["odometer"]
+
+        #vehicle_status["vehicleLocation"] = self.get_location(
+        #    token, vehicle_status["odometer"]["value"]
+        #)
         return vehicle_status
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle.id)
+        state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.time")
+            get_child_value(state, "vehicleStatus.dateTime")
         )
         vehicle.total_driving_distance = (
             get_child_value(
@@ -241,7 +205,22 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.rear_right_seat_heater_is_on = get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )
-        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLock"))
+        vehicle.tire_pressure_rear_left_warning_is_on = get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontLeft"
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontRight"
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
+        )
+        vehicle.tire_pressure_all_warning_is_on = get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
+        )
+        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLockStatus"))
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
@@ -297,7 +276,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
         
-    def get_location(self, token: Token, vehicle_id: str, current_odometer):
+    def get_location(self, token: Token, vehicle: Vehicle) -> None:
         r"""
         Get the location of the vehicle
 
@@ -309,66 +288,54 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle_id
+        headers["vehicleId"] = vehicle.id
         #Not used, not sure why it is here? 
         #headers["pAuth"] = self.get_pin_token(token)
-        prev_odometer = "0"
-        if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-            prev_odometer = HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                "odometer", {}
-            ).get("value")
-        check_server = (
-            current_odometer > prev_odometer
-            and HyundaiBlueLinkAPIUSA.last_loc_timestamp
-            < datetime.now() - timedelta(hours=1)
-        )
-        if check_server:
-            try:
-                HyundaiBlueLinkAPIUSA.last_loc_timestamp = datetime.now()
-                response = self.sessions.get(url, headers=headers)
-                response_json = response.json()
-                _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
-                if response_json.get("coord") is not None:
-                    return response_json
+        
+        try:
+            HyundaiBlueLinkAPIUSA.last_loc_timestamp = datetime.now()
+            response = self.sessions.get(url, headers=headers)
+            response_json = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
+            if response_json.get("coord") is not None:
+                return response_json
+            else:
+                # Check for rate limit exceeded
+                # These hard-coded values were extracted from a rate limit exceeded response.  In either case the log
+                # will include the full response when the "coord" attribute is not present
+                if (
+                    response_json.get("errorCode", 0) == 502
+                    and response_json.get("errorSubCode", "") == "HT_534"
+                ):
+                    # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
+                    HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
+                        datetime.now() + timedelta(hours=11)
+                    )
+                    _LOGGER.warn(
+                        f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + timedelta(hours = 12)}"
+                    )
                 else:
-                    # Check for rate limit exceeded
-                    # These hard-coded values were extracted from a rate limit exceeded response.  In either case the log
-                    # will include the full response when the "coord" attribute is not present
-                    if (
-                        response_json.get("errorCode", 0) == 502
-                        and response_json.get("errorSubCode", "") == "HT_534"
-                    ):
-                        # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
-                        HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
-                            datetime.now() + timedelta(hours=11)
-                        )
-                        _LOGGER.warn(
-                            f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + timedelta(hours = 12)}"
-                        )
-                    else:
-                        _LOGGER.warn(
-                            f"{DOMAIN} - Unable to get vehicle location: {response_json}"
-                        )
+                    _LOGGER.warn(
+                        f"{DOMAIN} - Unable to get vehicle location: {response_json}"
+                    )
 
-                    if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-                        return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                            "vehicleLocation"
-                        )
-                    else:
-                        return None
-
-            except Exception as e:
-                _LOGGER.warning(
-                    f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
-                )
                 if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
                     return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
                         "vehicleLocation"
                     )
                 else:
                     return None
-        elif HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-            return HyundaiBlueLinkAPIUSA.old_vehicle_status.get("vehicleLocation")
+
+        except Exception as e:
+            _LOGGER.warning(
+                f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
+            )
+            if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
+                return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
+                    "vehicleLocation"
+                )
+            else:
+                return None
 
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
@@ -395,7 +362,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def update_vehicle_status(self, token: Token):
         pass
 
-    def lock_action(self, token: Token, vehicle_id: str, action) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
         if action == "close":
@@ -407,11 +374,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = token.vehicle_id
-        headers["registrationId"] = token.vehicle_regid
-        headers["APPCLOUD-VIN"] = token.vehicle_id
+        headers["vin"] = vehicle.id
+        headers["registrationId"] = vehicle.vehicle_regid
+        headers["APPCLOUD-VIN"] = vehicle.id
 
-        data = {"userName": self.username, "vin": token.vehicle_id}
+        data = {"userName": self.username, "vin": vehicle.id}
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
@@ -424,7 +391,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def start_climate(
-        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
+        self, token: Token, vehicle: Vehicle, set_temp, duration, defrost, climate, heating
     ) -> None:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
 
@@ -432,7 +399,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = token.vehicle_id
+        headers["vin"] = vehicle.id
         headers["registrationId"] = token.vehicle_regid
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
@@ -445,7 +412,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "igniOnDuration": duration,
             # "seatHeaterVentInfo": None,
             "username": self.username,
-            "vin": token.vehicle_id,
+            "vin": vehicle.id,
         }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
@@ -457,14 +424,14 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle_id: str) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         url = self.API_URL + "rcs/rsc/stop"
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = token.vehicle_id
+        headers["vin"] = vehicle.id
         headers["registrationId"] = token.vehicle_regid
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
@@ -475,8 +442,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token, vehicle_id: str) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def stop_charge(self, token: Token, vehicle_id: str) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
