@@ -12,7 +12,6 @@ with open("HISTORY.rst") as history_file:
 
 readme = ""
 history = ""
-
 requirements = ["curlify", "bs4", "push_receiver"]
 
 test_requirements = [
