@@ -10,8 +10,8 @@ with open("README.rst") as readme_file:
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
 
-readme = ""
-history = ""
+long_description=readme + "\n\n" + history
+long_description=""
 requirements = ["curlify", "bs4", "push_receiver"]
 
 test_requirements = [
@@ -35,7 +35,7 @@ setup(
     description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
     install_requires=requirements,
     license="MIT license",
-    long_description=readme + "\n\n" + history,
+    long_description=long_description,
     include_package_data=True,
     keywords="hyundai_kia_connect_api",
     name="hyundai_kia_connect_api",
