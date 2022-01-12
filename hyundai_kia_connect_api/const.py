@@ -17,7 +17,7 @@ DISTANCE_UNITS = {None: None, 1: LENGTH_KILOMETERS, 3: LENGTH_MILES}
 
 TEMPERATURE_C = "c"
 TEMPERATURE_F = "f"
-TEMPERATURE_UNITS = {None: None, 1: TEMPERATURE_C, 2: TEMPERATURE_F}
+TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
 
 SEAT_STATUS = {
     2: "Off",
@@ -28,6 +28,7 @@ SEAT_STATUS = {
     7: "Medium Heat",
     8: "High Heat",
 }
+
 
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
