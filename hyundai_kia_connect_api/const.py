@@ -19,6 +19,15 @@ TEMPERATURE_C = "c"
 TEMPERATURE_F = "f"
 TEMPERATURE_UNITS = {None: None, 1: TEMPERATURE_C, 2: TEMPERATURE_F}
 
+SEAT_STATUS = {
+    2: "Off",
+    3: "Low Cool",
+    4: "Medium Cool",
+    5: "Full Cool",
+    6: "Low Heat",
+    7: "Medium Heat",
+    8: "High Heat",
+}
 
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
