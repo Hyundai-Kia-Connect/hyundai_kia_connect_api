@@ -49,7 +49,7 @@ class ApiImpl:
     def get_fresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle):
+    def check_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         pass
 
     def get_geocoded_location(self, lat, lon) -> dict:
@@ -69,7 +69,7 @@ class ApiImpl:
         response = response.json()
         return response
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         pass
 
     def start_climate(
@@ -80,16 +80,17 @@ class ApiImpl:
     ) -> None:
         pass
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         pass
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         pass
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         pass
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int
-    ) -> None:
+    ) -> str:
         pass
+
