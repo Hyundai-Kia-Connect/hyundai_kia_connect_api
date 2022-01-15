@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytz
 
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -87,6 +87,15 @@ class VehicleManager:
             self.token = self.api.login(self.username, self.password)
             return True
         return False
+
+    def remote_start(self, vehicleID: str, options: ClimateRequestOptions):
+        self.api.start_climate(self.token, self.vehicles[vehicleID], options)
+
+    def lock(self, vehicleID: str):
+        self.api.lock_action(self.token, self.vehicles[vehicleID], "close")
+    
+    def unlock(self, vehicleID: str):
+        self.api.lock_action(self.token, self.vehicles[vehicleID], "open")
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
