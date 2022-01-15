@@ -3,7 +3,7 @@ bump2version==0.5.11
 Click==7.1.2
 coverage==4.5.4
 flake8==3.7.8
-pip==19.2.3
+pip>=21.1
 pytest==6.2.4
 Sphinx==1.8.5
 tox==3.14.0
