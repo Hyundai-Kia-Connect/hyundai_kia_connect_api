@@ -88,14 +88,26 @@ class VehicleManager:
             return True
         return False
 
-    def remote_start(self, vehicleID: str, options: ClimateRequestOptions):
+    def remote_start(self, vehicleID: str, options: ClimateRequestOptions) -> None:
         self.api.start_climate(self.token, self.vehicles[vehicleID], options)
+            
+    def cancel_remote_start(self, vehicleID: str) -> None:
+        self.api.stop_climate(self.token, self.vehicles[vehicleID])
 
-    def lock(self, vehicleID: str):
+    def lock(self, vehicleID: str) -> None:
         self.api.lock_action(self.token, self.vehicles[vehicleID], "close")
     
-    def unlock(self, vehicleID: str):
+    def unlock(self, vehicleID: str) -> None:
         self.api.lock_action(self.token, self.vehicles[vehicleID], "open")
+
+    def start_charge(self, vehicleID: str) -> None:
+        self.api.start_charge(self.token, self.vehicles[vehicleID])
+
+    def stop_charge(self, vehicleID: str) -> None:
+        self.api.stop_charge(self.token, self.vehicles[vehicleID])
+
+    def set_charge_limits(self, vehicleID: str, ac_limit: int, dc_limit: int) -> None:
+        self.api.start_climate(self.token, self.vehicles[vehicleID], ac_limit, dc_limit)
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
