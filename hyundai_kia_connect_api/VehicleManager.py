@@ -2,6 +2,8 @@ import asyncio
 import datetime as dt
 import logging
 from dataclasses import dataclass
+from unittest.util import strclass
+from xxlimited import Str
 
 import pytz
 
@@ -88,25 +90,25 @@ class VehicleManager:
             return True
         return False
 
-    def remote_start(self, vehicle_id: str, options: ClimateRequestOptions) -> None:
+    def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
             
-    def cancel_remote_start(self, vehicle_id: str) -> None:
+    def stop_climate(self, vehicle_id: str) -> str:
         self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
-    def lock(self, vehicle_id: str) -> None:
+    def lock(self, vehicle_id: str) -> str:
         self.api.lock_action(self.token, self.get_vehicle(vehicle_id), "close")
     
-    def unlock(self, vehicle_id: str) -> None:
+    def unlock(self, vehicle_id: str) -> str:
         self.api.lock_action(self.token, self.get_vehicle(vehicle_id), "open")
 
-    def start_charge(self, vehicle_id: str) -> None:
+    def start_charge(self, vehicle_id: str) -> str:
         self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def stop_charge(self, vehicle_id: str) -> None:
+    def stop_charge(self, vehicle_id: str) -> str:
         self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def set_charge_limits(self, vehicle_id: str, ac_limit: int, dc_limit: int) -> None:
+    def set_charge_limits(self, vehicle_id: str, ac_limit: int, dc_limit: int) -> str:
         self.api.start_climate(self.token, self.get_vehicle(vehicle_id), ac_limit, dc_limit)
 
     @staticmethod
