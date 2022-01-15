@@ -40,5 +40,3 @@ An example call would be::
     print(vm.vehicles)
 
 
-
-
