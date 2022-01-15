@@ -46,7 +46,8 @@ class VehicleManager:
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
-
+        self.update_all_vehicles_with_cached_state()
+        
     def get_vehicle(self, vehicle_id) -> Vehicle:
         return self.vehicles[vehicle_id]
 
