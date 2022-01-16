@@ -27,9 +27,10 @@ Once this is done you can now make the following calls against the vehicle manag
  get_vehicle(self, vehicle_id)
  update_all_vehicles_with_cached_state(self)
  update_vehicle_with_cached_state(self, vehicle_id)
- force_refresh_all_vehicles_states(self, vehicle_id)
+ force_refresh_all_vehicles_states(self)
  force_refresh_vehicles_states(self, vehicle_id)
  check_and_refresh_token(self)
+ check_and_force_update_vehicles(self, force_refresh_interval) # Interval in seconds - consider API Rate Limits https://github.com/Hacksore/bluelinky/wiki/API-Rate-Limits
 
 An example call would be::
 
