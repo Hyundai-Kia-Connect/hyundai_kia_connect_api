@@ -107,10 +107,10 @@ class VehicleManager:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
     def set_charge_limits(self, vehicle_id: str, ac_limit: int, dc_limit: int) -> str:
-        return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), ac_limit, dc_limit)
+        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac_limit, dc_limit)
 
     def check_action_status(self, vehicle_id: str, action_id: str):
-        return self.api.check_last_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
+        return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
