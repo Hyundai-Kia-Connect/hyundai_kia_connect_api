@@ -1,5 +1,5 @@
 import os
-from hyundai_kia_connect_api import *
+from ..hyundai_kia_connect_api import *
 def login():
     username = os.environ['KIA_CA_CDNNINJA_USERNAME']
     password = os.environ['KIA_CA_CDNNINJA_PASSWORD']
