@@ -1,5 +1,5 @@
 import os
-from hyundai_kia_connect_api import *
+from ..hyundai_kia_connect_api import *
 
 
 def login():
