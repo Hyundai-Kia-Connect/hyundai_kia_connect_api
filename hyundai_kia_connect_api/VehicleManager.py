@@ -60,7 +60,7 @@ class VehicleManager:
         self.api.update_vehicle_with_cached_state(self.token, vehicle)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        started_at_utc: datetime = dt.datetime.now(pytz.utc)
+        started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
             vehicle: Vehicle = self.get_vehicle(vehicle_id)
             _LOGGER.debug(
