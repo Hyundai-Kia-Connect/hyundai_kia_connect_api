@@ -21,6 +21,7 @@ from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 from .Vehicle import Vehicle
+from .Token import Token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class VehicleManager:
             self.region, self.brand
         )
 
-        self.token: token = None
+        self.token: Token = None
         self.vehicles: dict = {}
 
     def initialize(self) -> None:
