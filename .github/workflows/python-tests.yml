@@ -38,7 +38,7 @@ jobs:
     - name: Test with pytest
       env: 
         KIA_CA_CDNNINJA_USERNAME: ${{ secrets.KIA_CA_CDNNINJA_USERNAME }}
-        KIA_CA_CDNNINJA_PASSWORD: ${{ secets.KIA_CA_CDNNINJA_PASSWORD }}
+        KIA_CA_CDNNINJA_PASSWORD: ${{ secrets.KIA_CA_CDNNINJA_PASSWORD }}
         KIA_CA_CDNNINJA_PIN: ${{ secrets.KIA_CA_CDNNINJA_PIN }}
       run: |
         pytest
