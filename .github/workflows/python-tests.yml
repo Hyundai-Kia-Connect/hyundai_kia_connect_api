@@ -36,5 +36,9 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
+      env: 
+        KIA_CA_CDNNINJA_USERNAME: ${{ secrets.KIA_CA_CDNNINJA_USERNAME }}
+        KIA_CA_CDNNINJA_PASSWORD: ${{ secets.KIA_CA_CDNNINJA_PASSWORD }}
+        KIA_CA_CDNNINJA_PIN: ${{ secrets.KIA_CA_CDNNINJA_PIN }}
       run: |
         pytest
