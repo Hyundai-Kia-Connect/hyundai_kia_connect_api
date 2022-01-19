@@ -289,7 +289,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         try:
-            headers["pAuth"] = self.get_pin_token(token)
+            headers["pAuth"] = self._get_pin_token(token, vehicle)
 
             response = requests.post(
                 url, headers=headers, data=json.dumps({"pin": token.pin})
