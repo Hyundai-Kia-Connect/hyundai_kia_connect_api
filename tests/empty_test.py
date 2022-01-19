@@ -11,4 +11,4 @@ def test_login():
         region=1, brand=2, username=username, password=password, pin=pin
     )
     print(vm.vehicles)
-    assert len(vm.keys()) > 0
+    assert len(vm.vehicles.keys()) > 0
