@@ -396,7 +396,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle.id)
 
-        hex_set_temp = get_index_into_hex_temp(self.temperature_range.index(set_temp))
+        hex_set_temp = get_index_into_hex_temp(self.temperature_range.index(options.set_temp))
 
         payload = {
             "hvacInfo": {
