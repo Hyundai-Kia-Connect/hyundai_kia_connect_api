@@ -54,7 +54,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         
         ts = time.time()
         utc_offset = (
-            dt.fromtimestamp(ts) - dt.utcfromtimestamp(ts)
+            dt.datetime.fromtimestamp(ts) - dt.datetime.utcfromtimestamp(ts)
         ).total_seconds()
         utc_offset_hours = int(utc_offset / 60 / 60)
 
