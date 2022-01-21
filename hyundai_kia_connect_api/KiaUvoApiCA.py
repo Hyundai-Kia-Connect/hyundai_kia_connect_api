@@ -95,20 +95,20 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         result = []
         for entry in response["result"]["vehicles"]:
-            engine_type = None
+            entry_engine_type = None
             if(entry["fuelKindCode"] == "G"):
-                engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = ENGINE_TYPES.ICE
             elif(entry["fuelKindCode"] == "E"):
-                engine_type = ENGINE_TYPES.EV
+                entry_engine_type = ENGINE_TYPES.EV
             elif(entry["fuelKindCode"] == "P"): 
-                engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry["modelName"],
                 year=entry["modelYear"],
                 VIN=entry["vin"],
-                engine_type=engine_type
+                engine_type=entry_engine_type
             )
             result.append(vehicle)
         return result
