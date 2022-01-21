@@ -1,12 +1,9 @@
-import json
 import logging
-import random
 import time
-import uuid
+import pytz
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
-import curlify
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
@@ -108,7 +105,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
 
-        valid_until = (datetime.now() + timedelta(seconds=expires_in))
+        valid_until = (datetime.now(pytz.utc) + datetime.timedelta(seconds=expires_in))
 
         return Token(
             username=username,
