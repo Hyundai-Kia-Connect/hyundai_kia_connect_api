@@ -1,7 +1,8 @@
+from locale import D_T_FMT
 import logging
 import time
 import pytz
-from datetime import datetime, timedelta
+import datetime as dt
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -39,7 +40,7 @@ class cipherAdapter(HTTPAdapter):
 class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = datetime.now() - timedelta(hours=3)
+    last_loc_timestamp = dt.now() - dt.timedelta(hours=3)
 
     def __init__(
         self,
@@ -53,7 +54,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         
         ts = time.time()
         utc_offset = (
-            datetime.fromtimestamp(ts) - datetime.utcfromtimestamp(ts)
+            dt.fromtimestamp(ts) - dt.utcfromtimestamp(ts)
         ).total_seconds()
         utc_offset_hours = int(utc_offset / 60 / 60)
 
@@ -105,7 +106,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
 
-        valid_until = (datetime.now(pytz.utc) + datetime.timedelta(seconds=expires_in))
+        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
 
         return Token(
             username=username,
@@ -293,7 +294,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         #headers["pAuth"] = self.get_pin_token(token)
         
         try:
-            HyundaiBlueLinkAPIUSA.last_loc_timestamp = datetime.now()
+            HyundaiBlueLinkAPIUSA.last_loc_timestamp = dt.now()
             response = self.sessions.get(url, headers=headers)
             response_json = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
@@ -309,10 +310,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 ):
                     # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
                     HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
-                        datetime.now() + timedelta(hours=11)
+                        dt.now() + dt.timedelta(hours=11)
                     )
                     _LOGGER.warn(
-                        f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + timedelta(hours = 12)}"
+                        f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + dt.timedelta(hours = 12)}"
                     )
                 else:
                     _LOGGER.warn(
