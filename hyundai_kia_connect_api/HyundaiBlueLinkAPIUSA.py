@@ -80,8 +80,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "encryptFlag": "false",
             "brandIndicator": "H",
             "gen": "2",
-            "username": self.username,
-            "blueLinkServicePin": self.pin,
             "client_id": "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920",
             "clientSecret": "v558o935-6nne-423i-baa8",
         }
@@ -98,6 +96,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         data = {"username": username, "password": password}
         headers = self.API_HEADERS
+        headers["username"] = username
+
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
@@ -124,6 +124,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vin"] = vehicle.vin
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
 
@@ -288,6 +290,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
         #Not used, not sure why it is here? 
         #headers["pAuth"] = self.get_pin_token(token)
         
@@ -340,6 +344,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
+        headers["username"] = token.username
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -378,6 +383,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["vin"] = vehicle.vin
         headers["registrationId"] = vehicle.id
         headers["APPCLOUD-VIN"] = vehicle.vin
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
         data = {"userName": self.username, "vin": vehicle.vin}
         response = self.sessions.post(url, headers=headers, json=data)
@@ -402,6 +409,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vin"] = vehicle.vin
         headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         data = {
@@ -434,6 +443,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vin"] = vehicle.vin
         headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
