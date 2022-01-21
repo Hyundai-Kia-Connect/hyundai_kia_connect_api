@@ -40,7 +40,7 @@ class cipherAdapter(HTTPAdapter):
 class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = dt.now() - dt.timedelta(hours=3)
+    last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
 
     def __init__(
         self,
@@ -294,7 +294,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         #headers["pAuth"] = self.get_pin_token(token)
         
         try:
-            HyundaiBlueLinkAPIUSA.last_loc_timestamp = dt.now()
+            HyundaiBlueLinkAPIUSA.last_loc_timestamp = dt.datetime.now(pytz.utc)
             response = self.sessions.get(url, headers=headers)
             response_json = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
@@ -310,7 +310,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 ):
                     # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
                     HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
-                        dt.now() + dt.timedelta(hours=11)
+                        dt.datetime.now(pytz.utc) + dt.timedelta(hours=11)
                     )
                     _LOGGER.warn(
                         f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + dt.timedelta(hours = 12)}"
