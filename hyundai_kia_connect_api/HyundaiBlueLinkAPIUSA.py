@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import curlify
-import push_receiver
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context

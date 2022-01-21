@@ -21,7 +21,7 @@ from .const import (
     SEAT_STATUS,
 )
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index
+from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)

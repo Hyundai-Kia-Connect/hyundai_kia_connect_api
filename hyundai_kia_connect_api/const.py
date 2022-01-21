@@ -26,7 +26,7 @@ SEAT_STATUS = {
     2: "Off",
     3: "Low Cool",
     4: "Medium Cool",
-    5: "Full Cool",
+    5: "High Cool",
     6: "Low Heat",
     7: "Medium Heat",
     8: "High Heat",
