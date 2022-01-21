@@ -15,6 +15,7 @@ from .const import (
     REGION_EUROPE,
     REGION_USA,
     REGIONS,
+    VEHICLE_LOCK_ACTION,
 )
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -95,10 +96,10 @@ class VehicleManager:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
     def lock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), "close")
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK)
     
     def unlock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), "open")
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK)
 
     def start_charge(self, vehicle_id: str) -> str:
         return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
