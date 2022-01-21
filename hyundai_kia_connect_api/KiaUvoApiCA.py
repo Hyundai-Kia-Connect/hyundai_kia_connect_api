@@ -1,11 +1,7 @@
-from asyncio.proactor_events import streams
 import json
 import logging
 import datetime as dt
-from pickletools import string1
 import re
-from time import strftime
-from xxlimited import Str
 
 import requests
 import pytz
@@ -326,7 +322,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def lock_action(self, token: Token, action, vehicle: Vehicle) -> streams:
+    def lock_action(self, token: Token, action, vehicle: Vehicle) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == "close":
             url = self.API_URL + "drlck"

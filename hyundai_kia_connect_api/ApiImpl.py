@@ -17,8 +17,8 @@ class ClimateRequestOptions:
     set_temp: str = None
     duration: int = None
     defrost = None
-    climate: int = None
-    heating: int = None
+    climate: bool = None
+    heating: bool = None
 
 
 class ApiImpl:
