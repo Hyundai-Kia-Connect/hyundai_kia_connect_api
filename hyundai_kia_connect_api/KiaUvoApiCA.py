@@ -14,7 +14,6 @@ from .const import (
     DOMAIN,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
-    ENGINE_TYPES,
 )
 from .Token import Token
 from .utils import (
@@ -95,20 +94,12 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         result = []
         for entry in response["result"]["vehicles"]:
-            entry_engine_type = None
-            if(entry["fuelKindCode"] == "G"):
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif(entry["fuelKindCode"] == "E"):
-                entry_engine_type = ENGINE_TYPES.EV
-            elif(entry["fuelKindCode"] == "P"): 
-                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry["modelName"],
                 year=entry["modelYear"],
                 VIN=entry["vin"],
-                engine_type=entry_engine_type
             )
             result.append(vehicle)
         return result
