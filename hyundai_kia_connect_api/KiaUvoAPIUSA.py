@@ -166,7 +166,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 f"no session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
             )
         _LOGGER.debug(f"got session id {session_id}")
-        valid_until = (datetime.now() + timedelta(hours=1)).strftime(DATE_FORMAT)
+        valid_until = (datetime.now() + timedelta(hours=1))
         return Token(
             username=username,
             password=password,
