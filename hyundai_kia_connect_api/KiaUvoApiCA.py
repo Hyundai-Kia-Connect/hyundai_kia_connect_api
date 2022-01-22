@@ -99,7 +99,7 @@ class KiaUvoApiCA(ApiImpl):
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry["modelName"],
-                year=entry["modelYear"],
+                year=int(entry["modelYear"]),
                 VIN=entry["vin"],
             )
             result.append(vehicle)
