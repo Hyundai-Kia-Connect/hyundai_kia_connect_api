@@ -362,11 +362,11 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token)
 
-        if get_child_value(response, "airTemp.unit") == 0 & vehicle.year < 2020:
+        if vehicle.year < 2020:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_old.index(options.set_temp)
             )
-        elif get_child_value(response, "airTemp.unit") == 0 & vehicle.year >= 2020: 
+        elif vehicle.year >= 2020: 
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
