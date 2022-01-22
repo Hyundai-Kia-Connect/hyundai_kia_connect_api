@@ -147,9 +147,13 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         ]
         vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
         
-        #vehicle_status["vehicleLocation"] = self.get_location(
-        #    token, vehicle_status["odometer"]["value"]
-        #)
+        if vehicle.odometer:
+            if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer.value"):
+                vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
+            else:
+                vehicle_status["vehicleLocation"] = None
+        else:
+            vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
         return vehicle_status
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -269,68 +273,43 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
         
-    def get_location(self, token: Token, vehicle: Vehicle) -> None:
+    def get_location(self, token: Token, vehicle: Vehicle):
         r"""
         Get the location of the vehicle
-
+        This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per: 
         Only update the location if the odometer moved AND if the last location update was over an hour ago.
         Note that the "last updated" time is initially set to three hours ago.
-
-        This will help to prevent too many cals to the API
+        This will help to prevent too many calls to the API
         """
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
-        headers["username"] = token.username
-        headers["blueLinkServicePin"] = token.pin
-        #Not used, not sure why it is here? 
-        #headers["pAuth"] = self.get_pin_token(token)
-        
+        headers["vehicleId"] = token.vehicle_id
+        headers["pAuth"] = self.get_pin_token(token)
         try:
-            HyundaiBlueLinkAPIUSA.last_loc_timestamp = dt.datetime.now(pytz.utc)
             response = self.sessions.get(url, headers=headers)
             response_json = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
             if response_json.get("coord") is not None:
                 return response_json
             else:
-                # Check for rate limit exceeded
-                # These hard-coded values were extracted from a rate limit exceeded response.  In either case the log
-                # will include the full response when the "coord" attribute is not present
                 if (
                     response_json.get("errorCode", 0) == 502
                     and response_json.get("errorSubCode", "") == "HT_534"
                 ):
-                    # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
-                    HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
-                        dt.datetime.now(pytz.utc) + dt.timedelta(hours=11)
-                    )
                     _LOGGER.warn(
-                        f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + dt.timedelta(hours = 12)}"
+                        f"{DOMAIN} - get vehicle location rate limit exceeded."
                     )
                 else:
                     _LOGGER.warn(
                         f"{DOMAIN} - Unable to get vehicle location: {response_json}"
                     )
 
-                if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-                    return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                        "vehicleLocation"
-                    )
-                else:
-                    return None
-
         except Exception as e:
             _LOGGER.warning(
                 f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
             )
-            if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-                return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                    "vehicleLocation"
-                )
-            else:
-                return None
+
 
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
