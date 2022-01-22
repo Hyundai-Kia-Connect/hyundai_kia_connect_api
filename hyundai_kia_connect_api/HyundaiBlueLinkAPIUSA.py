@@ -145,15 +145,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle_status["vehicleLocation"] = vehicle_status["vehicleStatus"][
             "vehicleLocation"
         ]
-
-        # Get Odomoter Details - Needs to be refactored
-        #response = self.get_vehicle(token.access_token)
-        #vehicle_status["odometer"] = {}
-        #vehicle_status["odometer"]["unit"] = 3
-        #vehicle_status["odometer"]["value"] = response["enrolledVehicleDetails"][0][
-        #    "vehicleDetails"
-        #]["odometer"]
-
+        vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
+        
         #vehicle_status["vehicleLocation"] = self.get_location(
         #    token, vehicle_status["odometer"]["value"]
         #)
@@ -169,11 +162,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "km",
+            "mi",
         )
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
-            "km",
+            get_child_value(state, "vehicleDetails.odometer.value"),
+            "mi",
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -181,7 +174,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
-            "c",
+            "f",
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -360,6 +353,20 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             result.append(vehicle)
 
         return result
+
+    def _get_vehicle(self, token: Token, vehicle: Vehicle):
+        url = self.API_URL + "enrollment/details/" + token.username
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["username"] = token.username
+        response = self.sessions.get(url, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        response = response.json()
+        for entry in response["enrolledVehicleDetails"]:
+            entry = entry["vehicleDetails"]
+            if entry["regid"] == vehicle.id:
+                return entry
+
 
     def get_pin_token(self, token: Token):
         pass
