@@ -255,9 +255,9 @@ class KiaUvoApiCA(ApiImpl):
 
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(response, "airTemp.value"))
-        if get_child_value(response, "airTemp.unit") == 0 & vehicle.year < 2020:
+        if get_child_value(response, "airTemp.unit") == 0 and vehicle.year < 2020:
             response["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
-        elif get_child_value(response, "airTemp.unit") == 0 & vehicle.year >= 2020: 
+        elif get_child_value(response, "airTemp.unit") == 0 and vehicle.year >= 2020: 
             response["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
 
         status = {}
