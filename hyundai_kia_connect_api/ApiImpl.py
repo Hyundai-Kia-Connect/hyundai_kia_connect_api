@@ -52,6 +52,9 @@ class ApiImpl:
     def check_last_action_status(self, token: Token, vehicle: Vehicle):
         pass
 
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        pass
+
     def get_geocoded_location(self, lat, lon) -> dict:
         email_parameter = ""
         if self.use_email_with_geocode_api == True:
