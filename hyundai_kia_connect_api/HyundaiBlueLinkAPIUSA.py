@@ -3,6 +3,7 @@ import logging
 import time
 import pytz
 import datetime as dt
+import re
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -457,7 +458,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
-    
+
     def get_last_updated_at(self, value) -> dt.datetime:
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
