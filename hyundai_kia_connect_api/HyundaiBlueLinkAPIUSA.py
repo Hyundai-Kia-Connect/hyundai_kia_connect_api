@@ -364,7 +364,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def get_pin_token(self, token: Token):
         pass
 
-    def update_vehicle_status(self, token: Token):
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
