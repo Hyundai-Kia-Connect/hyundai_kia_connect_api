@@ -158,17 +158,17 @@ class Vehicle:
     @property
     def location_longitude(self):
         return self._location_longitude
-    
-    @location_latitude.setter
-    def location(self, value):
-        self._location_latitude = value
-        self._location_last_set_time = datetime.datetime.now(pytz)
-    
-    @location_longitude.setter
-    def location(self, value):
-        self._location_longitude = value
-        self._location_last_set_time = datetime.datetime.now(pytz)
 
+    @property
+    def location(self):
+        return self._location_longitude, self._location_latitude
+    
+    @location.setter
+    def location(self, latitude, longitude):
+        self._location_latitude = latitude
+        self._location_longitude = longitude
+        self._location_last_set_time = datetime.datetime.now(pytz)
+    
     @property
     def odometer(self):
         return self._odometer
