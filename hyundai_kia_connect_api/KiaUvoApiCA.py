@@ -14,6 +14,7 @@ from .const import (
     DOMAIN,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
 from .utils import (
