@@ -327,10 +327,10 @@ class KiaUvoApiCA(ApiImpl):
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "drlck"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "drulck"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
         headers = self.API_HEADERS
