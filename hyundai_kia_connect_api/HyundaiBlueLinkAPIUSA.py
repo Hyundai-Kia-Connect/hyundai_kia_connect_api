@@ -356,10 +356,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rcs/rdo/off"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "rcs/rdo/on"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
 
