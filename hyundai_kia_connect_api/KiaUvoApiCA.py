@@ -32,11 +32,6 @@ class KiaUvoApiCA(ApiImpl):
 
     def __init__(self, region: int, brand: int) -> None:
 
-        self.last_action_tracked = True
-        self.last_action_xid = None
-        self.last_action_completed = False
-        self.last_action_pin_auth = None
-
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
@@ -330,7 +325,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def lock_action(self, token: Token, action, vehicle: Vehicle) -> None:
+    def lock_action(self, token: Token, action, vehicle: Vehicle) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == "close":
             url = self.API_URL + "drlck"
@@ -348,14 +343,13 @@ class KiaUvoApiCA(ApiImpl):
         )
         response_headers = response.headers
         response = response.json()
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response")
+        return response_headers["transactionId"]
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         url = self.API_URL + "rmtstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -390,14 +384,12 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
+        return response_headers["transactionId"]
 
     def start_climate_ev(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         # TODO: get rid of this function as we can access all vehicle information from `start_climate` function
         url = self.API_URL + "evc/rfon"
         headers = self.API_HEADERS
@@ -428,11 +420,10 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
         _LOGGER.debug(f"{DOMAIN} - Received start_climate_ev response {response}")
+        return response_headers["transactionId"]
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rmtstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -445,12 +436,10 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response")
+        return response_headers["transactionId"]
 
-    def stop_climate_ev(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate_ev(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rfoff"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -462,13 +451,10 @@ class KiaUvoApiCA(ApiImpl):
         )
         response_headers = response.headers
         response = response.json()
-
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response")
+        return response_headers["transactionId"]
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle) -> None:
+    def check_last_action_status(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -486,7 +472,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Last action_status: {action_status}")
         return self.last_action_completed
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -500,8 +486,9 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        return response_headers["transactionId"]
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -515,3 +502,4 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        return response_headers["transactionId"]
