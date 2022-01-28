@@ -14,9 +14,9 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ClimateRequestOptions:
-    set_temp: str = None
+    set_temp: float = None
     duration: int = None
-    defrost = None
+    defrost: bool = None
     climate: bool = None
     heating: bool = None
 
