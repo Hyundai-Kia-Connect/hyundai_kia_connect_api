@@ -31,6 +31,11 @@ SEAT_STATUS = {
     8: "High Heat",
 }
 
+class ENGINE_TYPES(Enum):
+    ICE = "ICE"
+    EV = "EV"
+    PHEV = "PHEV"
+
 
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
