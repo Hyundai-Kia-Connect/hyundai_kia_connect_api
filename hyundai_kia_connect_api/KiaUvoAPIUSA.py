@@ -9,8 +9,8 @@ import pytz
 import requests
 from requests import RequestException, Response
 
-from .const import DOMAIN
-from .ApiImpl import ApiImpl
+from .const import DOMAIN, VEHICLE_LOCK_ACTION
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 from .utils import get_child_value
@@ -30,6 +30,7 @@ def request_with_active_session(func):
             _LOGGER.debug(f"got invalid session, attempting to repair and resend")
             self = args[0]
             token = kwargs["token"]
+            vehicle = kwargs["vehicle"]
             new_token = self.login()
             _LOGGER.debug(
                 f"old token:{token.access_token}, new token:{new_token.access_token}"
@@ -39,7 +40,7 @@ def request_with_active_session(func):
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
             if json_body is not None and json_body.get("vinKey", None):
-                json_body["vinKey"] = [token.vehicle_regid]
+                json_body["vinKey"] = [vehicle.key]
             response = func(*args, **kwargs)
             return response
 
@@ -124,18 +125,18 @@ class KiaUvoAPIUSA(ApiImpl):
         headers["deviceid"] = self.device_id
         return headers
 
-    def authed_api_headers(self, token: Token):
+    def authed_api_headers(self, token: Token, vehicle: Vehicle):
         headers = self.api_headers()
         headers["sid"] = token.access_token
-        headers["vinkey"] = token.vehicle_regid
+        headers["vinkey"] = vehicle.key
         return headers
 
     @request_with_active_session
     @request_with_logging
     def post_request_with_logging_and_active_session(
-        self, token: Token, url: str, json_body: dict
+        self, token: Token, url: str, json_body: dict, vehicle: Vehicle
     ) -> Response:
-        headers = self.authed_api_headers(token)
+        headers = self.authed_api_headers(token, vehicle)
         return requests.post(url, json=json_body, headers=headers)
 
     @request_with_active_session
@@ -187,13 +188,14 @@ class KiaUvoAPIUSA(ApiImpl):
                 id=entry["vehicleIdentifier"],
                 name=entry["nickName"],
                 model=entry["modelName"],
+                key=entry["vehicleKey"],
                 registration_date=None,
             )
             result.append(vehicle)
         return result
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle.id)
+        state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.lastStatusDate")
         )
@@ -304,7 +306,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle_id: str) -> dict:
+    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "cmm/gvi"
 
         body = {
@@ -324,10 +326,10 @@ class KiaUvoAPIUSA(ApiImpl):
                 "vehicleStatus": "1",
                 "weather": "0",
             },
-            "vinKey": [token.vehicle_regid],
+            "vinKey": [vehicle.key],
         }
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
 
         response_body = response.json()
@@ -393,20 +395,20 @@ class KiaUvoAPIUSA(ApiImpl):
     def _get_pin_token(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def update_vehicle_status(self, token: Token):
+    def update_vehicle_status(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "rems/rvs"
         body = {
             "requestType": 0  # value of 1 would return cached results instead of forcing update
         }
         self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
 
-    def check_last_action_status(self, token: Token):
+    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"
         body = {"xid": self.last_action_xid}
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_json = response.json()
         self.last_action_completed = all(
@@ -414,7 +416,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         return self.last_action_completed
 
-    def lock_action(self, token: Token, action, vehicle_id: str) -> None:
+    def lock_action(self, token: Token, action, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"Action for lock is: {action}")
         if action == "close":
             url = self.API_URL + "rems/door/lock"
@@ -424,62 +426,65 @@ class KiaUvoAPIUSA(ApiImpl):
             _LOGGER.debug(f"Calling unlock")
 
         response = self.get_request_with_logging_and_active_session(
-            token=token, url=url
+            token=token, url=url, vehicle=vehicle
         )
 
         self.last_action_xid = response.headers["Xid"]
 
     def start_climate(
-        self, token: Token, vehicle_id: str, set_temp, duration, defrost, climate, heating
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions
     ) -> None:
         url = self.API_URL + "rems/start"
         body = {
             "remoteClimate": {
-                "airCtrl": climate,
+                "airCtrl": options.climate,
                 "airTemp": {
                     "unit": 1,
-                    "value": str(set_temp),
+                    "value": str(options.set_temp),
                 },
-                "defrost": defrost,
+                "defrost": options.defrost,
                 "heatingAccessory": {
-                    "rearWindow": int(heating),
-                    "sideMirror": int(heating),
-                    "steeringWheel": int(heating),
+                    "rearWindow": int(options.heating),
+                    "sideMirror": int(options.heating),
+                    "steeringWheel": int(options.heating),
                 },
                 "ignitionOnDuration": {
                     "unit": 4,
-                    "value": duration,
+                    "value": options.duration,
                 },
             }
         }
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
         self.last_action_xid = response.headers["Xid"]
 
-    def stop_climate(self, token: Token, vehicle_id: str)-> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "rems/stop"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url
         )
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
 
-    def start_charge(self, token: Token, vehicle_id: str)-> None:
+    def start_charge(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "evc/charge"
         body = {"chargeRatio": 100}
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body
         )
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
 
-    def stop_charge(self, token: Token, vehicle_id: str)-> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "evc/cancel"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url
         )
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
 
-    def set_charge_limits(self, token: Token, vehicle_id: str, ac_limit: int, dc_limit: int)-> None:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int)-> str:
         url = self.API_URL + "evc/sts"
         body = {
             "targetSOClist": [
@@ -494,6 +499,6 @@ class KiaUvoAPIUSA(ApiImpl):
             ]
         }
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vechile=vehicle
         )
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
