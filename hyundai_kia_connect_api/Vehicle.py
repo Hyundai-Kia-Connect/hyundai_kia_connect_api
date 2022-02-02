@@ -50,6 +50,7 @@ class Vehicle:
     front_right_seat_status: str = None
     rear_left_seat_status: str = None
     rear_right_seat_status: str = None
+    
     ## Door Status
     is_locked: bool = None
     front_left_door_is_open: bool = None

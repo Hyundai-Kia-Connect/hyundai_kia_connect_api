@@ -16,9 +16,13 @@ _LOGGER = logging.getLogger(__name__)
 class ClimateRequestOptions:
     set_temp: str = None
     duration: int = None
-    defrost = None
-    climate: int = None
-    heating: int = None
+    defrost: bool = None
+    climate: bool = None
+    heating: bool = None
+    front_left_status: str = None
+    front_right_status: str = None
+    rear_left_status: str = None
+    rear_right_status: str = None
 
 
 class ApiImpl:
