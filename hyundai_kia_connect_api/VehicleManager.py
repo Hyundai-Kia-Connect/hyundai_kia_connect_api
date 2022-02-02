@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytz
 
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -15,6 +15,7 @@ from .const import (
     REGION_EUROPE,
     REGION_USA,
     REGIONS,
+    VEHICLE_LOCK_ACTION,
 )
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -88,6 +89,30 @@ class VehicleManager:
             self.token = self.api.login(self.username, self.password)
             return True
         return False
+
+    def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
+        return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
+            
+    def stop_climate(self, vehicle_id: str) -> str:
+        return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
+
+    def lock(self, vehicle_id: str) -> str:
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK)
+    
+    def unlock(self, vehicle_id: str) -> str:
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK)
+
+    def start_charge(self, vehicle_id: str) -> str:
+        return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
+
+    def stop_charge(self, vehicle_id: str) -> str:
+        return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
+
+    def set_charge_limits(self, vehicle_id: str, ac_limit: int, dc_limit: int) -> str:
+        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac_limit, dc_limit)
+
+    def check_action_status(self, vehicle_id: str, action_id: str):
+        return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
