@@ -148,8 +148,7 @@ class KiaUvoAPIUSA(ApiImpl):
         return requests.get(url, headers=headers)
 
     def login(self, username: str, password: str) -> Token:
-
-        # Sign In with Email and Password and Get Authorization Code
+        """Login into cloud endpoints and return Token"""
 
         url = self.API_URL + "prof/authUser"
 
@@ -176,6 +175,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
@@ -195,6 +195,7 @@ class KiaUvoAPIUSA(ApiImpl):
         return result
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Get cached vehicle data and update Vehicle instance with it"""
         state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.lastStatusDate")
@@ -392,10 +393,8 @@ class KiaUvoAPIUSA(ApiImpl):
     def get_location(self, token: Token, vehicle_id: str) -> None:
         pass
 
-    def _get_pin_token(self, token: Token, vehicle_id: str) -> None:
-        pass
 
-    def update_vehicle_status(self, token: Token, vehicle: Vehicle):
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.API_URL + "rems/rvs"
         body = {
             "requestType": 0  # value of 1 would return cached results instead of forcing update
