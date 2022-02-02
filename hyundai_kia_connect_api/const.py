@@ -15,8 +15,8 @@ LENGTH_KILOMETERS = "km"
 LENGTH_MILES = "mi"
 DISTANCE_UNITS = {None: None, 1: LENGTH_KILOMETERS, 3: LENGTH_MILES}
 
-TEMPERATURE_C = "c"
-TEMPERATURE_F = "f"
+TEMPERATURE_C = "°C"
+TEMPERATURE_F = "°F"
 TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
 
 SEAT_STATUS = {
@@ -31,6 +31,11 @@ SEAT_STATUS = {
     7: "Medium Heat",
     8: "High Heat",
 }
+
+class ENGINE_TYPES(Enum):
+    ICE = "ICE"
+    EV = "EV"
+    PHEV = "PHEV"
 
 
 class VEHICLE_LOCK_ACTION(Enum):

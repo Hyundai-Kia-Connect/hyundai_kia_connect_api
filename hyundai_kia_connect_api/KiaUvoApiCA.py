@@ -15,6 +15,8 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     SEAT_STATUS,
+    ENGINE_TYPES,
+    VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
 from .utils import (
@@ -28,14 +30,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class KiaUvoApiCA(ApiImpl):
-    temperature_range = [x * 0.5 for x in range(32, 64)]
+    temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
+    temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
 
     def __init__(self, region: int, brand: int) -> None:
-
-        self.last_action_tracked = True
-        self.last_action_xid = None
-        self.last_action_completed = False
-        self.last_action_pin_auth = None
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
@@ -95,12 +93,20 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         result = []
         for entry in response["result"]["vehicles"]:
+            entry_engine_type = None
+            if(entry["fuelKindCode"] == "G"):
+                entry_engine_type = ENGINE_TYPES.ICE
+            elif(entry["fuelKindCode"] == "E"):
+                entry_engine_type = ENGINE_TYPES.EV
+            elif(entry["fuelKindCode"] == "P"): 
+                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry["modelName"],
-                year=entry["modelYear"],
+                year=int(entry["modelYear"]),
                 VIN=entry["vin"],
+                engine_type=entry_engine_type
             )
             result.append(vehicle)
         return result
@@ -138,7 +144,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "status.engine")
         vehicle.air_temperature = (
             get_child_value(state, "status.airTemp.value"),
-            "c",
+            "°C",
         )
         vehicle.defrost_is_on = get_child_value(state, "status.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -161,8 +167,8 @@ class KiaUvoApiCA(ApiImpl):
         )]
         vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.rrSeatHeatState"
-        )]
-        vehicle.is_locked = not get_child_value(state, "status.doorLock")
+        )
+        vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "status.doorOpen.frontLeft"
         )
@@ -255,8 +261,10 @@ class KiaUvoApiCA(ApiImpl):
 
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(response, "airTemp.value"))
-        if get_child_value(response, "airTemp.unit") == 0:
-            response["airTemp"]["value"] = self.temperature_range[tempIndex]
+        if get_child_value(response, "airTemp.unit") == 0 and vehicle.year < 2020:
+            response["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
+        elif get_child_value(response, "airTemp.unit") == 0 and vehicle.year >= 2020: 
+            response["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
 
         status = {}
         status["status"] = response
@@ -328,12 +336,12 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def lock_action(self, token: Token, action, vehicle: Vehicle) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "drlck"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "drulck"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
         headers = self.API_HEADERS
@@ -346,23 +354,28 @@ class KiaUvoApiCA(ApiImpl):
         )
         response_headers = response.headers
         response = response.json()
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response")
+        return response_headers["transactionId"]
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         url = self.API_URL + "rmtstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token)
 
-        hex_set_temp = get_index_into_hex_temp(
-            self.temperature_range.index(options.set_temp)
-        )
+        if vehicle.year < 2020:
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range_c_old.index(options.set_temp)
+            )
+        elif vehicle.year >= 2020: 
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range_c_new.index(options.set_temp)
+            )
+
 
         payload = {
             "setting": {
@@ -382,14 +395,12 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
+        return response_headers["transactionId"]
 
     def start_climate_ev(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         # TODO: get rid of this function as we can access all vehicle information from `start_climate` function
         url = self.API_URL + "evc/rfon"
         headers = self.API_HEADERS
@@ -420,11 +431,10 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
         _LOGGER.debug(f"{DOMAIN} - Received start_climate_ev response {response}")
+        return response_headers["transactionId"]
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rmtstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -437,12 +447,10 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response")
+        return response_headers["transactionId"]
 
-    def stop_climate_ev(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate_ev(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rfoff"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -454,13 +462,10 @@ class KiaUvoApiCA(ApiImpl):
         )
         response_headers = response.headers
         response = response.json()
-
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
-
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response")
+        return response_headers["transactionId"]
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle) -> None:
+    def check_last_action_status(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -478,7 +483,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Last action_status: {action_status}")
         return self.last_action_completed
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -492,8 +497,9 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        return response_headers["transactionId"]
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -507,3 +513,4 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        return response_headers["transactionId"]

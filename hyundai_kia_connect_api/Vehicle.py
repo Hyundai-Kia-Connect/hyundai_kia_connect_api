@@ -109,7 +109,7 @@ class Vehicle:
     fuel_level_is_low: bool = None
 
     # Calculated fields
-    engine_type = None
+    engine_type: str = None
 
     # Debug fields
     data: dict = None

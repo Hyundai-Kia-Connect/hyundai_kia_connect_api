@@ -1,12 +1,11 @@
-import json
+from locale import D_T_FMT
 import logging
-import random
 import time
-import uuid
-from datetime import datetime, timedelta
+import pytz
+import datetime as dt
+import re
 from urllib.parse import parse_qs, urlparse
 
-import curlify
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
@@ -42,7 +41,7 @@ class cipherAdapter(HTTPAdapter):
 class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = datetime.now() - timedelta(hours=3)
+    last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
 
     def __init__(
         self,
@@ -56,7 +55,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         
         ts = time.time()
         utc_offset = (
-            datetime.fromtimestamp(ts) - datetime.utcfromtimestamp(ts)
+            dt.datetime.fromtimestamp(ts) - dt.datetime.utcfromtimestamp(ts)
         ).total_seconds()
         utc_offset_hours = int(utc_offset / 60 / 60)
 
@@ -80,8 +79,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "encryptFlag": "false",
             "brandIndicator": "H",
             "gen": "2",
-            "username": self.username,
-            "blueLinkServicePin": self.pin,
             "client_id": "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920",
             "clientSecret": "v558o935-6nne-423i-baa8",
         }
@@ -98,6 +95,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         data = {"username": username, "password": password}
         headers = self.API_HEADERS
+        headers["username"] = username
+
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
@@ -108,7 +107,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
 
-        valid_until = (datetime.now() + timedelta(seconds=expires_in))
+        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
 
         return Token(
             username=username,
@@ -123,7 +122,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.vin
+        headers["vin"] = vehicle.VIN
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
 
@@ -144,18 +145,15 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle_status["vehicleLocation"] = vehicle_status["vehicleStatus"][
             "vehicleLocation"
         ]
-
-        # Get Odomoter Details - Needs to be refactored
-        #response = self.get_vehicle(token.access_token)
-        #vehicle_status["odometer"] = {}
-        #vehicle_status["odometer"]["unit"] = 3
-        #vehicle_status["odometer"]["value"] = response["enrolledVehicleDetails"][0][
-        #    "vehicleDetails"
-        #]["odometer"]
-
-        #vehicle_status["vehicleLocation"] = self.get_location(
-        #    token, vehicle_status["odometer"]["value"]
-        #)
+        vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
+        
+        if vehicle.odometer:
+            if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer.value"):
+                vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
+            else:
+                vehicle_status["vehicleLocation"] = None
+        else:
+            vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
         return vehicle_status
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -168,11 +166,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "km",
+            "mi",
         )
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
-            "km",
+            get_child_value(state, "vehicleDetails.odometer.value"),
+            "mi",
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -180,7 +178,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
-            "c",
+            "f",
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -275,71 +273,49 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.data = state
         
-    def get_location(self, token: Token, vehicle: Vehicle) -> None:
+    def get_location(self, token: Token, vehicle: Vehicle):
         r"""
         Get the location of the vehicle
-
+        This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per: 
         Only update the location if the odometer moved AND if the last location update was over an hour ago.
         Note that the "last updated" time is initially set to three hours ago.
-
-        This will help to prevent too many cals to the API
+        This will help to prevent too many calls to the API
         """
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
-        #Not used, not sure why it is here? 
-        #headers["pAuth"] = self.get_pin_token(token)
-        
+        headers["vehicleId"] = token.vehicle_id
+        headers["pAuth"] = self.get_pin_token(token)
         try:
-            HyundaiBlueLinkAPIUSA.last_loc_timestamp = datetime.now()
             response = self.sessions.get(url, headers=headers)
             response_json = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
             if response_json.get("coord") is not None:
                 return response_json
             else:
-                # Check for rate limit exceeded
-                # These hard-coded values were extracted from a rate limit exceeded response.  In either case the log
-                # will include the full response when the "coord" attribute is not present
                 if (
                     response_json.get("errorCode", 0) == 502
                     and response_json.get("errorSubCode", "") == "HT_534"
                 ):
-                    # rate limit exceeded; set the last_loc_timestamp such that the next check will be at least 12 hours from now
-                    HyundaiBlueLinkAPIUSA.last_loc_timestamp = (
-                        datetime.now() + timedelta(hours=11)
-                    )
                     _LOGGER.warn(
-                        f"{DOMAIN} - get vehicle location rate limit exceeded.  Location will not be fetched until at least {HyundaiBlueLinkAPIUSA.last_loc_timestamp + timedelta(hours = 12)}"
+                        f"{DOMAIN} - get vehicle location rate limit exceeded."
                     )
                 else:
                     _LOGGER.warn(
                         f"{DOMAIN} - Unable to get vehicle location: {response_json}"
                     )
 
-                if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-                    return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                        "vehicleLocation"
-                    )
-                else:
-                    return None
-
         except Exception as e:
             _LOGGER.warning(
                 f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
             )
-            if HyundaiBlueLinkAPIUSA.old_vehicle_status is not None:
-                return HyundaiBlueLinkAPIUSA.old_vehicle_status.get(
-                    "vehicleLocation"
-                )
-            else:
-                return None
+
 
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
+        headers["username"] = token.username
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -357,29 +333,45 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         return result
 
+    def _get_vehicle(self, token: Token, vehicle: Vehicle):
+        url = self.API_URL + "enrollment/details/" + token.username
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["username"] = token.username
+        response = self.sessions.get(url, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        response = response.json()
+        for entry in response["enrolledVehicleDetails"]:
+            entry = entry["vehicleDetails"]
+            if entry["regid"] == vehicle.id:
+                return entry
+
+
     def get_pin_token(self, token: Token):
         pass
 
-    def update_vehicle_status(self, token: Token):
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rcs/rdo/off"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "rcs/rdo/on"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.vin
+        headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
-        headers["APPCLOUD-VIN"] = vehicle.vin
+        headers["APPCLOUD-VIN"] = vehicle.VIN
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
-        data = {"userName": self.username, "vin": vehicle.vin}
+        data = {"userName": self.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
@@ -400,8 +392,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.vin
+        headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         data = {
@@ -432,8 +426,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.vin
+        headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
@@ -448,3 +444,19 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
+
+    def get_last_updated_at(self, value) -> dt.datetime:
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
+        value = dt.datetime(
+            year=int(m.group(1)),
+            month=int(m.group(2)),
+            day=int(m.group(3)),
+            hour=int(m.group(4)),
+            minute=int(m.group(5)),
+            second=int(m.group(6)),
+            tzinfo=self.data_timezone,
+        )
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+
+        return value
