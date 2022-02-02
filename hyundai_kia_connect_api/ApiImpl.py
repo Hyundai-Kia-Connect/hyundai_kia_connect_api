@@ -50,9 +50,11 @@ class ApiImpl:
         pass
 
     def check_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
+        """Check if a previous placed call was successful"""
         pass
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Triggers the system to contact the car and get fresh data"""
         pass
 
     def get_geocoded_location(self, lat, lon) -> dict:
@@ -73,6 +75,7 @@ class ApiImpl:
         return response
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
+        """Lock or unlocks a vehicle.  Returns the tracking ID"""
         pass
 
     def start_climate(
@@ -80,20 +83,26 @@ class ApiImpl:
         token: Token,
         vehicle: Vehicle,
         options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
+        """Starts climate or remote start.  Returns the tracking ID"""
+
         pass
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        """Stops climate or remote start.  Returns the tracking ID"""
         pass
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        """Starts charge. Returns the tracking ID"""
         pass
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        """Stops charge. Returns the tracking ID"""
         pass
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int
     ) -> str:
+        """Sets charge limits. Returns the tracking ID"""
         pass
 
