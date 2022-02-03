@@ -200,7 +200,7 @@ class KiaUvoAPIUSA(ApiImpl):
         """Get cached vehicle data and update Vehicle instance with it"""
         state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.lastStatusDate")
+            get_child_value(state, "vehicleStatus.syncDate.utc")
         )
         vehicle.total_driving_distance = (
             get_child_value(
