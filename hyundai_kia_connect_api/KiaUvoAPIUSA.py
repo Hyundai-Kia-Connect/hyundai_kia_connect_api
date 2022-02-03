@@ -11,7 +11,7 @@ import pytz
 import requests
 from requests import RequestException, Response
 
-from .const import DOMAIN, VEHICLE_LOCK_ACTION
+from .const import DOMAIN, VEHICLE_LOCK_ACTION, TEMPERATURE_UNITS
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
@@ -227,7 +227,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
             get_child_value(state, "vehicleStatus.airTemp.value"),
-            "c",
+            TEMPERATURE_UNITS[1],
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -251,7 +251,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.rear_right_seat_heater_is_on = get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )
-        vehicle.is_locked = not get_child_value(state, "vehicleStatus.doorLock")
+        vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
