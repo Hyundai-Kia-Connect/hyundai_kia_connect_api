@@ -143,7 +143,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "status.engine")
         vehicle.air_temperature = (
             get_child_value(state, "status.airTemp.value"),
-            "°C",
+            TEMPERATURE_UNITS[0],
         )
         vehicle.defrost_is_on = get_child_value(state, "status.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
