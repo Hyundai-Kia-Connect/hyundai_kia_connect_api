@@ -11,7 +11,7 @@ import pytz
 import requests
 from requests import RequestException, Response
 
-from .const import DOMAIN, VEHICLE_LOCK_ACTION, TEMPERATURE_UNITS
+from .const import DOMAIN, VEHICLE_LOCK_ACTION, TEMPERATURE_UNITS, DISTANCE_UNITS
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
@@ -207,22 +207,22 @@ class KiaUvoAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "km",
+            DISTANCE_UNITS[3],
         )
         vehicle.odometer = (
-            get_child_value(state, "service.currentOdometer"),
-            "km",
+            get_child_value(state, "odometer.value"),
+            DISTANCE_UNITS[3],
         )
         vehicle.next_service_distance = (
             get_child_value(state, "service.imatServiceOdometer"),
-            "km",
+            DISTANCE_UNITS[3],
         )
         vehicle.last_service_distance = (
             get_child_value(state, "service.msopServiceOdometer"),
-            "km",
+            DISTANCE_UNITS[3],
         )
         vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
+            state, "vehicleStatus.batteryStatus.stateOfCharge"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
@@ -230,6 +230,10 @@ class KiaUvoAPIUSA(ApiImpl):
             TEMPERATURE_UNITS[1],
         )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
+        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
+        vehicle.tire_pressure_all_warning_is_on = get_child_value(state, "vehicleStatus.tirePressure.all")
+
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
         )
@@ -253,20 +257,20 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontLeft"
+            state, "vehicleStatus.doorStatus.frontLeft"
         )
         vehicle.front_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontRight"
+            state, "vehicleStatus.doorStatus.frontRight"
         )
         vehicle.back_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backLeft"
+            state, "vehicleStatus.doorStatus.backLeft"
         )
         vehicle.back_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backRight"
+            state, "vehicleStatus.doorStatus.backRight"
         )
-        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
+        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.doorStatus.hood")
 
-        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
+        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.doorStatus.trunk")
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
         )
@@ -281,7 +285,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "km",
+            DISTANCE_UNITS[3],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -302,11 +306,13 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                "vehicleStatus.dte.value",
             ),
-            "km",
+            DISTANCE_UNITS[3],
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+        vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
+
         vehicle.data = state
 
     def get_last_updated_at(self, value) -> dt.datetime:
@@ -371,21 +377,10 @@ class KiaUvoAPIUSA(ApiImpl):
             ]["location"],
         }
 
-        vehicle_status["time"] = vehicle_status["syncDate"]["utc"]
-
-        if vehicle_status["batteryStatus"].get("stateOfCharge"):
-            vehicle_status["battery"] = {
-                "batSoc": vehicle_status["batteryStatus"]["stateOfCharge"],
-            }
-
         if vehicle_status.get("evStatus"):
             vehicle_status["evStatus"]["remainTime2"] = {
                 "atc": vehicle_status["evStatus"]["remainChargeTime"][0]["timeInterval"]
             }
-
-        vehicle_status["doorOpen"] = vehicle_status["doorStatus"]
-        vehicle_status["trunkOpen"] = vehicle_status["doorStatus"]["trunk"]
-        vehicle_status["hoodOpen"] = vehicle_status["doorStatus"]["hood"]
 
         if vehicle_status.get("tirePressure"):
             vehicle_status["tirePressureLamp"] = {
