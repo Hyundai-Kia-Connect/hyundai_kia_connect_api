@@ -45,9 +45,7 @@ class VehicleManager:
     def initialize(self) -> None:
         self.token: Token = self.api.login(self.username, self.password)
         self.token.pin = self.pin
-        vehicles = self.api.get_vehicles(self.token)
-        for vehicle in vehicles:
-            self.vehicles[vehicle.id] = vehicle
+        self.refresh_vehicles()
         self.update_all_vehicles_with_cached_state()
         
     def get_vehicle(self, vehicle_id) -> Vehicle:
@@ -87,8 +85,16 @@ class VehicleManager:
         if self.token.valid_until <= dt.datetime.now(pytz.utc):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token = self.api.login(self.username, self.password)
+            self.refresh_vehicles()
             return True
         return False
+
+    def refresh_vehicles(self) -> None:
+            vehicles = self.api.get_vehicles(self.token)
+            for vehicle in vehicles:
+                self.vehicles[vehicle.id] = vehicle
+
+
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
