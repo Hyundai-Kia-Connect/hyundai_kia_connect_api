@@ -38,6 +38,10 @@ class ApiImpl:
         """Return all Vehicle instances for a given Token"""
         pass
 
+    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+        """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
+        pass
+
     def get_last_updated_at(self, value) -> dt.datetime:
         """Convert last updated value of vehicle into into datetime"""
         pass
