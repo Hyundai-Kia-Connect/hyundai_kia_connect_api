@@ -191,10 +191,32 @@ class KiaUvoAPIUSA(ApiImpl):
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
-                registration_date=None,
             )
             result.append(vehicle)
         return result
+
+    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+        """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
+        url = self.API_URL + "ownr/gvl"
+        headers = self.api_headers()
+        headers["sid"] = token.access_token
+        response = requests.get(url, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        response = response.json()
+        for entry in response["payload"]["vehicleSummary"]:
+            if vehicles[entry["vehicleIdentifier"]]:
+                vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
+                vehicles[entry["vehicleIdentifier"]].model=entry["modelName"]
+                vehicles[entry["vehicleIdentifier"]].key=entry["vehicleKey"]
+            else:
+                vehicle: Vehicle = Vehicle(
+                    id=entry["vehicleIdentifier"],
+                    name=entry["nickName"],
+                    model=entry["modelName"],
+                    key=entry["vehicleKey"],
+                )
+                vehicles.append(vehicle)
+
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
