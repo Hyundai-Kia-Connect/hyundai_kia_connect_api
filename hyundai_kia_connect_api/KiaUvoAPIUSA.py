@@ -33,12 +33,11 @@ def request_with_active_session(func):
             self = args[0]
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
-            new_token = self.login()
+            new_token = self.login(token.username, token.password)
             _LOGGER.debug(
                 f"old token:{token.access_token}, new token:{new_token.access_token}"
             )
             token.access_token = new_token.access_token
-            token.vehicle_regid = new_token.vehicle_regid
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
             if json_body is not None and json_body.get("vinKey", None):
