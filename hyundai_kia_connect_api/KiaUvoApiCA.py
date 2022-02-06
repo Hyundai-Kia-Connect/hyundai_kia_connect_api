@@ -331,7 +331,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def lock_action(self, token: Token, action, vehicle: Vehicle) -> str:
+    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "drlck"
@@ -358,7 +358,6 @@ class KiaUvoApiCA(ApiImpl):
     ) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
             url = self.API_URL + "evc/rfon"
-
         else: 
             url = self.API_URL + "rmtstrt"
         headers = self.API_HEADERS
