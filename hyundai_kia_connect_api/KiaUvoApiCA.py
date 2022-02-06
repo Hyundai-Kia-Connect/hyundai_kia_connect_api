@@ -333,10 +333,10 @@ class KiaUvoApiCA(ApiImpl):
 
     def lock_action(self, token: Token, action, vehicle: Vehicle) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "drlck"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "drulck"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
         headers = self.API_HEADERS
@@ -349,10 +349,9 @@ class KiaUvoApiCA(ApiImpl):
         )
         response_headers = response.headers
         response = response.json()
-        self.last_action_xid = response_headers["transactionId"]
-        self.last_action_pin_auth = headers["pAuth"]
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response")
+        return response_headers["transactionId"]
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
