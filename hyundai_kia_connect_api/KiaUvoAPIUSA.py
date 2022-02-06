@@ -143,9 +143,9 @@ class KiaUvoAPIUSA(ApiImpl):
     @request_with_active_session
     @request_with_logging
     def get_request_with_logging_and_active_session(
-        self, token: Token, url: str
+        self, token: Token, url: str, vehicle: Vehicle
     ) -> Response:
-        headers = self.authed_api_headers(token)
+        headers = self.authed_api_headers(token, vehicle)
         return requests.get(url, headers=headers)
 
     def login(self, username: str, password: str) -> Token:
@@ -514,7 +514,7 @@ class KiaUvoAPIUSA(ApiImpl):
     def stop_charge(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "evc/cancel"
         response = self.get_request_with_logging_and_active_session(
-            token=token, url=url
+            token=token, url=url, vehicle=vehicle
         )
         return response.headers["Xid"]
 
