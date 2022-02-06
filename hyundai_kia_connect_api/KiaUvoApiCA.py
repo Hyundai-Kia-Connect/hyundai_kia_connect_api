@@ -32,6 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 class KiaUvoApiCA(ApiImpl):
     temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
+    temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int) -> None:
 
@@ -103,7 +104,7 @@ class KiaUvoApiCA(ApiImpl):
             result.append(vehicle)
         return result
 
-     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "status.lastStatusDate")
@@ -254,7 +255,7 @@ class KiaUvoApiCA(ApiImpl):
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(response, "airTemp.value"))
         if get_child_value(response, "airTemp.unit") == 0:
-            if vehicle.year > 2020:
+            if vehicle.year > self.temperature_range_model_year:
                 response["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
 
             else:
@@ -365,7 +366,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token)
-        if vehicle.year > 2020:
+        if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
