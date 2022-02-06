@@ -16,6 +16,8 @@ from .const import (
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
     VEHICLE_LOCK_ACTION,
+    SEAT_STATUS,
+    ENGINE_TYPES,
 )
 from .Token import Token
 from .utils import (
@@ -31,6 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 class KiaUvoApiCA(ApiImpl):
     temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
+    temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int) -> None:
 
@@ -260,10 +263,12 @@ class KiaUvoApiCA(ApiImpl):
 
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(response, "airTemp.value"))
-        if get_child_value(response, "airTemp.unit") == 0 and vehicle.year < 2020:
-            response["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
-        elif get_child_value(response, "airTemp.unit") == 0 and vehicle.year >= 2020: 
-            response["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
+        if get_child_value(response, "airTemp.unit") == 0:
+            if vehicle.year > self.temperature_range_model_year:
+                response["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
+
+            else:
+                response["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
 
         status = {}
         status["status"] = response
@@ -360,19 +365,21 @@ class KiaUvoApiCA(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.API_URL + "rmtstrt"
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            url = self.API_URL + "evc/rfon"
+        else: 
+            url = self.API_URL + "rmtstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token)
-
-        if vehicle.year < 2020:
-            hex_set_temp = get_index_into_hex_temp(
-                self.temperature_range_c_old.index(options.set_temp)
-            )
-        elif vehicle.year >= 2020: 
+        if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
+            )
+        else:
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range_c_old.index(options.set_temp)
             )
 
 
@@ -393,44 +400,8 @@ class KiaUvoApiCA(ApiImpl):
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
-
+        
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
-        return response_headers["transactionId"]
-
-    def start_climate_ev(
-        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> str:
-        # TODO: get rid of this function as we can access all vehicle information from `start_climate` function
-        url = self.API_URL + "evc/rfon"
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle.id)
-
-        hex_set_temp = get_index_into_hex_temp(self.temperature_range.index(options.set_temp))
-
-        payload = {
-            "hvacInfo": {
-                "airCtrl": int(options.climate),
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-                "airTemp": {
-                    "value": hex_set_temp,
-                    "unit": 0,
-                    "hvacTempType": 1,
-                },
-            },
-            "pin": token.pin,
-        }
-
-        data = json.dumps(payload)
-        # _LOGGER.debug(f"{DOMAIN} - Planned start_climate_ev payload {payload}")
-
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response_headers = response.headers
-        response = response.json()
-
-        _LOGGER.debug(f"{DOMAIN} - Received start_climate_ev response {response}")
         return response_headers["transactionId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
