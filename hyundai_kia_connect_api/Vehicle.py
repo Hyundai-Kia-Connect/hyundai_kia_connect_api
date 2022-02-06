@@ -4,6 +4,8 @@ import dataclasses
 import datetime
 import re
 
+import pytz
+
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,6 +75,12 @@ class Vehicle:
     _last_service_distance: float = None
     _last_service_distance_value: float = None
     _last_service_distance_unit: str = None
+
+    # Location
+    _location_latitude: float = None
+    _location_longitude: float = None
+    _location_last_set_time: datetime.datetime = None
+
     # EV fields (EV/PHEV)
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
@@ -143,6 +151,24 @@ class Vehicle:
         self._last_service_distance_unit = value[1]
         self._last_service_distance = value[0]
 
+    @property
+    def location_latitude(self):
+        return self._location_latitude
+
+    @property
+    def location_longitude(self):
+        return self._location_longitude
+
+    @property
+    def location(self):
+        return self._location_longitude, self._location_latitude
+    
+    @location.setter
+    def location(self, latitude, longitude):
+        self._location_latitude = latitude
+        self._location_longitude = longitude
+        self._location_last_set_time = datetime.datetime.now(pytz)
+    
     @property
     def odometer(self):
         return self._odometer
