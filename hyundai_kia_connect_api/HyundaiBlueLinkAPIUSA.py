@@ -274,7 +274,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
             get_child_value(state, "vehicleStatus.vehicleLocation.time"),
 
-        )
+        )        
+        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
+
         vehicle.data = state
         
     def get_location(self, token: Token, vehicle: Vehicle):

@@ -44,6 +44,7 @@ class Vehicle:
     _air_temperature_value: float = None
     _air_temperature_unit: str = None
 
+    air_control_is_on: bool = None
     defrost_is_on: bool = None
     steering_wheel_heater_is_on: bool = None
     back_window_heater_is_on: bool = None
