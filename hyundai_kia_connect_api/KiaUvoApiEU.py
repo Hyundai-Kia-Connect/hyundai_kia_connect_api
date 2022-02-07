@@ -292,6 +292,12 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+        vehicle.location = (
+            get_child_value(state, "vehicleLocation.coord.lat"),
+            get_child_value(state, "vehicleLocation.coord.lon"),
+            get_child_value(state, "vehicleLocation.time"),
+
+        )
         vehicle.data = state
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
