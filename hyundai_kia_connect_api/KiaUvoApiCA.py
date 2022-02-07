@@ -230,6 +230,14 @@ class KiaUvoApiCA(ApiImpl):
             ),
             DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
         )
+
+        vehicle.location = (
+            get_child_value(state, "vehicleLocation.coord.lat"),
+            get_child_value(state, "vehicleLocation.coord.lon"),
+            get_child_value(state, "vehicleLocation.time"),
+
+        )
+
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.data = state
 
@@ -275,6 +283,7 @@ class KiaUvoApiCA(ApiImpl):
 
         # Service Status Call
         status["service"] = self._get_next_service(token, vehicle)
+        #Get location if the car has moved since last call
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(status, "service.currentOdometer"):
                 status["vehicleLocation"] = self.get_location(token, vehicle)
