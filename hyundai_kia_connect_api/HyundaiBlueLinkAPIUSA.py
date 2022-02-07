@@ -142,9 +142,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             .replace(":", "")
             .replace("Z", "")
         )
-        vehicle_status["vehicleLocation"] = vehicle_status["vehicleStatus"][
-            "vehicleLocation"
-        ]
+
         vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
         
         if vehicle.odometer:
@@ -271,6 +269,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "km",
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+        vehicle.location = (
+            get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
+            get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
+            get_child_value(state, "vehicleStatus.vehicleLocation.time"),
+
+        )
         vehicle.data = state
         
     def get_location(self, token: Token, vehicle: Vehicle):
