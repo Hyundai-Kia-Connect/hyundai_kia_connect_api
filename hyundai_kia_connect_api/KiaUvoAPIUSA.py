@@ -333,6 +333,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
+        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
         vehicle.location = (
             get_child_value(state, "vehicleLocation.coord.lat"),
@@ -340,7 +341,7 @@ class KiaUvoAPIUSA(ApiImpl):
             get_child_value(state, "vehicleLocation.time"),
 
         )
-
+    
         vehicle.data = state
 
     def get_last_updated_at(self, value) -> dt.datetime:
