@@ -86,33 +86,32 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         response = requests.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        result = []
         for entry in response["result"]["vehicles"]:
-            if vehicles.get(entry["vehicleId"]):
-                vehicles[entry["vehicleId"]].name=entry["nickName"]
-            else:
-                entry_engine_type = None
-                if(entry["fuelKindCode"] == "G"):
-                    entry_engine_type = ENGINE_TYPES.ICE
-                elif(entry["fuelKindCode"] == "E"):
-                    entry_engine_type = ENGINE_TYPES.EV
-                elif(entry["fuelKindCode"] == "P"): 
-                    entry_engine_type = ENGINE_TYPES.PHEV
-                vehicle: Vehicle = Vehicle(
-                    id=entry["vehicleId"],
-                    name=entry["nickName"],
-                    model=entry["modelName"],
-                    year=int(entry["modelYear"]),
-                    VIN=entry["vin"],
-                    engine_type=entry_engine_type
-                )
-                vehicles[vehicle.id] = vehicle
+            entry_engine_type = None
+            if(entry["fuelKindCode"] == "G"):
+                entry_engine_type = ENGINE_TYPES.ICE
+            elif(entry["fuelKindCode"] == "E"):
+                entry_engine_type = ENGINE_TYPES.EV
+            elif(entry["fuelKindCode"] == "P"): 
+                entry_engine_type = ENGINE_TYPES.PHEV
+            vehicle: Vehicle = Vehicle(
+                id=entry["vehicleId"],
+                name=entry["nickName"],
+                model=entry["modelName"],
+                year=int(entry["modelYear"]),
+                VIN=entry["vin"],
+                engine_type=entry_engine_type
+            )
+            result.append(vehicle)
+        return result
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
@@ -231,13 +230,13 @@ class KiaUvoApiCA(ApiImpl):
             ),
             DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
         )
-        if get_child_value(state, "vehicleLocation.coord.lat"):
-            vehicle.location = (
-                get_child_value(state, "vehicleLocation.coord.lat"),
-                get_child_value(state, "vehicleLocation.coord.lon"),
-                get_child_value(state, "vehicleLocation.time"),
 
-            )
+        vehicle.location = (
+            get_child_value(state, "vehicleLocation.coord.lat"),
+            get_child_value(state, "vehicleLocation.coord.lon"),
+            get_child_value(state, "vehicleLocation.time"),
+
+        )
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         vehicle.data = state

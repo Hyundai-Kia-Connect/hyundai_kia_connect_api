@@ -127,7 +127,7 @@ class KiaUvoApiEU(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def get_vehicles(self, token: Token) -> None:
         url = self.SPA_API_URL + "vehicles"
         headers = {
             "Authorization": token.access_token,

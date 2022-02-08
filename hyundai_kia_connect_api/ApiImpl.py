@@ -24,6 +24,7 @@ class ClimateRequestOptions:
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
+    refresh_vehicles_on_token_refresh = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -34,11 +35,11 @@ class ApiImpl:
         """Login into cloud endpoints and return Token"""
         pass
 
-    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
-        """Update all Vehicle instances for a given Token"""
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Return all Vehicle instances for a given Token"""
         pass
 
-    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def update_vehicle_tokens(self, token: Token, vehicles: dict) -> None:
         """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
         pass
 

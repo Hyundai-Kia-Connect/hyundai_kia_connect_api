@@ -80,7 +80,11 @@ class KiaUvoAPIUSA(ApiImpl):
         region: int,
         brand: int,
     ) -> None:
+        self.last_action_tracked = True
+        self.last_action_xid = None
+        self.last_action_completed = False
         self.temperature_range = range(62, 82)
+
         self.supports_soc_range = False
 
         # Randomly generate a plausible device id on startup
@@ -171,7 +175,7 @@ class KiaUvoAPIUSA(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
@@ -179,24 +183,23 @@ class KiaUvoAPIUSA(ApiImpl):
         response = requests.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        result = []
         for entry in response["payload"]["vehicleSummary"]:
-            if vehicles.get(entry["vehicleIdentifier"]):
-                vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
-                vehicles[entry["vehicleIdentifier"]].model=entry["modelName"]
-                vehicles[entry["vehicleIdentifier"]].key=entry["vehicleKey"]
-            else:
-                vehicle: Vehicle = Vehicle(
-                    id=entry["vehicleIdentifier"],
-                    name=entry["nickName"],
-                    model=entry["modelName"],
-                    key=entry["vehicleKey"],
-                )
-                vehicles[vehicle.id] = vehicle
+            vehicle: Vehicle = Vehicle(
+                id=entry["vehicleIdentifier"],
+                name=entry["nickName"],
+                model=entry["modelName"],
+                key=entry["vehicleKey"],
+            )
+            result.append(vehicle)
+        return result
 
-        for vehicle in vehicles:
-            #How do I check for a vehicle that is gone
-            pass
-            
+    def update_vehicle_tokens(self, token: Token, vehicles: dict) -> None:
+        new_vehicles = self.get_vehicles(token)
+        for new_vehicle in new_vehicles:
+            if self.vehicles.get(new_vehicle.id, None) is not None:
+                vehicle = self.vehicles[new_vehicle_id]
+                vehicle.key=entry["vehicleKey"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
@@ -429,22 +432,22 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"
-        body = {"xid": action_id}
+        body = {"xid": self.last_action_xid}
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_json = response.json()
-        last_action_completed = all(
+        self.last_action_completed = all(
             v == 0 for v in response_json["payload"].values()
         )
-        return last_action_completed
+        return self.last_action_completed
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
+    def lock_action(self, token: Token, action, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"Action for lock is: {action}")
-        if action == VEHICLE_LOCK_ACTION.LOCK:
+        if action == "close":
             url = self.API_URL + "rems/door/lock"
             _LOGGER.debug(f"Calling Lock")
-        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
+        else:
             url = self.API_URL + "rems/door/unlock"
             _LOGGER.debug(f"Calling unlock")
 
@@ -452,14 +455,14 @@ class KiaUvoAPIUSA(ApiImpl):
             token=token, url=url, vehicle=vehicle
         )
 
-        return response.headers["Xid"]
+        self.last_action_xid = response.headers["Xid"]
 
     def start_climate(
         self,
         token: Token,
         vehicle: Vehicle,
         options: ClimateRequestOptions
-    ) -> str:
+    ) -> None:
         url = self.API_URL + "rems/start"
         body = {
             "remoteClimate": {
@@ -483,7 +486,7 @@ class KiaUvoAPIUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        self.last_action_xid = response.headers["Xid"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "rems/stop"
