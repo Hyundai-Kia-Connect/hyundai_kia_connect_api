@@ -339,7 +339,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                     model=entry["modelCode"],
                     registration_date=["enrollmentDate"],
                 )
-                vehicles.append(vehicle)
+                vehicles[vehicle.id] = vehicle
 
     def _get_vehicle(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "enrollment/details/" + token.username

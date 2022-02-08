@@ -191,7 +191,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     model=entry["modelName"],
                     key=entry["vehicleKey"],
                 )
-                vehicles.append(vehicle)
+                vehicles[vehicle.id] = vehicle
 
         for vehicle in vehicles:
             #How do I check for a vehicle that is gone

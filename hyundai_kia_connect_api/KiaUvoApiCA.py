@@ -112,7 +112,7 @@ class KiaUvoApiCA(ApiImpl):
                     VIN=entry["vin"],
                     engine_type=entry_engine_type
                 )
-                vehicles.append(vehicle)
+                vehicles[vehicle.id] = vehicle
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
