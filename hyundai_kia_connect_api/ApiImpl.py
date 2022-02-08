@@ -24,6 +24,8 @@ class ClimateRequestOptions:
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
+    refresh_vehicles_on_token_refresh = False
+
 
     def __init__(self) -> None:
         """Initialize."""

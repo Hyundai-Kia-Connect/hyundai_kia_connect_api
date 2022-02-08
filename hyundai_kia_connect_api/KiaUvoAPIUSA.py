@@ -82,6 +82,8 @@ class KiaUvoAPIUSA(ApiImpl):
     ) -> None:
         self.temperature_range = range(62, 82)
         self.supports_soc_range = False
+        refresh_vehicles_on_token_refresh = True
+
 
         # Randomly generate a plausible device id on startup
         self.device_id = (
