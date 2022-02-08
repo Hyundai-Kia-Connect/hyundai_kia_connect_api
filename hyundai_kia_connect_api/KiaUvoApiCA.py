@@ -94,7 +94,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         for entry in response["result"]["vehicles"]:
-            if vehicles[entry["vehicleId"]]:
+            if vehicles.get(entry["vehicleId"]):
                 vehicles[entry["vehicleId"]].name=entry["nickName"]
             else:
                 entry_engine_type = None

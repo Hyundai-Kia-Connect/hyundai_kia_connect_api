@@ -328,7 +328,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
-            if vehicles[entry["regid"]]:
+            if vehicles.get(entry["regid"]):
                 vehicles[entry["regid"]].name=entry["nickName"]
                 vehicles[entry["regid"]].registration_date=entry["enrollmentDate"]
             else:

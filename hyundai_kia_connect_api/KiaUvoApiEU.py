@@ -142,7 +142,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
         for entry in response["resMsg"]["vehicles"]:
-            if vehicles[entry["vehicleId"]]:
+            if vehicles.get(entry["vehicleId"]):
                 vehicles[entry["vehicleId"]].name=entry["nickName"]
             else:
                 vehicle: Vehicle = Vehicle(

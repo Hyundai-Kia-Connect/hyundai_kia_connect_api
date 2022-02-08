@@ -180,7 +180,7 @@ class KiaUvoAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         for entry in response["payload"]["vehicleSummary"]:
-            if vehicles[entry["vehicleIdentifier"]]:
+            if vehicles.get(entry["vehicleIdentifier"]):
                 vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
                 vehicles[entry["vehicleIdentifier"]].model=entry["modelName"]
                 vehicles[entry["vehicleIdentifier"]].key=entry["vehicleKey"]
