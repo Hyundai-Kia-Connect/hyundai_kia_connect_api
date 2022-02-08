@@ -127,7 +127,7 @@ class KiaUvoApiEU(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
+    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         url = self.SPA_API_URL + "vehicles"
         headers = {
             "Authorization": token.access_token,
@@ -141,16 +141,17 @@ class KiaUvoApiEU(ApiImpl):
 
         response = requests.get(url, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
-        result = []
         for entry in response["resMsg"]["vehicles"]:
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-            )
-            result.append(vehicle)
-        return result
+            if vehicles[entry["vehicleId"]]:
+                vehicles[entry["vehicleId"]].name=entry["nickName"]
+            else:
+                vehicle: Vehicle = Vehicle(
+                    id=entry["vehicleId"],
+                    name=entry["nickname"],
+                    model=entry["vehicleName"],
+                    registration_date=entry["regDate"],
+                )
+                vehicles.append(vehicle)      
 
     def get_last_updated_at(self, value) -> dt.datetime:
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)

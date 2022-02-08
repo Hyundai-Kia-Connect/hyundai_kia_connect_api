@@ -317,7 +317,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             )
 
 
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -328,16 +328,18 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
-            vehicle: Vehicle = Vehicle(
-                id=entry["regid"],
-                name=entry["nickName"],
-                VIN=entry["vin"],
-                model=entry["modelCode"],
-                registration_date=["enrollmentDate"],
-            )
-            result.append(vehicle)
-
-        return result
+            if vehicles[entry["regid"]]:
+                vehicles[entry["regid"]].name=entry["nickName"]
+                vehicles[entry["regid"]].registration_date=entry["enrollmentDate"]
+            else:
+                vehicle: Vehicle = Vehicle(
+                    id=entry["regid"],
+                    name=entry["nickName"],
+                    VIN=entry["vin"],
+                    model=entry["modelCode"],
+                    registration_date=["enrollmentDate"],
+                )
+                vehicles.append(vehicle)
 
     def _get_vehicle(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "enrollment/details/" + token.username

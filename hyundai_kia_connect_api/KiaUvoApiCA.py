@@ -86,32 +86,33 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
+    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         url = self.API_URL + "vhcllst"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         response = requests.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        result = []
         for entry in response["result"]["vehicles"]:
-            entry_engine_type = None
-            if(entry["fuelKindCode"] == "G"):
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif(entry["fuelKindCode"] == "E"):
-                entry_engine_type = ENGINE_TYPES.EV
-            elif(entry["fuelKindCode"] == "P"): 
-                entry_engine_type = ENGINE_TYPES.PHEV
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickName"],
-                model=entry["modelName"],
-                year=int(entry["modelYear"]),
-                VIN=entry["vin"],
-                engine_type=entry_engine_type
-            )
-            result.append(vehicle)
-        return result
+            if vehicles[entry["vehicleId"]]:
+                vehicles[entry["vehicleId"]].name=entry["nickName"]
+            else:
+                entry_engine_type = None
+                if(entry["fuelKindCode"] == "G"):
+                    entry_engine_type = ENGINE_TYPES.ICE
+                elif(entry["fuelKindCode"] == "E"):
+                    entry_engine_type = ENGINE_TYPES.EV
+                elif(entry["fuelKindCode"] == "P"): 
+                    entry_engine_type = ENGINE_TYPES.PHEV
+                vehicle: Vehicle = Vehicle(
+                    id=entry["vehicleId"],
+                    name=entry["nickName"],
+                    model=entry["modelName"],
+                    year=int(entry["modelYear"]),
+                    VIN=entry["vin"],
+                    engine_type=entry_engine_type
+                )
+                vehicles.append(vehicle)
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)

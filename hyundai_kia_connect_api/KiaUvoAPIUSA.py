@@ -80,11 +80,7 @@ class KiaUvoAPIUSA(ApiImpl):
         region: int,
         brand: int,
     ) -> None:
-        self.last_action_tracked = True
-        self.last_action_xid = None
-        self.last_action_completed = False
         self.temperature_range = range(62, 82)
-
         self.supports_soc_range = False
 
         # Randomly generate a plausible device id on startup
@@ -175,27 +171,8 @@ class KiaUvoAPIUSA(ApiImpl):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
+    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Return all Vehicle instances for a given Token"""
-        url = self.API_URL + "ownr/gvl"
-        headers = self.api_headers()
-        headers["sid"] = token.access_token
-        response = requests.get(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        result = []
-        for entry in response["payload"]["vehicleSummary"]:
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleIdentifier"],
-                name=entry["nickName"],
-                model=entry["modelName"],
-                key=entry["vehicleKey"],
-            )
-            result.append(vehicle)
-        return result
-
-    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
-        """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
@@ -216,6 +193,10 @@ class KiaUvoAPIUSA(ApiImpl):
                 )
                 vehicles.append(vehicle)
 
+        for vehicle in vehicles:
+            #How do I check for a vehicle that is gone
+            pass
+            
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""

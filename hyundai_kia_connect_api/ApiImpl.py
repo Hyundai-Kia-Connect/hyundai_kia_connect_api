@@ -34,8 +34,8 @@ class ApiImpl:
         """Login into cloud endpoints and return Token"""
         pass
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        """Return all Vehicle instances for a given Token"""
+    def get_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+        """Update all Vehicle instances for a given Token"""
         pass
 
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
