@@ -23,6 +23,7 @@ from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import Vehicle
 
+
 _LOGGER = logging.getLogger(__name__)
 
 INVALID_STAMP_RETRY_COUNT = 10
@@ -467,7 +468,7 @@ class KiaUvoApiEU(ApiImpl):
         frequency = self.stamps["frequency"]
         generated_at = dt.dateutil.parser.isoparse(self.stamps["generated"])
         position = int(
-            (datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
+            (dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
