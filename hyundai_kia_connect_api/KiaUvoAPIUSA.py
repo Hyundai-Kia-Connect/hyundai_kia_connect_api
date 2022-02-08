@@ -448,22 +448,22 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"
-        body = {"xid": self.last_action_xid}
+        body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_json = response.json()
-        self.last_action_completed = all(
+        last_action_completed = all(
             v == 0 for v in response_json["payload"].values()
         )
-        return self.last_action_completed
+        return last_action_completed
 
-    def lock_action(self, token: Token, action, vehicle: Vehicle) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"Action for lock is: {action}")
-        if action == "close":
+        if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rems/door/lock"
             _LOGGER.debug(f"Calling Lock")
-        else:
+        elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "rems/door/unlock"
             _LOGGER.debug(f"Calling unlock")
 
@@ -471,14 +471,14 @@ class KiaUvoAPIUSA(ApiImpl):
             token=token, url=url, vehicle=vehicle
         )
 
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
 
     def start_climate(
         self,
         token: Token,
         vehicle: Vehicle,
         options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         url = self.API_URL + "rems/start"
         body = {
             "remoteClimate": {
@@ -502,7 +502,7 @@ class KiaUvoAPIUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        self.last_action_xid = response.headers["Xid"]
+        return response.headers["Xid"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "rems/stop"
