@@ -230,13 +230,13 @@ class KiaUvoApiCA(ApiImpl):
             ),
             DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
         )
+        if get_child_value(state, "vehicleLocation.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "vehicleLocation.coord.lat"),
+                get_child_value(state, "vehicleLocation.coord.lon"),
+                get_child_value(state, "vehicleLocation.time"),
 
-        vehicle.location = (
-            get_child_value(state, "vehicleLocation.coord.lat"),
-            get_child_value(state, "vehicleLocation.coord.lon"),
-            get_child_value(state, "vehicleLocation.time"),
-
-        )
+            )
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         vehicle.data = state
