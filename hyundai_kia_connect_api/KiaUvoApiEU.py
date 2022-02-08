@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 import pytz
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz
+from dateutil import tz, parser
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
@@ -101,8 +101,8 @@ class KiaUvoApiEU(ApiImpl):
             authorization_code = self._get_authorization_code_with_redirect_url(
                 username, password, cookies
             )
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
         except Exception as ex1:
+            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
             authorization_code = self._get_authorization_code_with_form(
                 username, password, cookies
             )
@@ -136,6 +136,7 @@ class KiaUvoApiEU(ApiImpl):
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
             "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
@@ -300,7 +301,6 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "vehicleLocation.coord.lat"),
             get_child_value(state, "vehicleLocation.coord.lon"),
             get_child_value(state, "vehicleLocation.time"),
-
         )
         vehicle.data = state
 
@@ -465,13 +465,15 @@ class KiaUvoApiEU(ApiImpl):
             self.stamps = requests.get(self.stamps_url).json()
 
         frequency = self.stamps["frequency"]
-        generated_at = dateutil.parser.isoparse(self.stamps["generated"])
+        generated_at = parser.isoparse(self.stamps["generated"])
         position = int(
-            (datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
+            (dt.datetime.now(pytz.utc) - generated_at).total_seconds()
+            * 1000.0
+            / frequency
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
-            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((datetime.now(pytz.utc) - generated_at).total_seconds()*1000.0)/frequency}"
+            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds()*1000.0)/frequency}"
         )
         if (position * 100.0) / stamp_count > 90:
             self.stamps = None
