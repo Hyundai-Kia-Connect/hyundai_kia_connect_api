@@ -468,7 +468,7 @@ class KiaUvoApiEU(ApiImpl):
         frequency = self.stamps["frequency"]
         generated_at = dt.dateutil.parser.isoparse(self.stamps["generated"])
         position = int(
-            (datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
+            (dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
