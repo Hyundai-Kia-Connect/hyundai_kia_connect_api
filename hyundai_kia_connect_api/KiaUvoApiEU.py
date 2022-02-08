@@ -465,13 +465,13 @@ class KiaUvoApiEU(ApiImpl):
             self.stamps = requests.get(self.stamps_url).json()
 
         frequency = self.stamps["frequency"]
-        generated_at = dateutil.parser.isoparse(self.stamps["generated"])
+        generated_at = dt.dateutil.parser.isoparse(self.stamps["generated"])
         position = int(
             (datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
-            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((datetime.now(pytz.utc) - generated_at).total_seconds()*1000.0)/frequency}"
+            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds()*1000.0)/frequency}"
         )
         if (position * 100.0) / stamp_count > 90:
             self.stamps = None
