@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlparse
 import pytz
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz
+from dateutil import tz, parser
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
@@ -466,7 +466,7 @@ class KiaUvoApiEU(ApiImpl):
             self.stamps = requests.get(self.stamps_url).json()
 
         frequency = self.stamps["frequency"]
-        generated_at = dt.dateutil.parser.isoparse(self.stamps["generated"])
+        generated_at = parser.isoparse(self.stamps["generated"])
         position = int(
             (dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0 / frequency
         )
