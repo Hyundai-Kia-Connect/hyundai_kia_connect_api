@@ -341,6 +341,11 @@ class KiaUvoAPIUSA(ApiImpl):
             get_child_value(state, "vehicleLocation.time"),
 
         )
+
+        vehicle.next_service_distance = (
+            get_child_value(state, "nextService.value"),
+            DISTANCE_UNITS[get_child_value(state, "nextService.unit")],
+        )
     
         vehicle.data = state
 
@@ -367,7 +372,7 @@ class KiaUvoAPIUSA(ApiImpl):
         body = {
             "vehicleConfigReq": {
                 "airTempRange": "0",
-                "maintenance": "0",
+                "maintenance": "1",
                 "seatHeatCoolOption": "0",
                 "vehicle": "1",
                 "vehicleFeature": "0",
@@ -398,6 +403,14 @@ class KiaUvoAPIUSA(ApiImpl):
                     response_body["payload"]["vehicleInfoList"][0]["vehicleConfig"][
                         "vehicleDetail"
                     ]["vehicle"]["mileage"]
+                ),
+                "unit": 3,
+            },
+            "nextService": {
+                "value": float(
+                    response_body["payload"]["vehicleInfoList"][0]["vehicleConfig"][
+                        "maintenance"
+                    ]["nextServiceMile"]
                 ),
                 "unit": 3,
             },
