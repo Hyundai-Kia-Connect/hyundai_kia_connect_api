@@ -290,7 +290,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = token.vehicle_id
+        headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self.get_pin_token(token)
         try:
             response = self.sessions.get(url, headers=headers)
