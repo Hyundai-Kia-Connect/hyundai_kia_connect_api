@@ -493,6 +493,10 @@ class KiaUvoAPIUSA(ApiImpl):
         options: ClimateRequestOptions
     ) -> str:
         url = self.API_URL + "rems/start"
+        if set_temp < 62:
+            set_temp = "LOW"
+        elif set_temp > 82:
+            set_temp = "HIGH"
         body = {
             "remoteClimate": {
                 "airCtrl": options.climate,
