@@ -14,6 +14,7 @@ from .const import (
     DOMAIN,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
+    SEAT_STATUS,
     ENGINE_TYPES,
     VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
@@ -158,18 +159,18 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "status.sideMirrorHeat"
         )
-        vehicle.front_left_seat_heater_is_on = get_child_value(
+        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.flSeatHeatState"
-        )
-        vehicle.front_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.frSeatHeatState"
-        )
-        vehicle.rear_left_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_left_seat_staus = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.rlSeatHeatState"
-        )
-        vehicle.rear_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.rrSeatHeatState"
-        )
+        )]
         vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "status.doorOpen.frontLeft"

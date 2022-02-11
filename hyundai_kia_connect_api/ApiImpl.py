@@ -18,7 +18,11 @@ class ClimateRequestOptions:
     duration: int = None
     defrost: bool = None
     climate: bool = None
-    heating: bool = None
+    heating: int = None
+    front_left_seat: int = None
+    front_right_seat: int = None
+    rear_left_seat: int = None
+    rear_right_seat: int = None
 
 
 class ApiImpl:
