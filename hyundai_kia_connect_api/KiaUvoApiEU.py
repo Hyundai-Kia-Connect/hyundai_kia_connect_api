@@ -18,6 +18,7 @@ from .const import (
     DOMAIN,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
+    SEAT_STATUS,
 )
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
@@ -220,18 +221,18 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "vehicleStatus.sideMirrorHeat"
         )
-        vehicle.front_left_seat_heater_is_on = get_child_value(
+        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
-        )
-        vehicle.front_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
-        )
-        vehicle.rear_left_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_left_seat_staus = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
-        )
-        vehicle.rear_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
-        )
+        )]
         vehicle.is_locked = not get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
