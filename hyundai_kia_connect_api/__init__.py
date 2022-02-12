@@ -9,3 +9,4 @@ from .KiaUvoAPIUSA import KiaUvoAPIUSA
 from .Token import Token
 from .Vehicle import Vehicle
 from .VehicleManager import VehicleManager
+from .const import SEAT_STATUS, HEAT_STATUS
