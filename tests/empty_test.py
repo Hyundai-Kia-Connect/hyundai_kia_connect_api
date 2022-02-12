@@ -10,6 +10,5 @@ def test_login():
     vm = VehicleManager(
         region=2, brand=1, username=username, password=password, pin=pin
     )
-    print(vm.check_and_refresh_token())
-    print(vm.vehicles)
+    vm.check_and_refresh_token()
     assert len(vm.vehicles.keys()) > 0
