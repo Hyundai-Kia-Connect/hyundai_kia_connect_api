@@ -12,14 +12,3 @@ def test_CA_login():
     )
     vm.check_and_refresh_token()
     assert len(vm.vehicles.keys()) > 0
-
-
-def test_EU_login():
-    username = os.environ["KIA_EU_FUATAKGUN_USERNAME"]
-    password = os.environ["KIA_EU_FUATAKGUN_PASSWORD"]
-    pin = ""
-    vm = VehicleManager(
-        region=1, brand=1, username=username, password=password, pin=pin
-    )
-    vm.check_and_refresh_token()
-    assert len(vm.vehicles.keys()) > 0
