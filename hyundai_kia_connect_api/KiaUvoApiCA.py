@@ -382,7 +382,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(vehicle, token)
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
         if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
@@ -457,7 +457,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle.id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
