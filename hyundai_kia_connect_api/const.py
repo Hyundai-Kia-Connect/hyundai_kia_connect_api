@@ -20,6 +20,7 @@ TEMPERATURE_F = "°F"
 TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
 
 SEAT_STATUS = {
+    None: None,
     0: "Off",
     1: "On",
     2: "Off",
@@ -29,6 +30,14 @@ SEAT_STATUS = {
     6: "Low Heat",
     7: "Medium Heat",
     8: "High Heat",
+}
+
+HEAT_STATUS = {
+    None: None,
+    0: "Off",
+    1: "Steering Wheel and Rear Window",
+    2: "Rear Window",
+    3: "Steering Wheel",
 }
 
 class ENGINE_TYPES(Enum):

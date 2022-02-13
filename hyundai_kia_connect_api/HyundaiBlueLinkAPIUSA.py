@@ -11,7 +11,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
-                    VEHICLE_LOCK_ACTION)
+                    VEHICLE_LOCK_ACTION, SEAT_STATUS,)
 from .utils import get_child_value
 from .ApiImpl import ApiImpl
 from .Token import Token
@@ -188,18 +188,18 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "vehicleStatus.sideMirrorHeat"
         )
-        vehicle.front_left_seat_heater_is_on = get_child_value(
+        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
-        )
-        vehicle.front_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
-        )
-        vehicle.rear_left_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_left_seat_staus = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
-        )
-        vehicle.rear_right_seat_heater_is_on = get_child_value(
+        )]
+        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
-        )
+        )]
         vehicle.tire_pressure_rear_left_warning_is_on = get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
         )
@@ -290,7 +290,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = token.vehicle_id
+        headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self.get_pin_token(token)
         try:
             response = self.sessions.get(url, headers=headers)
