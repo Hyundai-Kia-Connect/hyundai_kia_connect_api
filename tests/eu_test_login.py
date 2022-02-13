@@ -2,6 +2,7 @@ import os
 
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
+
 def test_EU_login():
     username = os.environ["KIA_EU_FUATAKGUN_USERNAME"]
     password = os.environ["KIA_EU_FUATAKGUN_PASSWORD"]
