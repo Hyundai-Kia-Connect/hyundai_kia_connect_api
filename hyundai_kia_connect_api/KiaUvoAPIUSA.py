@@ -336,9 +336,9 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
         vehicle.location = (
-            get_child_value(state, "location.coord.lat"),
-            get_child_value(state, "location.coord.lon"),
-            get_child_value(state, "location.time"),
+            get_child_value(state, "vehicleLocation.coord.lat"),
+            get_child_value(state, "vehicleLocation.coord.lon"),
+            get_child_value(state, "vehicleLocation.syncDate.utc"),
 
         )
 
