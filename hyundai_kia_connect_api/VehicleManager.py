@@ -72,6 +72,8 @@ class VehicleManager:
             ).total_seconds() > force_refresh_interval:
                 self.force_refresh_vehicle_state(vehicle)
                 self.update_vehicle_with_cached_state(vehicle)
+            else: 
+                self.update_vehicle_with_cached_state(vehicle)
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
