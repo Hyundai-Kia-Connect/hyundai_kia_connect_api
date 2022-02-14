@@ -31,8 +31,6 @@ class ApiImpl:
 
     def __init__(self) -> None:
         """Initialize."""
-        self.last_action_tracked = False
-        self.supports_soc_range = True
 
     def login(self, username: str, password: str) -> Token:
         """Login into cloud endpoints and return Token"""
