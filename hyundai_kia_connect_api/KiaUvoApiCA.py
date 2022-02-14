@@ -383,6 +383,16 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+
+        if options.climate is None:
+            options.climate = 1
+        if options.set_temp is None:
+            options.set_temp = 21
+        if options.duration is None:
+            options.duration = 5
+        if options.heating is None:
+            options.heating = 0
+            
         if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
@@ -392,12 +402,11 @@ class KiaUvoApiCA(ApiImpl):
                 self.temperature_range_c_old.index(options.set_temp)
             )
 
-
         payload = {
             "setting": {
-                "airCtrl": int(options.climate),
+                "airCtrl": options.climate,
                 "defrost": options.defrost,
-                "heating1": int(options.heating),
+                "heating1": options.heating,
                 "igniOnDuration": options.duration,
                 "ims": 0,
                 "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
