@@ -322,8 +322,15 @@ class KiaUvoApiEU(ApiImpl):
 
         response = requests.get(url, headers=headers)
         response = response.json()
+        response = response["resMsg"]["vehicleStatusInfo"]
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
-        return response["resMsg"]["vehicleStatusInfo"]
+        if vehicle.odometer:
+            #To Do:  Confirm date format is being stored correctly and add logic here to confirm we have old data before calling.
+            if vehicle.odometer < get_child_value(response, "odometer.value"):
+                response["vehicleLocation"] = self.get_location(token, vehicle)
+        else:
+            response["vehicleLocation"] = self.get_location(token, vehicle)
+        return response
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
@@ -342,6 +349,31 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+
+    def get_location(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        headers = {
+            "Authorization": token.access_token,
+            "Stamp": token.stamp,
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+        try:
+            response = requests.get(url, headers=headers)
+            response = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
+            if response["responseHeader"]["responseCode"] != 0:
+                raise Exception("No Location Located")
+
+        except:
+            _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
+            response = None
+            return response
+        else:
+            return response["resMsg"]["gpsDetail"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
