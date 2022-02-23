@@ -15,7 +15,7 @@ Vehicle manager is the key class that is called to manage the vehicle lists.  On
     brand: int, 
     username: str
     password: str
-    pin: str (required for CA, and potentially USA, otherwise pass a plan str) 
+    pin: str (required for CA, and potentially USA, otherwise pass a blank string) 
 
 Key values for the int exist in the constant(https://github.com/fuatakgun/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
 
