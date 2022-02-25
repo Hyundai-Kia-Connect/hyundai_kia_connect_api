@@ -302,7 +302,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.location = (
             get_child_value(state, "vehicleLocation.coord.lat"),
             get_child_value(state, "vehicleLocation.coord.lon"),
-            get_child_value(state, "vehicleLocation.time"),
+            self.get_last_updated_at(get_child_value(location, "vehicleLocation.time")),
         )
         vehicle.data = state
 
@@ -355,7 +355,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.location = (
             get_child_value(location, "vehicleLocation.coord.lat"),
             get_child_value(location, "vehicleLocation.coord.lon"),
-            get_child_value(location, "vehicleLocation.time"),
+            self.get_last_updated_at(get_child_value(location, "vehicleLocation.time")),
         )
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
