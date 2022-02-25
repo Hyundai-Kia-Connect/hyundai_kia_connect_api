@@ -327,9 +327,9 @@ class KiaUvoApiEU(ApiImpl):
         if vehicle.odometer:
             #To Do:  Confirm date format is being stored correctly and add logic here to confirm we have old data before calling.
             if vehicle.odometer < get_child_value(response, "odometer.value"):
-                response["vehicleLocation"] = self.get_location(token, vehicle)
+                response["vehicleLocation"] = self._get_location(token, vehicle)
         else:
-            response["vehicleLocation"] = self.get_location(token, vehicle)
+            response["vehicleLocation"] = self._get_location(token, vehicle)
         return response
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -350,7 +350,15 @@ class KiaUvoApiEU(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
-    def get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def force_refresh_vehicle_location(self, token: Token, vehicle: Vehicle) -> None:
+        location = self._get_location(token, vehicle)
+        vehicle.location = (
+            get_child_value(location, "vehicleLocation.coord.lat"),
+            get_child_value(location, "vehicleLocation.coord.lon"),
+            get_child_value(location, "vehicleLocation.time"),
+        )
+
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
         headers = {
             "Authorization": token.access_token,
