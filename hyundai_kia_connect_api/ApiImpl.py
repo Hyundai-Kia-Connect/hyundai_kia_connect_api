@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import requests
 
 from .const import *
+from .EvChargingLimits import EvChargingLimits
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -106,9 +107,11 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargingLimits:
+        pass
+
     def set_charge_limits(
-        self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int
-    ) -> str:
+        self, token: Token, vehicle: Vehicle, limits: EvChargingLimits) -> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 

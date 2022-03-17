@@ -20,6 +20,7 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
 )
+from .EvChargingLimits import EvChargingLimits
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import Vehicle
@@ -461,6 +462,32 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
+
+    
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargingLimits:
+        url = "https://" + self.BASE_URL + "/api/v1/spa/vehicles/" + vehicle.id + "/charge/target"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
+        response = requests.get(url, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
+        # API returns a list of four entries of target soc states - two per AC/DC, and they conflict.
+        # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
+        if response['resMsg'] is not None:
+            return EvChargingLimits(
+                dc_charging_limit=[ x['targetSOClevel'] for x in response['resMsg']['targetSOClist'] if x['plugType'] == 0 ][-1],
+                ac_charging_limit=[ x['targetSOClevel'] for x in response['resMsg']['targetSOClist'] if x['plugType'] == 1 ][-1],
+            )
 
     def _get_stamp(self) -> str:
         if self.stamps is None:
