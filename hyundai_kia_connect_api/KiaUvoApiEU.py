@@ -539,6 +539,36 @@ class KiaUvoApiEU(ApiImpl):
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
 
+
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int) -> str:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        body = {
+            "targetSOClist": [
+                {
+                    "plugType": 0,
+                    "targetSOClevel": dc_limit,
+                },
+                {
+                    "plugType": 1,
+                    "targetSOClevel": ac_limit,
+                },
+            ]
+        }
+        response = requests.post(url, json=body, headers=headers)
+        return str(response.status_code == 200)
+        
     def _get_stamp(self) -> str:
         if self.stamps is None:
             self.stamps = requests.get(self.stamps_url).json()
