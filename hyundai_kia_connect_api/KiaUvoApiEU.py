@@ -481,7 +481,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
         response = requests.get(url, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
-        # API returns a list of four entries of target soc states - two per AC/DC, and they conflict.
+        # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
         if response['resMsg'] is not None:
             return EvChargingLimits(
