@@ -16,7 +16,7 @@ class EvChargingLimits:
     @dc_charging_limit.setter
     def dc_charging_limit(self, value: int):
         if value < 50 or value > 100 or value % 10 != 0:
-            raise ValueError("Charging limit must be between 50 and 100 and divisable by 10.")
+            raise ValueError("Charging limit must be between 50 and 100 and divisible by 10.")
         self._dc_charging_limit = value
         
     @property
@@ -26,6 +26,6 @@ class EvChargingLimits:
     @ac_charging_limit.setter
     def ac_charging_limit(self, value: int):
         if value < 50 or value > 100 or value % 10 != 0:
-            raise ValueError("Charging limit must be between 50 and 100 and divisable by 10.")
+            raise ValueError("Charging limit must be between 50 and 100 and divisible by 10.")
         self._ac_charging_limit = value
         
