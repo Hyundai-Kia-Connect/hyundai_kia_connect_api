@@ -465,7 +465,7 @@ class KiaUvoApiEU(ApiImpl):
 
     
     def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargingLimits:
-        url = "https://" + self.BASE_URL + "/api/v1/spa/vehicles/" + vehicle.id + "/charge/target"
+        url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
         headers = {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
