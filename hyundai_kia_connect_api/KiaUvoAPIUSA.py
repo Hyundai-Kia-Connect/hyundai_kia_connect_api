@@ -11,9 +11,13 @@ import pytz
 import requests
 from requests import RequestException, Response
 
-from .const import DOMAIN, VEHICLE_LOCK_ACTION, TEMPERATURE_UNITS, DISTANCE_UNITS
-from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .EvChargingLimits import EvChargingLimits
+from .const import (
+    DOMAIN,
+    VEHICLE_LOCK_ACTION,
+    TEMPERATURE_UNITS,
+    DISTANCE_UNITS,
+)
+from .ApiImpl import ApiImpl, ClimateRequestOptions, EvChargeLimits
 from .Token import Token
 from .Vehicle import Vehicle
 from .utils import get_child_value
@@ -539,17 +543,17 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         return response.headers["Xid"]
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargingLimits) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.API_URL + "evc/sts"
         body = {
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": limits.dc_charging_limit,
+                    "targetSOClevel": limits.dc,
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": limits.ac_charging_limit,
+                    "targetSOClevel": limits.ac,
                 },
             ]
         }

@@ -10,7 +10,11 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import tz, parser
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import (
+    ApiImpl,
+    ClimateRequestOptions,
+    EvChargeLimits,
+)
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -20,7 +24,6 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
 )
-from .EvChargingLimits import EvChargingLimits
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import Vehicle
@@ -286,13 +289,14 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
-        vehicle.ev_dc_charging_limit = (
-            [ x['targetSOClevel'] for x in get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist") if x['plugType'] == 0 ][-1],
-            "%",
-        )
-        vehicle.ev_ac_charging_limit = (
-            [ x['targetSOClevel'] for x in get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist") if x['plugType'] == 1 ][-1],
-            "%",
+
+        target_soc_list = get_child_value(
+            state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
+        vehicle.ev_charge_limits = EvChargeLimits(
+            dc = [x['targetSOClevel']
+                for x in target_soc_list if x['plugType'] == 0][-1],
+            ac = [x['targetSOClevel']
+                for x in target_soc_list if x['plugType'] == 1][-1],
         )
         vehicle.fuel_driving_distance = (
             get_child_value(
@@ -472,8 +476,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
 
-    
-    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargingLimits:
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
         headers = {
             "Authorization": token.access_token,
@@ -493,10 +496,12 @@ class KiaUvoApiEU(ApiImpl):
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
         if response['resMsg'] is not None:
-            return EvChargingLimits(
-                dc_charging_limit=[ x['targetSOClevel'] for x in response['resMsg']['targetSOClist'] if x['plugType'] == 0 ][-1],
-                ac_charging_limit=[ x['targetSOClevel'] for x in response['resMsg']['targetSOClist'] if x['plugType'] == 1 ][-1],
+            target_soc_list = response['resMsg']['targetSOClist']
+            return EvChargeLimits(
+                dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
+                ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
+        )
 
     def _get_stamp(self) -> str:
         if self.stamps is None:

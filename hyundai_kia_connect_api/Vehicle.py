@@ -6,6 +6,8 @@ import re
 
 import pytz
 
+from hyundai_kia_connect_api.ApiImpl import EvChargeLimits
+
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,13 +110,7 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
-    _ev_ac_charging_limit: int = None
-    _ev_ac_charging_limit_value: int = None
-    _ev_ac_charging_limit_unit: str = None
-
-    _ev_dc_charging_limit: int = None
-    _ev_dc_charging_limit_value: int = None
-    _ev_dc_charging_limit_unit: str = None
+    _ev_charge_limits: EvChargeLimits = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_distance: float = None
@@ -250,24 +246,12 @@ class Vehicle:
         self._ev_estimated_station_charge_duration = value[0]
 
     @property
-    def ev_ac_charging_limit(self) -> int:
-        return self._ev_ac_charging_limit
+    def ev_charge_limits(self) -> EvChargeLimits:
+        return self._ev_charge_limits
 
-    @ev_ac_charging_limit.setter
-    def ev_ac_charging_limit(self, value: tuple[int, str]):
-        self._ev_ac_charging_limit_value = value[0]
-        self._ev_ac_charging_limit_unit = value[1]
-        self._ev_ac_charging_limit = value[0]
-
-    @property
-    def ev_dc_charging_limit(self) -> int:
-        return self._ev_dc_charging_limit
-
-    @ev_dc_charging_limit.setter
-    def ev_dc_charging_limit(self, value: int):
-        self._ev_dc_charging_limit_value = value[0]
-        self._ev_dc_charging_limit_unit = value[1]
-        self._ev_dc_charging_limit = value[0]
+    @ev_charge_limits.setter
+    def ev_ac_charging_limit(self, value: EvChargeLimits):
+        self._ev_charge_limits = value
 
     @property
     def fuel_driving_distance(self):

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import requests
 
 from .const import *
-from .EvChargingLimits import EvChargingLimits
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -25,6 +24,9 @@ class ClimateRequestOptions:
     rear_left_seat: int = None
     rear_right_seat: int = None
 
+class EvChargeLimits:
+    ac: EvChargeLimit
+    dc: EvChargeLimit
 
 class ApiImpl:
     data_timezone = dt.timezone.utc
@@ -107,11 +109,11 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
-    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargingLimits:
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
         pass
 
     def set_charge_limits(
-        self, token: Token, vehicle: Vehicle, limits: EvChargingLimits) -> str:
+        self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 

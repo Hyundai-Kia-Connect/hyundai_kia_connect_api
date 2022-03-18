@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytz
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, EvChargeLimits
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -17,7 +17,6 @@ from .const import (
     REGIONS,
     VEHICLE_LOCK_ACTION,
 )
-from .EvChargingLimits import EvChargingLimits
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
@@ -112,7 +111,7 @@ class VehicleManager:
     def stop_charge(self, vehicle_id: str) -> str:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def set_charge_limits(self, vehicle_id: str, limits: EvChargingLimits) -> str:
+    def set_charge_limits(self, vehicle_id: str, limits: EvChargeLimits) -> str:
         return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), limits)
 
     def check_action_status(self, vehicle_id: str, action_id: str):
