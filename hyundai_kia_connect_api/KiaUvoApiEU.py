@@ -286,6 +286,14 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
+        vehicle.ev_dc_charging_limit = (
+            [ x['targetSOClevel'] for x in get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist") if x['plugType'] == 0 ][-1],
+            "%",
+        )
+        vehicle.ev_ac_charging_limit = (
+            [ x['targetSOClevel'] for x in get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist") if x['plugType'] == 1 ][-1],
+            "%",
+        )
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
@@ -343,6 +351,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+        return response["resMsg"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"

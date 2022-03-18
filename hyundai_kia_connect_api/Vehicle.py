@@ -108,6 +108,14 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
+    _ev_ac_charging_limit: int = None
+    _ev_ac_charging_limit_value: int = None
+    _ev_ac_charging_limit_unit: str = None
+
+    _ev_dc_charging_limit: int = None
+    _ev_dc_charging_limit_value: int = None
+    _ev_dc_charging_limit_unit: str = None
+
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_distance: float = None
     _fuel_driving_distance_value: float = None
@@ -240,6 +248,26 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
+
+    @property
+    def ev_ac_charging_limit(self) -> int:
+        return self._ev_ac_charging_limit
+
+    @ev_ac_charging_limit.setter
+    def ev_ac_charging_limit(self, value: tuple[int, str]):
+        self._ev_ac_charging_limit_value = value[0]
+        self._ev_ac_charging_limit_unit = value[1]
+        self._ev_ac_charging_limit = value[0]
+
+    @property
+    def ev_dc_charging_limit(self) -> int:
+        return self._ev_dc_charging_limit
+
+    @ev_dc_charging_limit.setter
+    def ev_dc_charging_limit(self, value: int):
+        self._ev_dc_charging_limit_value = value[0]
+        self._ev_dc_charging_limit_unit = value[1]
+        self._ev_dc_charging_limit = value[0]
 
     @property
     def fuel_driving_distance(self):
