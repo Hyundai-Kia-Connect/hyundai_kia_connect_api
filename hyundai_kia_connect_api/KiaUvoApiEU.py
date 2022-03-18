@@ -293,10 +293,8 @@ class KiaUvoApiEU(ApiImpl):
         target_soc_list = get_child_value(
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
         vehicle.ev_charge_limits = EvChargeLimits(
-            dc = [x['targetSOClevel']
-                for x in target_soc_list if x['plugType'] == 0][-1],
-            ac = [x['targetSOClevel']
-                for x in target_soc_list if x['plugType'] == 1][-1],
+            dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
+            ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
         )
         vehicle.fuel_driving_distance = (
             get_child_value(
