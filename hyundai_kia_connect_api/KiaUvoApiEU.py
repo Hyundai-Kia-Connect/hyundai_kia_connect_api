@@ -362,7 +362,7 @@ class KiaUvoApiEU(ApiImpl):
 
         response = requests.get(url, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+        _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
         return response["resMsg"]["gpsDetail"]
 
     def _get_forced_vehicle_status(self, token: Token, vehicle: Vehicle) -> dict:
