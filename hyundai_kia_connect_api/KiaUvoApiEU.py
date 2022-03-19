@@ -176,8 +176,12 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle, force_refresh: bool = False) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
+        if force_refresh:
+            state["vehicleStatus"] = self._get_forced_vehicle_status(token, vehicle)
+            state["vehicleLocation"] = self._get_location(token, vehicle)
+            
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.time")
         )
@@ -342,7 +346,26 @@ class KiaUvoApiEU(ApiImpl):
             response["vehicleLocation"] = self._get_location(token, vehicle)
         return response
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        response = requests.get(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+        return response["resMsg"]["gpsDetail"]
+
+    def _get_forced_vehicle_status(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         headers = {
             "Authorization": token.refresh_token,
@@ -360,39 +383,6 @@ class KiaUvoApiEU(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
         return response["resMsg"]
-
-    def force_refresh_vehicle_location(self, token: Token, vehicle: Vehicle) -> None:
-        location = self._get_location(token, vehicle)
-        vehicle.location = (
-            get_child_value(location, "vehicleLocation.coord.lat"),
-            get_child_value(location, "vehicleLocation.coord.lon"),
-            self.get_last_updated_at(get_child_value(location, "vehicleLocation.time")),
-        )
-
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-        try:
-            response = requests.get(url, headers=headers)
-            response = response.json()
-            _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
-            if response["resCode"] != "0000":
-                raise Exception("No Location Located")
-
-        except:
-            _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
-            response = None
-            return response
-        else:
-            return response["resMsg"]["gpsDetail"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
