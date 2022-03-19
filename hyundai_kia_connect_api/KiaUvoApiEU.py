@@ -359,11 +359,15 @@ class KiaUvoApiEU(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-
-        response = requests.get(url, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
-        return response["resMsg"]["gpsDetail"]
+        try:
+            response = requests.get(url, headers=headers)
+            response = response.json()
+            _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
+            if response["resCode"] != "0000":
+                    raise Exception("No Location Located")
+            return response["resMsg"]["gpsDetail"]
+        except:
+            _LOGGER.warning(f"{DOMAIN} - _get_location failed")
 
     def _get_forced_vehicle_status(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
