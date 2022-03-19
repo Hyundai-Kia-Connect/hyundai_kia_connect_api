@@ -6,7 +6,7 @@ import requests
 
 from .const import *
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, EvChargeLimits
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,10 +23,6 @@ class ClimateRequestOptions:
     front_right_seat: int = None
     rear_left_seat: int = None
     rear_right_seat: int = None
-
-class EvChargeLimits:
-    ac: EvChargeLimit
-    dc: EvChargeLimit
 
 class ApiImpl:
     data_timezone = dt.timezone.utc

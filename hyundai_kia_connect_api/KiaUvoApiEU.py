@@ -13,7 +13,6 @@ from dateutil import tz, parser
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
-    EvChargeLimits,
 )
 from .const import (
     BRAND_HYUNDAI,
@@ -25,8 +24,8 @@ from .const import (
     SEAT_STATUS,
 )
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
-from .Vehicle import Vehicle
+from .utils import get_child_value, get_index_into_hex_temp
+from .Vehicle import Vehicle, EvChargeLimits
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -499,7 +498,6 @@ class KiaUvoApiEU(ApiImpl):
                 dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
-        )
 
     def _get_stamp(self) -> str:
         if self.stamps is None:

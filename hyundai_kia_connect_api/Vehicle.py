@@ -6,12 +6,14 @@ import re
 
 import pytz
 
-from hyundai_kia_connect_api.ApiImpl import EvChargeLimits
-
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
+@dataclasses.dataclass
+class EvChargeLimits:
+    ac: EvChargeLimit = None
+    dc: EvChargeLimit = None
 
 @dataclasses.dataclass
 class Vehicle:
@@ -250,7 +252,7 @@ class Vehicle:
         return self._ev_charge_limits
 
     @ev_charge_limits.setter
-    def ev_ac_charging_limit(self, value: EvChargeLimits):
+    def ev_charge_limits(self, value: EvChargeLimits):
         self._ev_charge_limits = value
 
     @property
