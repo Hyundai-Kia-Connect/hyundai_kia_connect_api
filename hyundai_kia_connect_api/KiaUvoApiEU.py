@@ -176,12 +176,17 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_cached_vehicle_state(token, vehicle)
+        state["vehicleStatus"] = self._get_forced_vehicle_state(token, vehicle)
+        state["vehicleLocation"] = self._get_location(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle, force_refresh: bool = False) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        if force_refresh:
-            state["vehicleStatus"] = self._get_forced_vehicle_status(token, vehicle)
-            state["vehicleLocation"] = self._get_location(token, vehicle)
-            
+        self._update_vehicle_properties(vehicle, state)
+
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.time")
         )
@@ -369,7 +374,7 @@ class KiaUvoApiEU(ApiImpl):
         except:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
 
-    def _get_forced_vehicle_status(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         headers = {
             "Authorization": token.refresh_token,

@@ -53,12 +53,12 @@ class VehicleManager:
     def get_vehicle(self, vehicle_id) -> Vehicle:
         return self.vehicles[vehicle_id]
 
-    def update_all_vehicles_with_cached_state(self, force_refresh: bool = False) -> None:
+    def update_all_vehicles_with_cached_state(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id), force_refresh)
+            self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id))
 
-    def update_vehicle_with_cached_state(self, vehicle: Vehicle, force_refresh: bool = False) -> None:
-        self.api.update_vehicle_with_cached_state(self.token, vehicle, force_refresh)
+    def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
+        self.api.update_vehicle_with_cached_state(self.token, vehicle)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
         started_at_utc: dt = dt.datetime.now(pytz.utc)
@@ -70,24 +70,18 @@ class VehicleManager:
             if (
                 started_at_utc - vehicle.last_updated_at
             ).total_seconds() > force_refresh_interval:
-                # TODO: remove later, use force flag on _update method instead and refactor US and CA
                 self.force_refresh_vehicle_state(vehicle)
-                # TODO: previous command, which does not seem to do anything on all impls
-                # is now handled by force_refresh param
-                self.update_vehicle_with_cached_state(vehicle, force_refresh=True)
+                self.update_vehicle_with_cached_state(vehicle)
             else: 
                 self.update_vehicle_with_cached_state(vehicle)
 
-    # TODO: remove later, use force flag on _update method instead and refactor US and CA
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
             self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
+        self.update_all_vehicles_with_cached_state()
 
     def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
-        # TODO: remove later, use force flag on _update method instead and refactor US and CA
         self.api.force_refresh_vehicle_state(self.token, vehicle)
-        # now handled by parameter
-        self.api.update_vehicle_with_cached_state(self.token, vehicle, force_refresh=True)
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
