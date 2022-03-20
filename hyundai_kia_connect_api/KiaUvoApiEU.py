@@ -176,14 +176,14 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         state["vehicleStatus"] = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
-
-    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle, force_refresh: bool = False) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
