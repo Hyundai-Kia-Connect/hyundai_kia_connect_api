@@ -295,7 +295,7 @@ class KiaUvoApiCA(ApiImpl):
 
         return status
 
-    def _get_next_service(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
@@ -306,7 +306,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response["result"]["maintenanceInfo"]
         return response
 
-    def get_location(self, token: Token, vehicle: Vehicle) -> None:
+    def get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "fndmcr"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
