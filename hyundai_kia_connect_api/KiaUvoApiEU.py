@@ -10,7 +10,10 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import tz, parser
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import (
+    ApiImpl,
+    ClimateRequestOptions,
+)
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -21,8 +24,8 @@ from .const import (
     SEAT_STATUS,
 )
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
-from .Vehicle import Vehicle
+from .utils import get_child_value, get_index_into_hex_temp
+from .Vehicle import Vehicle, EvChargeLimits
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -285,6 +288,13 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
+
+        target_soc_list = get_child_value(
+            state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
+        vehicle.ev_charge_limits = EvChargeLimits(
+            dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
+            ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
+        )
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
@@ -349,6 +359,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+        return response["resMsg"]
 
     def force_refresh_vehicle_location(self, token: Token, vehicle: Vehicle) -> None:
         location = self._get_location(token, vehicle)
@@ -501,6 +512,32 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
+
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
+        url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
+        response = requests.get(url, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
+        # API sometimes returns multiple entries per plug type and they conflict.
+        # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
+        if response['resMsg'] is not None:
+            target_soc_list = response['resMsg']['targetSOClist']
+            return EvChargeLimits(
+                dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
+                ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
+            )
 
     def _get_stamp(self) -> str:
         if self.stamps is None:
