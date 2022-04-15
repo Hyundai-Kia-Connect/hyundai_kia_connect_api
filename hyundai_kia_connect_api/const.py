@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 
 DOMAIN: str = "hyundai_kia_connect_api"
 
@@ -49,3 +49,6 @@ class ENGINE_TYPES(Enum):
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
+
+class EvChargeLimit(IntEnum):
+    50, 60, 70, 80, 90, 100

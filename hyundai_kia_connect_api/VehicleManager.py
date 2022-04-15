@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytz
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, EvChargeLimits
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -111,8 +111,8 @@ class VehicleManager:
     def stop_charge(self, vehicle_id: str) -> str:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def set_charge_limits(self, vehicle_id: str, ac_limit: int, dc_limit: int) -> str:
-        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac_limit, dc_limit)
+    def set_charge_limits(self, vehicle_id: str, limits: EvChargeLimits) -> str:
+        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), limits)
 
     def check_action_status(self, vehicle_id: str, action_id: str):
         return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)

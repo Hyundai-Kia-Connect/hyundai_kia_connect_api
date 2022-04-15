@@ -6,7 +6,7 @@ import requests
 
 from .const import *
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, EvChargeLimits
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +23,6 @@ class ClimateRequestOptions:
     front_right_seat: int = None
     rear_left_seat: int = None
     rear_right_seat: int = None
-
 
 class ApiImpl:
     data_timezone = dt.timezone.utc
@@ -110,9 +109,11 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
+        pass
+
     def set_charge_limits(
-        self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int
-    ) -> str:
+        self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
