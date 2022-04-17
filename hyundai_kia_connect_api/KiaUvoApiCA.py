@@ -492,3 +492,30 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
         return response_headers["transactionId"]
+
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int)-> str:
+        url = self.API_URL + "evc/setsoc"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        headers["pAuth"] = self.get_pin_token(token, vehicle.id)
+
+        payload = {
+            "tsoc": [{
+                "plugType": 0,
+                "level": ac_limit,
+                },
+                {
+                "plugType": 1,
+                "level": dc_limit,          
+                }],
+            "pin": token.pin,
+        }
+
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response_headers = response.headers
+        response = response.json()
+
+        _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
+        return response_headers["transactionId"]
+
