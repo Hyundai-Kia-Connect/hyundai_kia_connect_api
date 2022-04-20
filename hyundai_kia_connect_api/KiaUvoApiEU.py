@@ -312,7 +312,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.location = (
             get_child_value(state, "vehicleLocation.coord.lat"),
             get_child_value(state, "vehicleLocation.coord.lon"),
-            self.get_last_updated_at(get_child_value(location, "vehicleLocation.time")),
+            self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
         )
         vehicle.data = state
 
