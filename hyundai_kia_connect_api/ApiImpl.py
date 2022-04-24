@@ -51,13 +51,6 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
-    def force_refresh_vehicle_location(self, token: Token, vehicle: Vehicle) -> None:
-        """force update vehicle location"""
-        pass
-
-    def get_fresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        pass
-
     def check_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         """Check if a previous placed call was successful"""
         pass
