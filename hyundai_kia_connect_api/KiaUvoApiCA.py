@@ -26,7 +26,7 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
 )
-from .Vehicle import Vehicle
+from .Vehicle import EvChargeLimits, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -493,7 +493,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
         return response_headers["transactionId"]
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int)-> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits)-> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -503,11 +503,11 @@ class KiaUvoApiCA(ApiImpl):
         payload = {
             "tsoc": [{
                 "plugType": 0,
-                "level": dc_limit,
+                "level": limits.dc,
                 },
                 {
                 "plugType": 1,
-                "level": ac_limit,          
+                "level": limits.ac,          
                 }],
             "pin": token.pin,
         }

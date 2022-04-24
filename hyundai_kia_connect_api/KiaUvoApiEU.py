@@ -540,7 +540,7 @@ class KiaUvoApiEU(ApiImpl):
             )
 
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac_limit: int, dc_limit: int) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
         headers = {
             "Authorization": token.access_token,
@@ -558,17 +558,17 @@ class KiaUvoApiEU(ApiImpl):
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": dc_limit,
+                    "targetSOClevel": limits.dc,
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": ac_limit,
+                    "targetSOClevel": limits.ac,
                 },
             ]
         }
         response = requests.post(url, json=body, headers=headers)
         return str(response.status_code == 200)
-        
+
     def _get_stamp(self) -> str:
         if self.stamps is None:
             self.stamps = requests.get(self.stamps_url).json()
