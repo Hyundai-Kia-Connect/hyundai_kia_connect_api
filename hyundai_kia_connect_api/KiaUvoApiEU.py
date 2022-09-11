@@ -237,7 +237,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )]
-        vehicle.is_locked = not get_child_value(state, "vehicleStatus.doorLock")
+        vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
