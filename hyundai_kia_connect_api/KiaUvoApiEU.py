@@ -296,8 +296,9 @@ class KiaUvoApiEU(ApiImpl):
                 dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
-        finally:
-        
+        except:
+            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.}")
+
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
