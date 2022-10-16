@@ -296,6 +296,8 @@ class KiaUvoApiEU(ApiImpl):
                 dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
+        finally:
+        
         vehicle.fuel_driving_distance = (
             get_child_value(
                 state,
