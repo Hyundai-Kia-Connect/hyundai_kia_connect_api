@@ -23,6 +23,8 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
 )
+
+from .exceptions import *
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp
 from .Vehicle import Vehicle, EvChargeLimits
@@ -106,7 +108,7 @@ class KiaUvoApiEU(ApiImpl):
             authorization_code = self._get_authorization_code_with_redirect_url(
                 username, password, cookies
             )
-        except Exception as ex1:
+        except AuthenticationError as ex1:
             _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
             authorization_code = self._get_authorization_code_with_form(
                 username, password, cookies
