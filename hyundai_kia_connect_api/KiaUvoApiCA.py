@@ -414,7 +414,7 @@ class KiaUvoApiCA(ApiImpl):
             "pin": token.pin,
         }
         data = json.dumps(payload)
-         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
+        _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
