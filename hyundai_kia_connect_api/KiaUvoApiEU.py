@@ -108,12 +108,12 @@ class KiaUvoApiEU(ApiImpl):
             authorization_code = self._get_authorization_code_with_redirect_url(
                 username, password, cookies
             )
-        except AuthenticationError as ex1:
+        except Exception as ex1:
             _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
             authorization_code = self._get_authorization_code_with_form(
                 username, password, cookies
             )
-
+            raise AuthenticationError("Login Failed") 
         if authorization_code is None:
             return None
 
