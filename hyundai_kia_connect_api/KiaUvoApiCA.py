@@ -432,7 +432,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle.id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -482,7 +482,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle.id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -498,7 +498,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle.id)
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         payload = {
             "tsoc": [{
