@@ -290,6 +290,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
         try:
             response = self.sessions.get(url, headers=headers)
