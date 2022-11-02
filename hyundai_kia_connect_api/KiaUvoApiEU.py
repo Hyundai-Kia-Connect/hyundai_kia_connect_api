@@ -572,6 +572,46 @@ class KiaUvoApiEU(ApiImpl):
         }
         response = requests.post(url, json=body, headers=headers)
         return str(response.status_code == 200)
+    
+    def get_driving_info(self, token: Token):
+        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/drvhistory"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self.get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=headers)
+        responseAlltime = responseAlltime.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
+
+        response30d = requests.post(url, json={"periodTarget": 0}, headers=headers)
+        response30d = response30d.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+
+        drivingInfo = {}
+
+        try:
+            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
+
+            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+                if drivingInfoItem["drivingPeriod"] == 0:
+                    drivingInfo["consumption30d"] = round(
+                        drivingInfoItem["totalPwrCsp"]
+                        / drivingInfoItem["calculativeOdo"]
+                    )
+                    break
+
+        except:
+            _LOGGER.warning("Unable to parse drivingInfo")
+
+        return drivingInfo
 
     def _get_stamp(self) -> str:
         if self.stamps is None:
