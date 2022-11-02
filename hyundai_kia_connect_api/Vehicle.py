@@ -91,6 +91,14 @@ class Vehicle:
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
     ev_battery_is_plugged_in: bool = None
+        
+    _total_power_consumed: float = None
+    _total_power_consumed_value: float = None
+    _total_power_consumed_unit: str = None
+        
+    _power_consumption_30d: float = None
+    _power_consumption_30d_value: float = None
+    _power_consumption_30d_unit: str = None
 
     _ev_driving_distance: float = None
     _ev_driving_distance_value: float = None
@@ -246,6 +254,18 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
+        
+    @total_power_consumed.setter
+    def total_power_consumed(self, value):
+        self._total_power_consumed_value = value[0]
+        self._total_power_consumed_unit = value[1]
+        self._total_power_consumed = value[0]
+        
+    @power_consumption_30d.setter
+    def power_consumption_30d(self, value):
+        self._power_consumption_30d_value = value[0]
+        self._power_consumption_30d_unit = value[1]
+        self._power_consumption_30d = value[0]
 
     @property
     def ev_charge_limits(self) -> EvChargeLimits:
