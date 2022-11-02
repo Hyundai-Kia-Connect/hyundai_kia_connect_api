@@ -227,6 +227,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.back_right_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.backRight"
         )
+        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
         vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
