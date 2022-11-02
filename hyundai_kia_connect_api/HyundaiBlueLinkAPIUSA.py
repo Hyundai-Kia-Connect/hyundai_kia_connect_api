@@ -199,21 +199,21 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )]
-        vehicle.tire_pressure_rear_left_warning_is_on = get_child_value(
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
-        )
-        vehicle.tire_pressure_front_left_warning_is_on = get_child_value(
+        ))
+        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontLeft"
-        )
-        vehicle.tire_pressure_front_right_warning_is_on = get_child_value(
+        ))
+        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontRight"
-        )
-        vehicle.tire_pressure_rear_right_warning_is_on = get_child_value(
+        ))
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
         )
-        vehicle.tire_pressure_all_warning_is_on = get_child_value(
+        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
-        )
+        ))
         vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLockStatus"))
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
