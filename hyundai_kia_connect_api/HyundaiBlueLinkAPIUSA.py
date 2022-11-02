@@ -243,7 +243,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "km",
+            "mi",
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -266,9 +266,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
             ),
-            "km",
+            "mi",
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
+
+        vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
         vehicle.location = (
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
