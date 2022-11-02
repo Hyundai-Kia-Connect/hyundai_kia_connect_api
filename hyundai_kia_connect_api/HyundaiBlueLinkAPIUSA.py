@@ -210,7 +210,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         ))
         vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
-        )
+        ))
         vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
         ))
