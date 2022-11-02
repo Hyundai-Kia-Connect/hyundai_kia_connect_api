@@ -116,6 +116,14 @@ class KiaUvoApiCA(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+        
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_forced_vehicle_state(token, vehicle)
+        #state["vehicleLocation"] = self._get_location(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+        
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:        
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "status.lastStatusDate")
         )
@@ -294,6 +302,17 @@ class KiaUvoApiCA(ApiImpl):
             status["vehicleLocation"] = self.get_location(token, vehicle)
 
         return status
+    
+    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.API_URL + "rltmvhclsts"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+
+        response = requests.post(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+        return response
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self.API_HEADERS
@@ -340,16 +359,6 @@ class KiaUvoApiCA(ApiImpl):
         result = response.json()["result"]
 
         return result["pAuth"]
-
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.API_URL + "rltmvhclsts"
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
-
-        response = requests.post(url, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
