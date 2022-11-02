@@ -105,7 +105,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
-
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
 
         return Token(
