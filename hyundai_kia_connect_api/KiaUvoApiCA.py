@@ -41,7 +41,7 @@ class KiaUvoApiCA(ApiImpl):
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "www.kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
-            self.BASE_URL: str = "www.mybluelink.ca"
+            self.BASE_URL: str = "mybluelink.ca"
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
