@@ -370,7 +370,7 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        _LOGGER.debug(f"{DOMAIN} - Received lock_action response")
+        _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
         return response_headers["transactionId"]
 
     def start_climate(
