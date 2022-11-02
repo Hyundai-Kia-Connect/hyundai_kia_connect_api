@@ -254,12 +254,20 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
-        
+
+    @property
+    def total_power_consumed(self):
+        return self._total_power_consumed
+    
     @total_power_consumed.setter
     def total_power_consumed(self, value):
         self._total_power_consumed_value = value[0]
         self._total_power_consumed_unit = value[1]
         self._total_power_consumed = value[0]
+        
+    @property
+    def power_consumption_30d(self):
+        return self._power_consumption_30d
         
     @power_consumption_30d.setter
     def power_consumption_30d(self, value):
