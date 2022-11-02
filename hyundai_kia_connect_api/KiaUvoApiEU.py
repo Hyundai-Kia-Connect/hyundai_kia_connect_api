@@ -573,8 +573,8 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(url, json=body, headers=headers)
         return str(response.status_code == 200)
     
-    def get_driving_info(self, token: Token):
-        url = self.SPA_API_URL + "vehicles/" + token.vehicle_id + "/drvhistory"
+    def get_driving_info(self, token: Token, vehicle: Vehicle):
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
         headers = {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
