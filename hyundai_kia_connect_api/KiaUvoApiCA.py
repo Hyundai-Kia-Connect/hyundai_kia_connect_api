@@ -39,7 +39,7 @@ class KiaUvoApiCA(ApiImpl):
     def __init__(self, region: int, brand: int) -> None:
 
         if BRANDS[brand] == BRAND_KIA:
-            self.BASE_URL: str = "kiaconnect.ca"
+            self.BASE_URL: str = "www.kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "www.mybluelink.ca"
         self.old_vehicle_status = {}
@@ -331,11 +331,12 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        _LOGGER.debug(f"{DOMAIN} - Pin Headers {headers}")
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
-        _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
 
         return result["pAuth"]
