@@ -379,7 +379,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
 
-        data = {"userName": self.username, "vin": vehicle.VIN}
+        data = {"userName": token.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
