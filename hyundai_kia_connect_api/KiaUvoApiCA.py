@@ -402,6 +402,8 @@ class KiaUvoApiCA(ApiImpl):
             options.duration = 5
         if options.heating is None:
             options.heating = 0
+        if options.defrost is None:
+            options.defrost = false
             
         if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
