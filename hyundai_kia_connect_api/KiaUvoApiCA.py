@@ -479,7 +479,9 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
-
+        _LOGGER.debug(f"{DOMAIN} - Planned start_charge headers {headers}")
+        data=json.dumps({"pin": token.pin})
+        _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
