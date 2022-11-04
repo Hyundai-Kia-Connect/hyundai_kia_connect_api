@@ -131,7 +131,7 @@ class KiaUvoApiCA(ApiImpl):
                 self._update_vehicle_properties_location(vehicle, location)
                 
         #Update service after the fact so we still have the old odometer reading available for above.        
-        self._update_vehicle_properties_service(vehicle, state)
+        self._update_vehicle_properties_service(vehicle, service)
         
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -150,7 +150,7 @@ class KiaUvoApiCA(ApiImpl):
                 self._update_vehicle_properties_location(vehicle, location)
                 
         #Update service after the fact so we still have the old odometer reading available for above.        
-        self._update_vehicle_properties_service(vehicle, state)
+        self._update_vehicle_properties_service(vehicle, service)
         
         
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:        
