@@ -281,7 +281,7 @@ class KiaUvoApiCA(ApiImpl):
             DISTANCE_UNITS[get_child_value(state, "currentOdometerUnit")],
         )
         vehicle.next_service_distance = (
-            get_child_value(state, "service.imatServiceOdometer"),
+            get_child_value(state, "imatServiceOdometer"),
             DISTANCE_UNITS[get_child_value(state, "imatServiceOdometerUnit")],
         )
         vehicle.last_service_distance = (
