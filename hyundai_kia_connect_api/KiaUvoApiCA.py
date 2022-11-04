@@ -270,6 +270,8 @@ class KiaUvoApiCA(ApiImpl):
         )
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
+        if vehicle.data is None:
+            vehicle.data = {}
         vehicle.data["status"] = state["status"]
         
     def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
