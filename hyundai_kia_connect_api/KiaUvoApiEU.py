@@ -181,8 +181,7 @@ class KiaUvoApiEU(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle)
-        state["vehicleStatus"] = self._get_forced_vehicle_state(token, vehicle)
+        state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
@@ -395,7 +394,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
-        return response["resMsg"]
+        return response["resMsg"]["vehicleStatusInfo"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
