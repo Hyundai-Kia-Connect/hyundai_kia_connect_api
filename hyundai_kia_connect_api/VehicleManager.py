@@ -78,7 +78,6 @@ class VehicleManager:
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
             self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
-        self.update_all_vehicles_with_cached_state()
 
     def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
         self.api.force_refresh_vehicle_state(self.token, vehicle)
