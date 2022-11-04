@@ -153,11 +153,12 @@ class KiaUvoApiCA(ApiImpl):
         self._update_vehicle_properties_service(vehicle, service)
         
         
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:        
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:   
+        _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "status.lastStatusDate")
         )
-        
+        _LOGGER.debug(f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}")
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(state, "status.airTemp.value"))
         if get_child_value(state, "status.airTemp.unit") == 0:
