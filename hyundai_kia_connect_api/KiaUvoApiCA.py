@@ -120,11 +120,25 @@ class KiaUvoApiCA(ApiImpl):
         
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
-        #state["vehicleLocation"] = self._get_location(token, vehicle)
-        # Service Status Call
-        service = self._get_next_service(token, vehicle)       
         self._update_vehicle_properties(vehicle, state)
-        self._update_vehicle_service(vehicle, state)
+        
+        # Service Status Call       
+        service = self._get_next_service(token, vehicle)
+        
+        #Get location if the car has moved since last call
+        if vehicle.odometer:
+            if vehicle.odometer < get_child_value(service, "currentOdometer"):
+                location = self.get_location(token, vehicle)
+                self._update_vehicle_properties_location(vehicle, location)
+            else:
+                status["vehicleLocation"] = None
+        else:
+                location = self.get_location(token, vehicle)
+                self._update_vehicle_properties_location(vehicle, location)
+                
+        #Update service after the fact so we still have the old odometer reading available for above.        
+        self._update_vehicle_properties_service(vehicle, state)
+        
         
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:        
         vehicle.last_updated_at = self.get_last_updated_at(
@@ -241,18 +255,11 @@ class KiaUvoApiCA(ApiImpl):
             ),
             DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
         )
-        if get_child_value(state, "vehicleLocation.coord.lat"):
-            vehicle.location = (
-                get_child_value(state, "vehicleLocation.coord.lat"),
-                get_child_value(state, "vehicleLocation.coord.lon"),
-                get_child_value(state, "vehicleLocation.time"),
-
-            )
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         vehicle.data["status"] = state["status"]
         
-    def _update_vehicle_service(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
         
         vehicle.odometer = (
             get_child_value(state, "currentOdometer"),
@@ -268,6 +275,17 @@ class KiaUvoApiCA(ApiImpl):
         )
         
         vehicle.data["service"] = state
+        
+     def _update_vehicle_properties_location(self, vehicle: Vehicle, state: dict) -> None:
+        
+        if get_child_value(state, "coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "coord.lat"),
+                get_child_value(state, "coord.lon"),
+                get_child_value(state, "time"),
+
+            )      
+        vehicle.data["vehicleLocation"] = state
         
 
     def get_last_updated_at(self, value) -> dt.datetime:
@@ -300,15 +318,6 @@ class KiaUvoApiCA(ApiImpl):
 
         status = {}
         status["status"] = response
-
-        #Get location if the car has moved since last call
-        if vehicle.odometer:
-            if vehicle.odometer < get_child_value(status, "service.currentOdometer"):
-                status["vehicleLocation"] = self.get_location(token, vehicle)
-            else:
-                status["vehicleLocation"] = None
-        else:
-            status["vehicleLocation"] = self.get_location(token, vehicle)
 
         return status
     
