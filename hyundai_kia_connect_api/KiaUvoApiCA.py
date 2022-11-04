@@ -276,7 +276,7 @@ class KiaUvoApiCA(ApiImpl):
         
         vehicle.data["service"] = state
         
-     def _update_vehicle_properties_location(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_location(self, vehicle: Vehicle, state: dict) -> None:
         
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
