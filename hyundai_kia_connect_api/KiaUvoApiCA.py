@@ -130,8 +130,6 @@ class KiaUvoApiCA(ApiImpl):
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
-            else:
-                status["vehicleLocation"] = None
         else:
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
