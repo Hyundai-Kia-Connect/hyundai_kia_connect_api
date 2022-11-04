@@ -118,6 +118,21 @@ class KiaUvoApiCA(ApiImpl):
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
         
+        # Service Status Call       
+        service = self._get_next_service(token, vehicle)
+        
+        #Get location if the car has moved since last call
+        if vehicle.odometer:
+            if vehicle.odometer < get_child_value(service, "currentOdometer"):
+                location = self.get_location(token, vehicle)
+                self._update_vehicle_properties_location(vehicle, location)
+        else:
+                location = self.get_location(token, vehicle)
+                self._update_vehicle_properties_location(vehicle, location)
+                
+        #Update service after the fact so we still have the old odometer reading available for above.        
+        self._update_vehicle_properties_service(vehicle, state)
+        
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
@@ -144,7 +159,7 @@ class KiaUvoApiCA(ApiImpl):
         )
         
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
-        tempIndex = get_hex_temp_into_index(get_child_value(response, "status.airTemp.value"))
+        tempIndex = get_hex_temp_into_index(get_child_value(state, "status.airTemp.value"))
         if get_child_value(state, "status.airTemp.unit") == 0:
             if vehicle.year > self.temperature_range_model_year:
                 state["status"]["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
