@@ -311,8 +311,13 @@ class KiaUvoApiCA(ApiImpl):
 
         response = requests.post(url, headers=headers)
         response = response.json()
+
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
-        return response
+        response = response["result"]["status"]
+        status = {}
+        status["status"] = response
+        
+        return status
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self.API_HEADERS
