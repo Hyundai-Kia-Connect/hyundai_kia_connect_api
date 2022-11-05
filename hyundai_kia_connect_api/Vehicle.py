@@ -6,6 +6,8 @@ import re
 
 import pytz
 
+from .ApiImpl import EvChargeLimits
+
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
