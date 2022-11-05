@@ -10,10 +10,6 @@ from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
-@dataclasses.dataclass
-class EvChargeLimits:
-    ac: EvChargeLimit = None
-    dc: EvChargeLimit = None
 
 @dataclasses.dataclass
 class Vehicle:
