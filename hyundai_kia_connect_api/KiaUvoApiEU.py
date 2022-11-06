@@ -180,6 +180,8 @@ class KiaUvoApiEU(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        state = self._get_driving_info(token, vehicle)
+        self._update_vehicle_drive_info(vehicle, state)      
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -353,7 +355,11 @@ class KiaUvoApiEU(ApiImpl):
                 self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
             )
         vehicle.data = state
-
+        
+    def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
+        vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
+        vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
+        
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
         headers = {
@@ -562,7 +568,7 @@ class KiaUvoApiEU(ApiImpl):
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
         
-    def get_driving_info(self, token: Token, vehicle: Vehicle):
+    def _get_driving_info(self, token: Token, vehicle: Vehicle):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
         headers = {
             "Authorization": token.access_token,
