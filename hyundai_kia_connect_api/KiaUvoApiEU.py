@@ -162,22 +162,31 @@ class KiaUvoApiEU(ApiImpl):
         return result
 
     def get_last_updated_at(self, value) -> dt.datetime:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        value = dt.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=self.data_timezone,
-        )
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+        if value is not None:
+            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+            _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
+            value = dt.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=self.data_timezone,
+            )
+            _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = self._get_forced_vehicle_state(token, vehicle)
+        state["vehicleLocation"] = self._get_location(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.time")
         )
@@ -250,6 +259,21 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.back_right_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.backRight"
         )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampRL"
+        ))
+        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampFL"
+        ))
+        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampFR"
+        ))
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampRR"
+        ))
+        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampAll"
+        ))
         vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
@@ -351,7 +375,30 @@ class KiaUvoApiEU(ApiImpl):
             response["vehicleLocation"] = self._get_location(token, vehicle)
         return response
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+        try:
+            response = requests.get(url, headers=headers)
+            response = response.json()
+            _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
+            if response["resCode"] != "0000":
+                    raise Exception("No Location Located")
+            return response["resMsg"]["gpsDetail"]
+        except:
+            _LOGGER.warning(f"{DOMAIN} - _get_location failed")
+
+    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         headers = {
             "Authorization": token.refresh_token,
@@ -368,40 +415,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
-        return response["resMsg"]
-
-    def force_refresh_vehicle_location(self, token: Token, vehicle: Vehicle) -> None:
-        location = self._get_location(token, vehicle)
-        vehicle.location = (
-            get_child_value(location, "vehicleLocation.coord.lat"),
-            get_child_value(location, "vehicleLocation.coord.lon"),
-            self.get_last_updated_at(get_child_value(location, "vehicleLocation.time")),
-        )
-
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
-        headers = {
-            "Authorization": token.access_token,
-            "Stamp": token.stamp,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-        try:
-            response = requests.get(url, headers=headers)
-            response = response.json()
-            _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
-            if response["resCode"] != "0000":
-                raise Exception("No Location Located")
-
-        except:
-            _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
-            response = None
-            return response
-        else:
-            return response["resMsg"]["gpsDetail"]
+        return response["resMsg"]["vehicleStatusInfo"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
