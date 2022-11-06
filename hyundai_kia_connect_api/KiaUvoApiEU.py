@@ -556,8 +556,47 @@ class KiaUvoApiEU(ApiImpl):
                 dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
+        
+    def get_driving_info(self, token: Token, vehicle: Vehicle):
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
+        headers = {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self.get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
 
+        responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=headers)
+        responseAlltime = responseAlltime.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
 
+        response30d = requests.post(url, json={"periodTarget": 0}, headers=headers)
+        response30d = response30d.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+
+        drivingInfo = {}
+
+        try:
+            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
+
+            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+                if drivingInfoItem["drivingPeriod"] == 0:
+                    drivingInfo["consumption30d"] = round(
+                        drivingInfoItem["totalPwrCsp"]
+                        / drivingInfoItem["calculativeOdo"]
+                    )
+                    break
+
+        except:
+            _LOGGER.warning("Unable to parse drivingInfo")
+
+        return drivingInfo
+    
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
         headers = {
