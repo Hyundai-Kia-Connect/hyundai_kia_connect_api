@@ -7,5 +7,5 @@ from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, EvChargeLimits
 from .VehicleManager import VehicleManager
