@@ -12,8 +12,8 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class EvChargeLimits:
-    ac: EvChargeLimit = None
-    dc: EvChargeLimit = None
+    ac: int = None
+    dc: int = None
 
 @dataclasses.dataclass
 class Vehicle:
