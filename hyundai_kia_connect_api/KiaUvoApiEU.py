@@ -259,6 +259,21 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.back_right_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.backRight"
         )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampRL"
+        ))
+        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampFL"
+        ))
+        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampFR"
+        ))
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampRR"
+        ))
+        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
+            state, "vehicleStatus.tirePressureLamp.tirePressureLampAll"
+        ))
         vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
