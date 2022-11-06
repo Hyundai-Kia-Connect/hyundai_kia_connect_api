@@ -319,7 +319,12 @@ class KiaUvoApiEU(ApiImpl):
             self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
         )
         vehicle.data = state
-
+        
+        
+    def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
+        vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
+        vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
+        
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
         headers = {
@@ -573,7 +578,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(url, json=body, headers=headers)
         return str(response.status_code == 200)
     
-    def get_driving_info(self, token: Token, vehicle: Vehicle):
+    def _get_driving_info(self, token: Token, vehicle: Vehicle):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
         headers = {
             "Authorization": token.access_token,
