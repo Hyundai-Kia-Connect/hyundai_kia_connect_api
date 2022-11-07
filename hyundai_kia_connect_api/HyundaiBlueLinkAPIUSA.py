@@ -172,10 +172,17 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
-        vehicle.air_temperature = (
+        air_temp = (
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
             "f",
         )
+        
+        if air_temp == "0xLOW":
+            air_temp = self.temperature_range[0]
+        if air_temp == "0xHIGH":
+            air_temp = self.temperature_range[-1]
+        
+        vehicle.air_temperature = air_temp
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
