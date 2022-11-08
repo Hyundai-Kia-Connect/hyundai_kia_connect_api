@@ -36,30 +36,25 @@ _LOGGER = logging.getLogger(__name__)
 class HyundaiBlueLinkAPIAUS(ApiImpl):
     data_timezone = dt.timezone.utc
     temperature_range = [x * 0.5 for x in range(28, 64)]
-   
+
 
     def __init__(self, region: int, brand: int) -> None:
-      self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
+      self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
+      self.API_URL: str = "https://" + self.BASE_URL + "/api/v1/"
       self.API_HEADERS = {
-          "content-type": "application/json;charset=UTF-8",
+          "content-type": "text/plain;charset=UTF-8",
           "accept": "application/json, text/plain, */*",
           "accept-encoding": "gzip, deflate, br",
           "accept-language": "en-US,en;q=0.9",
           "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
           "host": self.BASE_URL,
           "origin": "https://" + self.BASE_URL,
-          "referer": "https://" + self.BASE_URL + "/login",
-          "from": "SPA",
-          "language": "0",
-          "offset": "0",
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "same-origin",
+          "referer": "https://" + self.BASE_URL,
       }
 
     def login(self, username: str, password: str) -> Token:
         """Login into cloud endpoints and return Token"""
-        url = self.API_URL + "lgn"
+        url = self.API_URL + "/user/signin"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         response = requests.post(url, json=data, headers=headers)
