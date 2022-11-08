@@ -452,18 +452,32 @@ class KiaUvoApiCA(ApiImpl):
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_old.index(options.set_temp)
             )
-
-        payload = {
-            "setting": {
-                "airCtrl": options.climate,
-                "defrost": options.defrost,
-                "heating1": options.heating,
-                "igniOnDuration": options.duration,
-                "ims": 0,
-                "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
-            },
-            "pin": token.pin,
-        }
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            payload = {
+                "hvacInfo": {
+                    "airCtrl": int(climate),
+                    "defrost": defrost,
+                    "heating1": int(heating),
+                    "airTemp": {
+                        "value": set_temp,
+                        "unit": 0,
+                        "hvacTempType": 1,
+                    },
+                },
+                "pin": self.pin,
+            }
+        else:
+              payload = {
+                "setting": {
+                    "airCtrl": options.climate,
+                    "defrost": options.defrost,
+                    "heating1": options.heating,
+                    "igniOnDuration": options.duration,
+                    "ims": 0,
+                    "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
+                },
+                "pin": token.pin,
+              }
         data = json.dumps(payload)
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
 
