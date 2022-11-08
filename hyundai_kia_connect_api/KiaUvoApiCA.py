@@ -483,6 +483,8 @@ class KiaUvoApiCA(ApiImpl):
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
+        _LOGGER.debug(f"{DOMAIN} - Received start_climate response non-json: {response}")
+
         response = response.json()
         
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
