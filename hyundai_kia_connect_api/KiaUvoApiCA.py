@@ -455,16 +455,16 @@ class KiaUvoApiCA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             payload = {
                 "hvacInfo": {
-                    "airCtrl": int(climate),
-                    "defrost": defrost,
-                    "heating1": int(heating),
+                    "airCtrl": options.climate,
+                    "defrost": options.defrost,
+                    "heating1": options.heating,
                     "airTemp": {
-                        "value": set_temp,
+                        "value": hex_set_temp,
                         "unit": 0,
                         "hvacTempType": 1,
                     },
                 },
-                "pin": self.pin,
+                "pin": token.pin,
             }
         else:
               payload = {
