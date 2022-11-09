@@ -434,7 +434,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         if options.climate is None:
-            options.climate = 1
+            options.climate = True
         if options.set_temp is None:
             options.set_temp = 21
         if options.duration is None:
@@ -455,7 +455,7 @@ class KiaUvoApiCA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             payload = {
                 "hvacInfo": {
-                    "airCtrl": options.climate,
+                    "airCtrl": int(options.climate),
                     "defrost": options.defrost,
                     "heating1": options.heating,
                     "airTemp": {
@@ -469,7 +469,7 @@ class KiaUvoApiCA(ApiImpl):
         else:
               payload = {
                 "setting": {
-                    "airCtrl": options.climate,
+                    "airCtrl": int(options.climate),
                     "defrost": options.defrost,
                     "heating1": options.heating,
                     "igniOnDuration": options.duration,
