@@ -559,7 +559,7 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
 
-        _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
         return response_headers["transactionId"]
 
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits)-> str:
