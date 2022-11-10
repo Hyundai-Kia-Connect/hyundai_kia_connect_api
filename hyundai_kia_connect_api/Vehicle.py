@@ -37,6 +37,9 @@ class Vehicle:
         
     geocode_api_enable: bool = False   
     geocode_api_use_email: bool = False
+    _geocode_address: str = None
+    _geocode_name: str = None
+    
     
 
     car_battery_percentage: int = None
@@ -132,6 +135,15 @@ class Vehicle:
 
     # Debug fields
     data: dict = None
+        
+    @property
+    def geocode(self):     
+        return self._geocode_name, self._geocode_address
+    
+    @geocode.setter
+    def geocode(self, value):
+        self._geocode_name = value[0]
+        self._geocode_address = value[1]
 
     @property
     def total_driving_distance(self):
