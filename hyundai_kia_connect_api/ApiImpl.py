@@ -78,6 +78,10 @@ class ApiImpl:
             vehicle.geocode = response, response["address"]
         else: 
             pass
+        
+    def configure_geocoded(self, enable_geo: Boolean, enable_geo_email: Boolean, Vehicle) -> None
+        vehicle.geocode_api_enable = enable_geo
+        vehicle.geocode_api_user_email = enable_geo_email
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
