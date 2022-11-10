@@ -75,6 +75,7 @@ class ApiImpl:
             )
             response = requests.get(url)
             response = response.json()
+            vehicle.geocode = response, response["address"]
          else: 
             pass
 
