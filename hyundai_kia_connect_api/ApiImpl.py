@@ -59,7 +59,7 @@ class ApiImpl:
         """Triggers the system to contact the car and get fresh data"""
         pass
 
-    def get_geocoded_location(self, token: Token, vehicle: Vehicle) -> None:
+    def update_geocoded_location(self, token: Token, vehicle: Vehicle) -> None:
         if vehicle.geocode_api_enable == True:
             email_parameter = ""
             if vehicle.geocode_api_use_email == True:
