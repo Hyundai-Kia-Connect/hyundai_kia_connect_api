@@ -60,20 +60,23 @@ class ApiImpl:
         pass
 
     def get_geocoded_location(self, token: Token, vehicle: Vehicle) -> None:
-        email_parameter = ""
-        if vehicle.use_email_with_geocode_api == True:
-            email_parameter = "&email=" + token.username
+        if vehicle.geocode_api_enable == True:
+            email_parameter = ""
+            if vehicle.geocode_api_use_email == True:
+                email_parameter = "&email=" + token.username
 
-        url = (
-            "https://nominatim.openstreetmap.org/reverse?lat="
-            + str(vehicle.location_latitude)
-            + "&lon="
-            + str(vehicle.location_longitude)
-            + "&format=json&addressdetails=1&zoom=18"
-            + email_parameter
-        )
-        response = requests.get(url)
-        response = response.json()
+            url = (
+                "https://nominatim.openstreetmap.org/reverse?lat="
+                + str(vehicle.location_latitude)
+                + "&lon="
+                + str(vehicle.location_longitude)
+                + "&format=json&addressdetails=1&zoom=18"
+                + email_parameter
+            )
+            response = requests.get(url)
+            response = response.json()
+         else: 
+            pass
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
