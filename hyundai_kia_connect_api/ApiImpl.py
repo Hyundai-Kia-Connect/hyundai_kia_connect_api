@@ -59,22 +59,21 @@ class ApiImpl:
         """Triggers the system to contact the car and get fresh data"""
         pass
 
-    def get_geocoded_location(self, lat, lon) -> dict:
+    def get_geocoded_location(self, token: Token, vehicle: Vehicle) -> None:
         email_parameter = ""
-        if self.use_email_with_geocode_api == True:
-            email_parameter = "&email=" + self.username
+        if vehicle.use_email_with_geocode_api == True:
+            email_parameter = "&email=" + token.username
 
         url = (
             "https://nominatim.openstreetmap.org/reverse?lat="
-            + str(lat)
+            + str(vehicle.location_latitude)
             + "&lon="
-            + str(lon)
+            + str(vehicle.location_longitude)
             + "&format=json&addressdetails=1&zoom=18"
             + email_parameter
         )
         response = requests.get(url)
         response = response.json()
-        return response
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
