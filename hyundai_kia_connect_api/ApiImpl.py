@@ -79,7 +79,7 @@ class ApiImpl:
         else: 
             pass
         
-    def configure_geocoded(self, enable_geo: Bool, enable_geo_email: Bool, Vehicle) -> None:
+    def configure_geocoded(self, enable_geo: bool, enable_geo_email: bool, vehicle: Vehicle) -> None:
         vehicle.geocode_api_enable = enable_geo
         vehicle.geocode_api_user_email = enable_geo_email
 
