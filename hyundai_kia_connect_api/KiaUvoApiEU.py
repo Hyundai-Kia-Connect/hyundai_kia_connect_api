@@ -24,7 +24,7 @@ from .const import (
     SEAT_STATUS,
 )
 from .Token import Token
-from .utils import get_child_value, get_index_into_hex_temp
+from .utils import get_child_value, get_index_into_hex_temp,  get_hex_temp_into_index
 from .Vehicle import Vehicle, EvChargeLimits
 
 
@@ -215,8 +215,12 @@ class KiaUvoApiEU(ApiImpl):
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        
+        # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
+        tempIndex = get_hex_temp_into_index(get_child_value(state, "vehicleStatus.airTemp.value"))
+        
         vehicle.air_temperature = (
-            get_child_value(state, "vehicleStatus.airTemp.value"),
+            self.temperature_range[tempIndex],
             TEMPERATURE_UNITS[
                 get_child_value(
                     state,
