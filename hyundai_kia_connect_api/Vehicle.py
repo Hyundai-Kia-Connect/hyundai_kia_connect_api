@@ -34,6 +34,10 @@ class Vehicle:
     _odometer: float = None
     _odometer_value: float = None
     _odometer_unit: str = None
+        
+    geocode_api_enable: bool = False   
+    geocode_api_use_email: bool = False
+    
 
     car_battery_percentage: int = None
     engine_is_running: bool = None
