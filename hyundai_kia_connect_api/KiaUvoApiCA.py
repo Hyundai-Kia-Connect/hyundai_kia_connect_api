@@ -495,7 +495,6 @@ class KiaUvoApiCA(ApiImpl):
             url = self.API_URL + "evc/rfoff"
         else: 
             url = self.API_URL + "rmtstp"
-        url = self.API_URL + "rmtstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
