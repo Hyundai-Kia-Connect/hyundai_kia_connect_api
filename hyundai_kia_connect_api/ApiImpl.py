@@ -76,7 +76,7 @@ class ApiImpl:
             response = requests.get(url)
             response = response.json()
             vehicle.geocode = response, response["address"]
-         else: 
+        else: 
             pass
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
