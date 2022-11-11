@@ -40,6 +40,8 @@ class VehicleManager:
         )
 
         self.token: Token = None
+        self.geocode_api_enable: bool = False   
+        self.geocode_api_use_email: bool = False
         self.vehicles: dict = {}
 
     def initialize(self) -> None:
@@ -59,7 +61,8 @@ class VehicleManager:
 
     def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
         self.api.update_vehicle_with_cached_state(self.token, vehicle)
-        self.api.update_geocoded_location(self.token, vehicle)
+        if self.geocode_api_enable == True
+            self.api.update_geocoded_location(self.token, vehicle, geocode_api_use_email)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
         started_at_utc: dt = dt.datetime.now(pytz.utc)
