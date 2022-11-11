@@ -35,8 +35,6 @@ class Vehicle:
     _odometer_value: float = None
     _odometer_unit: str = None
         
-    geocode_api_enable: bool = False   
-    geocode_api_use_email: bool = False
     _geocode_address: str = None
     _geocode_name: str = None
     
