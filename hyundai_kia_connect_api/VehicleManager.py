@@ -28,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VehicleManager:
-    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable = False: bool, geocode_api_use_email: True: bool):
+    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable = False: bool, geocode_api_use_email = True: bool):
         self.region: int = region
         self.brand: int = brand
         self.username: str = username
