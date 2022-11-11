@@ -28,11 +28,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VehicleManager:
-    def __init__(self, region: int, brand: int, username: str, password: str, pin: str):
+    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable: bool = False, geocode_api_use_email: bool = False):
         self.region: int = region
         self.brand: int = brand
         self.username: str = username
         self.password: str = password
+        self.geocode_api_enable: bool = geocode_api_enable   
+        self.geocode_api_use_email: bool = geocode_api_use_email
         self.pin: str = pin
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
@@ -59,7 +61,8 @@ class VehicleManager:
 
     def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
         self.api.update_vehicle_with_cached_state(self.token, vehicle)
-        self.api.update_geocoded_location(self.token, vehicle)
+        if self.geocode_api_enable == True:
+            self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
         started_at_utc: dt = dt.datetime.now(pytz.utc)
