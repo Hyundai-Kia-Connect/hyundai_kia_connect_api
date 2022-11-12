@@ -8,6 +8,12 @@ from .const import *
 from .Token import Token
 from .Vehicle import Vehicle, EvChargeLimits
 
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -75,6 +81,7 @@ class ApiImpl:
         )
         response = requests.get(url)
         response = response.json()
+        vehicle.geocode = (get_child_value(response, "display_name"), get_child_value(response, "address"))
         
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
