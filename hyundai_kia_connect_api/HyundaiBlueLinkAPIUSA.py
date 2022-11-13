@@ -177,9 +177,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "f",
         )
         
-        if air_temp == "0xLOW":
+        if air_temp == "LO":
             air_temp = self.temperature_range[0]
-        if air_temp == "0xHIGH":
+        if air_temp == "HI":
             air_temp = self.temperature_range[-1]
         
         vehicle.air_temperature = air_temp
