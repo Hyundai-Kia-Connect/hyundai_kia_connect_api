@@ -417,7 +417,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
-        return response["resMsg"]["vehicleStatusInfo"]
+        return response["resMsg"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
