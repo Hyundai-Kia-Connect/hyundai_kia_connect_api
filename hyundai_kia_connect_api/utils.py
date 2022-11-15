@@ -15,7 +15,7 @@ def get_hex_temp_into_index(value):
         value = value.replace("H", "")
         value = int(value, 16)
         return value
-    else
+    else:
         return None
 
 def get_index_into_hex_temp(value):
@@ -24,5 +24,5 @@ def get_index_into_hex_temp(value):
         value = value[1] + "H"
         value = value.zfill(3).upper()
         return value
-    else
+    else:
         return None
