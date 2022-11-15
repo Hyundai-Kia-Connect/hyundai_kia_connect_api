@@ -506,7 +506,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
         return response_headers["transactionId"]
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: Str) -> bool:
+    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
