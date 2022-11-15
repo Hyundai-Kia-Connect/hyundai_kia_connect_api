@@ -57,7 +57,7 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: Str) -> bool:
+    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
         """Check if a previous placed call was successful. Returns true if complete. False if not.  Does not confirm if successful only confirms if complete"""
         pass
 
