@@ -389,7 +389,6 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        _LOGGER.debug(f"{DOMAIN} - Pin Headers {headers}")
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -483,8 +482,6 @@ class KiaUvoApiCA(ApiImpl):
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
-        _LOGGER.debug(f"{DOMAIN} - Received start_climate response non-json: {response}")
-
         response = response.json()
         
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
