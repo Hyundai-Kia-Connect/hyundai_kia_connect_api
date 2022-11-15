@@ -163,7 +163,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "mi",
         )
         vehicle.odometer = (
-            get_child_value(state, "vehicleDetails.odometer.value"),
+            get_child_value(state, "vehicleDetails.odometer"),
             "mi",
         )
         vehicle.car_battery_percentage = get_child_value(
