@@ -142,7 +142,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
         
         if vehicle.odometer:
-            if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer.value"):
+            if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer"):
                 vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
             else:
                 vehicle_status["vehicleLocation"] = None
