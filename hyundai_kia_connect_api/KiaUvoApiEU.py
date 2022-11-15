@@ -217,17 +217,18 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
-        tempIndex = get_hex_temp_into_index(get_child_value(state, "vehicleStatus.airTemp.value"))
-        
-        vehicle.air_temperature = (
-            self.temperature_range[tempIndex],
-            TEMPERATURE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.airTemp.unit",
-                )
-            ],
-        )
+        if get_child_value(state, "vehicleStatus.airTemp.value"):
+            tempIndex = get_hex_temp_into_index(get_child_value(state, "vehicleStatus.airTemp.value"))
+
+            vehicle.air_temperature = (
+                self.temperature_range[tempIndex],
+                TEMPERATURE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.airTemp.unit",
+                    )
+                ],
+            )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
