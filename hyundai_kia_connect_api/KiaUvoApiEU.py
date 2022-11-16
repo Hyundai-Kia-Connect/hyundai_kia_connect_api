@@ -345,11 +345,13 @@ class KiaUvoApiEU(ApiImpl):
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
-        vehicle.location = (
-            get_child_value(state, "vehicleLocation.coord.lat"),
-            get_child_value(state, "vehicleLocation.coord.lon"),
-            self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
-        )
+        
+        if get_child_value(state, "vehicleLocation.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "vehicleLocation.coord.lat"),
+                get_child_value(state, "vehicleLocation.coord.lon"),
+                self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
+            )
         vehicle.data = state
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -370,12 +372,7 @@ class KiaUvoApiEU(ApiImpl):
         response = response.json()
         response = response["resMsg"]["vehicleStatusInfo"]
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
-        if vehicle.odometer:
-            #To Do:  Confirm date format is being stored correctly and add logic here to confirm we have old data before calling.
-            if vehicle.odometer < get_child_value(response, "odometer.value"):
-                response["vehicleLocation"] = self._get_location(token, vehicle)
-        else:
-            response["vehicleLocation"] = self._get_location(token, vehicle)
+
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
