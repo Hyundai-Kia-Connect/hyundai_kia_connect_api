@@ -170,6 +170,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
+        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
+
         air_temp = (
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
             "f",
