@@ -27,9 +27,9 @@ class Vehicle:
 
     # Shared (EV/PHEV/HEV/IC)
     ## General
-    _total_driving_distance: float = None
-    _total_driving_distance_value: float = None
-    _total_driving_distance_unit: str = None
+    _total_driving_range: float = None
+    _total_driving_range_value: float = None
+    _total_driving_range_unit: str = None
 
     _odometer: float = None
     _odometer_value: float = None
@@ -97,9 +97,9 @@ class Vehicle:
     ev_battery_is_charging: bool = None
     ev_battery_is_plugged_in: bool = None
 
-    _ev_driving_distance: float = None
-    _ev_driving_distance_value: float = None
-    _ev_driving_distance_unit: str = None
+    _ev_driving_range: float = None
+    _ev_driving_range_value: float = None
+    _ev_driving_rangeunit: str = None
 
     _ev_estimated_current_charge_duration: int = None
     _ev_estimated_current_charge_duration_value: int = None
@@ -120,9 +120,9 @@ class Vehicle:
     _ev_charge_limits: EvChargeLimits = None
 
     # IC fields (PHEV/HEV/IC)
-    _fuel_driving_distance: float = None
-    _fuel_driving_distance_value: float = None
-    _fuel_driving_distance_unit: str = None
+    _fuel_driving_range: float = None
+    _fuel_driving_range_value: float = None
+    _fuel_driving_range_unit: str = None
     fuel_level: float = None
 
 
@@ -144,14 +144,14 @@ class Vehicle:
         self._geocode_address = value[1]
 
     @property
-    def total_driving_distance(self):
-        return self._total_driving_distance
+    def total_driving_range(self):
+        return self._total_driving_range
 
-    @total_driving_distance.setter
-    def total_driving_distance(self, value):
-        self._total_driving_distance_value = value[0]
-        self._total_driving_distance_unit = value[1]
-        self._total_driving_distance = value[0]
+    @total_driving_range.setter
+    def total_driving_range(self, value):
+        self._total_driving_range_value = value[0]
+        self._total_driving_range_unit = value[1]
+        self._total_driving_range = value[0]
 
     @property
     def next_service_distance(self):
@@ -212,14 +212,14 @@ class Vehicle:
         self._air_temperature = value[0]
 
     @property
-    def ev_driving_distance(self):
-        return self._ev_driving_distance
+    def ev_driving_range(self):
+        return self._ev_driving_range
 
-    @ev_driving_distance.setter
-    def ev_driving_distance(self, value):
-        self._ev_driving_distance_value = value[0]
-        self._ev_driving_distance_unit = value[1]
-        self._ev_driving_distance = value[0]
+    @ev_driving_range.setter
+    def ev_driving_range(self, value):
+        self._ev_driving_range_value = value[0]
+        self._ev_driving_range_unit = value[1]
+        self._ev_driving_range = value[0]
 
     @property
     def ev_estimated_current_charge_duration(self):
@@ -270,11 +270,11 @@ class Vehicle:
         self._ev_charge_limits = value
 
     @property
-    def fuel_driving_distance(self):
-        return self._fuel_driving_distance
-
-    @fuel_driving_distance.setter
-    def fuel_driving_distance(self, value):
-        self._fuel_driving_distance_value = value[0]
-        self._fuel_driving_distance_unit = value[1]
-        self._fuel_driving_distance = value[0]
+    def fuel_driving_range(self):
+        return self._fuel_driving_range
+    
+    @fuel_driving_range.setter
+    def fuel_driving_range(self, value):
+        self._fuel_driving_range_value = value[0]
+        self._fuel_driving_range_unit = value[1]
+        self._fuel_driving_range = value[0]

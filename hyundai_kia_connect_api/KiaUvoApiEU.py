@@ -190,7 +190,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.time")
         )
-        vehicle.total_driving_distance = (
+        vehicle.total_driving_range = (
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
@@ -292,7 +292,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
         )
-        vehicle.ev_driving_distance = (
+        vehicle.ev_driving_range = (
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
@@ -331,7 +331,7 @@ class KiaUvoApiEU(ApiImpl):
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
-        vehicle.fuel_driving_distance = (
+        vehicle.fuel_driving_range = (
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",

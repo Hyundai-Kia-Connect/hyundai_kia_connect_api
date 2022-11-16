@@ -223,7 +223,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.syncDate.utc")
         )
-        vehicle.total_driving_distance = (
+        vehicle.total_driving_range = (
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
@@ -324,7 +324,7 @@ class KiaUvoAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
-        vehicle.fuel_driving_distance = (
+        vehicle.fuel_driving_range = (
             get_child_value(
                 state,
                 "vehicleStatus.distanceToEmpty.value",

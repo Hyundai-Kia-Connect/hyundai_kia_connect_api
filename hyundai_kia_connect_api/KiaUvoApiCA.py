@@ -168,7 +168,7 @@ class KiaUvoApiCA(ApiImpl):
             else:
                 state["status"]["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
                 
-        vehicle.total_driving_distance = (
+        vehicle.total_driving_range = (
             get_child_value(
                 state,
                 "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
@@ -234,7 +234,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "status.evStatus.batteryPlugin"
         )
-        vehicle.ev_driving_distance = (
+        vehicle.ev_driving_range = (
             get_child_value(
                 state,
                 "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
@@ -262,7 +262,7 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
             "m",
         )
-        vehicle.fuel_driving_distance = (
+        vehicle.fuel_driving_range = (
             get_child_value(
                 state,
                 "status.dte.value",
