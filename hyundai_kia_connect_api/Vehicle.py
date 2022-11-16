@@ -99,7 +99,7 @@ class Vehicle:
 
     _ev_driving_range: float = None
     _ev_driving_range_value: float = None
-    _ev_driving_rangeunit: str = None
+    _ev_driving_range_unit: str = None
 
     _ev_estimated_current_charge_duration: int = None
     _ev_estimated_current_charge_duration_value: int = None
