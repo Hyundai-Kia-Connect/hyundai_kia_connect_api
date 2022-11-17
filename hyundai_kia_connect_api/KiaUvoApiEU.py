@@ -433,7 +433,7 @@ class KiaUvoApiEU(ApiImpl):
 
         payload = {"action": action, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = requests.post(url, json=payload, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
 
     def start_climate(
@@ -467,7 +467,7 @@ class KiaUvoApiEU(ApiImpl):
             "unit": "C",
         }
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = requests.post(url, json=payload, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response {response}")
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
@@ -495,7 +495,7 @@ class KiaUvoApiEU(ApiImpl):
             "unit": "C",
         }
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = requests.post(url, json=payload, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response {response}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
