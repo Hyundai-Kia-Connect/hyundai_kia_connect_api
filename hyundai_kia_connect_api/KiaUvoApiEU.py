@@ -187,9 +187,12 @@ class KiaUvoApiEU(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.time")
-        )
+        if get_child_value(state, "vehicleStatus.time"):
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "vehicleStatus.time")
+            )
+        else: 
+            vehicle.last_update_at = dt.datetime.now(self.data_timezone)
         vehicle.total_driving_range = (
             get_child_value(
                 state,
