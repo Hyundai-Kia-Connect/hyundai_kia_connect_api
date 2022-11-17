@@ -22,6 +22,7 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     SEAT_STATUS,
+    VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp,  get_hex_temp_into_index
@@ -420,7 +421,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
         return response["resMsg"]
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
         headers = {
             "Authorization": token.access_token,
@@ -434,7 +435,7 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-        payload = {"action": action, "deviceId": token.device_id}
+        payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request {payload}")
         response = requests.post(url, json=payload, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
