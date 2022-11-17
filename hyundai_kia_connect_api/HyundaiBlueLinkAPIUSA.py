@@ -162,13 +162,17 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             ),
             "mi",
         )
-        vehicle.fuel_driving_range = (
-            get_child_value(
-                state,
-                "vehicleStatus.dte.value",
-            ),
-            "mi",
-        )
+        if get_child_value(
+                    state,
+                    "vehicleStatus.dte.value",
+                ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "vehicleStatus.dte.value",
+                ),
+                "mi",
+            )
         vehicle.odometer = (
             get_child_value(state, "vehicleDetails.odometer"),
             "mi",
@@ -275,13 +279,17 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
-        vehicle.fuel_driving_range = (
-            get_child_value(
+        if get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-            ),
-            "mi",
-        )
+            ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                ),
+                "mi",
+            )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
 
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
