@@ -158,6 +158,7 @@ class KiaUvoApiEU(ApiImpl):
                 name=entry["nickname"],
                 model=entry["vehicleName"],
                 registration_date=entry["regDate"],
+                VIN=entry["vin"],
             )
             result.append(vehicle)
         return result
