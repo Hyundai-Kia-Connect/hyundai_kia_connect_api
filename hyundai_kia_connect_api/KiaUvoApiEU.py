@@ -1,3 +1,4 @@
+import datetime
 import datetime as dt
 import logging
 import random
@@ -25,8 +26,7 @@ from .const import (
 )
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp,  get_hex_temp_into_index
-from .Vehicle import Vehicle, EvChargeLimits
-
+from .Vehicle import Vehicle, EvChargeLimits, DailyDrivingStats
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
         state = self._get_driving_info(token, vehicle)
-        self._update_vehicle_drive_info(vehicle, state)      
+        self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -217,7 +217,7 @@ class KiaUvoApiEU(ApiImpl):
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
-        
+
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         if get_child_value(state, "vehicleStatus.airTemp.value"):
             tempIndex = get_hex_temp_into_index(get_child_value(state, "vehicleStatus.airTemp.value"))
@@ -347,7 +347,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
-        
+
         if get_child_value(state, "vehicleLocation.coord.lat"):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
@@ -355,11 +355,12 @@ class KiaUvoApiEU(ApiImpl):
                 self.get_last_updated_at(get_child_value(state, "vehicleLocation.time")),
             )
         vehicle.data = state
-        
+
     def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
         vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
-        
+        vehicle.daily_stats = get_child_value(state, "dailyStats")
+
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
         headers = {
@@ -567,14 +568,14 @@ class KiaUvoApiEU(ApiImpl):
                 dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
                 ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
             )
-        
+
     def _get_driving_info(self, token: Token, vehicle: Vehicle):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
         headers = {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
-            "Stamp": self.get_stamp(),
+            "Stamp": self._get_stamp(),
             "ccsp-device-id": token.device_id,
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
@@ -595,6 +596,21 @@ class KiaUvoApiEU(ApiImpl):
         try:
             drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
 
+            drivingInfo["dailyStats"] = []
+            for day in response30d["resMsg"]["drivingInfoDetail"]:
+                processedDay = DailyDrivingStats(
+                    date=datetime.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                    total_consumed=day["totalPwrCsp"],
+                    engine_consumption=day["motorPwrCsp"],
+                    climate_consumption=day["climatePwrCsp"],
+                    onboard_electronics_consumption=day["eDPwrCsp"],
+                    battery_care_consumption=day["batteryMgPwrCsp"],
+                    regenerated_energy=day["regenPwr"],
+                    distance=day["calculativeOdo"]
+                )
+                drivingInfo["dailyStats"].append(processedDay)
+
+
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
                 if drivingInfoItem["drivingPeriod"] == 0:
                     drivingInfo["consumption30d"] = round(
@@ -607,7 +623,7 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.warning("Unable to parse drivingInfo")
 
         return drivingInfo
-    
+
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
         headers = {
