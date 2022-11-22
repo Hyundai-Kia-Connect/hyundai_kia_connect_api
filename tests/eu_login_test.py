@@ -11,5 +11,4 @@ def test_EU_login():
         region=1, brand=1, username=username, password=password, pin=pin
     )
     vm.check_and_refresh_token()
-    vm.force_refresh_all_vehicles_states()
     assert len(vm.vehicles.keys()) > 0
