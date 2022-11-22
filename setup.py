@@ -12,7 +12,7 @@ with open("HISTORY.rst") as history_file:
 
 long_description = readme + "\n\n" + history
 long_description = readme
-requirements = ["curlify", "bs4", "push_receiver"]
+requirements = ["curlify", "bs4"]
 
 test_requirements = [
     "pytest>=3",
