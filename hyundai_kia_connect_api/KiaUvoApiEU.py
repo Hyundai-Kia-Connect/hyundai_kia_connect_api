@@ -406,7 +406,7 @@ class KiaUvoApiEU(ApiImpl):
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         headers = {
-            "Authorization": token.refresh_token,
+            "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
             "Stamp": self._get_stamp(),
