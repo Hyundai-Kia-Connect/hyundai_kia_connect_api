@@ -455,11 +455,23 @@ class KiaUvoApiEU(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
+        #Defaults are located here to be region specific
+        
+        if options.set_temp is None:
+            options.set_temp = 21
+        if options.duration is None:
+            options.duration = 5
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
 
         hex_set_temp = get_index_into_hex_temp(
             self.temperature_range.index(options.set_temp)
         )
-
+            
         payload = {
             "action": "start",
             "hvacType": 0,
