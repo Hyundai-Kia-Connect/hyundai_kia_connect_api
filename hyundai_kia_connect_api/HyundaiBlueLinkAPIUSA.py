@@ -232,7 +232,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
         ))
-        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLockStatus"))
+        vehicle.is_locked = (not get_child_value(state, "vehicleStatus.doorLock"))
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
