@@ -12,7 +12,7 @@ with open("HISTORY.rst") as history_file:
 
 long_description = readme + "\n\n" + history
 long_description = readme
-requirements = ["curlify", "bs4", "push_receiver"]
+requirements = ["curlify", "bs4"]
 
 test_requirements = [
     "pytest>=3",
@@ -45,6 +45,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/fuatakgun/hyundai_kia_connect_api",
-    version="1.40.3",
+    version="1.40.11",
     zip_safe=False,
 )

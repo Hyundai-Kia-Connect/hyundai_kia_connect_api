@@ -1,4 +1,3 @@
-import datetime
 import datetime as dt
 import logging
 import random
@@ -23,7 +22,10 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     SEAT_STATUS,
+    VEHICLE_LOCK_ACTION,
 )
+
+from .exceptions import *
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp, get_hex_temp_into_index
 from .Vehicle import Vehicle, EvChargeLimits, DailyDrivingStats
@@ -34,6 +36,39 @@ INVALID_STAMP_RETRY_COUNT = 10
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+
+
+def _check_response_for_errors(response: dict) -> None:
+    """
+    Checks for errors in the API response. If an error is found, an exception is raised.
+    retCode known values:
+    - S: success
+    - F: failure
+    resCode / resMsg known values:
+    - 0000: no error
+    - 4004: "Duplicate request"
+    - 4081: "Request timeout"
+    - 5031: "Unavailable remote control - Service Temporary Unavailable"
+    - 5091: "Exceeds number of requests"
+    :param response: the API's JSON response
+    """
+
+    error_code_mapping = {
+        "4004": DuplicateRequestError,
+        "4081": RequestTimeoutError,
+        "5031": APIError,
+        "5091": RateLimitingError
+    }
+
+    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+        _LOGGER.error(f"Unknown API response format: {response}")
+        raise InvalidAPIResponseError()
+
+    if response["retCode"] == "F":
+        if response["resCode"] in error_code_mapping:
+            raise error_code_mapping[response["resCode"]](response["resMsg"])
+        else:
+            raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
 class KiaUvoApiEU(ApiImpl):
@@ -95,6 +130,19 @@ class KiaUvoApiEU(ApiImpl):
             + ".v2.json"
         )
 
+    def _get_authenticated_headers(self, token: Token) -> dict:
+        return {
+            "Authorization": token.access_token,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
+            "ccsp-device-id": token.device_id,
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
     def login(self, username: str, password: str) -> Token:
 
         stamp = self._get_stamp()
@@ -113,8 +161,7 @@ class KiaUvoApiEU(ApiImpl):
             )
 
         if authorization_code is None:
-            return None
-
+            raise AuthenticationError("Login Failed")
         (
             token_type,
             access_token,
@@ -136,19 +183,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = requests.get(url, headers=headers).json()
+        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
         result = []
         for entry in response["resMsg"]["vehicles"]:
@@ -157,6 +192,7 @@ class KiaUvoApiEU(ApiImpl):
                 name=entry["nickname"],
                 model=entry["vehicleName"],
                 registration_date=entry["regDate"],
+                VIN=entry["vin"],
             )
             result.append(vehicle)
         return result
@@ -201,9 +237,12 @@ class KiaUvoApiEU(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.time")
-        )
+        if get_child_value(state, "vehicleStatus.time"):
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "vehicleStatus.time")
+            )
+        else:
+            vehicle.last_update_at = dt.datetime.now(self.data_timezone)
         vehicle.total_driving_range = (
             get_child_value(
                 state,
@@ -375,101 +414,58 @@ class KiaUvoApiEU(ApiImpl):
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
-        response = requests.get(url, headers=headers)
-        response = response.json()
+        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
+        _check_response_for_errors(response)
         response = response["resMsg"]["vehicleStatusInfo"]
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
 
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
+
         try:
-            response = requests.get(url, headers=headers)
-            response = response.json()
-            _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
-            if response["resCode"] != "0000":
-                raise Exception("No Location Located")
+            response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
+            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
+            _check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
         except:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
-        headers = {
-            "Authorization": token.refresh_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = requests.get(url, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
+        _check_response_for_errors(response)
         return response["resMsg"]
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> None:
+    def lock_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
-        payload = {"action": action, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response {response}")
+        payload = {"action": action.value, "deviceId": token.device_id}
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
+        _check_response_for_errors(response)
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
+
+        # Defaults are located here to be region specific
+
+        if options.set_temp is None:
+            options.set_temp = 21
+        if options.duration is None:
+            options.duration = 5
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
 
         hex_set_temp = get_index_into_hex_temp(
             self.temperature_range.index(options.set_temp)
@@ -485,23 +481,13 @@ class KiaUvoApiEU(ApiImpl):
             "tempCode": hex_set_temp,
             "unit": "C",
         }
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
+        _check_response_for_errors()
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
         payload = {
             "action": "stop",
@@ -513,65 +499,36 @@ class KiaUvoApiEU(ApiImpl):
             "tempCode": "10H",
             "unit": "C",
         }
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
+        _check_response_for_errors(response)
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
         payload = {"action": "start", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
+        _check_response_for_errors(response)
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
         payload = {"action": "stop", "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response {response}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
+        _check_response_for_errors(response)
 
     def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
-        response = requests.get(url, headers=headers).json()
+        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
+        _check_response_for_errors()
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
         if response['resMsg'] is not None:
@@ -583,23 +540,12 @@ class KiaUvoApiEU(ApiImpl):
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
-        responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=headers)
+        responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=self._get_authenticated_headers(token))
         responseAlltime = responseAlltime.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
 
-        response30d = requests.post(url, json={"periodTarget": 0}, headers=headers)
+        response30d = requests.post(url, json={"periodTarget": 0}, headers=self._get_authenticated_headers(token))
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
 
@@ -631,17 +577,6 @@ class KiaUvoApiEU(ApiImpl):
 
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
-        headers = {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
         body = {
             "targetSOClist": [
@@ -655,7 +590,7 @@ class KiaUvoApiEU(ApiImpl):
                 },
             ]
         }
-        response = requests.post(url, json=body, headers=headers)
+        response = requests.post(url, json=body, headers=self._get_authenticated_headers(token))
         return str(response.status_code == 200)
 
     def _get_stamp(self) -> str:
@@ -701,8 +636,8 @@ class KiaUvoApiEU(ApiImpl):
 
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID request {headers} {payload}")
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
         device_id = response["resMsg"]["deviceId"]
         return device_id
 
@@ -732,10 +667,10 @@ class KiaUvoApiEU(ApiImpl):
             "Accept-Language": "en,en-US;q=0.9",
         }
 
-        _LOGGER.debug(f"{DOMAIN} - Get cookies request {url}")
+        _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = requests.Session()
         response = session.get(url)
-        _LOGGER.debug(f"{DOMAIN} - Get cookies response {session.cookies.get_dict()}")
+        _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
         # return session
 
@@ -755,7 +690,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(
             url, json=data, headers=headers, cookies=cookies
         ).json()
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
@@ -766,7 +701,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=headers, cookies=cookies)
         cookies = cookies | response.cookies.get_dict()
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - IntegrationInfo Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - IntegrationInfo Response: {response}")
         user_id = response["userId"]
         service_id = response["serviceId"]
 
@@ -777,7 +712,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(login_form_url, headers=headers, cookies=cookies)
         cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
-            f"{DOMAIN} - LoginForm {login_form_url} - Response {response.text}"
+            f"{DOMAIN} - LoginForm {login_form_url} - Response: {response.text}"
         )
         soup = BeautifulSoup(response.content, "html.parser")
         login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
@@ -886,10 +821,10 @@ class KiaUvoApiEU(ApiImpl):
             + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data {headers}{data}")
+        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data: {headers}{data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
@@ -914,10 +849,10 @@ class KiaUvoApiEU(ApiImpl):
             "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data {data}")
+        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data: {data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Response: {response}")
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
