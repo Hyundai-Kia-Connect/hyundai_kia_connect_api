@@ -227,7 +227,7 @@ class KiaUvoApiEU(ApiImpl):
                                 - incompatible vehicle (ICE?)
                                 - new API format
                                 - API outage
-                        """, e)
+                        """, exc_info=e)
         else:
             self._update_vehicle_drive_info(vehicle, state)
 
