@@ -25,7 +25,7 @@ from .const import (
     SEAT_STATUS,
 )
 from .Token import Token
-from .utils import get_child_value, get_index_into_hex_temp,  get_hex_temp_into_index
+from .utils import get_child_value, get_index_into_hex_temp, get_hex_temp_into_index
 from .Vehicle import Vehicle, EvChargeLimits, DailyDrivingStats
 
 _LOGGER = logging.getLogger(__name__)
@@ -180,8 +180,20 @@ class KiaUvoApiEU(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-        state = self._get_driving_info(token, vehicle)
-        self._update_vehicle_drive_info(vehicle, state)
+
+        try:
+            state = self._get_driving_info(token, vehicle)
+        except Exception as e:
+            # we don't know if all car types (ex: ICE cars) provide this information.
+            # we also don't know what the API returns if the info is unavailable.
+            # so, catch any exception and move on.
+            _LOGGER.exception("""Failed to parse driving info. Possible reasons:
+                                - incompatible vehicle (ICE?)
+                                - new API format
+                                - API outage
+                        """, e)
+        else:
+            self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -327,8 +339,8 @@ class KiaUvoApiEU(ApiImpl):
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
         try:
             vehicle.ev_charge_limits = EvChargeLimits(
-                dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
-                ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
+                dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1],
+                ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1],
             )
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
@@ -400,7 +412,7 @@ class KiaUvoApiEU(ApiImpl):
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response {response}")
             if response["resCode"] != "0000":
-                    raise Exception("No Location Located")
+                raise Exception("No Location Located")
             return response["resMsg"]["gpsDetail"]
         except:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
@@ -565,8 +577,8 @@ class KiaUvoApiEU(ApiImpl):
         if response['resMsg'] is not None:
             target_soc_list = response['resMsg']['targetSOClist']
             return EvChargeLimits(
-                dc = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0 ][-1],
-                ac = [ x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1 ][-1],
+                dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1],
+                ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1],
             )
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle):
@@ -591,36 +603,29 @@ class KiaUvoApiEU(ApiImpl):
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
 
-        drivingInfo = {}
+        drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
 
-        try:
-            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
+        drivingInfo["dailyStats"] = []
+        for day in response30d["resMsg"]["drivingInfoDetail"]:
+            processedDay = DailyDrivingStats(
+                date=datetime.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                total_consumed=day["totalPwrCsp"],
+                engine_consumption=day["motorPwrCsp"],
+                climate_consumption=day["climatePwrCsp"],
+                onboard_electronics_consumption=day["eDPwrCsp"],
+                battery_care_consumption=day["batteryMgPwrCsp"],
+                regenerated_energy=day["regenPwr"],
+                distance=day["calculativeOdo"]
+            )
+            drivingInfo["dailyStats"].append(processedDay)
 
-            drivingInfo["dailyStats"] = []
-            for day in response30d["resMsg"]["drivingInfoDetail"]:
-                processedDay = DailyDrivingStats(
-                    date=datetime.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                    total_consumed=day["totalPwrCsp"],
-                    engine_consumption=day["motorPwrCsp"],
-                    climate_consumption=day["climatePwrCsp"],
-                    onboard_electronics_consumption=day["eDPwrCsp"],
-                    battery_care_consumption=day["batteryMgPwrCsp"],
-                    regenerated_energy=day["regenPwr"],
-                    distance=day["calculativeOdo"]
+        for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+            if drivingInfoItem["drivingPeriod"] == 0:
+                drivingInfo["consumption30d"] = round(
+                    drivingInfoItem["totalPwrCsp"]
+                    / drivingInfoItem["calculativeOdo"]
                 )
-                drivingInfo["dailyStats"].append(processedDay)
-
-
-            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if drivingInfoItem["drivingPeriod"] == 0:
-                    drivingInfo["consumption30d"] = round(
-                        drivingInfoItem["totalPwrCsp"]
-                        / drivingInfoItem["calculativeOdo"]
-                    )
-                    break
-
-        except:
-            _LOGGER.warning("Unable to parse drivingInfo")
+                break
 
         return drivingInfo
 
@@ -666,7 +671,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
-            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds()*1000.0)/frequency}"
+            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0) / frequency}"
         )
         if (position * 100.0) / stamp_count > 90:
             self.stamps = None
@@ -881,7 +886,7 @@ class KiaUvoApiEU(ApiImpl):
             + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data {headers }{data}")
+        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data {headers}{data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Access Token Response {response}")
