@@ -554,7 +554,7 @@ class KiaUvoApiEU(ApiImpl):
         drivingInfo["dailyStats"] = []
         for day in response30d["resMsg"]["drivingInfoDetail"]:
             processedDay = DailyDrivingStats(
-                date=datetime.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
                 total_consumed=day["totalPwrCsp"],
                 engine_consumption=day["motorPwrCsp"],
                 climate_consumption=day["climatePwrCsp"],
