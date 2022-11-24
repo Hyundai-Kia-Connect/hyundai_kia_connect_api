@@ -69,13 +69,12 @@ class VehicleManager:
         for vehicle_id in self.vehicles.keys():
             vehicle: Vehicle = self.get_vehicle(vehicle_id)
             _LOGGER.debug(
-                f"time diff - {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
+                f"{DOMAIN} - time diff - {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
             )
             if (
                 started_at_utc - vehicle.last_updated_at
             ).total_seconds() > force_refresh_interval:
                 self.force_refresh_vehicle_state(vehicle)
-                self.update_vehicle_with_cached_state(vehicle)
             else: 
                 self.update_vehicle_with_cached_state(vehicle)
 
