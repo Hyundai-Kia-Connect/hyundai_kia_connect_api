@@ -218,8 +218,18 @@ class KiaUvoAPIUSA(ApiImpl):
 
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Get cached vehicle data and update Vehicle instance with it"""
         state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)     
+        
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        self._get_forced_vehicle_state(token, vehicle)
+        #TODO: Force update needs work to return the correct data for processing
+        #self._update_vehicle_properties(vehicle, state)
+        #Temp call a cached state since we are removing this from parent logic in other commits should be removed when the above is fixed
+        self.update_vehicle_with_cached_state(token, vehicle)
+        
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:          
+        """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.syncDate.utc")
         )
@@ -396,6 +406,7 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle_status = response_body["payload"]["vehicleInfoList"][0][
             "lastVehicleInfo"
         ]["vehicleStatusRpt"]["vehicleStatus"]
+        #TODO: This logic should all be removed from here and moved to the update_vehicle_properties
         vehicle_data = {
             "vehicleStatus": vehicle_status,
             "odometer": {
@@ -450,14 +461,19 @@ class KiaUvoAPIUSA(ApiImpl):
         pass
 
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rems/rvs"
         body = {
             "requestType": 0  # value of 1 would return cached results instead of forcing update
         }
-        self.post_request_with_logging_and_active_session(
+        response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
+        response_body = response.json()
+        vehicle_status = response_body["payload"]["vehicleInfoList"][0][
+            "lastVehicleInfo"
+        ]["vehicleStatusRpt"]["vehicleStatus"]
+        
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"
