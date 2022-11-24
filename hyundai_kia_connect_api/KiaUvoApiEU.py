@@ -184,7 +184,8 @@ class KiaUvoApiEU(ApiImpl):
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response}")
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
+        _check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
             vehicle: Vehicle = Vehicle(
