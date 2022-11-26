@@ -557,7 +557,17 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
         return response_headers["transactionId"]
-
+    
+    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
+        url = self.API_URL + "evc/selsoc"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        
+        response = requests.post(url, headers=headers)    
+        response = response.json()
+        return response["result"]
+    
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits)-> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
