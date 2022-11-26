@@ -65,6 +65,7 @@ class VehicleManager:
             self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
+        #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update. 
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
             vehicle: Vehicle = self.get_vehicle(vehicle_id)
