@@ -69,7 +69,7 @@ class VehicleManager:
         for vehicle_id in self.vehicles.keys():
             vehicle: Vehicle = self.get_vehicle(vehicle_id)
             _LOGGER.debug(
-                f"{DOMAIN} - Time differential in minutes: {(started_at_utc - vehicle.last_updated_at).total_seconds()/60}"
+                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
             )
             if (
                 started_at_utc - vehicle.last_updated_at
