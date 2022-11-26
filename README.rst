@@ -24,13 +24,27 @@ Key values for the int exist in the constant(https://github.com/fuatakgun/hyunda
     
 Once this is done you can now make the following calls against the vehicle manager::
 
- get_vehicle(self, vehicle_id)
- update_all_vehicles_with_cached_state(self)
- update_vehicle_with_cached_state(self, vehicle_id)
- force_refresh_all_vehicles_states(self)
- force_refresh_vehicles_states(self, vehicle_id)
+ #Checks the token is still valid and updates it if not.  Should be called before anything else.
  check_and_refresh_token(self)
+ 
+ #Ideal fresh command. Checks if the car has been updated since the time in seconds provided.  If so does a cached update. If not force calls the car. 
  check_and_force_update_vehicles(self, force_refresh_interval) # Interval in seconds - consider API Rate Limits https://github.com/Hacksore/bluelinky/wiki/API-Rate-Limits
+
+ #Used to return a specific vehicle object:
+ get_vehicle(self, vehicle_id)
+ 
+ #Updates all cars with what is cached in the cloud:
+ update_all_vehicles_with_cached_state(self)
+ 
+ #Updates a specific car with cached state:
+ update_vehicle_with_cached_state(self, vehicle_id)
+ 
+ #Force refreshes all cars:
+ force_refresh_all_vehicles_states(self)
+ 
+ #Force refreshes a single car:
+ force_refresh_vehicles_states(self, vehicle_id)
+ 
 
 An example call would be::
 
