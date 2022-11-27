@@ -156,8 +156,9 @@ class KiaUvoApiCA(ApiImpl):
         #Update service after the fact so we still have the old odometer reading available for above.        
         self._update_vehicle_properties_service(vehicle, service)
         
-        charge = self._get_charge_limits(token, vehicle)
-        self._update_vehicle_properties_charge(vehicle, soc)
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            charge = self._get_charge_limits(token, vehicle)
+            self._update_vehicle_properties_charge(vehicle, charge)
         
         
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:   
