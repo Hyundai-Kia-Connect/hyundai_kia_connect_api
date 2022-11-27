@@ -116,7 +116,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties_base(vehicle, state)
         
         # Service Status Call       
         service = self._get_next_service(token, vehicle)
@@ -132,6 +132,10 @@ class KiaUvoApiCA(ApiImpl):
                 
         #Update service after the fact so we still have the old odometer reading available for above.        
         self._update_vehicle_properties_service(vehicle, service)
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            charge = self._get_charge_limits(token, vehicle)
+            self._update_vehicle_properties_charge(vehicle, charge)
+        
         
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -152,8 +156,12 @@ class KiaUvoApiCA(ApiImpl):
         #Update service after the fact so we still have the old odometer reading available for above.        
         self._update_vehicle_properties_service(vehicle, service)
         
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            charge = self._get_charge_limits(token, vehicle)
+            self._update_vehicle_properties_charge(vehicle, charge)
         
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:   
+        
+    def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:   
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "status.lastStatusDate")
@@ -557,7 +565,24 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
         return response_headers["transactionId"]
+    
+    def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:   
+        vehicle.ev_charge_limits = EvChargeLimits(
+            dc=[x['level'] for x in state if x['plugType'] == 0][-1],
+            ac=[x['level'] for x in state if x['plugType'] == 1][-1],
+        )
 
+    
+    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
+        url = self.API_URL + "evc/selsoc"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        
+        response = requests.post(url, headers=headers)    
+        response = response.json()
+        return response["result"]
+    
     def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits)-> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
