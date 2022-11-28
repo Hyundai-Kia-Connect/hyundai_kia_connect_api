@@ -1,12 +1,7 @@
 class HyundaiKiaException(Exception):
-    """Generic hyundaiKiaException exception.
-    Attributes:
-        stage: the stage that the exception occurred at
     """
-
-    def __init__(self, stage: str) -> None:
-        self.stage = stage
-
+    Generic hyundaiKiaException exception.
+    """
     pass
 
 
