@@ -115,8 +115,8 @@ class VehicleManager:
     def stop_charge(self, vehicle_id: str) -> str:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def set_charge_limits(self, vehicle_id: str, limits: EvChargeLimits) -> str:
-        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), limits)
+    def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
+        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac, dc)
 
     def check_action_status(self, vehicle_id: str, action_id: str):
         return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)

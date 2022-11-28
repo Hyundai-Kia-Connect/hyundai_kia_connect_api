@@ -364,10 +364,8 @@ class KiaUvoApiEU(ApiImpl):
         target_soc_list = get_child_value(
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
         try:
-            vehicle.ev_charge_limits = EvChargeLimits(
-                dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1],
-                ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1],
-            )
+            vehicle.ev_charge_limits_ac = ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1]
+            vehicle.ev_charge_limits_dc = dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
@@ -414,6 +412,7 @@ class KiaUvoApiEU(ApiImpl):
             return response["resMsg"]["gpsDetail"]
         except:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
+            return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
@@ -504,7 +503,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
 
-    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
+    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
@@ -514,24 +513,20 @@ class KiaUvoApiEU(ApiImpl):
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
         if response['resMsg'] is not None:
-            target_soc_list = response['resMsg']['targetSOClist']
-            return EvChargeLimits(
-                dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1],
-                ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1],
-            )
+            return response['resMsg']
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
 
         body = {
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": limits.dc,
+                    "targetSOClevel": dc,
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": limits.ac,
+                    "targetSOClevel": ac,
                 },
             ]
         }

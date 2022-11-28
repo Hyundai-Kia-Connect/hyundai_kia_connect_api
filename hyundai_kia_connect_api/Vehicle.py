@@ -10,10 +10,6 @@ from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
-@dataclasses.dataclass
-class EvChargeLimits:
-    ac: int = None
-    dc: int = None
 
 @dataclasses.dataclass
 class Vehicle:
@@ -93,6 +89,11 @@ class Vehicle:
     _location_last_set_time: datetime.datetime = None
 
     # EV fields (EV/PHEV)
+
+
+    ev_charge_limits_dc: int = None
+    ev_charge_limits_ac: int = None
+
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
     ev_battery_is_plugged_in: bool = None
@@ -117,7 +118,9 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
-    _ev_charge_limits: EvChargeLimits = None
+    _ev_charge_limits_ac: int = None
+    _ev_charge_limits_dc: int = None
+
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
@@ -260,14 +263,6 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
-
-    @property
-    def ev_charge_limits(self) -> EvChargeLimits:
-        return self._ev_charge_limits
-
-    @ev_charge_limits.setter
-    def ev_charge_limits(self, value: EvChargeLimits):
-        self._ev_charge_limits = value
 
     @property
     def fuel_driving_range(self):

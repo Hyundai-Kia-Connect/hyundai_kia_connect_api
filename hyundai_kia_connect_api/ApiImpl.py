@@ -109,11 +109,7 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
-    def get_charge_limits(self, token: Token, vehicle: Vehicle) -> EvChargeLimits:
-        pass
-
-    def set_charge_limits(
-        self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
