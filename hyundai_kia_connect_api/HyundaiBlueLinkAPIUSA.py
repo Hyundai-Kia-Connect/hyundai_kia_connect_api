@@ -49,7 +49,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
         self.temperature_range = range(62, 82)
-        
+
         ts = time.time()
         utc_offset = (
             dt.datetime.fromtimestamp(ts) - dt.datetime.utcfromtimestamp(ts)
@@ -111,7 +111,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
-        )  
+        )
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
@@ -140,7 +140,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
 
         vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
-        
+
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer"):
                 vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
@@ -163,9 +163,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "mi",
         )
         if get_child_value(
-                    state,
-                    "vehicleStatus.dte.value",
-                ):
+            state,
+            "vehicleStatus.dte.value",
+        ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
@@ -188,12 +188,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
             "f",
         )
-        
+
         if air_temp == "LO":
             air_temp = self.temperature_range[0]
         if air_temp == "HI":
             air_temp = self.temperature_range[-1]
-        
+
         vehicle.air_temperature = air_temp
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
@@ -280,9 +280,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "m",
         )
         if get_child_value(
-                state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-            ):
+            state,
+            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+        ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
@@ -298,15 +298,15 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
             get_child_value(state, "vehicleStatus.vehicleLocation.time"),
 
-        )        
+        )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
         vehicle.data = state
-        
+
     def get_location(self, token: Token, vehicle: Vehicle):
         r"""
         Get the location of the vehicle
-        This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per: 
+        This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per:
         Only update the location if the odometer moved AND if the last location update was over an hour ago.
         Note that the "last updated" time is initially set to three hours ago.
         This will help to prevent too many calls to the API
