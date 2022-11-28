@@ -27,6 +27,7 @@ class DailyDrivingStats:
     regenerated_energy: int = None
     # distance is expressed in (I assume) whatever unit the vehicle is configured in. KMs (rounded) in my case
     distance: int = None
+    distance_unit = DISTANCE_UNITS[1]  # set to kms by default for now
 
 
 @dataclasses.dataclass
@@ -108,13 +109,12 @@ class Vehicle:
 
     # EV fields (EV/PHEV)
 
-    _total_power_consumed: float = None
-    _total_power_consumed_value: float = None
-    _total_power_consumed_unit: str = None
-
-    _power_consumption_30d: float = None
-    _power_consumption_30d_value: float = None
-    _power_consumption_30d_unit: str = None
+    # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
+    # expressed in watt-hours (Wh)
+    total_power_consumed: float = None
+    # energy consumed in the last ~30 days
+    # expressed in watt-hours (Wh)
+    power_consumption_30d: float = None
 
     daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
 
@@ -277,22 +277,6 @@ class Vehicle:
         self._ev_estimated_portable_charge_duration_value = value[0]
         self._ev_estimated_portable_charge_duration_unit = value[1]
         self._ev_estimated_portable_charge_duration = value[0]
-
-    @property
-    def total_power_consumed(self):
-        return self._total_power_consumed
-
-    @total_power_consumed.setter
-    def total_power_consumed(self, value):
-        self._total_power_consumed = value
-
-    @property
-    def power_consumption_30d(self):
-        return self._power_consumption_30d
-
-    @power_consumption_30d.setter
-    def power_consumption_30d(self, value):
-        self._power_consumption_30d = value
 
     @property
     def ev_estimated_station_charge_duration(self):
