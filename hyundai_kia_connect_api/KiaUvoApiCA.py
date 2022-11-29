@@ -567,9 +567,8 @@ class KiaUvoApiCA(ApiImpl):
         return response_headers["transactionId"]
     
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:   
-        vehicle.ev_charge_limits_ac = ac=[x['level'] for x in state if x['plugType'] == 1][-1]
-        vehicle.ev_charge_limits_dc = dc=[x['level'] for x in state if x['plugType'] == 0][-1]
-
+        vehicle.ev_charge_limits_ac = [x['level'] for x in state if x['plugType'] == 1][-1]
+        vehicle.ev_charge_limits_dc = [x['level'] for x in state if x['plugType'] == 0][-1]
 
     
     def _get_charge_limits(self, token: Token, vehicle: Vehicle):
