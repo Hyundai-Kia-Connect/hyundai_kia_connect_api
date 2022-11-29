@@ -378,8 +378,8 @@ class KiaUvoApiEU(ApiImpl):
         target_soc_list = get_child_value(
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist")
         try:
-            vehicle.ev_charge_limits_ac = ac=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1]
-            vehicle.ev_charge_limits_dc = dc=[x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1]
+            vehicle.ev_charge_limits_ac = [x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 1][-1]
+            vehicle.ev_charge_limits_dc = [x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
