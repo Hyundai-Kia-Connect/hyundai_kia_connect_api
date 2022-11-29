@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytz
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions, EvChargeLimits
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,

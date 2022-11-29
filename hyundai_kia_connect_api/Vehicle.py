@@ -142,18 +142,11 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
-    _ev_charge_limits_ac: int = None
-    _ev_charge_limits_dc: int = None
-
-
-
-
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
     _fuel_driving_range_unit: str = None
     fuel_level: float = None
-
 
     fuel_level_is_low: bool = None
 

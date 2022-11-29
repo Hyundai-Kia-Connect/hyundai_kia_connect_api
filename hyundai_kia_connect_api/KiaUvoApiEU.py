@@ -28,7 +28,7 @@ from .const import (
 from .exceptions import *
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp, get_hex_temp_into_index
-from .Vehicle import Vehicle, EvChargeLimits, DailyDrivingStats
+from .Vehicle import Vehicle, DailyDrivingStats
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -571,7 +571,7 @@ class KiaUvoApiEU(ApiImpl):
 
         return drivingInfo
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
 
         body = {

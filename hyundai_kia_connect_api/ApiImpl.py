@@ -6,7 +6,7 @@ import requests
 
 from .const import *
 from .Token import Token
-from .Vehicle import Vehicle, EvChargeLimits
+from .Vehicle import Vehicle
 
 from .utils import (
     get_child_value,
