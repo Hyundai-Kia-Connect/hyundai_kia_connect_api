@@ -571,7 +571,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.ev_charge_limits_dc = [x['level'] for x in state if x['plugType'] == 0][-1]
 
     
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle):
+    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
