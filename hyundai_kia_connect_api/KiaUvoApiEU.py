@@ -523,6 +523,7 @@ class KiaUvoApiEU(ApiImpl):
         _check_response_for_errors(response)
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
+        #Not currently used as value is in the general get.  Most likely this forces the car the update it. 
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
@@ -534,7 +535,7 @@ class KiaUvoApiEU(ApiImpl):
         if response['resMsg'] is not None:
             return response['resMsg']
 
-    def _get_driving_info(self, token: Token, vehicle: Vehicle):
+    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
 
         responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=self._get_authenticated_headers(token))
