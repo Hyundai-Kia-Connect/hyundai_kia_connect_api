@@ -28,7 +28,7 @@ from .const import (
 from .exceptions import *
 from .Token import Token
 from .utils import get_child_value, get_index_into_hex_temp, get_hex_temp_into_index
-from .Vehicle import Vehicle, EvChargeLimits
+from .Vehicle import Vehicle, EvChargeLimits, DailyDrivingStats
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -218,6 +218,20 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
+        try:
+            state = self._get_driving_info(token, vehicle)
+        except Exception as e:
+            # we don't know if all car types (ex: ICE cars) provide this information.
+            # we also don't know what the API returns if the info is unavailable.
+            # so, catch any exception and move on.
+            _LOGGER.exception("""Failed to parse driving info. Possible reasons:
+                                - incompatible vehicle (ICE?)
+                                - new API format
+                                - API outage
+                        """, exc_info=e)
+        else:
+            self._update_vehicle_drive_info(vehicle, state)
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
@@ -392,6 +406,11 @@ class KiaUvoApiEU(ApiImpl):
             )
         vehicle.data = state
 
+    def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
+        vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
+        vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
+        vehicle.daily_stats = get_child_value(state, "dailyStats")
+
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
 
@@ -515,7 +534,44 @@ class KiaUvoApiEU(ApiImpl):
         if response['resMsg'] is not None:
             return response['resMsg']
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
+    def _get_driving_info(self, token: Token, vehicle: Vehicle):
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
+
+        responseAlltime = requests.post(url, json={"periodTarget": 1}, headers=self._get_authenticated_headers(token))
+        responseAlltime = responseAlltime.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
+
+        response30d = requests.post(url, json={"periodTarget": 0}, headers=self._get_authenticated_headers(token))
+        response30d = response30d.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+
+        drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
+
+        drivingInfo["dailyStats"] = []
+        for day in response30d["resMsg"]["drivingInfoDetail"]:
+            processedDay = DailyDrivingStats(
+                date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                total_consumed=day["totalPwrCsp"],
+                engine_consumption=day["motorPwrCsp"],
+                climate_consumption=day["climatePwrCsp"],
+                onboard_electronics_consumption=day["eDPwrCsp"],
+                battery_care_consumption=day["batteryMgPwrCsp"],
+                regenerated_energy=day["regenPwr"],
+                distance=day["calculativeOdo"]
+            )
+            drivingInfo["dailyStats"].append(processedDay)
+
+        for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+            if drivingInfoItem["drivingPeriod"] == 0:
+                drivingInfo["consumption30d"] = round(
+                    drivingInfoItem["totalPwrCsp"]
+                    / drivingInfoItem["calculativeOdo"]
+                )
+                break
+
+        return drivingInfo
+
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
 
         body = {

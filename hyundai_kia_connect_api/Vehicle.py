@@ -12,6 +12,21 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
+class DailyDrivingStats:
+    # energy stats are expressed in watthours (Wh)
+    date: datetime.datetime = None
+    total_consumed: int = None
+    engine_consumption: int = None
+    climate_consumption: int = None
+    onboard_electronics_consumption: int = None
+    battery_care_consumption: int = None
+    regenerated_energy: int = None
+    # distance is expressed in (I assume) whatever unit the vehicle is configured in. KMs (rounded) in my case
+    distance: int = None
+    distance_unit = DISTANCE_UNITS[1]  # set to kms by default for now
+
+
+@dataclasses.dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -30,11 +45,11 @@ class Vehicle:
     _odometer: float = None
     _odometer_value: float = None
     _odometer_unit: str = None
-        
+
     _geocode_address: str = None
     _geocode_name: str = None
-    
-    
+
+
 
     car_battery_percentage: int = None
     engine_is_running: bool = None
@@ -58,7 +73,7 @@ class Vehicle:
     front_right_seat_status: str = None
     rear_left_seat_status: str = None
     rear_right_seat_status: str = None
-    
+
     ## Door Status
     is_locked: bool = None
     front_left_door_is_open: bool = None
@@ -93,6 +108,15 @@ class Vehicle:
 
     ev_charge_limits_dc: int = None
     ev_charge_limits_ac: int = None
+    
+    # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
+    # expressed in watt-hours (Wh)
+    total_power_consumed: float = None
+    # energy consumed in the last ~30 days
+    # expressed in watt-hours (Wh)
+    power_consumption_30d: float = None
+
+    daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
@@ -122,6 +146,8 @@ class Vehicle:
     _ev_charge_limits_dc: int = None
 
 
+
+
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
@@ -136,11 +162,11 @@ class Vehicle:
 
     # Debug fields
     data: dict = None
-        
+
     @property
-    def geocode(self):     
+    def geocode(self):
         return self._geocode_name, self._geocode_address
-    
+
     @geocode.setter
     def geocode(self, value):
         self._geocode_name = value[0]
@@ -187,13 +213,13 @@ class Vehicle:
     @property
     def location(self):
         return self._location_longitude, self._location_latitude
-    
+
     @location.setter
     def location(self, value):
         self._location_latitude = value[0]
         self._location_longitude = value[1]
         self._location_last_set_time = value[2]
-    
+
     @property
     def odometer(self):
         return self._odometer
@@ -267,7 +293,7 @@ class Vehicle:
     @property
     def fuel_driving_range(self):
         return self._fuel_driving_range
-    
+
     @fuel_driving_range.setter
     def fuel_driving_range(self, value):
         self._fuel_driving_range_value = value[0]
