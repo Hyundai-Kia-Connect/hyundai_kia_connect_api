@@ -45,6 +45,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         region: int,
         brand: int,
     ):
+
+        super().__init__()
+
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
@@ -84,7 +87,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
-    def login(self, username: str, password: str) -> Token:
+    def login(self, username: str, password: str, pin: str):
 
         ### Sign In with Email and Password and Get Authorization Code ###
 
@@ -105,21 +108,22 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
 
-        return Token(
+        self.token = Token(
             username=username,
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
         )
+        self.token.pin = self.pin
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(self, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
+        headers["accessToken"] = self.token.access_token
         headers["vin"] = vehicle.VIN
-        headers["username"] = token.username
+        headers["username"] = self.token.username
         headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - using API headers: {self.API_HEADERS}")
@@ -139,19 +143,19 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             .replace("Z", "")
         )
 
-        vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
+        vehicle_status["vehicleDetails"] = self._get_vehicle(vehicle)
 
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer"):
-                vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
+                vehicle_status["vehicleLocation"] = self.get_location(vehicle)
             else:
                 vehicle_status["vehicleLocation"] = None
         else:
-            vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
+            vehicle_status["vehicleLocation"] = self.get_location(vehicle)
         return vehicle_status
 
-    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle)
+    def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
+        state = self._get_cached_vehicle_state(vehicle)
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.dateTime")
         )
@@ -303,7 +307,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         vehicle.data = state
 
-    def get_location(self, token: Token, vehicle: Vehicle):
+    def get_location(self, vehicle: Vehicle):
         r"""
         Get the location of the vehicle
         This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per:
@@ -313,9 +317,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         """
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
+        headers["accessToken"] = self.token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["username"] = token.username
+        headers["username"] = self.token.username
         headers["blueLinkServicePin"] = token.pin
         try:
             response = self.sessions.get(url, headers=headers)
@@ -341,12 +345,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
             )
 
-
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["username"] = token.username
+        headers["accessToken"] = self.token.access_token
+        headers["username"] = self.token.username
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -364,11 +367,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         return result
 
-    def _get_vehicle(self, token: Token, vehicle: Vehicle):
-        url = self.API_URL + "enrollment/details/" + token.username
+    def _get_vehicle(self, vehicle: Vehicle):
+        url = self.API_URL + "enrollment/details/" + self.token.username
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["username"] = token.username
+        headers["accessToken"] = self.token.access_token
+        headers["username"] = self.token.username
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -377,14 +380,13 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             if entry["regid"] == vehicle.id:
                 return entry
 
-
-    def get_pin_token(self, token: Token):
+    def get_pin_token(self):
         pass
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
         pass
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
+    def lock_action(self, vehicle: Vehicle, action) -> None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
         if action == VEHICLE_LOCK_ACTION.LOCK:
@@ -395,18 +397,18 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
 
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
+        headers["accessToken"] = self.token.access_token
         headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
         headers["APPCLOUD-VIN"] = vehicle.VIN
-        headers["username"] = token.username
+        headers["username"] = self.token.username
         headers["blueLinkServicePin"] = token.pin
 
         data = {"userName": token.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
-        # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])
+        # action_status = self.check_action_status(headers["pAuth"], response_headers["transactionId"])
 
         # _LOGGER.debug(f"{DOMAIN} - Received lock_action response {action_status}")
         _LOGGER.debug(
@@ -415,17 +417,17 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def start_climate(
-        self, token: Token, vehicle: Vehicle, set_temp, duration, defrost, climate, heating
+        self, vehicle: Vehicle, set_temp, duration, defrost, climate, heating
     ) -> None:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
 
         url = self.API_URL + "rcs/rsc/start"
 
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
+        headers["accessToken"] = self.token.access_token
         headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
-        headers["username"] = token.username
+        headers["username"] = self.token.username
         headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
@@ -450,16 +452,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate(self, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         url = self.API_URL + "rcs/rsc/stop"
 
         headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
+        headers["accessToken"] = self.token.access_token
         headers["vin"] = vehicle.VIN
         headers["registrationId"] = vehicle.id
-        headers["username"] = token.username
+        headers["username"] = self.token.username
         headers["blueLinkServicePin"] = token.pin
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
@@ -470,24 +472,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def start_charge(self, vehicle: Vehicle) -> None:
         pass
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_charge(self, vehicle: Vehicle) -> None:
         pass
-
-    def get_last_updated_at(self, value) -> dt.datetime:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        value = dt.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=self.data_timezone,
-        )
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-
-        return value

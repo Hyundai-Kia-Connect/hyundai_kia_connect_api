@@ -1,21 +1,33 @@
 import logging
 
-import dataclasses
+from dataclasses import dataclass, field
 import datetime
-import re
-
-import pytz
 
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
-@dataclasses.dataclass
+
+@dataclass
+class ClimateRequestOptions:
+    set_temp: float = None
+    duration: int = None
+    defrost: bool = None
+    climate: bool = None
+    heating: int = None
+    front_left_seat: int = None
+    front_right_seat: int = None
+    rear_left_seat: int = None
+    rear_right_seat: int = None
+
+
+@dataclass
 class EvChargeLimits:
     ac: int = None
     dc: int = None
 
-@dataclasses.dataclass
+
+@dataclass
 class DailyDrivingStats:
     # energy stats are expressed in watthours (Wh)
     date: datetime.datetime = None
@@ -30,7 +42,7 @@ class DailyDrivingStats:
     distance_unit = DISTANCE_UNITS[1]  # set to kms by default for now
 
 
-@dataclasses.dataclass
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -39,6 +51,7 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
+    api: str = None
 
     # Shared (EV/PHEV/HEV/IC)
     ## General
@@ -52,8 +65,6 @@ class Vehicle:
 
     _geocode_address: str = None
     _geocode_name: str = None
-
-
 
     car_battery_percentage: int = None
     engine_is_running: bool = None
@@ -116,7 +127,7 @@ class Vehicle:
     # expressed in watt-hours (Wh)
     power_consumption_30d: float = None
 
-    daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
+    daily_stats: list[DailyDrivingStats] = field(default_factory=list)
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
@@ -144,14 +155,11 @@ class Vehicle:
 
     _ev_charge_limits: EvChargeLimits = None
 
-
-
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
     _fuel_driving_range_unit: str = None
     fuel_level: float = None
-
 
     fuel_level_is_low: bool = None
 
@@ -305,3 +313,35 @@ class Vehicle:
         self._fuel_driving_range_value = value[0]
         self._fuel_driving_range_unit = value[1]
         self._fuel_driving_range = value[0]
+
+    def update_with_cached_state(self) -> None:
+        self.api.update_vehicle_with_cached_state(self)
+        # if self.geocode_api_enable == True:
+        #     self.api.update_geocoded_location(self, self.geocode_api_use_email)
+
+    def force_refresh_state(self) -> None:
+        self.api.force_refresh_vehicle_state(self)
+
+    def start_climate(self, options: ClimateRequestOptions) -> str:
+        return self.api.start_climate(self, options)
+
+    def stop_climate(self) -> str:
+        return self.api.stop_climate(self)
+
+    def lock(self) -> str:
+        return self.api.lock_action(self, VEHICLE_LOCK_ACTION.LOCK)
+
+    def unlock(self) -> str:
+        return self.api.lock_action(self, VEHICLE_LOCK_ACTION.UNLOCK)
+
+    def start_charge(self) -> str:
+        return self.api.start_charge(self)
+
+    def stop_charge(self) -> str:
+        return self.api.stop_charge(self)
+
+    def set_charge_limits(self, limits: EvChargeLimits) -> str:
+        return self.api.set_charge_limits(self)
+
+    def check_action_status(self, action_id: str):
+        return self.api.check_action_status(self, action_id)

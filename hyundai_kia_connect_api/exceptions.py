@@ -46,3 +46,10 @@ class InvalidAPIResponseError(APIError):
     Raised upon receipt of an invalid API response.
     """
     pass
+
+
+class VehicleNotFoundError(HyundaiKiaException):
+    """
+    Raised when looking up an ID that does not exist / is not associated to the current account.
+    """
+    pass
