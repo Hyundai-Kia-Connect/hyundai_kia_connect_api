@@ -106,8 +106,8 @@ class Vehicle:
     # EV fields (EV/PHEV)
 
 
-    ev_charge_limits_dc: int = None
-    ev_charge_limits_ac: int = None
+    ev_charge_limits_dc: typing.Union[int, None] = None
+    ev_charge_limits_ac: typing.Union[int, None] = None
     
     # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
