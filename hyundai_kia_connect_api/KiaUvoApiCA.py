@@ -139,7 +139,7 @@ class KiaUvoApiCA(ApiImpl):
         
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties_service(vehicle, state)
         
         # Service Status Call       
         service = self._get_next_service(token, vehicle)
