@@ -26,7 +26,7 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
 )
-from .Vehicle import EvChargeLimits, Vehicle
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties_service(vehicle, state)
 
         # Service Status Call
         service = self._get_next_service(vehicle)
@@ -552,12 +552,10 @@ class KiaUvoApiCA(ApiImpl):
         return response_headers["transactionId"]
 
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
-        vehicle.ev_charge_limits = EvChargeLimits(
-            dc=[x['level'] for x in state if x['plugType'] == 0][-1],
-            ac=[x['level'] for x in state if x['plugType'] == 1][-1],
-        )
+        vehicle.ev_charge_limits_ac = [x['level'] for x in state if x['plugType'] == 1][-1]
+        vehicle.ev_charge_limits_dc = [x['level'] for x in state if x['plugType'] == 0][-1]
 
-    def _get_charge_limits(self, vehicle: Vehicle) -> EvChargeLimits:
+    def _get_charge_limits(self, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = self.token.access_token
@@ -567,7 +565,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         return response["result"]
 
-    def set_charge_limits(self, vehicle: Vehicle, limits: EvChargeLimits) -> str:
+    def set_charge_limits(self, vehicle: Vehicle, ac: int, dc: int) -> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = self.token.access_token
@@ -577,11 +575,11 @@ class KiaUvoApiCA(ApiImpl):
         payload = {
             "tsoc": [{
                 "plugType": 0,
-                "level": limits.dc,
+                "level": dc,
             },
                 {
                     "plugType": 1,
-                    "level": limits.ac,
+                    "level": ac,
                 }],
             "pin": self.token.pin,
         }

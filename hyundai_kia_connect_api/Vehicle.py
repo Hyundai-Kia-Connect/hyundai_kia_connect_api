@@ -2,6 +2,7 @@ import logging
 
 from dataclasses import dataclass, field
 import datetime
+import typing
 
 from .const import *
 
@@ -20,11 +21,6 @@ class ClimateRequestOptions:
     rear_left_seat: int = None
     rear_right_seat: int = None
 
-
-@dataclass
-class EvChargeLimits:
-    ac: int = None
-    dc: int = None
 
 
 @dataclass
@@ -120,6 +116,10 @@ class Vehicle:
 
     # EV fields (EV/PHEV)
 
+
+    ev_charge_limits_dc: typing.Union[int, None] = None
+    ev_charge_limits_ac: typing.Union[int, None] = None
+
     # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
     total_power_consumed: float = None
@@ -152,8 +152,6 @@ class Vehicle:
     _ev_estimated_station_charge_duration: int = None
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
-
-    _ev_charge_limits: EvChargeLimits = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
@@ -297,14 +295,6 @@ class Vehicle:
         self._ev_estimated_station_charge_duration = value[0]
 
     @property
-    def ev_charge_limits(self) -> EvChargeLimits:
-        return self._ev_charge_limits
-
-    @ev_charge_limits.setter
-    def ev_charge_limits(self, value: EvChargeLimits):
-        self._ev_charge_limits = value
-
-    @property
     def fuel_driving_range(self):
         return self._fuel_driving_range
 
@@ -340,8 +330,8 @@ class Vehicle:
     def stop_charge(self) -> str:
         return self.api.stop_charge(self)
 
-    def set_charge_limits(self, limits: EvChargeLimits) -> str:
-        return self.api.set_charge_limits(self)
+    def set_charge_limits(self, ac: int, dc: int) -> str:
+        return self.api.set_charge_limits(self, ac, dc)
 
     def check_action_status(self, action_id: str):
         return self.api.check_action_status(self, action_id)
