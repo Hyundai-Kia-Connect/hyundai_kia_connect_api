@@ -17,7 +17,7 @@ from .const import (
     TEMPERATURE_UNITS,
     DISTANCE_UNITS,
 )
-from .ApiImpl import ApiImpl, ClimateRequestOptions, EvChargeLimits
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 from .utils import get_child_value
@@ -559,17 +559,17 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         return response.headers["Xid"]
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, limits: EvChargeLimits) -> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         url = self.API_URL + "evc/sts"
         body = {
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": limits.dc,
+                    "targetSOClevel": dc,
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": limits.ac,
+                    "targetSOClevel": ac,
                 },
             ]
         }
