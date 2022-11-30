@@ -23,6 +23,7 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
     VEHICLE_LOCK_ACTION,
+    CHARGE_PORT_ACTION,
 )
 
 from .exceptions import *
@@ -96,6 +97,8 @@ class KiaUvoApiEU(ApiImpl):
         self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
+        self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
+
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.GCM_SENDER_ID = 199360397125
 
@@ -447,6 +450,15 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
         response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
+        _check_response_for_errors(response)
+
+    def charge_port_action(self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION) -> None:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
+
+        payload = {"action": action.value, "deviceId": token.device_id}
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
 
     def start_climate(

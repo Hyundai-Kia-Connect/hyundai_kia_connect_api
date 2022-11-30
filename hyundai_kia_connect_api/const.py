@@ -50,5 +50,9 @@ class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
 
+class CHARGE_PORT_ACTION(Enum):
+    CLOSE = "close"
+    OPEN = "open"
+
 class EvChargeLimit(IntEnum):
     50, 60, 70, 80, 90, 100
