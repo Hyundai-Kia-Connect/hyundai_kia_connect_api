@@ -3,6 +3,7 @@ import logging
 import dataclasses
 import datetime
 import re
+import typing
 
 import pytz
 
@@ -10,10 +11,6 @@ from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
-@dataclasses.dataclass
-class EvChargeLimits:
-    ac: int = None
-    dc: int = None
 
 @dataclasses.dataclass
 class DailyDrivingStats:
@@ -109,6 +106,10 @@ class Vehicle:
 
     # EV fields (EV/PHEV)
 
+
+    ev_charge_limits_dc: typing.Union[int, None] = None
+    ev_charge_limits_ac: typing.Union[int, None] = None
+    
     # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
     total_power_consumed: float = None
@@ -142,16 +143,11 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
-    _ev_charge_limits: EvChargeLimits = None
-
-
-
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
     _fuel_driving_range_unit: str = None
     fuel_level: float = None
-
 
     fuel_level_is_low: bool = None
 
@@ -287,14 +283,6 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
-
-    @property
-    def ev_charge_limits(self) -> EvChargeLimits:
-        return self._ev_charge_limits
-
-    @ev_charge_limits.setter
-    def ev_charge_limits(self, value: EvChargeLimits):
-        self._ev_charge_limits = value
 
     @property
     def fuel_driving_range(self):
