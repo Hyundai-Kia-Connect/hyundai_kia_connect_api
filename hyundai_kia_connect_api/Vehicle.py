@@ -3,7 +3,7 @@ import logging
 import dataclasses
 import datetime
 import re
-from typing import Union
+import typing
 
 import pytz
 
