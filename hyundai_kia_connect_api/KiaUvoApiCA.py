@@ -365,7 +365,7 @@ class KiaUvoApiCA(ApiImpl):
             headers["pAuth"] = self._get_pin_token(vehicle)
 
             response = requests.post(
-                url, headers=headers, data=json.dumps({"pin": token.pin})
+                url, headers=headers, data=json.dumps({"pin": self.token.pin})
             )
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
@@ -383,7 +383,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
 
         response = requests.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, data=json.dumps({"pin": self.token.pin})
         )
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
@@ -404,7 +404,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(vehicle)
 
         response = requests.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, data=json.dumps({"pin": self.token.pin})
         )
         response_headers = response.headers
         response = response.json()
@@ -455,19 +455,19 @@ class KiaUvoApiCA(ApiImpl):
                         "hvacTempType": 1,
                     },
                 },
-                "pin": token.pin,
+                "pin": self.token.pin,
             }
         else:
               payload = {
-                "setting": {
-                    "airCtrl": int(options.climate),
-                    "defrost": options.defrost,
-                    "heating1": options.heating,
-                    "igniOnDuration": options.duration,
-                    "ims": 0,
-                    "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
-                },
-                "pin": token.pin,
+                  "setting": {
+                      "airCtrl": int(options.climate),
+                      "defrost": options.defrost,
+                      "heating1": options.heating,
+                      "igniOnDuration": options.duration,
+                      "ims": 0,
+                      "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
+                  },
+                  "pin": self.token.pin,
               }
         data = json.dumps(payload)
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
@@ -490,7 +490,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(vehicle)
 
         response = requests.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, data=json.dumps({"pin": self.token.pin})
         )
         response_headers = response.headers
         response = response.json()
@@ -523,10 +523,10 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(vehicle)
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge headers {headers}")
-        data = json.dumps({"pin": token.pin})
+        data = json.dumps({"pin": self.token.pin})
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
         response = requests.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, data=json.dumps({"pin": self.token.pin})
         )
         response_headers = response.headers
         response = response.json()
@@ -542,7 +542,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(vehicle)
 
         response = requests.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, data=json.dumps({"pin": self.token.pin})
         )
         response_headers = response.headers
         response = response.json()
@@ -577,12 +577,12 @@ class KiaUvoApiCA(ApiImpl):
             "tsoc": [{
                 "plugType": 0,
                 "level": limits.dc,
-                },
+            },
                 {
                     "plugType": 1,
                     "level": limits.ac,
                 }],
-            "pin": token.pin,
+            "pin": self.token.pin,
         }
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
