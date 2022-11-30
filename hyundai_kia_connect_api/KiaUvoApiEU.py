@@ -433,7 +433,7 @@ class KiaUvoApiEU(ApiImpl):
     def lock_action(self, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
 
-        payload = {"action": action.value, "deviceId": token.device_id}
+        payload = {"action": action.value, "deviceId": self.token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
         response = requests.post(url, json=payload, headers=self._get_authenticated_headers()).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
@@ -497,7 +497,7 @@ class KiaUvoApiEU(ApiImpl):
     def start_charge(self, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
 
-        payload = {"action": "start", "deviceId": token.device_id}
+        payload = {"action": "start", "deviceId": self.token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
         response = requests.post(url, json=payload, headers=self._get_authenticated_headers()).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
@@ -506,7 +506,7 @@ class KiaUvoApiEU(ApiImpl):
     def stop_charge(self, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
 
-        payload = {"action": "stop", "deviceId": token.device_id}
+        payload = {"action": "stop", "deviceId": self.token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
         response = requests.post(url, json=payload, headers=self._get_authenticated_headers()).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
