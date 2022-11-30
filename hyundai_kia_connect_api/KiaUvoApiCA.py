@@ -112,7 +112,8 @@ class KiaUvoApiCA(ApiImpl):
                 model=entry["modelName"],
                 year=int(entry["modelYear"]),
                 VIN=entry["vin"],
-                engine_type=entry_engine_type
+                engine_type=entry_engine_type,
+                api=self,
             )
             result.append(vehicle)
         return result

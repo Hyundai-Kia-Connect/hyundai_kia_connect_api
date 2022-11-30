@@ -195,6 +195,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
+                api=self,
             )
             result.append(vehicle)
         return result
@@ -218,6 +219,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     name=entry["nickName"],
                     model=entry["modelName"],
                     key=entry["vehicleKey"],
+                    api=self,
                 )
                 vehicles.append(vehicle)
 

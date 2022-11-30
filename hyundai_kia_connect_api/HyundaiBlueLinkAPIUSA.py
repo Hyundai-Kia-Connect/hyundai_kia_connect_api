@@ -362,6 +362,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 VIN=entry["vin"],
                 model=entry["modelCode"],
                 registration_date=["enrollmentDate"],
+                api=self,
             )
             result.append(vehicle)
 
