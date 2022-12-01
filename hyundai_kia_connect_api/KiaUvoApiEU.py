@@ -593,6 +593,8 @@ class KiaUvoApiEU(ApiImpl):
             ]
         }
         response = requests.post(url, json=body, headers=self._get_authenticated_headers(token))
+        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
+
         return str(response.status_code == 200)
 
     def _get_stamp(self) -> str:
