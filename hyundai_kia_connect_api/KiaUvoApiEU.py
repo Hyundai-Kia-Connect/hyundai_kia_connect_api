@@ -289,7 +289,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
-        else if steer_wheel_heat == 1:
+        elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
             
         vehicle.back_window_heater_is_on = get_child_value(
