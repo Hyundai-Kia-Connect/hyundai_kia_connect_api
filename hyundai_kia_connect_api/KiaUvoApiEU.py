@@ -284,9 +284,14 @@ class KiaUvoApiEU(ApiImpl):
                 ],
             )
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
-        vehicle.steering_wheel_heater_is_on = get_child_value(
+        steer_wheel_heat = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
         )
+        if steer_wheel_heat in [0, 2]:
+            vehicle.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            vehicle.steering_wheel_heater_is_on = True
+            
         vehicle.back_window_heater_is_on = get_child_value(
             state, "vehicleStatus.sideBackWindowHeat"
         )
