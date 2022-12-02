@@ -16,6 +16,7 @@ from .const import (
     REGION_USA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
+    CHARGE_PORT_ACTION,
 )
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -120,6 +121,12 @@ class VehicleManager:
 
     def check_action_status(self, vehicle_id: str, action_id: str):
         return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
+
+    def open_charge_port(self, vehicle_id: str) -> str:
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN)
+
+    def close_charge_port(self, vehicle_id: str) -> str:
+        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
