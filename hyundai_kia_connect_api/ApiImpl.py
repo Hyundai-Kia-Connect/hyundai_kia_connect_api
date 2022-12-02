@@ -113,6 +113,7 @@ class ApiImpl:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
-    def charge_port_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
-        """Opens or closes the charging port of the car. Returns the tracking ID"""        
+    def charge_port_action(self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION) -> str:
+        """Opens or closes the charging port of the car. Returns the tracking ID"""   
+        pass
 
