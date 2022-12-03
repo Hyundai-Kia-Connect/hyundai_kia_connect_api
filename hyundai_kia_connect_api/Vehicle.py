@@ -106,7 +106,8 @@ class Vehicle:
 
     # EV fields (EV/PHEV)
 
-
+    ev_charge_port_door_is_open: typing.Union[bool, None] = None
+    
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
     

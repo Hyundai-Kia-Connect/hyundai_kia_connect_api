@@ -351,8 +351,12 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_is_charging = get_child_value(
             state, "vehicleStatus.evStatus.batteryCharge"
         )
+
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
+        )
+        vehicle.ev_charge_port_door_is_open = get_child_value(
+            state, "vehicleStatus.evStatus.chargePortDoorOpenStatus"
         )
         vehicle.ev_driving_range = (
             get_child_value(
