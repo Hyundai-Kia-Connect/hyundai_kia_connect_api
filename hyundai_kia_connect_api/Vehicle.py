@@ -143,6 +143,14 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
+    _ev_target_range_charge_AC: typing.Union[float, None] = None
+    _ev_target_range_charge_AC_value: typing.Union[float, None] = None
+    _ev_target_range_charge_AC_unit: typing.Union[str, None] = None
+
+    _ev_target_range_charge_DC: typing.Union[float, None] = None
+    _ev_target_range_charge_DC_value: typing.Union[float, None] = None
+    _ev_target_range_charge_DC_unit: typing.Union[str, None] = None
+
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
@@ -283,6 +291,26 @@ class Vehicle:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration_unit = value[1]
         self._ev_estimated_station_charge_duration = value[0]
+
+    @property
+    def ev_target_range_charge_AC(self):
+        return self._ev_target_range_charge_AC
+
+    @ev_target_range_charge_AC.setter
+    def ev_target_range_charge_AC(self, value):
+        self._ev_target_range_charge_AC_value = value[0]
+        self._ev_target_range_charge_AC_unit = value[1]
+        self._ev_target_range_charge_AC = value[0]
+
+    @property
+    def ev_target_range_charge_DC(self):
+        return self._ev_target_range_charge_DC
+
+    @ev_target_range_charge_DC.setter
+    def ev_target_range_charge_DC(self, value):
+        self._ev_target_range_charge_DC_value = value[0]
+        self._ev_target_range_charge_DC_unit= value[1]
+        self._ev_target_range_charge_DC = value[0]
 
     @property
     def fuel_driving_range(self):
