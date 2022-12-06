@@ -227,8 +227,8 @@ class KiaUvoApiEU(ApiImpl):
             # we don't know if all car types (ex: ICE cars) provide this information.
             # we also don't know what the API returns if the info is unavailable.
             # so, catch any exception and move on.
-            _LOGGER.exception("""Failed to parse driving info. Possible reasons:
-                                - incompatible vehicle (ICE?)
+            _LOGGER.warning("""Failed to parse driving info. Possible reasons:
+                                - incompatible vehicle (ICE)
                                 - new API format
                                 - API outage
                         """, exc_info=e)
