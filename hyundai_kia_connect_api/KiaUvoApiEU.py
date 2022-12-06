@@ -390,19 +390,34 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.ev_charge_limits_dc = [x['targetSOClevel'] for x in target_soc_list if x['plugType'] == 0][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
-
-        vehicle.fuel_driving_range = (
-            get_child_value(
+        if get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-            ),
-            DISTANCE_UNITS[
+            ):
+            vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
-                )
-            ],
-        )
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
+            )
+        elif get_child_value(
+                state,
+                "status.dte.value",
+            ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "status.dte.value",
+                ),
+                DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
+            )
+            
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
