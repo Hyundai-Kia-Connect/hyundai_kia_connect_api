@@ -501,7 +501,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(url, json=payload, headers=self._get_authenticated_headers(token)).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
-        _check_response_for_errors()
+        _check_response_for_errors(response)
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
