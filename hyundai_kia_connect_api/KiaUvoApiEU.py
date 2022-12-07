@@ -246,7 +246,8 @@ class KiaUvoApiEU(ApiImpl):
                 get_child_value(state, "vehicleStatus.time")
             )
         else:
-            vehicle.last_update_at = dt.datetime.now(self.data_timezone)
+            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
+            
         vehicle.total_driving_range = (
             get_child_value(
                 state,
