@@ -10,7 +10,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
-                    VEHICLE_LOCK_ACTION, SEAT_STATUS,)
+                    VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS,)
 from .utils import get_child_value
 from .ApiImpl import ApiImpl
 from .Token import Token
@@ -160,7 +160,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "mi",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
         )
         if get_child_value(
             state,
@@ -171,11 +176,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                     state,
                     "vehicleStatus.dte.value",
                 ),
-                "mi",
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.dte.unit",
+                    )
+                ],
             )
         vehicle.odometer = (
             get_child_value(state, "vehicleDetails.odometer"),
-            "mi",
+            DISTANCE_UNITS[3],
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -261,7 +271,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "mi",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                )
+            ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -288,7 +303,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                     state,
                     "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
-                "mi",
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
             )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
 
