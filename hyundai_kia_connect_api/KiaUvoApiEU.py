@@ -562,32 +562,34 @@ class KiaUvoApiEU(ApiImpl):
         response30d = requests.post(url, json={"periodTarget": 0}, headers=self._get_authenticated_headers(token))
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+        if get_child_value(responseAlltime, "resMsg.drivingInfoDetail.0"):
+            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
 
-        drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
-
-        drivingInfo["dailyStats"] = []
-        for day in response30d["resMsg"]["drivingInfoDetail"]:
-            processedDay = DailyDrivingStats(
-                date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                total_consumed=day["totalPwrCsp"],
-                engine_consumption=day["motorPwrCsp"],
-                climate_consumption=day["climatePwrCsp"],
-                onboard_electronics_consumption=day["eDPwrCsp"],
-                battery_care_consumption=day["batteryMgPwrCsp"],
-                regenerated_energy=day["regenPwr"],
-                distance=day["calculativeOdo"]
-            )
-            drivingInfo["dailyStats"].append(processedDay)
-
-        for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-            if drivingInfoItem["drivingPeriod"] == 0:
-                drivingInfo["consumption30d"] = round(
-                    drivingInfoItem["totalPwrCsp"]
-                    / drivingInfoItem["calculativeOdo"]
+            drivingInfo["dailyStats"] = []
+            for day in response30d["resMsg"]["drivingInfoDetail"]:
+                processedDay = DailyDrivingStats(
+                    date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                    total_consumed=day["totalPwrCsp"],
+                    engine_consumption=day["motorPwrCsp"],
+                    climate_consumption=day["climatePwrCsp"],
+                    onboard_electronics_consumption=day["eDPwrCsp"],
+                    battery_care_consumption=day["batteryMgPwrCsp"],
+                    regenerated_energy=day["regenPwr"],
+                    distance=day["calculativeOdo"]
                 )
-                break
+                drivingInfo["dailyStats"].append(processedDay)
 
-        return drivingInfo
+            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+                if drivingInfoItem["drivingPeriod"] == 0:
+                    drivingInfo["consumption30d"] = round(
+                        drivingInfoItem["totalPwrCsp"]
+                        / drivingInfoItem["calculativeOdo"]
+                    )
+                    break
+
+            return drivingInfo
+        else:
+            return None
 
     def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
