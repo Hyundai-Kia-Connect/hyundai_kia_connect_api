@@ -24,6 +24,7 @@ from .const import (
     SEAT_STATUS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
+    ENGINE_TYPES,
 )
 
 from .exceptions import *
@@ -191,6 +192,16 @@ class KiaUvoApiEU(ApiImpl):
         _check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
+            entry_engine_type = None
+            if(entry["type"] == "GN"):
+                entry_engine_type = ENGINE_TYPES.ICE
+            elif(entry["type"] == "EV"):
+                entry_engine_type = ENGINE_TYPES.EV
+            elif(entry["type"] == "PHEV"): 
+                entry_engine_type = ENGINE_TYPES.PHEV
+            elif(entry["type"] == HV"): 
+                #This isn't correct. I also don't know if EV and PHEV codes are for type. I posted to discord on bluelinky to see if anyone knows.  HV would be hyrbid but I don't have a type for that right now. 
+                entry_engine_type = ENGINE_TYPES.EV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -220,25 +231,40 @@ class KiaUvoApiEU(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-
-        try:
-            state = self._get_driving_info(token, vehicle)
-        except Exception as e:
-            # we don't know if all car types (ex: ICE cars) provide this information.
-            # we also don't know what the API returns if the info is unavailable.
-            # so, catch any exception and move on.
-            _LOGGER.exception("""Failed to parse driving info. Possible reasons:
-                                - incompatible vehicle (ICE)
-                                - new API format
-                                - API outage
-                        """, exc_info=e)
-        else:
-            self._update_vehicle_drive_info(vehicle, state)
+        
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            try:
+                state = self._get_driving_info(token, vehicle)
+            except Exception as e:
+                # we don't know if all car types (ex: ICE cars) provide this information.
+                # we also don't know what the API returns if the info is unavailable.
+                # so, catch any exception and move on.
+                _LOGGER.exception("""Failed to parse driving info. Possible reasons:
+                                    - incompatible vehicle (ICE)
+                                    - new API format
+                                    - API outage
+                            """, exc_info=e)
+            else:
+                self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            try:
+                state = self._get_driving_info(token, vehicle)
+            except Exception as e:
+                # we don't know if all car types (ex: ICE cars) provide this information.
+                # we also don't know what the API returns if the info is unavailable.
+                # so, catch any exception and move on.
+                _LOGGER.exception("""Failed to parse driving info. Possible reasons:
+                                    - incompatible vehicle (ICE)
+                                    - new API format
+                                    - API outage
+                            """, exc_info=e)
+            else:
+                self._update_vehicle_drive_info(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
