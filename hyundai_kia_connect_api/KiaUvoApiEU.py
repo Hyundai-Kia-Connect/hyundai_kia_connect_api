@@ -260,7 +260,7 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        #Only update odometer if present.   It isn't present in a force update.  Why? Whos knows. 
+        #Only update odometer if present.   It isn't present in a force update.  Why? Who's knows. 
         if get_child_value(state, "odometer.value"):
             vehicle.odometer = (
                 get_child_value(state, "odometer.value"),
