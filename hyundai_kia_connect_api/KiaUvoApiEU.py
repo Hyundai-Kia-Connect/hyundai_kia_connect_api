@@ -199,7 +199,7 @@ class KiaUvoApiEU(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.EV
             elif(entry["type"] == "PHEV"): 
                 entry_engine_type = ENGINE_TYPES.PHEV
-            elif(entry["type"] == HV"): 
+            elif(entry["type"] == "HV"): 
                 #This isn't correct. I also don't know if EV and PHEV codes are for type. I posted to discord on bluelinky to see if anyone knows.  HV would be hyrbid but I don't have a type for that right now. 
                 entry_engine_type = ENGINE_TYPES.EV
             vehicle: Vehicle = Vehicle(
