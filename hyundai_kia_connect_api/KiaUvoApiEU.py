@@ -260,15 +260,17 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "odometer.unit",
-                )
-            ],
-        )
+        #Only update odometer if present.   It isn't present in a force update.  Why? Whos knows. 
+        if get_child_value(state, "odometer.value"):
+            vehicle.odometer = (
+                get_child_value(state, "odometer.value"),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "odometer.unit",
+                    )
+                ],
+            )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
         )
@@ -462,7 +464,9 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
         _check_response_for_errors(response)
-        return response["resMsg"]
+        mapped_response = {}
+        mapped_response["vehicleStatus"] = response["resMsg"]
+        return mapped_response
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
