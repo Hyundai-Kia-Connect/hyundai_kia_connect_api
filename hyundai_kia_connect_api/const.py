@@ -44,6 +44,7 @@ class ENGINE_TYPES(Enum):
     ICE = "ICE"
     EV = "EV"
     PHEV = "PHEV"
+    HEV = "HEV"
 
 
 class VEHICLE_LOCK_ACTION(Enum):
