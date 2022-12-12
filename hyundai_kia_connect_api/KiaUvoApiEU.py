@@ -200,8 +200,7 @@ class KiaUvoApiEU(ApiImpl):
             elif(entry["type"] == "PHEV"): 
                 entry_engine_type = ENGINE_TYPES.PHEV
             elif(entry["type"] == "HV"): 
-                #This isn't correct. I also don't know if EV and PHEV codes are for type. I posted to discord on bluelinky to see if anyone knows.  HV would be hyrbid but I don't have a type for that right now. 
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = ENGINE_TYPES.HEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -252,15 +251,15 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        #Only call for driving info on cars we know have a chance of supporting it.   Could be expanded if other types do support it. 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
-                # we don't know if all car types (ex: ICE cars) provide this information.
+                # we don't know if all car types provide this information.
                 # we also don't know what the API returns if the info is unavailable.
                 # so, catch any exception and move on.
                 _LOGGER.exception("""Failed to parse driving info. Possible reasons:
-                                    - incompatible vehicle (ICE)
                                     - new API format
                                     - API outage
                             """, exc_info=e)
@@ -616,6 +615,7 @@ class KiaUvoApiEU(ApiImpl):
 
             return drivingInfo
         else:
+            _LOGGER.debug(f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it.")
             return None
 
     def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
