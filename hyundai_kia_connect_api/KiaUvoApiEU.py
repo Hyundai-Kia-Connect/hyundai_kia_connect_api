@@ -449,14 +449,14 @@ class KiaUvoApiEU(ApiImpl):
             )
         elif get_child_value(
                 state,
-                "status.dte.value",
+                "vehicleStatus.dte.value",
             ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "status.dte.value",
+                    "vehicleStatus.dte.value",
                 ),
-                DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
+                DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
             )
             
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
