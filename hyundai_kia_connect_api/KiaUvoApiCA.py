@@ -211,7 +211,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.frSeatHeatState"
         )]
-        vehicle.rear_left_seat_staus = SEAT_STATUS[get_child_value(
+        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
             state, "status.seatHeaterVentState.rlSeatHeatState"
         )]
         vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
