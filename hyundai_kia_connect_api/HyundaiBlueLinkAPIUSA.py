@@ -435,8 +435,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def start_climate(
-        self, token: Token, vehicle: Vehicle, set_temp, duration, defrost, climate, heating
-    ) -> None:
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
 
         url = self.API_URL + "rcs/rsc/start"
@@ -448,23 +448,33 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
-
+        
+        if options.climate is None:
+            options.climate = True
+        if options.set_temp is None:
+            options.set_temp = 70
+        if options.duration is None:
+            options.duration = 5
+        if options.heating is None:
+            options.heating = 0
+        if options.defrost is None:
+            options.defrost = False
+        
+        
         data = {
             "Ims": 0,
-            "airCtrl": int(climate),
-            "airTemp": {"unit": 1, "value": set_temp},
-            "defrost": defrost,
-            "heating1": int(heating),
-            "igniOnDuration": duration,
+            "airCtrl": int(options.climate),
+            "airTemp": {"unit": 1, "value": options.set_temp},
+            "defrost": options.defrost,
+            "heating1": int(options.heating),
+            "igniOnDuration": options.duration,
             # "seatHeaterVentInfo": None,
-            "username": self.username,
+            "username": token.username,
             "vin": vehicle.id,
         }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
-
-        # _LOGGER.debug(f"{DOMAIN} - Start engine curl: {curlify.to_curl(response.request)}")
         _LOGGER.debug(
             f"{DOMAIN} - Start engine response status code: {response.status_code}"
         )
