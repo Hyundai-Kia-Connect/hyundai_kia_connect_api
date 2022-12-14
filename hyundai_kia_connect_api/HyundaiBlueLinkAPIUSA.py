@@ -12,7 +12,7 @@ from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
                     VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS,)
 from .utils import get_child_value
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 
