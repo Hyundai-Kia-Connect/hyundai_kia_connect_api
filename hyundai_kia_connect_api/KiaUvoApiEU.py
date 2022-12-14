@@ -287,16 +287,17 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
         #Only update odometer if present.   It isn't present in a force update.  Why? Who's knows. 
-        if get_child_value(state, "odometer.value"):
-            vehicle.odometer = (
-                get_child_value(state, "odometer.value"),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "odometer.unit",
-                    )
-                ],
-            )
+        if get_child_value(state, "odometer.value") is not None:
+            if get_child_value(state, "odometer.value") is not 0:
+                vehicle.odometer = (
+                    get_child_value(state, "odometer.value"),
+                    DISTANCE_UNITS[
+                        get_child_value(
+                            state,
+                            "odometer.unit",
+                        )
+                    ],
+                )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
         )
