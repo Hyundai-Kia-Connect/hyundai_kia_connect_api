@@ -287,9 +287,19 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
         
-        #Only update odometer if present.   It isn't present in a force update.  Why? Who's knows. 
+        #Only update odometer if present.   It isn't present in a force update.  Dec 2022 update also reports 0 when the car is off.  This tries to remediate best we can.  Can be removed once fixed in the cars firmware. 
         if get_child_value(state, "odometer.value") is not None:
             if get_child_value(state, "odometer.value") != 0:
+                vehicle.odometer = (
+                    get_child_value(state, "odometer.value"),
+                    DISTANCE_UNITS[
+                        get_child_value(
+                            state,
+                            "odometer.unit",
+                        )
+                    ],
+                )
+            elif vehicle.odometer is None:
                 vehicle.odometer = (
                     get_child_value(state, "odometer.value"),
                     DISTANCE_UNITS[
