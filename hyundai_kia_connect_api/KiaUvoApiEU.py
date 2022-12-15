@@ -499,6 +499,8 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
+        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
+        
 
         if get_child_value(state, "vehicleLocation.coord.lat"):
             vehicle.location = (
