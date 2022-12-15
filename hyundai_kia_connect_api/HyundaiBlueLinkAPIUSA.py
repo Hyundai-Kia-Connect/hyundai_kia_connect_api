@@ -10,9 +10,9 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
-                    VEHICLE_LOCK_ACTION, SEAT_STATUS,)
+                    VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS,)
 from .utils import get_child_value
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -160,7 +160,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            "mi",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
         )
         if get_child_value(
             state,
@@ -171,11 +176,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                     state,
                     "vehicleStatus.dte.value",
                 ),
-                "mi",
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.dte.unit",
+                    )
+                ],
             )
         vehicle.odometer = (
             get_child_value(state, "vehicleDetails.odometer"),
-            "mi",
+            DISTANCE_UNITS[3],
         )
         vehicle.car_battery_percentage = get_child_value(
             state, "vehicleStatus.battery.batSoc"
@@ -211,7 +221,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
         )]
-        vehicle.rear_left_seat_staus = SEAT_STATUS[get_child_value(
+        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
             state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
         )]
         vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
@@ -261,7 +271,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            "mi",
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                )
+            ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -288,7 +303,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                     state,
                     "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
-                "mi",
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
             )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
 
@@ -415,8 +435,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def start_climate(
-        self, token: Token, vehicle: Vehicle, set_temp, duration, defrost, climate, heating
-    ) -> None:
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
 
         url = self.API_URL + "rcs/rsc/start"
@@ -428,23 +448,33 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
-
+        
+        if options.climate is None:
+            options.climate = True
+        if options.set_temp is None:
+            options.set_temp = 70
+        if options.duration is None:
+            options.duration = 5
+        if options.heating is None:
+            options.heating = 0
+        if options.defrost is None:
+            options.defrost = False
+        
+        
         data = {
             "Ims": 0,
-            "airCtrl": int(climate),
-            "airTemp": {"unit": 1, "value": set_temp},
-            "defrost": defrost,
-            "heating1": int(heating),
-            "igniOnDuration": duration,
+            "airCtrl": int(options.climate),
+            "airTemp": {"unit": 1, "value": options.set_temp},
+            "defrost": options.defrost,
+            "heating1": int(options.heating),
+            "igniOnDuration": options.duration,
             # "seatHeaterVentInfo": None,
-            "username": self.username,
+            "username": token.username,
             "vin": vehicle.id,
         }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
-
-        # _LOGGER.debug(f"{DOMAIN} - Start engine curl: {curlify.to_curl(response.request)}")
         _LOGGER.debug(
             f"{DOMAIN} - Start engine response status code: {response.status_code}"
         )
