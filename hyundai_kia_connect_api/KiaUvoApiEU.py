@@ -450,10 +450,15 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
-                )
-            ],
-        )        
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
+            )
         elif get_child_value(
                 state,
                 "vehicleStatus.dte.value",
@@ -464,7 +469,7 @@ class KiaUvoApiEU(ApiImpl):
                     "vehicleStatus.dte.value",
                 ),
                 DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
-        )
+            )
         
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
