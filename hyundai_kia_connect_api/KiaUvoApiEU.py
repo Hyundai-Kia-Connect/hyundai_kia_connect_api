@@ -470,6 +470,32 @@ class KiaUvoApiEU(ApiImpl):
                 ),
                 DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
             )
+        
+        vehicle.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
+        )
+        vehicle.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
+        )
+
         vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")           
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
