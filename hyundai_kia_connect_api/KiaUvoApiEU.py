@@ -401,9 +401,9 @@ class KiaUvoApiEU(ApiImpl):
             state, "vehicleStatus.evStatus.chargePortDoorOpenStatus"
         )
         
-        if ev_charge_port_door_is_open in [1]:         
+        if ev_charge_port_door_is_open == 1:         
             vehicle.ev_charge_port_door_is_open = True
-        elif ev_charge_port_door_is_open in [2]:
+        elif ev_charge_port_door_is_open == 2:
             vehicle.ev_charge_port_door_is_open = False   
         
         vehicle.ev_driving_range = (
