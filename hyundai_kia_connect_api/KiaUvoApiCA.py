@@ -500,6 +500,7 @@ class KiaUvoApiCA(ApiImpl):
                     "igniOnDuration": options.duration,
                     "ims": 0,
                     "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
+                    "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
                 },
                 "pin": token.pin,
               }
