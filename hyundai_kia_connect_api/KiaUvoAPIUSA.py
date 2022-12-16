@@ -470,10 +470,7 @@ class KiaUvoAPIUSA(ApiImpl):
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_body = response.json()
-        vehicle_status = response_body["payload"]["vehicleInfoList"][0][
-            "lastVehicleInfo"
-        ]["vehicleStatusRpt"]["vehicleStatus"]
-        
+       
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"
