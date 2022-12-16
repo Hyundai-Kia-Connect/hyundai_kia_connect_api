@@ -2,6 +2,7 @@ import json
 import logging
 import datetime as dt
 import re
+from dateutil.tz import *
 
 import requests
 import pytz
@@ -139,8 +140,25 @@ class KiaUvoApiCA(ApiImpl):
         
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
-        self._update_vehicle_properties_base(vehicle, state)
-        
+
+        # Calculate offset between vehicle last_updated_at and UTC
+        last_updated_at = self.get_last_updated_at(
+            get_child_value(state, "status.lastStatusDate")
+        )
+        now_utc: dt = dt.datetime.now(pytz.utc)
+        offset = round((last_updated_at - now_utc).total_seconds()/3600)
+        _LOGGER.debug(
+            f"{DOMAIN} - Offset between vehicle and UTC: {offset} hours"
+        )
+        if offset != 0:
+            # Set our timezone to account for the offset
+            self.data_timezone = tzoffset("VEHICLETIME", offset*3600)
+            _LOGGER.debug(
+                f"{DOMAIN} - Set data_timezone to UTC + {offset} hours"
+            )
+
+        self._update_vehicle_properties_base(vehicle, state)        
+
         # Service Status Call       
         service = self._get_next_service(token, vehicle)
         
