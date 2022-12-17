@@ -123,10 +123,10 @@ class VehicleManager:
         return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
 
     def open_charge_port(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN)
+        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN)
 
     def close_charge_port(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
+        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
