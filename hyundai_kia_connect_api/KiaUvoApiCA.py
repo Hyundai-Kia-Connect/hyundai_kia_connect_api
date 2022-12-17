@@ -110,7 +110,8 @@ class KiaUvoApiCA(ApiImpl):
                 model=entry["modelName"],
                 year=int(entry["modelYear"]),
                 VIN=entry["vin"],
-                engine_type=entry_engine_type
+                engine_type=entry_engine_type,
+                timezone=self.data_timezone
             )
             result.append(vehicle)
         return result
@@ -143,7 +144,8 @@ class KiaUvoApiCA(ApiImpl):
 
         # Calculate offset between vehicle last_updated_at and UTC
         last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate")
+            get_child_value(state, "status.lastStatusDate"),
+            vehicle
         )
         now_utc: dt = dt.datetime.now(pytz.utc)
         offset = round((last_updated_at - now_utc).total_seconds()/3600)
@@ -152,9 +154,9 @@ class KiaUvoApiCA(ApiImpl):
         )
         if offset != 0:
             # Set our timezone to account for the offset
-            self.data_timezone = tzoffset("VEHICLETIME", offset*3600)
+            vehicle.timezone = tzoffset("VEHICLETIME", offset*3600)
             _LOGGER.debug(
-                f"{DOMAIN} - Set data_timezone to UTC + {offset} hours"
+                f"{DOMAIN} - Set vehicle.timezone to UTC + {offset} hours"
             )
 
         self._update_vehicle_properties_base(vehicle, state)        
@@ -182,7 +184,8 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:   
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate")
+            get_child_value(state, "status.lastStatusDate"),
+            vehicle
         )
         _LOGGER.debug(f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}")
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
@@ -330,7 +333,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.data["vehicleLocation"] = state
         
 
-    def get_last_updated_at(self, value) -> dt.datetime:
+    def get_last_updated_at(self, value, vehicle) -> dt.datetime:
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
         value = dt.datetime(
@@ -340,7 +343,7 @@ class KiaUvoApiCA(ApiImpl):
             hour=int(m.group(4)),
             minute=int(m.group(5)),
             second=int(m.group(6)),
-            tzinfo=self.data_timezone,
+            tzinfo=vehicle.timezone,
         )
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
 
