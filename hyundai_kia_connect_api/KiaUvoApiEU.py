@@ -247,6 +247,10 @@ class KiaUvoApiEU(ApiImpl):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
+    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
+        # Return True until this function is implemented 
+        return True
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
