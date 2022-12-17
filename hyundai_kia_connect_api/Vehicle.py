@@ -55,6 +55,7 @@ class Vehicle:
     car_battery_percentage: int = None
     engine_is_running: bool = None
     last_updated_at: datetime.datetime = datetime.datetime.min
+    timezone: datetime.timezone = None
 
     smart_key_battery_warning_is_on: bool = None
     washer_fluid_warning_is_on: bool = None
