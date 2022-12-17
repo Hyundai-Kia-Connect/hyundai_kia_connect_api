@@ -468,6 +468,14 @@ class KiaUvoApiCA(ApiImpl):
             options.heating = 0
         if options.defrost is None:
             options.defrost = False
+        if options.front_left_seat is None:
+            options.front_left_seat = 0
+        if options.front_right_seat is None:
+            options.front_right_seat = 0
+        if options.rear_left_seat is None:
+            options.rear_left_seat = 0        
+        if options.rear_right_seat is None:
+            options.rear_right_seat = 0
             
         if vehicle.year > self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
@@ -500,6 +508,7 @@ class KiaUvoApiCA(ApiImpl):
                     "igniOnDuration": options.duration,
                     "ims": 0,
                     "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
+                    "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
                 },
                 "pin": token.pin,
               }
