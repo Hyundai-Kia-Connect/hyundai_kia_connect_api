@@ -480,7 +480,7 @@ class KiaUvoApiCA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
             
-        if vehicle.year > self.temperature_range_model_year:
+        if vehicle.year >= self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
