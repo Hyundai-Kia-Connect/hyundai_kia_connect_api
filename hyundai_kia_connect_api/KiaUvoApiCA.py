@@ -37,8 +37,8 @@ class KiaUvoApiCA(ApiImpl):
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
     temperature_range_model_year = 2020
 
-    def __init__(self, region: int, brand: int) -> None:
-
+    def __init__(self, region: int, brand: int,  language: str) -> None:
+        self.LANGUAGE: str = language
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "www.kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
@@ -49,7 +49,7 @@ class KiaUvoApiCA(ApiImpl):
             "content-type": "application/json;charset=UTF-8",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
-            "accept-language": "en-US,en;q=0.9",
+            "accept-language": self.LANGUAGE + ",en-US,en;q=0.9",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,

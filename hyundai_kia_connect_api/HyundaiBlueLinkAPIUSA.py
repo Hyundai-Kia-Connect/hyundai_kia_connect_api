@@ -44,7 +44,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self,
         region: int,
         brand: int,
+        language: str
     ):
+        self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
@@ -60,7 +62,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "content-type": "application/json;charset=UTF-8",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
-            "accept-language": "en-US,en;q=0.9",
+            "accept-language": self.LANGUAGE + ",en-US,en;q=0.9",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,

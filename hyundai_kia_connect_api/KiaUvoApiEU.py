@@ -77,8 +77,9 @@ class KiaUvoApiEU(ApiImpl):
     data_timezone = tz.gettz("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
-    def __init__(self, region: int, brand: int) -> None:
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.stamps = None
+        self.LANGUAGE: str = language
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -112,7 +113,7 @@ class KiaUvoApiEU(ApiImpl):
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
                 + self.USER_API_URL
-                + "integration/redirect/login&ui_locales=en&state=$service_id:$user_id"
+                + "integration/redirect/login&ui_locales=" + self.LANGUAGE + "&state=$service_id:$user_id"
             )
         elif BRANDS[brand] == BRAND_HYUNDAI:
             auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
@@ -123,7 +124,7 @@ class KiaUvoApiEU(ApiImpl):
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
                 + self.USER_API_URL
-                + "integration/redirect/login&ui_locales=en&state=$service_id:$user_id"
+                + "integration/redirect/login&ui_locales=" + self.LANGUAGE + "&state=$service_id:$user_id"
             )
 
         self.stamps_url: str = (

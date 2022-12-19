@@ -84,7 +84,9 @@ class KiaUvoAPIUSA(ApiImpl):
         self,
         region: int,
         brand: int,
+        language
     ) -> None:
+        self.LANGUAGE: str = language
         self.temperature_range = range(62, 82)
 
         # Randomly generate a plausible device id on startup
@@ -105,7 +107,7 @@ class KiaUvoAPIUSA(ApiImpl):
             "content-type": "application/json;charset=UTF-8",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
-            "accept-language": "en-US,en;q=0.9",
+            "accept-language": self.LANGUAGE + ",en-US,en;q=0.9",
             "apptype": "L",
             "appversion": "4.10.0",
             "clientid": "MWAMOBILE",
