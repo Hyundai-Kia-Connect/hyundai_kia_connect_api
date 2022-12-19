@@ -257,22 +257,22 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.air_temperature = (
-            get_child_value(state, "vehicleStatus.airTemp.value"),
-            TEMPERATURE_UNITS[1],
+            get_child_value(state, "vehicleStatus.climate.airTemp.value"),
+            TEMPERATURE_UNITS[get_child_value(state, "vehicleStatus.climate.airTemp.unit")],
         )
-        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
+        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.climate.defrost")
         vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
         vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
         vehicle.tire_pressure_all_warning_is_on = get_child_value(state, "vehicleStatus.tirePressure.all")
 
         vehicle.steering_wheel_heater_is_on = get_child_value(
-            state, "vehicleStatus.steerWheelHeat"
+            state, "vehicleStatus.climate.heatingAccessory.steeringWheel"
         )
         vehicle.back_window_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideBackWindowHeat"
+            state, "vehicleStatus.climate.heatingAccessory.rearWindow"
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideMirrorHeat"
+            state, "vehicleStatus.climate.heatingAccessory.sideMirror"
         )
         vehicle.front_left_seat_heater_is_on = get_child_value(
             state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
@@ -316,7 +316,10 @@ class KiaUvoAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
-            DISTANCE_UNITS[3],
+            DISTANCE_UNITS[get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+            )],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -339,11 +342,14 @@ class KiaUvoAPIUSA(ApiImpl):
                 state,
                 "vehicleStatus.distanceToEmpty.value",
             ),
-            DISTANCE_UNITS[3],
+            DISTANCE_UNITS[get_child_value(
+                state,
+                "vehicleStatus.distanceToEmpty.unit",
+            )],
         )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
+        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.climate.airCtrlOn")
 
         vehicle.location = (
             get_child_value(state, "vehicleLocation.coord.lat"),
@@ -356,7 +362,9 @@ class KiaUvoAPIUSA(ApiImpl):
             get_child_value(state, "nextService.value"),
             DISTANCE_UNITS[get_child_value(state, "nextService.unit")],
         )
-    
+
+        vehicle.dtc_count = get_child_value(state, "activeDTC.dtcActiveCount")
+
         vehicle.data = state
 
     def get_last_updated_at(self, value) -> dt.datetime:
@@ -403,10 +411,13 @@ class KiaUvoAPIUSA(ApiImpl):
         )
 
         response_body = response.json()
+        #TODO: This logic should all be removed from here and moved to the update_vehicle_properties
+        #What we should return:
+        #vehicle_data = response_body["payload"]["vehicleInfoList"][0]["lastVehicleInfo"]
+
         vehicle_status = response_body["payload"]["vehicleInfoList"][0][
             "lastVehicleInfo"
         ]["vehicleStatusRpt"]["vehicleStatus"]
-        #TODO: This logic should all be removed from here and moved to the update_vehicle_properties
         vehicle_data = {
             "vehicleStatus": vehicle_status,
             "odometer": {
@@ -435,25 +446,6 @@ class KiaUvoAPIUSA(ApiImpl):
                 "atc": vehicle_status["evStatus"]["remainChargeTime"][0]["timeInterval"]
             }
 
-        if vehicle_status.get("tirePressure"):
-            vehicle_status["tirePressureLamp"] = {
-                "tirePressureLampAll": vehicle_status["tirePressure"]["all"]
-            }
-
-        climate_data = vehicle_status["climate"]
-        vehicle_status["airCtrlOn"] = climate_data["airCtrl"]
-        vehicle_status["defrost"] = climate_data["defrost"]
-        vehicle_status["sideBackWindowHeat"] = climate_data["heatingAccessory"][
-            "rearWindow"
-        ]
-        vehicle_status["sideMirrorHeat"] = climate_data["heatingAccessory"][
-            "sideMirror"
-        ]
-        vehicle_status["steerWheelHeat"] = climate_data["heatingAccessory"][
-            "steeringWheel"
-        ]
-
-        vehicle_status["airTemp"] = climate_data["airTemp"]
 
         return vehicle_data
 
