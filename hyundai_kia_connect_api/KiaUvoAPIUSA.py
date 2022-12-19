@@ -231,17 +231,17 @@ class KiaUvoAPIUSA(ApiImpl):
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:          
         """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.syncDate.utc")
+            get_child_value(state, "vehicleStatusRpt.vehicleStatus.syncDate.utc")
         )
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[3],
         )
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
+            get_child_value(state, "vehicleConfig.vehicleDetail.vehicle.mileage"),
             DISTANCE_UNITS[3],
         )
         vehicle.next_service_distance = (
@@ -253,117 +253,118 @@ class KiaUvoAPIUSA(ApiImpl):
             DISTANCE_UNITS[3],
         )
         vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.batteryStatus.stateOfCharge"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge"
         )
-        vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        vehicle.engine_is_running = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine")
         vehicle.air_temperature = (
-            get_child_value(state, "vehicleStatus.climate.airTemp.value"),
-            TEMPERATURE_UNITS[get_child_value(state, "vehicleStatus.climate.airTemp.unit")],
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value"),
+            TEMPERATURE_UNITS[get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit")],
         )
-        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.climate.defrost")
-        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
-        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
-        vehicle.tire_pressure_all_warning_is_on = get_child_value(state, "vehicleStatus.tirePressure.all")
+        vehicle.defrost_is_on = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.defrost")
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.washerFluidStatus")
+        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.smartKeyBatteryWarning")
+        vehicle.tire_pressure_all_warning_is_on = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.tirePressure.all")
 
         vehicle.steering_wheel_heater_is_on = get_child_value(
-            state, "vehicleStatus.climate.heatingAccessory.steeringWheel"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel"
         )
         vehicle.back_window_heater_is_on = get_child_value(
-            state, "vehicleStatus.climate.heatingAccessory.rearWindow"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow"
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
-            state, "vehicleStatus.climate.heatingAccessory.sideMirror"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror"
         )
         vehicle.front_left_seat_heater_is_on = get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState"
         )
         vehicle.front_right_seat_heater_is_on = get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState"
         )
         vehicle.rear_left_seat_heater_is_on = get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState"
         )
         vehicle.rear_right_seat_heater_is_on = get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState"
         )
         vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorStatus.frontLeft"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.frontLeft"
         )
         vehicle.front_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorStatus.frontRight"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.frontRight"
         )
         vehicle.back_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorStatus.backLeft"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.backLeft"
         )
         vehicle.back_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorStatus.backRight"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.backRight"
         )
-        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.doorStatus.hood")
+        vehicle.hood_is_open = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.hood")
 
-        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.doorStatus.trunk")
+        vehicle.trunk_is_open = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.trunk")
         vehicle.ev_battery_percentage = get_child_value(
-            state, "vehicleStatus.evStatus.batteryStatus"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryStatus"
         )
         vehicle.ev_battery_is_charging = get_child_value(
-            state, "vehicleStatus.evStatus.batteryCharge"
+            state, "lastVehicleInfo.vehicleStatus.evStatus.batteryCharge"
         )
         vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "vehicleStatus.evStatus.batteryPlugin"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPlugin"
         )
         vehicle.ev_driving_distance = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
             DISTANCE_UNITS[get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
             )],
         )
         vehicle.ev_estimated_current_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value"),
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value"),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value"),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value"),
             "m",
         )
+
         vehicle.fuel_driving_range = (
             get_child_value(
                 state,
-                "vehicleStatus.distanceToEmpty.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
             ),
             DISTANCE_UNITS[get_child_value(
                 state,
-                "vehicleStatus.distanceToEmpty.unit",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
             )],
         )
-        vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
-        vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.climate.airCtrlOn")
+        vehicle.fuel_level_is_low = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.lowFuelLight")
+        vehicle.fuel_level = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.fuelLevel")
+        vehicle.air_control_is_on = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airCtrlOn")
 
         vehicle.location = (
-            get_child_value(state, "vehicleLocation.coord.lat"),
-            get_child_value(state, "vehicleLocation.coord.lon"),
-            get_child_value(state, "vehicleLocation.syncDate.utc"),
+            get_child_value(state, "lastVehicleInfo.location.coord.lat"),
+            get_child_value(state, "lastVehicleInfo.location.coord.lon"),
+            get_child_value(state, "lastVehicleInfo.location.syncDate.utc"),
 
         )
 
         vehicle.next_service_distance = (
-            get_child_value(state, "nextService.value"),
-            DISTANCE_UNITS[get_child_value(state, "nextService.unit")],
+            get_child_value(state, "vehicleConfig.maintenance.nextServiceMile"),
+            DISTANCE_UNITS[3],
         )
 
-        vehicle.dtc_count = get_child_value(state, "activeDTC.dtcActiveCount")
+        vehicle.dtc_count = get_child_value(state, "lastVehicleInfo.activeDTC.dtcActiveCount")
 
         vehicle.data = state
 
@@ -413,38 +414,7 @@ class KiaUvoAPIUSA(ApiImpl):
         response_body = response.json()
         #TODO: This logic should all be removed from here and moved to the update_vehicle_properties
         #What we should return:
-        #vehicle_data = response_body["payload"]["vehicleInfoList"][0]["lastVehicleInfo"]
-
-        vehicle_status = response_body["payload"]["vehicleInfoList"][0][
-            "lastVehicleInfo"
-        ]["vehicleStatusRpt"]["vehicleStatus"]
-        vehicle_data = {
-            "vehicleStatus": vehicle_status,
-            "odometer": {
-                "value": float(
-                    response_body["payload"]["vehicleInfoList"][0]["vehicleConfig"][
-                        "vehicleDetail"
-                    ]["vehicle"]["mileage"]
-                ),
-                "unit": 3,
-            },
-            "nextService": {
-                "value": float(
-                    response_body["payload"]["vehicleInfoList"][0]["vehicleConfig"][
-                        "maintenance"
-                    ]["nextServiceMile"]
-                ),
-                "unit": 3,
-            },
-            "vehicleLocation": response_body["payload"]["vehicleInfoList"][0][
-                "lastVehicleInfo"
-            ]["location"],
-        }
-
-        if vehicle_status.get("evStatus"):
-            vehicle_status["evStatus"]["remainTime2"] = {
-                "atc": vehicle_status["evStatus"]["remainChargeTime"][0]["timeInterval"]
-            }
+        vehicle_data = response_body["payload"]["vehicleInfoList"][0]
 
 
         return vehicle_data
