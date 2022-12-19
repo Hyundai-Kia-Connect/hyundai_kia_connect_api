@@ -191,7 +191,7 @@ class KiaUvoApiCA(ApiImpl):
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(state, "status.airTemp.value"))
         if get_child_value(state, "status.airTemp.unit") == 0:
-            if vehicle.year > self.temperature_range_model_year:
+            if vehicle.year >= self.temperature_range_model_year:
                 state["status"]["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
 
             else:
@@ -480,7 +480,7 @@ class KiaUvoApiCA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
             
-        if vehicle.year > self.temperature_range_model_year:
+        if vehicle.year >= self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
