@@ -412,12 +412,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
 
         response_body = response.json()
-        #TODO: This logic should all be removed from here and moved to the update_vehicle_properties
-        #What we should return:
-        vehicle_data = response_body["payload"]["vehicleInfoList"][0]
-
-
-        return vehicle_data
+        return response_body["payload"]["vehicleInfoList"][0]
 
     def get_location(self, token: Token, vehicle_id: str) -> None:
         pass
