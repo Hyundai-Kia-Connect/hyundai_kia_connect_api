@@ -231,7 +231,7 @@ class KiaUvoAPIUSA(ApiImpl):
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:          
         """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatusRpt.vehicleStatus.syncDate.utc")
+            get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.syncDate.utc")
         )
         vehicle.total_driving_range = (
             get_child_value(
