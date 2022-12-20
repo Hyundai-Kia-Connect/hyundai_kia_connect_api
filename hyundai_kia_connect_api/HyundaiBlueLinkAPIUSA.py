@@ -62,7 +62,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "content-type": "application/json;charset=UTF-8",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
-            "accept-language": self.LANGUAGE + ",en-US,en;q=0.9",
+            "accept-language": "en-US,en;q=0.9",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,
@@ -450,7 +450,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
-        
+
         if options.climate is None:
             options.climate = True
         if options.set_temp is None:
@@ -461,8 +461,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             options.heating = 0
         if options.defrost is None:
             options.defrost = False
-        
-        
+
+
         data = {
             "Ims": 0,
             "airCtrl": int(options.climate),
