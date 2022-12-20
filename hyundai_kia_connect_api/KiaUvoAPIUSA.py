@@ -34,7 +34,7 @@ def request_with_active_session(func):
         try:
             return func(*args, **kwargs)
         except AuthError:
-            _LOGGER.debug(f"{DOMAIN} got invalid session, attempting to repair and resend")
+            _LOGGER.debug(f"{DOMAIN} - got invalid session, attempting to repair and resend")
             self = args[0]
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
@@ -58,9 +58,9 @@ def request_with_logging(func):
         url = kwargs["url"]
         json_body = kwargs.get("json_body")
         if json_body is not None:
-            _LOGGER.debug(f"{DOMAIN} sending {url} request with {json_body}")
+            _LOGGER.debug(f"{DOMAIN} - sending {url} request with {json_body}")
         else:
-            _LOGGER.debug(f"{DOMAIN} sending {url} request")
+            _LOGGER.debug(f"{DOMAIN} - sending {url} request")
         response = func(*args, **kwargs)
         _LOGGER.debug(f"{DOMAIN} got response {response.text}")
         response_json = response.json()
@@ -71,9 +71,9 @@ def request_with_logging(func):
             and response_json["status"]["errorType"] == 1
             and response_json["status"]["errorCode"] == 1003
         ):
-            _LOGGER.debug(f"{DOMAIN} error: session invalid")
+            _LOGGER.debug(f"{DOMAIN} - error: session invalid")
             raise AuthError
-        _LOGGER.error(f"{DOMAIN} error: unknown error response {response.text}")
+        _LOGGER.error(f"{DOMAIN} - error: unknown error response {response.text}")
         raise RequestException
 
     return request_with_logging_wrapper
@@ -433,7 +433,7 @@ class KiaUvoAPIUSA(ApiImpl):
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle
+            token=token, url=url, json_body=body, vehicle=vehicle.id
         )
         response_json = response.json()
         last_action_completed = all(
@@ -442,7 +442,7 @@ class KiaUvoAPIUSA(ApiImpl):
         return last_action_completed
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
-        _LOGGER.debug(f"{DOMAIN} Action for lock is: {action}")
+        _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rems/door/lock"
             _LOGGER.debug(f"{DOMAIN} - Calling Lock")
@@ -486,7 +486,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 },
             }
         }
-        _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {body}")
+        _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
