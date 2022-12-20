@@ -44,7 +44,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self,
         region: int,
         brand: int,
+        language: str
     ):
+        self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
@@ -448,7 +450,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
-        
+
         if options.climate is None:
             options.climate = True
         if options.set_temp is None:
@@ -459,8 +461,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             options.heating = 0
         if options.defrost is None:
             options.defrost = False
-        
-        
+
+
         data = {
             "Ims": 0,
             "airCtrl": int(options.climate),

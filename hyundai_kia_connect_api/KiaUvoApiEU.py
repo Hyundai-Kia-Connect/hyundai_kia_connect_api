@@ -39,6 +39,24 @@ USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
 
+SUPPORTED_LANGUAGES_LIST = [
+    "en",   # English
+    "de",   # German
+    "fr",   # French
+    "it",   # Italian
+    "es",   # Spanish
+    "sv",   # Swedish
+    "nl",   # Dutch
+    "no",   # Norwegian
+    "cs",   # Czech
+    "sk",   # Slovak
+    "hu",   # Hungarian
+    "da",   # Danish
+    "pl",   # Polish
+    "fi",   # Finnish
+    "pt"    # Portuguese
+]
+
 
 def _check_response_for_errors(response: dict) -> None:
     """
@@ -77,8 +95,13 @@ class KiaUvoApiEU(ApiImpl):
     data_timezone = tz.gettz("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
-    def __init__(self, region: int, brand: int) -> None:
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.stamps = None
+
+        if language not in SUPPORTED_LANGUAGES_LIST:
+            _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
+            language = "en"  # fallback to English
+        self.LANGUAGE: str = language
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -112,7 +135,7 @@ class KiaUvoApiEU(ApiImpl):
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
                 + self.USER_API_URL
-                + "integration/redirect/login&ui_locales=en&state=$service_id:$user_id"
+                + "integration/redirect/login&ui_locales=" + self.LANGUAGE + "&state=$service_id:$user_id"
             )
         elif BRANDS[brand] == BRAND_HYUNDAI:
             auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
@@ -123,7 +146,7 @@ class KiaUvoApiEU(ApiImpl):
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
                 + self.USER_API_URL
-                + "integration/redirect/login&ui_locales=en&state=$service_id:$user_id"
+                + "integration/redirect/login&ui_locales=" + self.LANGUAGE + "&state=$service_id:$user_id"
             )
 
         self.stamps_url: str = (
@@ -197,9 +220,9 @@ class KiaUvoApiEU(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.ICE
             elif(entry["type"] == "EV"):
                 entry_engine_type = ENGINE_TYPES.EV
-            elif(entry["type"] == "PHEV"): 
+            elif(entry["type"] == "PHEV"):
                 entry_engine_type = ENGINE_TYPES.PHEV
-            elif(entry["type"] == "HV"): 
+            elif(entry["type"] == "HV"):
                 entry_engine_type = ENGINE_TYPES.HEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
@@ -231,7 +254,7 @@ class KiaUvoApiEU(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-        
+
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
@@ -251,7 +274,7 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-        #Only call for driving info on cars we know have a chance of supporting it.   Could be expanded if other types do support it. 
+        #Only call for driving info on cars we know have a chance of supporting it.   Could be expanded if other types do support it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
@@ -273,7 +296,7 @@ class KiaUvoApiEU(ApiImpl):
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
-            
+
         vehicle.total_driving_range = (
             get_child_value(
                 state,
@@ -286,8 +309,8 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        
-        #Only update odometer if present.   It isn't present in a force update.  Dec 2022 update also reports 0 when the car is off.  This tries to remediate best we can.  Can be removed once fixed in the cars firmware. 
+
+        #Only update odometer if present.   It isn't present in a force update.  Dec 2022 update also reports 0 when the car is off.  This tries to remediate best we can.  Can be removed once fixed in the cars firmware.
         if get_child_value(state, "odometer.value") is not None:
             if get_child_value(state, "odometer.value") != 0:
                 vehicle.odometer = (
@@ -335,7 +358,7 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.steering_wheel_heater_is_on = False
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
-            
+
         vehicle.back_window_heater_is_on = get_child_value(
             state, "vehicleStatus.sideBackWindowHeat"
         )
@@ -396,16 +419,16 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
         )
-        
+
         ev_charge_port_door_is_open = get_child_value(
             state, "vehicleStatus.evStatus.chargePortDoorOpenStatus"
         )
-        
-        if ev_charge_port_door_is_open == 1:         
+
+        if ev_charge_port_door_is_open == 1:
             vehicle.ev_charge_port_door_is_open = True
         elif ev_charge_port_door_is_open == 2:
-            vehicle.ev_charge_port_door_is_open = False   
-        
+            vehicle.ev_charge_port_door_is_open = False
+
         vehicle.ev_driving_range = (
             get_child_value(
                 state,
@@ -469,7 +492,7 @@ class KiaUvoApiEU(ApiImpl):
                 ),
                 DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
             )
-        
+
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
@@ -495,12 +518,12 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
 
-        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")           
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
         vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
-        
+
 
         if get_child_value(state, "vehicleLocation.coord.lat"):
             vehicle.location = (
@@ -638,7 +661,7 @@ class KiaUvoApiEU(ApiImpl):
         _check_response_for_errors(response)
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
-        #Not currently used as value is in the general get.  Most likely this forces the car the update it. 
+        #Not currently used as value is in the general get.  Most likely this forces the car the update it.
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
@@ -766,7 +789,7 @@ class KiaUvoApiEU(ApiImpl):
             + self.CLIENT_ID
             + "&redirect_uri="
             + self.USER_API_URL
-            + "oauth2/redirect&lang=en"
+            + "oauth2/redirect&lang=" + self.LANGUAGE
         )
         payload = {}
         headers = {
@@ -781,7 +804,7 @@ class KiaUvoApiEU(ApiImpl):
             "Sec-Fetch-User": "?1",
             "Sec-Fetch-Dest": "document",
             "Accept-Encoding": "gzip, deflate",
-            "Accept-Language": "en,en-US;q=0.9",
+            "Accept-Language": "en,en-US," + self.LANGUAGE + ";q=0.9",
         }
 
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
@@ -795,7 +818,7 @@ class KiaUvoApiEU(ApiImpl):
         ### Set Language for Session ###
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
-        payload = {"lang": "en"}
+        payload = {"lang": self.LANGUAGE}
         response = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_authorization_code_with_redirect_url(

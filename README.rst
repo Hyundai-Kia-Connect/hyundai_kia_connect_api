@@ -15,7 +15,7 @@ Python 3.9 or newer is required to use this package. Vehicle manager is the key 
     brand: int, 
     username: str
     password: str
-    pin: str (required for CA, and potentially USA, otherwise pass a blank string) 
+    pin: str (required for CA, and potentially USA, otherwise pass a blank string)
 
 Key values for the int exist in the constant(https://github.com/fuatakgun/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
 
@@ -59,4 +59,29 @@ If geolocation is required you can also allow this by running::
     vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234", geocode_api_enable=True, geocode_api_use_email=True)
     
 This will populate the address of the vehicle in the vehicle instance. 
+
+The Bluelink App is reset to English for users who have set another language in the Bluelink App in Europe when using hyundai_kia_connect_api.
+To avoid this, you can pass the optional parameter language (default is "en") to the constructor of VehicleManager, e.g. for Dutch:
+    vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234", language="nl")
+
+Note: this is only implemented for Europe currently.
+[For a list of language codes, see here.](https://www.science.co.il/language/Codes.php). Currently in Europe the Bluelink App shows the following languages:
+- "en" English
+- "de" German 
+- "fr" French
+- "it" Italian
+- "es" Spanish
+- "sv" Swedish
+- "nl" Dutch
+- "no" Norwegian
+- "cs" Czech
+- "sk" Slovak
+- "hu" Hungarian
+- "da" Danish
+- "pl" Polish
+- "fi" Finnish
+- "pt" Portuguese
+
+
+
 
