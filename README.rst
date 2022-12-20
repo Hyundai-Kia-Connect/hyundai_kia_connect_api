@@ -82,7 +82,3 @@ Note: this is only implemented for Europe currently.
 - "pl" Polish
 - "fi" Finnish
 - "pt" Portuguese
-
-
-
-
