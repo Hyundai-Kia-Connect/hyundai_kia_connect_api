@@ -111,7 +111,8 @@ class KiaUvoApiCA(ApiImpl):
                 year=int(entry["modelYear"]),
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
-                timezone=self.data_timezone
+                timezone=self.data_timezone,
+                dtc_count=entry["dtcCount"]
             )
             result.append(vehicle)
         return result
@@ -515,7 +516,6 @@ class KiaUvoApiCA(ApiImpl):
                 },
                 "pin": token.pin,
               }
-        data = json.dumps(payload)
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
