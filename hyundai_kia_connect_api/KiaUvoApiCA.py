@@ -37,8 +37,8 @@ class KiaUvoApiCA(ApiImpl):
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
     temperature_range_model_year = 2020
 
-    def __init__(self, region: int, brand: int) -> None:
-
+    def __init__(self, region: int, brand: int,  language: str) -> None:
+        self.LANGUAGE: str = language
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "www.kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
@@ -102,7 +102,7 @@ class KiaUvoApiCA(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.ICE
             elif(entry["fuelKindCode"] == "E"):
                 entry_engine_type = ENGINE_TYPES.EV
-            elif(entry["fuelKindCode"] == "P"): 
+            elif(entry["fuelKindCode"] == "P"):
                 entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
@@ -120,10 +120,10 @@ class KiaUvoApiCA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties_base(vehicle, state)
-        
-        # Service Status Call       
+
+        # Service Status Call
         service = self._get_next_service(token, vehicle)
-        
+
         #Get location if the car has moved since last call
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
@@ -132,14 +132,14 @@ class KiaUvoApiCA(ApiImpl):
         else:
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
-                
-        #Update service after the fact so we still have the old odometer reading available for above.        
+
+        #Update service after the fact so we still have the old odometer reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
-        
-        
+
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
 
@@ -160,11 +160,11 @@ class KiaUvoApiCA(ApiImpl):
                 f"{DOMAIN} - Set vehicle.timezone to UTC + {offset} hours"
             )
 
-        self._update_vehicle_properties_base(vehicle, state)        
+        self._update_vehicle_properties_base(vehicle, state)
 
-        # Service Status Call       
+        # Service Status Call
         service = self._get_next_service(token, vehicle)
-        
+
         #Get location if the car has moved since last call
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
@@ -173,16 +173,16 @@ class KiaUvoApiCA(ApiImpl):
         else:
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
-                
-        #Update service after the fact so we still have the old odometer reading available for above.        
+
+        #Update service after the fact so we still have the old odometer reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
-        
+
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
-        
-        
-    def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:   
+
+
+    def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "status.lastStatusDate"),
@@ -192,12 +192,12 @@ class KiaUvoApiCA(ApiImpl):
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(get_child_value(state, "status.airTemp.value"))
         if get_child_value(state, "status.airTemp.unit") == 0:
-            if vehicle.year > self.temperature_range_model_year:
+            if vehicle.year >= self.temperature_range_model_year:
                 state["status"]["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
 
             else:
                 state["status"]["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
-                
+
         vehicle.total_driving_range = (
             get_child_value(
                 state,
@@ -304,9 +304,9 @@ class KiaUvoApiCA(ApiImpl):
         if vehicle.data is None:
             vehicle.data = {}
         vehicle.data["status"] = state["status"]
-        
+
     def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
-        
+
         vehicle.odometer = (
             get_child_value(state, "currentOdometer"),
             DISTANCE_UNITS[get_child_value(state, "currentOdometerUnit")],
@@ -319,20 +319,20 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(state, "msopServiceOdometer"),
             DISTANCE_UNITS[get_child_value(state, "msopServiceOdometerUnit")],
         )
-        
+
         vehicle.data["service"] = state
-        
+
     def _update_vehicle_properties_location(self, vehicle: Vehicle, state: dict) -> None:
-        
+
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
                 get_child_value(state, "time"),
 
-            )      
+            )
         vehicle.data["vehicleLocation"] = state
-        
+
 
     def get_last_updated_at(self, value, vehicle) -> dt.datetime:
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
@@ -366,7 +366,7 @@ class KiaUvoApiCA(ApiImpl):
         status["status"] = response
 
         return status
-    
+
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rltmvhclsts"
         headers = self.API_HEADERS
@@ -380,7 +380,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response["result"]["status"]
         status = {}
         status["status"] = response
-        
+
         return status
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
@@ -455,7 +455,7 @@ class KiaUvoApiCA(ApiImpl):
     ) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
             url = self.API_URL + "evc/rfon"
-        else: 
+        else:
             url = self.API_URL + "rmtstrt"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -477,11 +477,11 @@ class KiaUvoApiCA(ApiImpl):
         if options.front_right_seat is None:
             options.front_right_seat = 0
         if options.rear_left_seat is None:
-            options.rear_left_seat = 0        
+            options.rear_left_seat = 0
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
-            
-        if vehicle.year > self.temperature_range_model_year:
+
+        if vehicle.year >= self.temperature_range_model_year:
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
@@ -521,14 +521,14 @@ class KiaUvoApiCA(ApiImpl):
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
-        
+
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
         return response_headers["transactionId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
             url = self.API_URL + "evc/rfoff"
-        else: 
+        else:
             url = self.API_URL + "rmtstp"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -595,22 +595,22 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
         return response_headers["transactionId"]
-    
-    def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:   
+
+    def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.ev_charge_limits_ac = [x['level'] for x in state if x['plugType'] == 1][-1]
         vehicle.ev_charge_limits_dc = [x['level'] for x in state if x['plugType'] == 0][-1]
 
-    
+
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        
-        response = requests.post(url, headers=headers)    
+
+        response = requests.post(url, headers=headers)
         response = response.json()
         return response["result"]
-    
+
     def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
@@ -625,7 +625,7 @@ class KiaUvoApiCA(ApiImpl):
                 },
                 {
                 "plugType": 1,
-                "level": ac,          
+                "level": ac,
                 }],
             "pin": token.pin,
         }

@@ -84,7 +84,9 @@ class KiaUvoAPIUSA(ApiImpl):
         self,
         region: int,
         brand: int,
+        language
     ) -> None:
+        self.LANGUAGE: str = language
         self.temperature_range = range(62, 82)
 
         # Randomly generate a plausible device id on startup
@@ -219,16 +221,16 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)     
-        
+        self._update_vehicle_properties(vehicle, state)
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         self._get_forced_vehicle_state(token, vehicle)
         #TODO: Force update needs work to return the correct data for processing
         #self._update_vehicle_properties(vehicle, state)
         #Temp call a cached state since we are removing this from parent logic in other commits should be removed when the above is fixed
         self.update_vehicle_with_cached_state(token, vehicle)
-        
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:          
+
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.syncDate.utc")
@@ -427,7 +429,7 @@ class KiaUvoAPIUSA(ApiImpl):
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_body = response.json()
-       
+
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
         url = self.API_URL + "cmm/gts"

@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VehicleManager:
-    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable: bool = False, geocode_api_use_email: bool = False):
+    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable: bool = False, geocode_api_use_email: bool = False, language: str = "en"):
         self.region: int = region
         self.brand: int = brand
         self.username: str = username
@@ -37,9 +37,10 @@ class VehicleManager:
         self.geocode_api_enable: bool = geocode_api_enable   
         self.geocode_api_use_email: bool = geocode_api_use_email
         self.pin: str = pin
+        self.language: str = language
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
-            self.region, self.brand
+            self.region, self.brand, self.language
         )
 
         self.token: Token = None
@@ -129,12 +130,12 @@ class VehicleManager:
         return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
 
     @staticmethod
-    def get_implementation_by_region_brand(region: int, brand: int) -> ApiImpl:
+    def get_implementation_by_region_brand(region: int, brand: int, language: str) -> ApiImpl:
         if REGIONS[region] == REGION_CANADA:
-            return KiaUvoApiCA(region, brand)
+            return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
-            return KiaUvoApiEU(region, brand)
+            return KiaUvoApiEU(region, brand, language)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_HYUNDAI:
-            return HyundaiBlueLinkAPIUSA(region, brand)
+            return HyundaiBlueLinkAPIUSA(region, brand, language)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
-            return KiaUvoAPIUSA(region, brand)
+            return KiaUvoAPIUSA(region, brand, language)
