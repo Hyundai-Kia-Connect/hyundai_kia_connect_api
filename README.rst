@@ -62,6 +62,7 @@ This will populate the address of the vehicle in the vehicle instance.
 
 The Bluelink App is reset to English for users who have set another language in the Bluelink App in Europe when using hyundai_kia_connect_api.
 To avoid this, you can pass the optional parameter language (default is "en") to the constructor of VehicleManager, e.g. for Dutch::
+
     vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234", language="nl")
 
 Note: this is only implemented for Europe currently.
