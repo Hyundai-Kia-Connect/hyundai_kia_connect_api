@@ -18,6 +18,12 @@ class APIError(HyundaiKiaException):
     """
     pass
 
+class NoDataFound(APIError):
+    """
+    No Data Available from the server. May be short term, may mean the car is offline. 
+    """
+    pass
+
 
 class RateLimitingError(APIError):
     """
