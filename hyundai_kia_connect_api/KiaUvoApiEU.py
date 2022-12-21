@@ -79,7 +79,7 @@ def _check_response_for_errors(response: dict) -> None:
         "4081": RequestTimeoutError,
         "5031": APIError,
         "5091": RateLimitingError,
-        "5921": NoDataFound
+        "5921": None
     }
 
     if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
