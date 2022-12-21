@@ -367,6 +367,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
 
         vehicle.dtc_count = get_child_value(state, "lastVehicleInfo.activeDTC.dtcActiveCount")
+        vehicle.dtc_descriptions = get_child_value(state, "lastVehicleInfo.activeDTC.dtcCategory")
 
         vehicle.data = state
 
