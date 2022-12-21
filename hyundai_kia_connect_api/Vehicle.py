@@ -57,7 +57,7 @@ class Vehicle:
     last_updated_at: datetime.datetime = datetime.datetime.min
     timezone: datetime.timezone = None
     dtc_count: typing.Union[int, None] = None
-    dtc_descriptions: typing.Union[list, None] = None
+    dtc_descriptions: typing.Union[dict, None] = None
 
     smart_key_battery_warning_is_on: bool = None
     washer_fluid_warning_is_on: bool = None
