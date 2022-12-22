@@ -166,6 +166,7 @@ class Vehicle:
 
     ev_off_peak_start_time: typing.Union[datetime.time, None] = None
     ev_off_peak_end_time: typing.Union[datetime.time, None] = None
+    ev_off_peak_charge_only_enabled: typing.Union[bool, None] = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
