@@ -155,6 +155,19 @@ class Vehicle:
     _ev_target_range_charge_DC_value: typing.Union[float, None] = None
     _ev_target_range_charge_DC_unit: typing.Union[str, None] = None
 
+    ev_first_departure_enabled: typing.Union[bool, None] = None
+    ev_second_departure_enabled: typing.Union[bool, None] = None
+
+    ev_first_departure_days: typing.Union[list, None] = None
+    ev_second_departure_days: typing.Union[list, None] = None
+
+    ev_first_departure_time: typing.Union[datetime.time, None] = None
+    ev_second_departure_time: typing.Union[datetime.time, None] = None
+
+    ev_off_peak_start_time: typing.Union[datetime.time, None] = None
+    ev_off_peak_end_time: typing.Union[datetime.time, None] = None
+    ev_off_peak_charge_only_enabled: typing.Union[bool, None] = None
+
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
     _fuel_driving_range_value: float = None
