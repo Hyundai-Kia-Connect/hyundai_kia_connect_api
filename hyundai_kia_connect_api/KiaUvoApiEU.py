@@ -70,6 +70,7 @@ def _check_response_for_errors(response: dict) -> None:
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
     - 5091: "Exceeds number of requests"
+    - 5921: "No Data Found v2 - No Data Found v2"
     :param response: the API's JSON response
     """
 
@@ -77,7 +78,8 @@ def _check_response_for_errors(response: dict) -> None:
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
         "5031": APIError,
-        "5091": RateLimitingError
+        "5091": RateLimitingError,
+        "5921": None
     }
 
     if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
@@ -86,7 +88,10 @@ def _check_response_for_errors(response: dict) -> None:
 
     if response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
-            raise error_code_mapping[response["resCode"]](response["resMsg"])
+            if response["resCode"] == "5921":
+                _LOGGER.error(f"{DOMAIN} - No Data Found, car may be offline")
+            else:
+                raise error_code_mapping[response["resCode"]](response["resMsg"])
         else:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
