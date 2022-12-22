@@ -256,9 +256,9 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def _get_time_from_string(self, value) -> dt.time:
+    def _get_time_from_string(self, value) -> dt.datetime.time:
         if value is not None:
-            time_object = dt.strptime(value, '%H%M').time()
+            time_object = dt.datetime.strptime(value, '%H%M').time()
         return time_object
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
