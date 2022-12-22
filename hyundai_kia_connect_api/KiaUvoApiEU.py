@@ -524,7 +524,10 @@ class KiaUvoApiEU(ApiImpl):
         )
         vehicle.ev_first_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet")
         vehicle.ev_second_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservChargeSet")
-
+        vehicle.ev_first_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day")
+        vehicle.ev_second_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.day")
+        vehicle.ev_first_departure_time = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time")
+        vehicle.ev_second_departure_time= get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.time")
 
         vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
