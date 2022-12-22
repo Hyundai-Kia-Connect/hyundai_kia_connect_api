@@ -256,6 +256,11 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
+    def _get_time_from_string(self, value) -> dt.datetime.time:
+        if value is not None:
+            value = dt.datetime.strptime(value, '%H%M').time()
+        return value
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
@@ -522,6 +527,19 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
+        vehicle.ev_first_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet")
+        vehicle.ev_second_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservChargeSet")
+        vehicle.ev_first_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day")
+        vehicle.ev_second_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.day") 
+        vehicle.ev_first_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time"))
+        vehicle.ev_second_departure_time= self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"))
+        vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerTime1.starttime.time"))
+        vehicle.ev_off_peak_end_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerTime1.endtime.time"))
+        if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag"):
+            if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag") == 1:
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag") == 2:
+                vehicle.ev_off_peak_charge_only_enabled = False
 
         vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
