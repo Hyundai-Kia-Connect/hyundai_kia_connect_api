@@ -257,6 +257,7 @@ class KiaUvoApiEU(ApiImpl):
         return value
 
     def _get_time_from_string(self, value) -> dt.datetime.time:
+        _LOGGER.debug(f"{DOMAIN} -Value to convert to time: {value}")
         if value is not None:
             time_object = dt.datetime.strptime(value, '%H%M').time()
         return time_object
