@@ -535,7 +535,11 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_second_departure_time= self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"))
         vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerTime1.starttime.time"))
         vehicle.ev_off_peak_end_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerTime1.endtime.time"))
-        vehicle.ev_off_peak_charge_only_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag")
+        if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag"):
+            if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag") == 1:
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerFlag") == 2:
+                vehicle.ev_off_peak_charge_only_enabled = False
 
         vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
