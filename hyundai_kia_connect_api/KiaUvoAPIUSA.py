@@ -40,7 +40,7 @@ def request_with_active_session(func):
             vehicle = kwargs["vehicle"]
             new_token = self.login(token.username, token.password)
             _LOGGER.debug(
-                f"old token:{token.access_token}, new token:{new_token.access_token}"
+                f"{DOMAIN} - old token:{token.access_token}, new token:{new_token.access_token}"
             )
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
@@ -166,7 +166,7 @@ class KiaUvoAPIUSA(ApiImpl):
         session_id = response.headers.get("sid")
         if not session_id:
             raise Exception(
-                f"no session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
+                f"{DOMAIN} - Mo session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
             )
         _LOGGER.debug(f"got session id {session_id}")
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=1)
@@ -436,7 +436,7 @@ class KiaUvoAPIUSA(ApiImpl):
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle.id
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_json = response.json()
         last_action_completed = all(
@@ -498,7 +498,7 @@ class KiaUvoAPIUSA(ApiImpl):
     def stop_climate(self, token: Token, vehicle: Vehicle)-> str:
         url = self.API_URL + "rems/stop"
         response = self.get_request_with_logging_and_active_session(
-            token=token, url=url
+            token=token, url=url, vehicle=vehicle
         )
         return response.headers["Xid"]
 
@@ -506,7 +506,7 @@ class KiaUvoAPIUSA(ApiImpl):
         url = self.API_URL + "evc/charge"
         body = {"chargeRatio": 100}
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
         return response.headers["Xid"]
 
@@ -532,6 +532,6 @@ class KiaUvoAPIUSA(ApiImpl):
             ]
         }
         response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vechile=vehicle
+            token=token, url=url, json_body=body, vehicle=vehicle
         )
         return response.headers["Xid"]
