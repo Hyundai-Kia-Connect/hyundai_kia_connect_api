@@ -25,17 +25,14 @@ repos:
           - --quiet-level=2
           - --ignore-words-list=hass,ba,fo
           
- -  repo: https://github.com/PyCQA/autoflake
-    rev: v2.0.0
-    hooks:
-      - id: autoflake
-
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.1.0
     hooks:
       - id: check-executables-have-shebangs
         stages: [manual]
       - id: check-json
+        stages: [manual]
+      - id: check-yaml
         stages: [manual]
       - id: requirements-txt-fixer
         stages: [manual]
