@@ -38,6 +38,8 @@ repos:
         stages: [manual]
       - id: check-ast
         stages: [manual]
+      - id: trailing-whitespace
+        stages: [manual]
       - id: mixed-line-ending
         stages: [manual]
         args:
