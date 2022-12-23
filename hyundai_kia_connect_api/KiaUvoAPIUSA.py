@@ -40,7 +40,7 @@ def request_with_active_session(func):
             vehicle = kwargs["vehicle"]
             new_token = self.login(token.username, token.password)
             _LOGGER.debug(
-                f"old token:{token.access_token}, new token:{new_token.access_token}"
+                f"{DOMAIN} - old token:{token.access_token}, new token:{new_token.access_token}"
             )
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
