@@ -24,7 +24,7 @@ repos:
         args:
           - --quiet-level=2
           - --ignore-words-list=hass,ba,fo
-          
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.1.0
     hooks:

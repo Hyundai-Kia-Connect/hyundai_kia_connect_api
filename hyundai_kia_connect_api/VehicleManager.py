@@ -34,7 +34,7 @@ class VehicleManager:
         self.brand: int = brand
         self.username: str = username
         self.password: str = password
-        self.geocode_api_enable: bool = geocode_api_enable   
+        self.geocode_api_enable: bool = geocode_api_enable
         self.geocode_api_use_email: bool = geocode_api_use_email
         self.pin: str = pin
         self.language: str = language
@@ -53,7 +53,7 @@ class VehicleManager:
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
         self.update_all_vehicles_with_cached_state()
-        
+
     def get_vehicle(self, vehicle_id) -> Vehicle:
         return self.vehicles[vehicle_id]
 
@@ -67,7 +67,7 @@ class VehicleManager:
             self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update. 
+        #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
             vehicle: Vehicle = self.get_vehicle(vehicle_id)
@@ -78,7 +78,7 @@ class VehicleManager:
                 started_at_utc - vehicle.last_updated_at
             ).total_seconds() > force_refresh_interval:
                 self.force_refresh_vehicle_state(vehicle)
-            else: 
+            else:
                 self.update_vehicle_with_cached_state(vehicle)
 
     def force_refresh_all_vehicles_states(self) -> None:
@@ -101,13 +101,13 @@ class VehicleManager:
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
-            
+
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
     def lock(self, vehicle_id: str) -> str:
         return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK)
-    
+
     def unlock(self, vehicle_id: str) -> str:
         return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK)
 
