@@ -11,13 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-            
       - name: Gets semantic release info
         id: semantic_release_info
         uses: jossef/action-semantic-release-info@v1
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Update Version and Commit   
+      - name: Update Version and Commit
         if: ${{steps.semantic_release_info.outputs.version != ''}}
         run: |
           echo "Version: ${{steps.semantic_release_info.outputs.version}}"
@@ -61,7 +60,7 @@ jobs:
           user: __token__
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
-      - name: Publish package to PyPi Live        
+      - name: Publish package to PyPi Live
         if: ${{steps.semantic_release_info.outputs.version != ''}}
         uses: pypa/gh-action-pypi-publish@c7f29f7adef1a245bd91520e94867e5c6eedddcc
         with:
