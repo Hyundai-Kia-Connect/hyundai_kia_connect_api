@@ -530,7 +530,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_first_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet")
         vehicle.ev_second_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservChargeSet")
         vehicle.ev_first_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day")
-        vehicle.ev_second_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.day") 
+        vehicle.ev_second_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.day")
         vehicle.ev_first_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time"))
         vehicle.ev_second_departure_time= self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"))
         vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.offpeakPowerInfo.offPeakPowerTime1.starttime.time"))

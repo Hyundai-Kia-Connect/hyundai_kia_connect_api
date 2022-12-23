@@ -82,7 +82,7 @@ class ApiImpl:
         response = requests.get(url)
         response = response.json()
         vehicle.geocode = (get_child_value(response, "display_name"), get_child_value(response, "address"))
-        
+
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
         pass
@@ -114,6 +114,6 @@ class ApiImpl:
         pass
 
     def charge_port_action(self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION) -> str:
-        """Opens or closes the charging port of the car. Returns the tracking ID"""   
+        """Opens or closes the charging port of the car. Returns the tracking ID"""
         pass
 
