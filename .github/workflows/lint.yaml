@@ -20,6 +20,8 @@ jobs:
           - requirements-txt-fixer
           - check-ast
           - mixed-line-ending
+          - trailing-whitespace
+          - check-yaml
     steps:
       - name: Check out repository
         uses: actions/checkout@v3
