@@ -609,6 +609,8 @@ class KiaUvoApiCA(ApiImpl):
 
         response = requests.post(url, headers=headers)
         response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received get_charge_limits: {response}")
+
         return response["result"]
 
     def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
@@ -636,4 +638,3 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
-
