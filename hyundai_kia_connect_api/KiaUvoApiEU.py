@@ -536,28 +536,28 @@ class KiaUvoApiEU(ApiImpl):
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection") == 0:
             ev_first_departure_time = self._get_time_from_string(ev_first_departure_time + " AM")
         elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection") == 1:
-            ev_first_departure_time = self._get_time_from_string(ev_first_departure_time + " PM")           
+            ev_first_departure_time = self._get_time_from_string(ev_first_departure_time + " PM")
         vehicle.ev_first_departure_time = ev_first_departure_time
 
         ev_second_departure_time = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time")
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection") == 0:
             ev_second_departure_time = self._get_time_from_string(ev_first_departure_time + " AM")
         elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection") == 1:
-            ev_second_departure_time = self._get_time_from_string(ev_first_departure_time + " PM")           
+            ev_second_departure_time = self._get_time_from_string(ev_first_departure_time + " PM")
         vehicle.ev_second_departure_time = ev_second_departure_time
 
         ev_off_peak_start_time = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time")
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection") == 0:
             ev_off_peak_start_time = self._get_time_from_string(ev_first_departure_time + " AM")
         elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection") == 1:
-            ev_off_peak_start_time = self._get_time_from_string(ev_first_departure_time + " PM")           
+            ev_off_peak_start_time = self._get_time_from_string(ev_first_departure_time + " PM")
         vehicle.ev_off_peak_start_time = ev_off_peak_start_time
 
         ev_off_peak_end_time = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time")
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection") == 0:
             ev_off_peak_end_time = self._get_time_from_string(ev_first_departure_time + " AM")
         elif get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection") == 1:
-            ev_off_peak_end_time = self._get_time_from_string(ev_first_departure_time + " PM")           
+            ev_off_peak_end_time = self._get_time_from_string(ev_first_departure_time + " PM")
         vehicle.ev_off_peak_end_time = ev_off_peak_end_time
 
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag"):
