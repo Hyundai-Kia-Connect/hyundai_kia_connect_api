@@ -260,7 +260,7 @@ class KiaUvoApiEU(ApiImpl):
         if value is not None:
             lastTwo = int(value[-2:])
             if lastTwo > 60:
-                value = int(value) + 40  
+                value = int(value) + 40
             if int(value) > 1260:
                 value = dt.datetime.strptime(str(value), '%H%M').time()
             else:
