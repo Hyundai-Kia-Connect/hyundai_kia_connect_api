@@ -256,9 +256,19 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def _get_time_from_string(self, value) -> dt.datetime.time:
+    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
-            value = dt.datetime.strptime(value, '%H%M').time()
+            lastTwo = int(value[-2:])
+            if lastTwo > 60:
+                value = int(value) + 40  
+            if int(value) > 1260:
+                value = dt.datetime.strptime(str(value), '%H%M').time()
+            else:
+                if timesection == 0:
+                    value = str(value) + " AM"
+                elif timesection == 1:
+                    value = str(value) + " PM"
+                value = dt.datetime.strptime(value, '%I%M %p').time()
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
