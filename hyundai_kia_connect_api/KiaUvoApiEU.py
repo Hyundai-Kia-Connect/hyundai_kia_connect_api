@@ -540,7 +540,7 @@ class KiaUvoApiEU(ApiImpl):
 
         vehicle.ev_second_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection"))
 
-        vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection"))        
+        vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection"))
 
         vehicle.ev_off_peak_end_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection"))
 
