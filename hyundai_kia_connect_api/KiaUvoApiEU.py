@@ -541,10 +541,15 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_second_departure_enabled = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet")
         vehicle.ev_first_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day")
         vehicle.ev_second_departure_days = get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day")
-        vehicle.ev_first_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time"))
-        vehicle.ev_second_departure_time= self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"))
-        vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time"))
-        vehicle.ev_off_peak_end_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time"))
+
+        vehicle.ev_first_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time"),get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection"))
+
+        vehicle.ev_second_departure_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection"))
+
+        vehicle.ev_off_peak_start_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection"))
+
+        vehicle.ev_off_peak_end_time = self._get_time_from_string(get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time"), get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection"))
+
         if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag"):
             if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag") == 1:
                 vehicle.ev_off_peak_charge_only_enabled = True
