@@ -95,7 +95,7 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token: Token = self.api.login(self.username, self.password)
             self.token.pin = self.pin
-            self.api.refresh_vehicles(self.token, self.vehicles)
+            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         return False
 
