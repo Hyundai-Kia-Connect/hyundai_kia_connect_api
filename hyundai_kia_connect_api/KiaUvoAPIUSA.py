@@ -221,7 +221,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     )
                     vehicles.append(vehicle)
                 return vehicles
-        else: 
+        else:
             #For readability work with vechile without s
             vehicle = vehicles
             for entry in response["payload"]["vehicleSummary"]:
