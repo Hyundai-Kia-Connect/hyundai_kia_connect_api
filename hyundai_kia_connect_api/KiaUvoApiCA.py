@@ -213,6 +213,22 @@ class KiaUvoApiCA(ApiImpl):
 
         vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
         vehicle.engine_is_running = get_child_value(state, "status.engine")
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "status.washerFluidStatus")
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
+            state, "status.tirePressureLamp.tirePressureLampRL"
+        ))
+        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
+            state, "status.tirePressureLamp.tirePressureLampFL"
+        ))
+        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
+            state, "status.tirePressureLamp.tirePressureLampFR"
+        ))
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
+            state, "status.tirePressureLamp.tirePressureLampRR"
+        ))
+        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
+            state, "status.tirePressureLamp.tirePressureLampAll"
+        ))
         vehicle.air_temperature = (
             get_child_value(state, "status.airTemp.value"),
             TEMPERATURE_UNITS[0],
