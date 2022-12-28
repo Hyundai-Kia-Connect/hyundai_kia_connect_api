@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta
 import datetime as dt
 import re
+import typing
 
 import pytz
 import requests
@@ -45,6 +46,7 @@ def request_with_active_session(func):
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
+            vehicle = self.refresh_vehicles(token, vehicle)
             if json_body is not None and json_body.get("vinKey", None):
                 json_body["vinKey"] = [vehicle.key]
             response = func(*args, **kwargs)
@@ -166,7 +168,7 @@ class KiaUvoAPIUSA(ApiImpl):
         session_id = response.headers.get("sid")
         if not session_id:
             raise Exception(
-                f"{DOMAIN} - Mo session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
+                f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
             )
         _LOGGER.debug(f"got session id {session_id}")
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=1)
@@ -196,7 +198,7 @@ class KiaUvoAPIUSA(ApiImpl):
             result.append(vehicle)
         return result
 
-    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def refresh_vehicles(self, token: Token, vehicles: typing.Union[list[Vehicle], Vehicle]) -> typing.Union[list[Vehicle], Vehicle]:
         """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
@@ -204,20 +206,30 @@ class KiaUvoAPIUSA(ApiImpl):
         response = requests.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        for entry in response["payload"]["vehicleSummary"]:
-            if vehicles[entry["vehicleIdentifier"]]:
-                vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
-                vehicles[entry["vehicleIdentifier"]].model=entry["modelName"]
-                vehicles[entry["vehicleIdentifier"]].key=entry["vehicleKey"]
-            else:
-                vehicle: Vehicle = Vehicle(
-                    id=entry["vehicleIdentifier"],
-                    name=entry["nickName"],
-                    model=entry["modelName"],
-                    key=entry["vehicleKey"],
-                )
-                vehicles.append(vehicle)
-
+        if type(vehicles) is list:
+            for entry in response["payload"]["vehicleSummary"]:
+                if vehicles[entry["vehicleIdentifier"]]:
+                    vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
+                    vehicles[entry["vehicleIdentifier"]].model=entry["modelName"]
+                    vehicles[entry["vehicleIdentifier"]].key=entry["vehicleKey"]
+                else:
+                    vehicle: Vehicle = Vehicle(
+                        id=entry["vehicleIdentifier"],
+                        name=entry["nickName"],
+                        model=entry["modelName"],
+                        key=entry["vehicleKey"],
+                    )
+                    vehicles.append(vehicle)
+                return vehicles
+        else:
+            #For readability work with vechile without s
+            vehicle = vehicles
+            for entry in response["payload"]["vehicleSummary"]:
+                if vehicle.id == entry["vehicleIdentifier"]:
+                        vehicle.name=entry["nickName"]
+                        vehicle.model=entry["modelName"]
+                        vehicle.key=entry["vehicleKey"]
+                        return vehicle
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)

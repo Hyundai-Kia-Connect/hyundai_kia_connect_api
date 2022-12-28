@@ -47,7 +47,7 @@ class ApiImpl:
 
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
-        pass
+        return vehicles
 
     def get_last_updated_at(self, value) -> dt.datetime:
         """Convert last updated value of vehicle into into datetime"""
