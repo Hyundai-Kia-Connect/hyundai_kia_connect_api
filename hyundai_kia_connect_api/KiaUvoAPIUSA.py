@@ -205,8 +205,11 @@ class KiaUvoAPIUSA(ApiImpl):
         headers["sid"] = token.access_token
         response = requests.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
+        _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
+
         response = response.json()
-        if type(vehicles) is list:
+        if type(vehicles) is dict:
             for entry in response["payload"]["vehicleSummary"]:
                 if vehicles[entry["vehicleIdentifier"]]:
                     vehicles[entry["vehicleIdentifier"]].name=entry["nickName"]
