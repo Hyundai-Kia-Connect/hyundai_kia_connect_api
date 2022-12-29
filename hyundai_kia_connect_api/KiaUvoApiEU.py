@@ -317,19 +317,6 @@ class KiaUvoApiEU(ApiImpl):
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
-        vehicle.total_driving_range = (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
-                )
-            ],
-        )
-
         #Only update odometer if present.   It isn't present in a force update.  Dec 2022 update also reports 0 when the car is off.  This tries to remediate best we can.  Can be removed once fixed in the cars firmware.
         if get_child_value(state, "odometer.value") is not None:
             if get_child_value(state, "odometer.value") != 0:
@@ -448,19 +435,38 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.ev_charge_port_door_is_open = True
         elif ev_charge_port_door_is_open == 2:
             vehicle.ev_charge_port_door_is_open = False
-
-        vehicle.ev_driving_range = (
-            get_child_value(
+        if get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            ):   
+            vehicle.total_driving_range = (
+                round(float(get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                )), 2),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    )
+                ],
+            )
+        if get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-            ),
-            DISTANCE_UNITS[
-                get_child_value(
+            ):
+            vehicle.ev_driving_range = (
+                round(float(get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
-                )
-            ],
-        )
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                ), 2)),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                    )
+                ],
+            )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
             "m",
