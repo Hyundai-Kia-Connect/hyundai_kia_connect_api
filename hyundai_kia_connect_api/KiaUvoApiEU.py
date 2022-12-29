@@ -438,7 +438,7 @@ class KiaUvoApiEU(ApiImpl):
         if get_child_value(
                 state,
                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            ):   
+            ):
             vehicle.total_driving_range = (
                 round(float(get_child_value(
                     state,
