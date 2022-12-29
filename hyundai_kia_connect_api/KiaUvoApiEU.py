@@ -459,7 +459,7 @@ class KiaUvoApiEU(ApiImpl):
                 round(float(get_child_value(
                     state,
                     "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-                ), 2)),
+                )), 2),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
