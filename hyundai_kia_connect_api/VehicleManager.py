@@ -47,8 +47,7 @@ class VehicleManager:
         self.vehicles: dict = {}
 
     def initialize(self) -> None:
-        self.token: Token = self.api.login(self.username, self.password)
-        self.token.pin = self.pin
+        self.token: Token = self.api.login(username=self.username, password=self.password, pin=self.pin)
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
