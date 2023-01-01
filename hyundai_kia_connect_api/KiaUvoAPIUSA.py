@@ -323,7 +323,7 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryStatus"
         )
         vehicle.ev_battery_is_charging = get_child_value(
-            state, "lastVehicleInfo.vehicleStatus.evStatus.batteryCharge"
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryCharge"
         )
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPlugin"
