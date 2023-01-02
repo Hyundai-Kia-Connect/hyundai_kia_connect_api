@@ -11,5 +11,5 @@ pytz>=2021.3
 Sphinx==6.0.0
 tox==4.1.2
 twine==4.0.2
-watchdog==2.2.0
+watchdog==2.2.1
 wheel==0.38.4
