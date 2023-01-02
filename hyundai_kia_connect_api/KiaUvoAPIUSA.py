@@ -273,6 +273,7 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge"
         )
         vehicle.engine_is_running = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine")
+        
         vehicle.air_temperature = (
             get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value"),
             TEMPERATURE_UNITS[get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit")],
@@ -328,6 +329,15 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPlugin"
         )
+        ChargeDict = get_child_value(
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC"
+        )
+        try:
+            vehicle.ev_charge_limits_ac = [x['targetSOClevel'] for x in ChargeDict if x['plugType'] == 1][-1]
+            vehicle.ev_charge_limits_dc = [x['targetSOClevel'] for x in ChargeDict if x['plugType'] == 0][-1]
+        except:
+            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+
         vehicle.ev_driving_distance = (
             get_child_value(
                 state,
