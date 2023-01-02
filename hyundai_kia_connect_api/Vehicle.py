@@ -36,6 +36,8 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
+    #Not part of the API, enabled in our library for scanning.
+    enabled: bool = True
 
     # Shared (EV/PHEV/HEV/IC)
     ## General
