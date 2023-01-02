@@ -52,7 +52,6 @@ class VehicleManager:
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
-        self.update_all_vehicles_with_cached_state()
 
     def get_vehicle(self, vehicle_id) -> Vehicle:
         return self.vehicles[vehicle_id]
@@ -62,9 +61,12 @@ class VehicleManager:
             self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id))
 
     def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
-        self.api.update_vehicle_with_cached_state(self.token, vehicle)
-        if self.geocode_api_enable == True:
-            self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
+        if vehicle.enabled:
+            self.api.update_vehicle_with_cached_state(self.token, vehicle)
+            if self.geocode_api_enable == True:
+                self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
+        else:
+            _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
         #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
@@ -86,8 +88,10 @@ class VehicleManager:
             self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
 
     def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
-        self.api.force_refresh_vehicle_state(self.token, vehicle)
-
+        if vehicle.enabled:
+            self.api.force_refresh_vehicle_state(self.token, vehicle)
+        else:
+            _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
@@ -128,6 +132,12 @@ class VehicleManager:
 
     def close_charge_port(self, vehicle_id: str) -> str:
         return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
+
+    def disable_vehicle(self, vehicle_id: str) -> None:
+        self.get_vehicle(vehicle_id).enabled = False
+
+    def disable_vehicle(self, vehicle_id: str) -> None:
+        self.get_vehicle(vehicle_id).enabled = False
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int, language: str) -> ApiImpl:
