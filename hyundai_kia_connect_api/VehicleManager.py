@@ -136,8 +136,8 @@ class VehicleManager:
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False
 
-    def disable_vehicle(self, vehicle_id: str) -> None:
-        self.get_vehicle(vehicle_id).enabled = False
+    def enable_vehicle(self, vehicle_id: str) -> None:
+        self.get_vehicle(vehicle_id).enabled = True
 
     @staticmethod
     def get_implementation_by_region_brand(region: int, brand: int, language: str) -> ApiImpl:
