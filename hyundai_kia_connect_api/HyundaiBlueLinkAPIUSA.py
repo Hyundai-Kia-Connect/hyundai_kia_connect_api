@@ -10,7 +10,7 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
-                    VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS,)
+                    VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS, TEMPERATURE_UNITS)
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -206,7 +206,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         if air_temp == "HI":
             air_temp = self.temperature_range[-1]
 
-        vehicle.air_temperature = air_temp
+        vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
