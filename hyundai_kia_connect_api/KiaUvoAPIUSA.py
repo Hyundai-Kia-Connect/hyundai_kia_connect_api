@@ -273,7 +273,7 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge"
         )
         vehicle.engine_is_running = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine")
-        
+
         vehicle.air_temperature = (
             get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value"),
             TEMPERATURE_UNITS[get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit")],
