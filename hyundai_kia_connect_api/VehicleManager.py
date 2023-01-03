@@ -1,7 +1,5 @@
-import asyncio
 import datetime as dt
 import logging
-from dataclasses import dataclass
 
 import pytz
 
@@ -64,13 +62,13 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
-            if self.geocode_api_enable == True:
+            if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
+        # Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
             vehicle = self.get_vehicle(vehicle_id)
@@ -97,6 +95,7 @@ class VehicleManager:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
+
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()

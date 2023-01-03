@@ -2,10 +2,7 @@ import logging
 
 import dataclasses
 import datetime
-import re
 import typing
-
-import pytz
 
 from .const import *
 
@@ -36,11 +33,11 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
-    #Not part of the API, enabled in our library for scanning.
+    # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
     # Shared (EV/PHEV/HEV/IC)
-    ## General
+    # General
     _total_driving_range: float = None
     _total_driving_range_value: float = None
     _total_driving_range_unit: str = None
@@ -51,8 +48,6 @@ class Vehicle:
 
     _geocode_address: str = None
     _geocode_name: str = None
-
-
 
     car_battery_percentage: int = None
     engine_is_running: bool = None
@@ -65,7 +60,7 @@ class Vehicle:
     washer_fluid_warning_is_on: bool = None
     brake_fluid_warning_is_on: bool = None
 
-    ## Climate
+    # Climate
     _air_temperature: float = None
     _air_temperature_value: float = None
     _air_temperature_unit: str = None
@@ -80,7 +75,7 @@ class Vehicle:
     rear_left_seat_status: str = None
     rear_right_seat_status: str = None
 
-    ## Door Status
+    # Door Status
     is_locked: bool = None
     front_left_door_is_open: bool = None
     front_right_door_is_open: bool = None
@@ -328,7 +323,7 @@ class Vehicle:
     @ev_target_range_charge_DC.setter
     def ev_target_range_charge_DC(self, value):
         self._ev_target_range_charge_DC_value = value[0]
-        self._ev_target_range_charge_DC_unit= value[1]
+        self._ev_target_range_charge_DC_unit = value[1]
         self._ev_target_range_charge_DC = value[0]
 
     @property

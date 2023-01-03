@@ -17,7 +17,6 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 
-
 @dataclass
 class ClimateRequestOptions:
     set_temp: float = None
@@ -29,6 +28,7 @@ class ClimateRequestOptions:
     front_right_seat: int = None
     rear_left_seat: int = None
     rear_right_seat: int = None
+
 
 class ApiImpl:
     data_timezone = dt.timezone.utc
@@ -68,7 +68,7 @@ class ApiImpl:
     def update_geocoded_location(self, token: Token, vehicle: Vehicle, use_email: bool) -> None:
 
         email_parameter = ""
-        if use_email == True:
+        if use_email is True:
             email_parameter = "&email=" + token.username
 
         url = (
@@ -109,11 +109,10 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int) -> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
     def charge_port_action(self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION) -> str:
         """Opens or closes the charging port of the car. Returns the tracking ID"""
         pass
-
