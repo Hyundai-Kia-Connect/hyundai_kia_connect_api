@@ -53,14 +53,15 @@ class VehicleManager:
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
 
-    def get_vehicle(self, vehicle_id) -> Vehicle:
+    def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
 
     def update_all_vehicles_with_cached_state(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id))
+            self.update_vehicle_with_cached_state(vehicle_id)
 
-    def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
+    def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
+        vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable == True:
@@ -87,7 +88,8 @@ class VehicleManager:
         for vehicle_id in self.vehicles.keys():
             self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
 
-    def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
+    def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
+        vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
