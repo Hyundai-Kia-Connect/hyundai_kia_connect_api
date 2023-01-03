@@ -20,6 +20,7 @@ CIPHERS = "DEFAULT@SECLEVEL=1"
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class cipherAdapter(HTTPAdapter):
     """
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
@@ -34,6 +35,7 @@ class cipherAdapter(HTTPAdapter):
         context = create_urllib3_context(ciphers=CIPHERS)
         kwargs["ssl_context"] = context
         return super().proxy_manager_for(*args, **kwargs)
+
 
 class HyundaiBlueLinkAPIUSA(ApiImpl):
 
@@ -88,7 +90,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def login(self, username: str, password: str) -> Token:
 
-        ### Sign In with Email and Password and Get Authorization Code ###
+        # Sign In with Email and Password and Get Authorization Code
 
         url = self.LOGIN_API + "oauth/token"
 
@@ -363,7 +365,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
             )
 
-
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self.API_HEADERS
@@ -398,7 +399,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             entry = entry["vehicleDetails"]
             if entry["regid"] == vehicle.id:
                 return entry
-
 
     def get_pin_token(self, token: Token):
         pass
@@ -461,7 +461,14 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             options.heating = 0
         if options.defrost is None:
             options.defrost = False
-
+        if options.front_left_seat is None:
+            options.front_left_seat = 0
+        if options.front_right_seat is None:
+            options.front_right_seat = 0
+        if options.rear_left_seat is None:
+            options.rear_left_seat = 0
+        if options.rear_right_seat is None:
+            options.rear_right_seat = 0
 
         data = {
             "Ims": 0,
@@ -470,6 +477,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "defrost": options.defrost,
             "heating1": int(options.heating),
             "igniOnDuration": options.duration,
+            "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
             # "seatHeaterVentInfo": None,
             "username": token.username,
             "vin": vehicle.id,
