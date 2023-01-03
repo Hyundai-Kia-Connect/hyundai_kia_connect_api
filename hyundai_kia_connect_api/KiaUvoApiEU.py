@@ -79,7 +79,7 @@ def _check_response_for_errors(response: dict) -> None:
         "4081": RequestTimeoutError,
         "5031": APIError,
         "5091": RateLimitingError,
-        "5921": None
+        "5921": NoDataFound,
     }
 
     if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
@@ -88,10 +88,7 @@ def _check_response_for_errors(response: dict) -> None:
 
     if response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
-            if response["resCode"] == "5921":
-                _LOGGER.error(f"{DOMAIN} - No Data Found, car may be offline")
-            else:
-                raise error_code_mapping[response["resCode"]](response["resMsg"])
+            raise error_code_mapping[response["resCode"]](response["resMsg"])
         else:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
