@@ -46,7 +46,8 @@ class ApiImpl:
         pass
 
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
-        """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
+        """Refresh the vehicle data provided in get_vehicles.
+        Required for Kia USA as key is session specific"""
         return vehicles
 
     def get_last_updated_at(self, value) -> dt.datetime:
@@ -58,7 +59,8 @@ class ApiImpl:
         pass
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
-        """Check if a previous placed call was successful. Returns true if complete. False if not.  Does not confirm if successful only confirms if complete"""
+        """Check if a previous placed call was successful. Returns true if complete.
+        False if not.  Does not confirm if successful only confirms if complete"""
         pass
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
