@@ -14,7 +14,7 @@ repos:
         stages: [manual]
         args:
           - --safe
-        files: ^((custom_components|script|tests)/.+)?[^/]+\.py$
+        files: ^((hyundai_kia_connect_api|script|tests)/.+)?[^/]+\.py$
 
   - repo: https://github.com/codespell-project/codespell
     rev: v1.17.1
