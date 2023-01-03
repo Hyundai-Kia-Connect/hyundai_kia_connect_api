@@ -27,7 +27,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VehicleManager:
-    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable: bool = False, geocode_api_use_email: bool = False, language: str = "en"):
+    def __init__(
+        self,
+        region: int,
+        brand: int,
+        username: str,
+        password: str,
+        pin: str,
+        geocode_api_enable: bool = False,
+        geocode_api_use_email: bool = False,
+        language: str = "en",
+    ):
         self.region: int = region
         self.brand: int = brand
         self.username: str = username
@@ -63,7 +73,9 @@ class VehicleManager:
         if vehicle.enabled:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
-                self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
+                self.api.update_geocoded_location(
+                    self.token, vehicle, self.geocode_api_use_email
+                )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
@@ -114,10 +126,14 @@ class VehicleManager:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
     def lock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK)
+        return self.api.lock_action(
+            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
+        )
 
     def unlock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK)
+        return self.api.lock_action(
+            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK
+        )
 
     def start_charge(self, vehicle_id: str) -> str:
         return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
@@ -126,16 +142,24 @@ class VehicleManager:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
-        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac, dc)
+        return self.api.set_charge_limits(
+            self.token, self.get_vehicle(vehicle_id), ac, dc
+        )
 
     def check_action_status(self, vehicle_id: str, action_id: str):
-        return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
+        return self.api.check_action_status(
+            self.token, self.get_vehicle(vehicle_id), action_id
+        )
 
     def open_charge_port(self, vehicle_id: str) -> str:
-        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN)
+        return self.api.charge_port_action(
+            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN
+        )
 
     def close_charge_port(self, vehicle_id: str) -> str:
-        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
+        return self.api.charge_port_action(
+            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE
+        )
 
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False
@@ -144,7 +168,9 @@ class VehicleManager:
         self.get_vehicle(vehicle_id).enabled = True
 
     @staticmethod
-    def get_implementation_by_region_brand(region: int, brand: int, language: str) -> ApiImpl:
+    def get_implementation_by_region_brand(
+        region: int, brand: int, language: str
+    ) -> ApiImpl:
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
