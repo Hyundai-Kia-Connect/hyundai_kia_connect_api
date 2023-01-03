@@ -9,8 +9,15 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
-from .const import (BRAND_HYUNDAI, BRANDS, DOMAIN,
-                    VEHICLE_LOCK_ACTION, SEAT_STATUS, DISTANCE_UNITS, TEMPERATURE_UNITS)
+from .const import (
+    BRAND_HYUNDAI,
+    BRANDS,
+    DOMAIN,
+    VEHICLE_LOCK_ACTION,
+    SEAT_STATUS,
+    DISTANCE_UNITS,
+    TEMPERATURE_UNITS,
+)
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -42,12 +49,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
 
-    def __init__(
-        self,
-        region: int,
-        brand: int,
-        language: str
-    ):
+    def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
@@ -146,7 +148,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle_status["vehicleDetails"] = self._get_vehicle(token, vehicle)
 
         if vehicle.odometer:
-            if vehicle.odometer < get_child_value(vehicle_status["vehicleDetails"], "odometer"):
+            if vehicle.odometer < get_child_value(
+                vehicle_status["vehicleDetails"], "odometer"
+            ):
                 vehicle_status["vehicleLocation"] = self.get_location(token, vehicle)
             else:
                 vehicle_status["vehicleLocation"] = None
@@ -195,8 +199,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             state, "vehicleStatus.battery.batSoc"
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
-        vehicle.washer_fluid_warning_is_on = get_child_value(state, "vehicleStatus.washerFluidStatus")
-        vehicle.smart_key_battery_warning_is_on = get_child_value(state, "vehicleStatus.smartKeyBatteryWarning")
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "vehicleStatus.washerFluidStatus"
+        )
+        vehicle.smart_key_battery_warning_is_on = get_child_value(
+            state, "vehicleStatus.smartKeyBatteryWarning"
+        )
 
         air_temp = (
             get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
@@ -219,34 +227,45 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "vehicleStatus.sideMirrorHeat"
         )
-        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.flSeatHeatState"
-        )]
-        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.frSeatHeatState"
-        )]
-        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState"
-        )]
-        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState"
-        )]
-        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
-            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
-        ))
-        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
-            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontLeft"
-        ))
-        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
-            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontRight"
-        ))
-        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
-            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
-        ))
-        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
-            state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
-        ))
-        vehicle.is_locked = (get_child_value(state, "vehicleStatus.doorLock"))
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "vehicleStatus.seatHeaterVentState.flSeatHeatState")
+        ]
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "vehicleStatus.seatHeaterVentState.frSeatHeatState")
+        ]
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState")
+        ]
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
+        ]
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(
+                state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
+            )
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(
+                state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontLeft"
+            )
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(
+                state,
+                "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontRight",
+            )
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(
+                state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
+            )
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(
+                state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
+            )
+        )
+        vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
         )
@@ -321,7 +340,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
             get_child_value(state, "vehicleStatus.vehicleLocation.time"),
-
         )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
@@ -477,7 +495,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "defrost": options.defrost,
             "heating1": int(options.heating),
             "igniOnDuration": options.duration,
-            "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
+            "seatHeaterVentCMD": {
+                "drvSeatOptCmd": options.front_left_seat,
+                "astSeatOptCmd": options.front_right_seat,
+                "rlSeatOptCmd": options.rear_left_seat,
+                "rrSeatOptCmd": options.rear_right_seat,
+            },
             # "seatHeaterVentInfo": None,
             "username": token.username,
             "vin": vehicle.id,
