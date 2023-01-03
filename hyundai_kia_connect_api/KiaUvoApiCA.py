@@ -37,7 +37,7 @@ class KiaUvoApiCA(ApiImpl):
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
     temperature_range_model_year = 2020
 
-    def __init__(self, region: int, brand: int,  language: str) -> None:
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.LANGUAGE: str = language
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "www.kiaconnect.ca"
@@ -98,11 +98,11 @@ class KiaUvoApiCA(ApiImpl):
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
-            if (entry["fuelKindCode"] == "G"):
+            if entry["fuelKindCode"] == "G":
                 entry_engine_type = ENGINE_TYPES.ICE
-            elif (entry["fuelKindCode"] == "E"):
+            elif entry["fuelKindCode"] == "E":
                 entry_engine_type = ENGINE_TYPES.EV
-            elif (entry["fuelKindCode"] == "P"):
+            elif entry["fuelKindCode"] == "P":
                 entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
@@ -112,7 +112,7 @@ class KiaUvoApiCA(ApiImpl):
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
-                dtc_count=entry["dtcCount"]
+                dtc_count=entry["dtcCount"],
             )
             result.append(vehicle)
         return result
@@ -144,20 +144,15 @@ class KiaUvoApiCA(ApiImpl):
 
         # Calculate offset between vehicle last_updated_at and UTC
         last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate"),
-            vehicle
+            get_child_value(state, "status.lastStatusDate"), vehicle
         )
         now_utc: dt = dt.datetime.now(pytz.utc)
-        offset = round((last_updated_at - now_utc).total_seconds()/3600)
-        _LOGGER.debug(
-            f"{DOMAIN} - Offset between vehicle and UTC: {offset} hours"
-        )
+        offset = round((last_updated_at - now_utc).total_seconds() / 3600)
+        _LOGGER.debug(f"{DOMAIN} - Offset between vehicle and UTC: {offset} hours")
         if offset != 0:
             # Set our timezone to account for the offset
-            vehicle.timezone = tzoffset("VEHICLETIME", offset*3600)
-            _LOGGER.debug(
-                f"{DOMAIN} - Set vehicle.timezone to UTC + {offset} hours"
-            )
+            vehicle.timezone = tzoffset("VEHICLETIME", offset * 3600)
+            _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to UTC + {offset} hours")
 
         self._update_vehicle_properties_base(vehicle, state)
 
@@ -183,18 +178,25 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate"),
-            vehicle
+            get_child_value(state, "status.lastStatusDate"), vehicle
         )
-        _LOGGER.debug(f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}"
+        )
         # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
-        tempIndex = get_hex_temp_into_index(get_child_value(state, "status.airTemp.value"))
+        tempIndex = get_hex_temp_into_index(
+            get_child_value(state, "status.airTemp.value")
+        )
         if get_child_value(state, "status.airTemp.unit") == 0:
             if vehicle.year >= self.temperature_range_model_year:
-                state["status"]["airTemp"]["value"] = self.temperature_range_c_new[tempIndex]
+                state["status"]["airTemp"]["value"] = self.temperature_range_c_new[
+                    tempIndex
+                ]
 
             else:
-                state["status"]["airTemp"]["value"] = self.temperature_range_c_old[tempIndex]
+                state["status"]["airTemp"]["value"] = self.temperature_range_c_old[
+                    tempIndex
+                ]
 
         vehicle.total_driving_range = (
             get_child_value(
@@ -211,22 +213,24 @@ class KiaUvoApiCA(ApiImpl):
 
         vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
         vehicle.engine_is_running = get_child_value(state, "status.engine")
-        vehicle.washer_fluid_warning_is_on = get_child_value(state, "status.washerFluidStatus")
-        vehicle.tire_pressure_rear_left_warning_is_on = bool(get_child_value(
-            state, "status.tirePressureLamp.tirePressureLampRL"
-        ))
-        vehicle.tire_pressure_front_left_warning_is_on = bool(get_child_value(
-            state, "status.tirePressureLamp.tirePressureLampFL"
-        ))
-        vehicle.tire_pressure_front_right_warning_is_on = bool(get_child_value(
-            state, "status.tirePressureLamp.tirePressureLampFR"
-        ))
-        vehicle.tire_pressure_rear_right_warning_is_on = bool(get_child_value(
-            state, "status.tirePressureLamp.tirePressureLampRR"
-        ))
-        vehicle.tire_pressure_all_warning_is_on = bool(get_child_value(
-            state, "status.tirePressureLamp.tirePressureLampAll"
-        ))
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "status.washerFluidStatus"
+        )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRL")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFL")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFR")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRR")
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampAll")
+        )
         vehicle.air_temperature = (
             get_child_value(state, "status.airTemp.value"),
             TEMPERATURE_UNITS[0],
@@ -241,18 +245,18 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "status.sideMirrorHeat"
         )
-        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "status.seatHeaterVentState.flSeatHeatState"
-        )]
-        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "status.seatHeaterVentState.frSeatHeatState"
-        )]
-        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "status.seatHeaterVentState.rlSeatHeatState"
-        )]
-        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "status.seatHeaterVentState.rrSeatHeatState"
-        )]
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "status.seatHeaterVentState.flSeatHeatState")
+        ]
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "status.seatHeaterVentState.frSeatHeatState")
+        ]
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "status.seatHeaterVentState.rlSeatHeatState")
+        ]
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
+        ]
         vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "status.doorOpen.frontLeft"
@@ -336,14 +340,15 @@ class KiaUvoApiCA(ApiImpl):
 
         vehicle.data["service"] = state
 
-    def _update_vehicle_properties_location(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_location(
+        self, vehicle: Vehicle, state: dict
+    ) -> None:
 
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
                 get_child_value(state, "time"),
-
             )
         vehicle.data["vehicleLocation"] = state
 
@@ -557,7 +562,9 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
         return response_headers["transactionId"]
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
+    def check_last_action_status(
+        self, token: Token, vehicle: Vehicle, action_id: str
+    ) -> bool:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -611,8 +618,12 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
         try:
-            vehicle.ev_charge_limits_ac = [x['level'] for x in state if x['plugType'] == 1][-1]
-            vehicle.ev_charge_limits_dc = [x['level'] for x in state if x['plugType'] == 0][-1]
+            vehicle.ev_charge_limits_ac = [
+                x["level"] for x in state if x["plugType"] == 1
+            ][-1]
+            vehicle.ev_charge_limits_dc = [
+                x["level"] for x in state if x["plugType"] == 0
+            ][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
@@ -628,7 +639,9 @@ class KiaUvoApiCA(ApiImpl):
 
         return response["result"]
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int) -> str:
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -636,14 +649,16 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
 
         payload = {
-            "tsoc": [{
-                "plugType": 0,
-                "level": dc,
+            "tsoc": [
+                {
+                    "plugType": 0,
+                    "level": dc,
                 },
                 {
-                "plugType": 1,
-                "level": ac,
-                }],
+                    "plugType": 1,
+                    "level": ac,
+                },
+            ],
             "pin": token.pin,
         }
 
