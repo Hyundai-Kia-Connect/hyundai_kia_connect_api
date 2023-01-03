@@ -84,7 +84,7 @@ class VehicleManager:
                     self.force_refresh_vehicle_state(vehicle)
                 else:
                     self.update_vehicle_with_cached_state(vehicle_id)
-            else: 
+            else:
                 self.update_vehicle_with_cached_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
