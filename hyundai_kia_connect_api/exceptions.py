@@ -30,6 +30,14 @@ class RateLimitingError(APIError):
     pass
 
 
+class NoDataFound(APIError):
+    """
+    Raised when the API doesn't have data for that car. Disabling the car is the solution.
+    """
+
+    pass
+
+
 class DuplicateRequestError(APIError):
     """
     Raised when (supposedly) a previous request is already queued server-side and the server temporarily rejects
