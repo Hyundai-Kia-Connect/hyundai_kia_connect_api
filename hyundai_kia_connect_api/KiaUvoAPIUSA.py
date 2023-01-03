@@ -548,11 +548,11 @@ class KiaUvoAPIUSA(ApiImpl):
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": int(dc),
+                    "targetSOClevel": dc,
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": int(ac),
+                    "targetSOClevel": ac,
                 },
             ]
         }
