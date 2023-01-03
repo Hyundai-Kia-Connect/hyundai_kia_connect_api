@@ -16,5 +16,5 @@ def test_CA_login():
         geocode_api_enable=True,
     )
     vm.check_and_refresh_token()
-    vm.update_all_vehicles_with_cached_state()
+    vm.check_and_force_update_vehicles(force_refresh_interval=600)
     assert len(vm.vehicles.keys()) > 0
