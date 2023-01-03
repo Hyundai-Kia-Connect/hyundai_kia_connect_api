@@ -27,7 +27,7 @@ Once this is done you can now make the following calls against the vehicle manag
  #Checks the token is still valid and updates it if not.  Should be called before anything else.
  check_and_refresh_token(self)
 
- #Ideal fresh command. Checks if the car has been updated since the time in seconds provided.  If so does a cached update. If not force calls the car.
+ #Ideal refresh command. Checks if the car has been updated since the time in seconds provided.  If so does a cached update. If not force calls the car.
  check_and_force_update_vehicles(self, force_refresh_interval) # Interval in seconds - consider API Rate Limits https://github.com/Hacksore/bluelinky/wiki/API-Rate-Limits
 
  #Used to return a specific vehicle object:
