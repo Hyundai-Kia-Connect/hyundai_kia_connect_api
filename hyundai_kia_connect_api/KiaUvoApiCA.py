@@ -98,11 +98,11 @@ class KiaUvoApiCA(ApiImpl):
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
-            if(entry["fuelKindCode"] == "G"):
+            if (entry["fuelKindCode"] == "G"):
                 entry_engine_type = ENGINE_TYPES.ICE
-            elif(entry["fuelKindCode"] == "E"):
+            elif (entry["fuelKindCode"] == "E"):
                 entry_engine_type = ENGINE_TYPES.EV
-            elif(entry["fuelKindCode"] == "P"):
+            elif (entry["fuelKindCode"] == "P"):
                 entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
@@ -124,21 +124,20 @@ class KiaUvoApiCA(ApiImpl):
         # Service Status Call
         service = self._get_next_service(token, vehicle)
 
-        #Get location if the car has moved since last call
+        # Get location if the car has moved since last call
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-                location = self.get_location(token, vehicle)
-                self._update_vehicle_properties_location(vehicle, location)
+            location = self.get_location(token, vehicle)
+            self._update_vehicle_properties_location(vehicle, location)
 
-        #Update service after the fact so we still have the old odometer reading available for above.
+        # Update service after the fact so we still have the old odometer reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
-
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -165,22 +164,21 @@ class KiaUvoApiCA(ApiImpl):
         # Service Status Call
         service = self._get_next_service(token, vehicle)
 
-        #Get location if the car has moved since last call
+        # Get location if the car has moved since last call
         if vehicle.odometer:
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-                location = self.get_location(token, vehicle)
-                self._update_vehicle_properties_location(vehicle, location)
+            location = self.get_location(token, vehicle)
+            self._update_vehicle_properties_location(vehicle, location)
 
-        #Update service after the fact so we still have the old odometer reading available for above.
+        # Update service after the fact so we still have the old odometer reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
-
 
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
@@ -348,7 +346,6 @@ class KiaUvoApiCA(ApiImpl):
 
             )
         vehicle.data["vehicleLocation"] = state
-
 
     def get_last_updated_at(self, value, vehicle) -> dt.datetime:
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
@@ -520,7 +517,7 @@ class KiaUvoApiCA(ApiImpl):
                 "pin": token.pin,
             }
         else:
-              payload = {
+            payload = {
                 "setting": {
                     "airCtrl": int(options.climate),
                     "defrost": options.defrost,
@@ -528,10 +525,10 @@ class KiaUvoApiCA(ApiImpl):
                     "igniOnDuration": options.duration,
                     "ims": 0,
                     "airTemp": {"value": hex_set_temp, "unit": 0, "hvacTempType": 0},
-                    "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
+                    "seatHeaterVentCMD": {"drvSeatOptCmd": options.front_left_seat, "astSeatOptCmd": options.front_right_seat, "rlSeatOptCmd": options.rear_left_seat, "rrSeatOptCmd": options.rear_right_seat},
                 },
                 "pin": token.pin,
-              }
+            }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
 
         response = requests.post(url, headers=headers, data=json.dumps(payload))
@@ -585,7 +582,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge headers {headers}")
-        data=json.dumps({"pin": token.pin})
+        data = json.dumps({"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -631,7 +628,7 @@ class KiaUvoApiCA(ApiImpl):
 
         return response["result"]
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int)-> str:
+    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int) -> str:
         url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token

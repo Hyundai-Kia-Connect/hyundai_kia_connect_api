@@ -477,7 +477,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "defrost": options.defrost,
             "heating1": int(options.heating),
             "igniOnDuration": options.duration,
-            "seatHeaterVentCMD":{"drvSeatOptCmd":options.front_left_seat, "astSeatOptCmd":options.front_right_seat, "rlSeatOptCmd":options.rear_left_seat, "rrSeatOptCmd":options.rear_right_seat},
+            "seatHeaterVentCMD": {"drvSeatOptCmd": options.front_left_seat, "astSeatOptCmd": options.front_right_seat, "rlSeatOptCmd": options.rear_left_seat, "rrSeatOptCmd": options.rear_right_seat},
             # "seatHeaterVentInfo": None,
             "username": token.username,
             "vin": vehicle.id,
