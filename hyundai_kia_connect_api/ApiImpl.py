@@ -58,7 +58,9 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
+    def check_last_action_status(
+        self, token: Token, vehicle: Vehicle, action_id: str
+    ) -> bool:
         """Check if a previous placed call was successful. Returns true if complete.
         False if not.  Does not confirm if successful only confirms if complete"""
         pass
@@ -67,7 +69,9 @@ class ApiImpl:
         """Triggers the system to contact the car and get fresh data"""
         pass
 
-    def update_geocoded_location(self, token: Token, vehicle: Vehicle, use_email: bool) -> None:
+    def update_geocoded_location(
+        self, token: Token, vehicle: Vehicle, use_email: bool
+    ) -> None:
 
         email_parameter = ""
         if use_email is True:
@@ -83,17 +87,17 @@ class ApiImpl:
         )
         response = requests.get(url)
         response = response.json()
-        vehicle.geocode = (get_child_value(response, "display_name"), get_child_value(response, "address"))
+        vehicle.geocode = (
+            get_child_value(response, "display_name"),
+            get_child_value(response, "address"),
+        )
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
         pass
 
     def start_climate(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        options: ClimateRequestOptions
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         """Starts climate or remote start.  Returns the tracking ID"""
 
@@ -111,10 +115,14 @@ class ApiImpl:
         """Stops charge. Returns the tracking ID"""
         pass
 
-    def set_charge_limits(self, token: Token, vehicle: Vehicle, ac: int, dc: int) -> str:
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
-    def charge_port_action(self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION) -> str:
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
         """Opens or closes the charging port of the car. Returns the tracking ID"""
         pass
