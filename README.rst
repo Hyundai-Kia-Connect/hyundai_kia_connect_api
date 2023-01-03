@@ -24,7 +24,7 @@ Key values for the int exist in the constant(https://github.com/fuatakgun/hyunda
 
 Once this is done you can now make the following calls against the vehicle manager::
 
- #Checks the token is still valid and updates it if not.  Should be called before anything else.
+ #Checks the token is still valid and updates it if not.  Should be called before anything else if the code has been running for any length of time. 
  check_and_refresh_token(self)
 
  #Ideal refresh command. Checks if the car has been updated since the time in seconds provided.  If so does a cached update. If not force calls the car.
