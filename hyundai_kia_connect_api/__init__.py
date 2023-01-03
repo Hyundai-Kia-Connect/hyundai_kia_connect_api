@@ -8,4 +8,4 @@ from .KiaUvoAPIUSA import KiaUvoAPIUSA
 
 from .Token import Token
 from .Vehicle import Vehicle
-from .VehicleManager import VehicleManager 
+from .VehicleManager import VehicleManager
