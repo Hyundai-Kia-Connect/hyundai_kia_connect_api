@@ -10,6 +10,7 @@ def get_child_value(data, key):
                 value = None
     return value
 
+
 def get_hex_temp_into_index(value):
     if value is not None:
         value = value.replace("H", "")
@@ -17,6 +18,7 @@ def get_hex_temp_into_index(value):
         return value
     else:
         return None
+
 
 def get_index_into_hex_temp(value):
     if value is not None:
