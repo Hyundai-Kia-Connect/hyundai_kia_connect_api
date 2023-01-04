@@ -540,7 +540,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:       
+    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         url = self.API_URL + "control/charge"
 
         headers = self.API_HEADERS
@@ -554,9 +554,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - Start charge response status code: {response.status_code}"
         )
-        _LOGGER.debug(f"{DOMAIN} - Start Charge response: {response.text}")      
+        _LOGGER.debug(f"{DOMAIN} - Start Charge response: {response.text}")
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:       
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
         url = self.API_URL + "control/charge"
 
         headers = self.API_HEADERS
@@ -571,7 +571,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             f"{DOMAIN} - Stop charge response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
-        
+
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
