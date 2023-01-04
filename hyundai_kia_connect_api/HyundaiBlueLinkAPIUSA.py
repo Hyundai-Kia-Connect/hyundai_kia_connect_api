@@ -51,6 +51,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
+        self.API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/vehicles/"
         self.temperature_range = range(62, 82)
 
         ts = time.time()
@@ -539,9 +540,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
-        """
-        url = self.API_URL + ""
+    def start_charge(self, token: Token, vehicle: Vehicle) -> None:       
+        url = self.API_URL + "control/charge"
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -554,13 +554,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - Start charge response status code: {response.status_code}"
         )
-        _LOGGER.debug(f"{DOMAIN} - Start Charge response: {response.text}")
-        """
-        pass
+        _LOGGER.debug(f"{DOMAIN} - Start Charge response: {response.text}")      
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
-        """
-        url = self.API_URL + ""
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:       
+        url = self.API_URL + "control/charge"
 
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -574,9 +571,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             f"{DOMAIN} - Stop charge response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
-        """
-        pass
-
+        
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
