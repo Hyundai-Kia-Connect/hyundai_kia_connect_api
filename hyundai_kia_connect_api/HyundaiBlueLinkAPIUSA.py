@@ -3,15 +3,12 @@ import time
 import pytz
 import datetime as dt
 import re
-from urllib.parse import parse_qs, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (
-    BRAND_HYUNDAI,
-    BRANDS,
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
@@ -119,6 +116,15 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             valid_until=valid_until,
         )
 
+    def _get_authenticated_headers(self, token: Token, vehicle: Vehicle) -> dict:
+        # Not used or tested yet.  Start of moving these out of each call.
+        return {
+            "accessToken": token.access_token,
+            "vin": vehicle.VIN,
+            "username": token.username,
+            "blueLinkServicePin": token.pin
+        }
+
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
@@ -160,6 +166,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties_base(vehicle, state)
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        self.update_vehicle_with_cached_state(token, vehicle)
+
+    def _update_vehicle_properties_base(self, vehicle: Vehicle, state) -> None:
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.dateTime")
         )
@@ -418,10 +430,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             if entry["regid"] == vehicle.id:
                 return entry
 
-    def get_pin_token(self, token: Token):
-        pass
-
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         pass
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
@@ -457,7 +466,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        _LOGGER.debug(f"{DOMAIN} - Start engine..")
+        _LOGGER.debug(f"{DOMAIN} - Start engine.")
 
         url = self.API_URL + "rcs/rsc/start"
 
@@ -524,8 +533,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers["username"] = token.username
         headers["blueLinkServicePin"] = token.pin
 
-        _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
-
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(
             f"{DOMAIN} - Stop engine response status code: {response.status_code}"
@@ -533,9 +540,79 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+        """
+        url = self.API_URL + ""
+
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vin"] = vehicle.VIN
+        headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Start charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Start Charge response: {response.text}")
+        """
         pass
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+        """
+        url = self.API_URL + ""
+
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vin"] = vehicle.VIN
+        headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Stop charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
+        """
+        pass
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        """
+        url = self.API_URL + ""
+
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vin"] = vehicle.VIN
+        headers["registrationId"] = vehicle.id
+        headers["username"] = token.username
+        headers["blueLinkServicePin"] = token.pin
+
+        data = {
+            "targetSOCData":
+                {
+                    "targetSOClist": [
+                        {
+                            "plugType": 0,
+                            "targetSOClevel": dc,
+                        },
+                        {
+                            "plugType": 1,
+                            "targetSOClevel": ac,
+                        },
+                    ],
+                    "pin": token.pin,
+                }
+        }
+
+        response = self.sessions.post(url, json=data, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Stop charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
+        """
         pass
 
     def get_last_updated_at(self, value) -> dt.datetime:

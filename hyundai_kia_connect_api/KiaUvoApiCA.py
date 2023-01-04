@@ -18,8 +18,6 @@ from .const import (
     SEAT_STATUS,
     ENGINE_TYPES,
     VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
-    ENGINE_TYPES,
 )
 from .Token import Token
 from .utils import (
