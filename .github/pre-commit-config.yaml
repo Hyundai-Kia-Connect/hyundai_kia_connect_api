@@ -8,13 +8,13 @@ repos:
           - "--py38-plus"
 
   - repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: stable
     hooks:
       - id: black
         stages: [manual]
+        language: python
         args:
           - --safe
-        files: ^((custom_components|script|tests)/.+)?[^/]+\.py$
 
   - repo: https://github.com/codespell-project/codespell
     rev: v1.17.1

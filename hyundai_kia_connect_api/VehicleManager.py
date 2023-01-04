@@ -1,7 +1,5 @@
-import asyncio
 import datetime as dt
 import logging
-from dataclasses import dataclass
 
 import pytz
 
@@ -29,7 +27,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class VehicleManager:
-    def __init__(self, region: int, brand: int, username: str, password: str, pin: str, geocode_api_enable: bool = False, geocode_api_use_email: bool = False, language: str = "en"):
+    def __init__(
+        self,
+        region: int,
+        brand: int,
+        username: str,
+        password: str,
+        pin: str,
+        geocode_api_enable: bool = False,
+        geocode_api_use_email: bool = False,
+        language: str = "en",
+    ):
         self.region: int = region
         self.brand: int = brand
         self.username: str = username
@@ -53,45 +61,53 @@ class VehicleManager:
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
 
-    def get_vehicle(self, vehicle_id) -> Vehicle:
+    def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
 
     def update_all_vehicles_with_cached_state(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.update_vehicle_with_cached_state(self.get_vehicle(vehicle_id))
+            self.update_vehicle_with_cached_state(vehicle_id)
 
-    def update_vehicle_with_cached_state(self, vehicle: Vehicle) -> None:
+    def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
+        vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
-            if self.geocode_api_enable == True:
-                self.api.update_geocoded_location(self.token, vehicle, self.geocode_api_use_email)
+            if self.geocode_api_enable is True:
+                self.api.update_geocoded_location(
+                    self.token, vehicle, self.geocode_api_use_email
+                )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        #Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
+        # Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
-            vehicle: Vehicle = self.get_vehicle(vehicle_id)
-            _LOGGER.debug(
-                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
-            )
-            if (
-                started_at_utc - vehicle.last_updated_at
-            ).total_seconds() > force_refresh_interval:
-                self.force_refresh_vehicle_state(vehicle)
+            vehicle = self.get_vehicle(vehicle_id)
+            if vehicle.last_updated_at is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
+                )
+                if (
+                    started_at_utc - vehicle.last_updated_at
+                ).total_seconds() > force_refresh_interval:
+                    self.force_refresh_vehicle_state(vehicle_id)
+                else:
+                    self.update_vehicle_with_cached_state(vehicle_id)
             else:
-                self.update_vehicle_with_cached_state(vehicle)
+                self.update_vehicle_with_cached_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
             self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
 
-    def force_refresh_vehicle_state(self, vehicle: Vehicle) -> None:
+    def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
+        vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
+
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
@@ -110,10 +126,14 @@ class VehicleManager:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
     def lock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK)
+        return self.api.lock_action(
+            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
+        )
 
     def unlock(self, vehicle_id: str) -> str:
-        return self.api.lock_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK)
+        return self.api.lock_action(
+            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK
+        )
 
     def start_charge(self, vehicle_id: str) -> str:
         return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
@@ -122,18 +142,24 @@ class VehicleManager:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
-        ac = int(float(ac))
-        dc = int(float(dc))
-        return self.api.set_charge_limits(self.token, self.get_vehicle(vehicle_id), ac, dc)
+        return self.api.set_charge_limits(
+            self.token, self.get_vehicle(vehicle_id), ac, dc
+        )
 
     def check_action_status(self, vehicle_id: str, action_id: str):
-        return self.api.check_action_status(self.token, self.get_vehicle(vehicle_id), action_id)
+        return self.api.check_action_status(
+            self.token, self.get_vehicle(vehicle_id), action_id
+        )
 
     def open_charge_port(self, vehicle_id: str) -> str:
-        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN)
+        return self.api.charge_port_action(
+            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN
+        )
 
     def close_charge_port(self, vehicle_id: str) -> str:
-        return self.api.charge_port_action(self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE)
+        return self.api.charge_port_action(
+            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE
+        )
 
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False
@@ -142,7 +168,9 @@ class VehicleManager:
         self.get_vehicle(vehicle_id).enabled = True
 
     @staticmethod
-    def get_implementation_by_region_brand(region: int, brand: int, language: str) -> ApiImpl:
+    def get_implementation_by_region_brand(
+        region: int, brand: int, language: str
+    ) -> ApiImpl:
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
