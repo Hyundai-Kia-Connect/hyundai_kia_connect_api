@@ -123,7 +123,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "accessToken": token.access_token,
             "vin": vehicle.VIN,
             "username": token.username,
-            "blueLinkServicePin": token.pin
+            "blueLinkServicePin": token.pin,
         }
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
