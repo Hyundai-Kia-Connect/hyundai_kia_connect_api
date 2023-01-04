@@ -230,6 +230,15 @@ class Vehicle:
     def location(self):
         return self._location_longitude, self._location_latitude
 
+    @property
+    def location_last_updated_at(self):
+        """
+        return last location datetime.
+        last_updated_at and location_last_updated_at can be different.
+        The newest of those 2 can be computed by the caller.
+        """
+        return self._location_last_set_time
+
     @location.setter
     def location(self, value):
         self._location_latitude = value[0]
