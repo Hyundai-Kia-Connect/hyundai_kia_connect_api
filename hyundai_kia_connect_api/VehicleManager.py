@@ -99,7 +99,7 @@ class VehicleManager:
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
-            self.force_refresh_vehicle_state(self.get_vehicle(vehicle_id))
+            self.force_refresh_vehicle_state(vehicle_id)
 
     def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
