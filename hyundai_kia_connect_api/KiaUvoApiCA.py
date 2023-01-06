@@ -64,43 +64,37 @@ class KiaUvoApiCA(ApiImpl):
         }
 
 
-def _check_response_for_errors(response: dict) -> None:
-    """
-    Checks for errors in the API response. If an error is found, an exception is raised.
-    retCode known values:
-    - S: success
-    - F: failure
-    resCode / resMsg known values:
-    - 0000: no error
-    - 7404: "Wrong Username and password"
-    :param response: the API's JSON response
-    """
+    def _check_response_for_errors(self, response: dict) -> None:
+        """
+        Checks for errors in the API response. If an error is found, an exception is raised.
+        retCode known values:
+        - S: success
+        - F: failure
+        resCode / resMsg known values:
+        - 0000: no error
+        - 7404: "Wrong Username and password"
+        :param response: the API's JSON response
+        """
 
-    error_code_mapping = {
-        "7404": AuthenticationError,
-    }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
-        _LOGGER.error(f"Unknown API response format: {response}")
-
-        raise InvalidAPIResponseError()
-    if response.headers["responseCode"] == 1:
-        if response["error"]["errorCode"] in error_code_mapping:
-            raise error_code_mapping[response["error"]["errorCode"]](response['error']['errorDesc'])
-        else:
-            raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
+        error_code_mapping = {
+            "7404": AuthenticationError,
+        }
+        if response["responseHeader"]["responseCode"] == 1:
+            if response["error"]["errorCode"] in error_code_mapping:
+                raise error_code_mapping[response["error"]["errorCode"]](response['error']['errorDesc'])
+            else:
+                raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
     def login(self, username: str, password: str) -> Token:
 
         # Sign In with Email and Password and Get Authorization Code
-
         url = self.API_URL + "lgn"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         response = requests.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         response = response["result"]
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
