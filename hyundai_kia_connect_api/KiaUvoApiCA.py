@@ -86,7 +86,9 @@ def _check_response_for_errors(response: dict) -> None:
         raise InvalidAPIResponseError()
     if response.headers["responseCode"] == 1:
         if response["error"]["errorCode"] in error_code_mapping:
-            raise error_code_mapping[response["error"]["errorCode"]](response['error']['errorDesc'])
+            raise error_code_mapping[response["error"]["errorCode"]](
+                response["error"]["errorDesc"]
+            )
         else:
             raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
