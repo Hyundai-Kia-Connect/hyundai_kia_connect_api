@@ -100,6 +100,7 @@ def _check_response_for_errors(response: dict) -> None:
         response = requests.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
+        _check_response_for_errors(response)
         response = response["result"]
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
