@@ -63,7 +63,6 @@ class KiaUvoApiCA(ApiImpl):
             "sec-fetch-site": "same-origin",
         }
 
-
     def _check_response_for_errors(self, response: dict) -> None:
         """
         Checks for errors in the API response. If an error is found, an exception is raised.
@@ -77,13 +76,12 @@ class KiaUvoApiCA(ApiImpl):
         :param response: the API's JSON response
         """
 
-        error_code_mapping = {
-            "7404": AuthenticationError,
-            "7402": AuthenticationError
-        }
+        error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
         if response["responseHeader"]["responseCode"] == 1:
             if response["error"]["errorCode"] in error_code_mapping:
-                raise error_code_mapping[response["error"]["errorCode"]](response['error']['errorDesc'])
+                raise error_code_mapping[response["error"]["errorCode"]](
+                    response["error"]["errorDesc"]
+                )
             else:
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
