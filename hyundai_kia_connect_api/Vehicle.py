@@ -32,7 +32,7 @@ class DailyTripStats:
     day_trip_max_speed: int = None
     # Thinking this would be a list of type of type trip?
     trip_list: list = None
-    
+
 
 @dataclasses.dataclass
 class DailyDrivingStats:

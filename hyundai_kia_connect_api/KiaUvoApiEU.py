@@ -1176,13 +1176,13 @@ class KiaUvoApiEU(ApiImpl):
 
         body = {
             "tripPeriodType": type,
-            #need to format the date still for this to work: 
+            #need to format the date still for this to work:
             "setTripMonth": date
         }
-        
+
         response = requests.post(
             url, json=body, headers=self._get_authenticated_headers(token)
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Trip Info Response: {response}") 
+        _LOGGER.debug(f"{DOMAIN} - Get Trip Info Response: {response}")
         # Parse data into dataclass
         return str(response.status_code == 200)
