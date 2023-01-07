@@ -10,6 +10,31 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
+class MonthlyTripStats:
+    date: datetime.datetime = None
+    month_trip_day_count: int = None
+    month_drive_time: int = None
+    month_idle_time: int = None
+    month_dist: int = None
+    month_trip_avg_speed: float = None
+    month_trip_max_speed: int = None
+    # Thinking this would be a list of type of type day_trip?
+    trip_day_list: list = None 
+
+@dataclasses.dataclass
+class DailyTripStats:
+    date: datetime.datetime = None
+    day_trip_count: int = None
+    day_drive_time: int = None
+    day_idle_time: int = None
+    day_dist: int = None
+    day_trip_avg_speed: float = None
+    day_trip_max_speed: int = None
+    # Thinking this would be a list of type of type trip?
+    trip_list: list = None 
+    
+
+@dataclasses.dataclass
 class DailyDrivingStats:
     # energy stats are expressed in watthours (Wh)
     date: datetime.datetime = None
