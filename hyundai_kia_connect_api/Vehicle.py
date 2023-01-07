@@ -144,6 +144,9 @@ class Vehicle:
     power_consumption_30d: float = None
 
     daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
+    daily_trip_stats: list[DailyTripStats] = dataclasses.field(default_factory=list)
+    monthly_stats: list[MonthlyTripStats] = dataclasses.field(default_factory=list)
+
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
