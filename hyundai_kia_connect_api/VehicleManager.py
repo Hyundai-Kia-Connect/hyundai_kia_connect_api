@@ -109,7 +109,7 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def update_trip_info(self, vehicle_id: str, date: dt.date, type: int) -> None:
-        # Probably will return the object once we define that. 
+        # Probably will return the object once we define that.
         # Should be enum for type.  0 being month 1 being date.
         self.api.update_trip_info(self.token, self.get_vehicle(vehicle_id), date, type)
 

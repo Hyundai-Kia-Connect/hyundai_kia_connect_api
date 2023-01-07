@@ -19,7 +19,7 @@ class MonthlyTripStats:
     month_trip_avg_speed: float = None
     month_trip_max_speed: int = None
     # Thinking this would be a list of type of type day_trip?
-    trip_day_list: list = None 
+    trip_day_list: list = None
 
 @dataclasses.dataclass
 class DailyTripStats:
@@ -31,7 +31,7 @@ class DailyTripStats:
     day_trip_avg_speed: float = None
     day_trip_max_speed: int = None
     # Thinking this would be a list of type of type trip?
-    trip_list: list = None 
+    trip_list: list = None
     
 
 @dataclasses.dataclass

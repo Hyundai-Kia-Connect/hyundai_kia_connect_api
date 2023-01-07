@@ -954,7 +954,7 @@ class KiaUvoApiEU(ApiImpl):
         return device_id
 
     def _get_cookies(self) -> dict:
-        ### Get Cookies ###
+        # Get Cookies #
         url = (
             self.USER_API_URL
             + "oauth2/authorize?response_type=code&state=test&client_id="
@@ -988,7 +988,7 @@ class KiaUvoApiEU(ApiImpl):
         # return session
 
     def _set_session_language(self, cookies) -> None:
-        ### Set Language for Session ###
+        # Set Language for Session #
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
         payload = {"lang": self.LANGUAGE}
@@ -1116,7 +1116,7 @@ class KiaUvoApiEU(ApiImpl):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        ### Get Access Token ###
+        # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
@@ -1169,3 +1169,20 @@ class KiaUvoApiEU(ApiImpl):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def update_trip_info(self, token: Token, vehicle: Vehicle, date: dt.date, type: int) -> None:
+        """Updates the trip data information for the requested date or month.  Type being 0 for month 1 for specific day"""
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
+
+        body = {
+            "tripPeriodType": type,
+            #need to format the date still for this to work: 
+            "setTripMonth": date
+        }
+        
+        response = requests.post(
+            url, json=body, headers=self._get_authenticated_headers(token)
+        )
+        _LOGGER.debug(f"{DOMAIN} - Get Trip Info Response: {response}") 
+        # Parse data into dataclass
+        return str(response.status_code == 200)
