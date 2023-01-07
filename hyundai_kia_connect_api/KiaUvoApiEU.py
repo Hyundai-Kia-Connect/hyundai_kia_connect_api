@@ -71,6 +71,7 @@ def _check_response_for_errors(response: dict) -> None:
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
     - 5091: "Exceeds number of requests"
     - 5921: "No Data Found v2 - No Data Found v2"
+    - 9999: "Undefined Error - Response timeout"
     :param response: the API's JSON response
     """
 
@@ -80,6 +81,7 @@ def _check_response_for_errors(response: dict) -> None:
         "5031": APIError,
         "5091": RateLimitingError,
         "5921": NoDataFound,
+        "9999": RequestTimeoutError,
     }
 
     if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
@@ -948,8 +950,10 @@ class KiaUvoApiEU(ApiImpl):
 
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
+        _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
+
         device_id = response["resMsg"]["deviceId"]
         return device_id
 
