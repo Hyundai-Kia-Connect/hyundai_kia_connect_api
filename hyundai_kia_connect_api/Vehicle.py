@@ -21,6 +21,7 @@ class MonthlyTripStats:
     # Thinking this would be a list of type of type day_trip?
     trip_day_list: list = None
 
+
 @dataclasses.dataclass
 class DailyTripStats:
     date: datetime.datetime = None
@@ -146,7 +147,6 @@ class Vehicle:
     daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
     daily_trip_stats: list[DailyTripStats] = dataclasses.field(default_factory=list)
     monthly_stats: list[MonthlyTripStats] = dataclasses.field(default_factory=list)
-
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None

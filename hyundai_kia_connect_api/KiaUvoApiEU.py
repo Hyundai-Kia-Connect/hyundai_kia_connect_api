@@ -1170,14 +1170,16 @@ class KiaUvoApiEU(ApiImpl):
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
 
-    def update_trip_info(self, token: Token, vehicle: Vehicle, date: dt.date, type: int) -> None:
+    def update_trip_info(
+        self, token: Token, vehicle: Vehicle, date: dt.date, type: int
+    ) -> None:
         """Updates the trip data information for the requested date or month.  Type being 0 for month 1 for specific day"""
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
 
         body = {
             "tripPeriodType": type,
-            #need to format the date still for this to work:
-            "setTripMonth": date
+            # need to format the date still for this to work:
+            "setTripMonth": date,
         }
 
         response = requests.post(

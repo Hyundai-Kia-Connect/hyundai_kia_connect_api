@@ -127,6 +127,8 @@ class ApiImpl:
         """Opens or closes the charging port of the car. Returns the tracking ID"""
         pass
 
-    def update_trip_info(self, token: Token, vehicle: Vehicle, date: dt.date, type: int) -> None:
+    def update_trip_info(
+        self, token: Token, vehicle: Vehicle, date: dt.date, type: int
+    ) -> None:
         """Updates the trip data information for the requested date or month.  Type being 0 for month 1 for specific day"""
         pass
