@@ -261,20 +261,21 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
-            lastTwo = int(value[-2:])
+    def _get_time_from_string(self, dateToParse, timesection) -> dt.datetime.time:
+        if dateToParse is not None:
+            lastTwo = int(dateToParse[-2:])
             if lastTwo > 60:
-                value = int(value) + 40
-            if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
+                dateToParse = int(dateToParse) + 40
+            if int(dateToParse) > 1260:
+                dateToParse = dt.datetime.strptime(str(dateToParse), "%H%M").time()
             else:
                 if timesection == 0:
-                    value = str(value) + " AM"
+                    dateToParse = str(dateToParse) + " AM"
                 elif timesection == 1:
-                    value = str(value) + " PM"
-                value = dt.datetime.strptime(value, "%I%M %p").time()
-        return value
+                    dateToParse = str(dateToParse) + " PM"
+                dateToParse = dt.datetime.strptime(dateToParse, "%I%M %p").time()
+        return dateToParse
+
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
