@@ -3,7 +3,7 @@ import random
 import secrets
 import string
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import datetime as dt
 import re
 import typing
@@ -36,7 +36,7 @@ def request_with_active_session(func):
             return func(*args, **kwargs)
         except AuthError:
             _LOGGER.debug(
-                f"{DOMAIN} - got invalid session, attempting to repair and resend"
+                f"{DOMAIN} - Got invalid session, attempting to repair and resend"
             )
             self = args[0]
             token = kwargs["token"]
@@ -73,7 +73,7 @@ def request_with_logging(func):
         if (
             response_json["status"]["statusCode"] == 1
             and response_json["status"]["errorType"] == 1
-            and response_json["status"]["errorCode"] == 1003
+            and (response_json["status"]["errorCode"] == 1003 or response_json["status"]["errorCode"] == 1005)
         ):
             _LOGGER.debug(f"{DOMAIN} - error: session invalid")
             raise AuthError
