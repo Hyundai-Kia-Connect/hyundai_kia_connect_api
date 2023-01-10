@@ -73,10 +73,7 @@ def request_with_logging(func):
         if (
             response_json["status"]["statusCode"] == 1
             and response_json["status"]["errorType"] == 1
-            and (
-                response_json["status"]["errorCode"] == 1003
-                or response_json["status"]["errorCode"] == 1005
-            )
+            and response_json["status"]["errorCode"] in [1003, 1005]
         ):
             _LOGGER.debug(f"{DOMAIN} - error: session invalid")
             raise AuthError
