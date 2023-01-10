@@ -43,7 +43,7 @@ def request_with_active_session(func):
             vehicle = kwargs["vehicle"]
             new_token = self.login(token.username, token.password)
             _LOGGER.debug(
-                f"{DOMAIN} - old token:{token.access_token}, new token:{new_token.access_token}"
+                f"{DOMAIN} - Old token:{token.access_token}, new token:{new_token.access_token}"
             )
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
@@ -75,9 +75,9 @@ def request_with_logging(func):
             and response_json["status"]["errorType"] == 1
             and response_json["status"]["errorCode"] in [1003, 1005]
         ):
-            _LOGGER.debug(f"{DOMAIN} - error: session invalid")
+            _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
             raise AuthError
-        _LOGGER.error(f"{DOMAIN} - error: unknown error response {response.text}")
+        _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
     return request_with_logging_wrapper
@@ -121,7 +121,7 @@ class KiaUvoAPIUSA(ApiImpl):
             "tokentype": "G",
             "user-agent": "okhttp/3.12.1",
         }
-        # should produce something like "Mon, 18 Oct 2021 07:06:26 GMT". May require adjusting locale to en_US
+        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT". May require adjusting locale to en_US
         date = datetime.now(tz=pytz.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
