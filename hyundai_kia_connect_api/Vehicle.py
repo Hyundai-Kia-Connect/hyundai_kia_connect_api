@@ -11,7 +11,8 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class TripInfo:
-    """ Trip Info """
+    """Trip Info"""
+
     hhmmss: str = None  # will not be filled by summary
     drive_time: int = None
     idle_time: int = None
@@ -22,14 +23,16 @@ class TripInfo:
 
 @dataclasses.dataclass
 class DayTripCounts:
-    """Day trip info """
+    """Day trip info"""
+
     yyyymmdd: str
     trip_count: int
 
 
 @dataclasses.dataclass
 class MonthTripInfo:
-    """ Month Trip Info """
+    """Month Trip Info"""
+
     yyyymm: str = None
     summary: TripInfo = None
     day_list: list[DayTripCounts] = dataclasses.field(default_factory=list)
@@ -37,7 +40,8 @@ class MonthTripInfo:
 
 @dataclasses.dataclass
 class DayTripInfo:
-    """ Day Trip Info"""
+    """Day Trip Info"""
+
     yyyymmdd: str = None
     summary: TripInfo = None
     trip_list: list[TripInfo] = dataclasses.field(default_factory=list)
