@@ -550,10 +550,20 @@ class KiaUvoAPIUSA(ApiImpl):
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         url = self.API_URL + "rems/start"
+        if options.set_temp is None:
+            options.set_temp = 70  
         if options.set_temp < 62:
             options.set_temp = "LOW"
         elif options.set_temp > 82:
             options.set_temp = "HIGH"
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
+        if options.defrost is None:
+            options.defrost = False
+        if options.duration is None:
+            options.duration = 5
         body = {
             "remoteClimate": {
                 "airCtrl": options.climate,
