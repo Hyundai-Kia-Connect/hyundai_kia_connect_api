@@ -18,8 +18,6 @@ from .const import (
     SEAT_STATUS,
     ENGINE_TYPES,
     VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
-    ENGINE_TYPES,
 )
 from .exceptions import *
 from .Token import Token
