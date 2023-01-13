@@ -1,6 +1,5 @@
 import datetime as dt
 import logging
-import random
 import re
 import uuid
 from urllib.parse import parse_qs, urlparse
