@@ -551,7 +551,7 @@ class KiaUvoAPIUSA(ApiImpl):
     ) -> str:
         url = self.API_URL + "rems/start"
         if options.set_temp is None:
-            options.set_temp = 70  
+            options.set_temp = 70
         if options.set_temp < 62:
             options.set_temp = "LOW"
         elif options.set_temp > 82:
