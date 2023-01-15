@@ -1,3 +1,5 @@
+# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument
+"""ApiImpl.py"""
 import datetime as dt
 import logging
 from dataclasses import dataclass
@@ -8,11 +10,7 @@ from .const import *
 from .Token import Token
 from .Vehicle import Vehicle
 
-from .utils import (
-    get_child_value,
-    get_hex_temp_into_index,
-    get_index_into_hex_temp,
-)
+from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,7 +52,9 @@ class ApiImpl:
         """Convert last updated value of vehicle into into datetime"""
         pass
 
-    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+    def update_vehicle_with_cached_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
@@ -65,7 +65,9 @@ class ApiImpl:
         False if not.  Does not confirm if successful only confirms if complete"""
         pass
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+    def force_refresh_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> None:
         """Triggers the system to contact the car and get fresh data"""
         pass
 
@@ -100,7 +102,6 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         """Starts climate or remote start.  Returns the tracking ID"""
-
         pass
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -125,4 +126,30 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
         """Opens or closes the charging port of the car. Returns the tracking ID"""
+        pass
+
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        pass
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
         pass
