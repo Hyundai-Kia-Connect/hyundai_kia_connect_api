@@ -932,19 +932,9 @@ class KiaUvoApiEU(ApiImpl):
     ) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
         if trip_period_type == 0:  # month
-            if len(date_string) != 6:
-                raise APIError(
-                    f"Invalid date_string, expected yyyymm: {date_string}"
-                )
             payload = {"tripPeriodType": 0, "setTripMonth": date_string}
-        elif trip_period_type == 1:  # day
-            if len(date_string) != 8:
-                raise APIError(
-                    f"Invalid date_string, expected yyyymmdd: {date_string}"
-                )
-            payload = {"tripPeriodType": 1, "setTripDay": date_string}
         else:
-            raise APIError(f"Invalid trip period type: {trip_period_type}")
+            payload = {"tripPeriodType": 1, "setTripDay": date_string}
 
         _LOGGER.debug(f"{DOMAIN} - get_trip_info Request {payload}")
         response = requests.post(
@@ -954,6 +944,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
+        _check_response_for_errors(response)
         return response
 
     def update_month_trip_info(
@@ -1059,6 +1050,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}"
         )
+        _check_response_for_errors(responseAlltime)
 
         response30d = requests.post(
             url,
@@ -1067,6 +1059,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+        _check_response_for_errors(response30d)
         if get_child_value(responseAlltime, "resMsg.drivingInfoDetail.0"):
             drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
 
