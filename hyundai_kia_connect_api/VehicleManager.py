@@ -81,9 +81,7 @@ class VehicleManager:
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
-    def check_and_force_update_vehicles(
-        self, force_refresh_interval: int
-    ) -> None:
+    def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
@@ -119,18 +117,12 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token: Token = self.api.login(self.username, self.password)
             self.token.pin = self.pin
-            self.vehicles = self.api.refresh_vehicles(
-                self.token, self.vehicles
-            )
+            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         return False
 
-    def start_climate(
-        self, vehicle_id: str, options: ClimateRequestOptions
-    ) -> str:
-        return self.api.start_climate(
-            self.token, self.get_vehicle(vehicle_id), options
-        )
+    def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
+        return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
 
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
@@ -168,9 +160,7 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE
         )
 
-    def update_month_trip_info(
-        self, vehicle_id: str, yyyymm_string: str
-    ) -> None:
+    def update_month_trip_info(self, vehicle_id: str, yyyymm_string: str) -> None:
         """
         Europe feature only.
         Updates the vehicle.month_trip_info for the specified month.
@@ -182,9 +172,7 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         self.api.update_month_trip_info(self.token, vehicle, yyyymm_string)
 
-    def update_day_trip_info(
-        self, vehicle_id: str, yyyymmdd_string: str
-    ) -> None:
+    def update_day_trip_info(self, vehicle_id: str, yyyymmdd_string: str) -> None:
         """
         Europe feature only.
         Updates the vehicle.day_trip_info information for the specified day.

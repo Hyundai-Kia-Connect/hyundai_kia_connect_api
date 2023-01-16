@@ -52,9 +52,7 @@ class ApiImpl:
         """Convert last updated value of vehicle into into datetime"""
         pass
 
-    def update_vehicle_with_cached_state(
-        self, token: Token, vehicle: Vehicle
-    ) -> None:
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
@@ -65,9 +63,7 @@ class ApiImpl:
         False if not.  Does not confirm if successful only confirms if complete"""
         pass
 
-    def force_refresh_vehicle_state(
-        self, token: Token, vehicle: Vehicle
-    ) -> None:
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Triggers the system to contact the car and get fresh data"""
         pass
 
