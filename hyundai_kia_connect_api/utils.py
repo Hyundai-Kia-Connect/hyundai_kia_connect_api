@@ -1,3 +1,7 @@
+# pylint:disable=bare-except,missing-function-docstring,invalid-name
+"""utils.py"""
+
+
 def get_child_value(data, key):
     value = data
     for x in key.split("."):
