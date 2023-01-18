@@ -1,15 +1,54 @@
+# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name
+"""Vehicle class"""
 import logging
-
-import dataclasses
 import datetime
 import typing
+from dataclasses import dataclass, field
 
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
+@dataclass
+class TripInfo:
+    """Trip Info"""
+
+    hhmmss: str = None  # will not be filled by summary
+    drive_time: int = None
+    idle_time: int = None
+    distance: int = None
+    avg_speed: float = None
+    max_speed: int = None
+
+
+@dataclass
+class DayTripCounts:
+    """Day trip counts"""
+
+    yyyymmdd: str = None
+    trip_count: int = None
+
+
+@dataclass
+class MonthTripInfo:
+    """Month Trip Info"""
+
+    yyyymm: str = None
+    summary: TripInfo = None
+    day_list: list[DayTripCounts] = field(default_factory=list)
+
+
+@dataclass
+class DayTripInfo:
+    """Day Trip Info"""
+
+    yyyymmdd: str = None
+    summary: TripInfo = None
+    trip_list: list[TripInfo] = field(default_factory=list)
+
+
+@dataclass
 class DailyDrivingStats:
     # energy stats are expressed in watthours (Wh)
     date: datetime.datetime = None
@@ -19,12 +58,13 @@ class DailyDrivingStats:
     onboard_electronics_consumption: int = None
     battery_care_consumption: int = None
     regenerated_energy: int = None
-    # distance is expressed in (I assume) whatever unit the vehicle is configured in. KMs (rounded) in my case
+    # distance is expressed in (I assume) whatever unit the vehicle is
+    # configured in. KMs (rounded) in my case
     distance: int = None
-    distance_unit = DISTANCE_UNITS[1]  # set to kms by default for now
+    distance_unit = DISTANCE_UNITS[1]  # set to kms by default
 
 
-@dataclasses.dataclass
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -111,14 +151,19 @@ class Vehicle:
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
 
-    # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
+    # energy consumed since the vehicle was paired with the account
+    # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
-    total_power_consumed: float = None
+    total_power_consumed: float = None  # Europe feature only
     # energy consumed in the last ~30 days
     # expressed in watt-hours (Wh)
-    power_consumption_30d: float = None
+    power_consumption_30d: float = None  # Europe feature only
 
-    daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
+    # Europe feature only
+    daily_stats: list[DailyDrivingStats] = field(default_factory=list)
+
+    month_trip_info: MonthTripInfo = None  # Europe feature only
+    day_trip_info: DayTripInfo = None  # Europe feature only
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None

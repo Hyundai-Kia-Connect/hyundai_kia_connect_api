@@ -1,3 +1,5 @@
+# pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
+"""VehicleManager.py"""
 import datetime as dt
 import logging
 
@@ -132,7 +134,9 @@ class VehicleManager:
 
     def unlock(self, vehicle_id: str) -> str:
         return self.api.lock_action(
-            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.UNLOCK
+            self.token,
+            self.get_vehicle(vehicle_id),
+            VEHICLE_LOCK_ACTION.UNLOCK,
         )
 
     def start_charge(self, vehicle_id: str) -> str:
@@ -146,11 +150,6 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )
 
-    def check_action_status(self, vehicle_id: str, action_id: str):
-        return self.api.check_action_status(
-            self.token, self.get_vehicle(vehicle_id), action_id
-        )
-
     def open_charge_port(self, vehicle_id: str) -> str:
         return self.api.charge_port_action(
             self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN
@@ -160,6 +159,30 @@ class VehicleManager:
         return self.api.charge_port_action(
             self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE
         )
+
+    def update_month_trip_info(self, vehicle_id: str, yyyymm_string: str) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        vehicle = self.get_vehicle(vehicle_id)
+        self.api.update_month_trip_info(self.token, vehicle, yyyymm_string)
+
+    def update_day_trip_info(self, vehicle_id: str, yyyymmdd_string: str) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
+        vehicle = self.get_vehicle(vehicle_id)
+        self.api.update_day_trip_info(self.token, vehicle, yyyymmdd_string)
 
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False

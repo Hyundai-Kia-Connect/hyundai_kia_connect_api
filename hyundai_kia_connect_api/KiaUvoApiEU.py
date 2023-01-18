@@ -1,3 +1,5 @@
+# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
+"""KiaUvoApiEU.py"""
 import datetime as dt
 import logging
 import re
@@ -28,8 +30,19 @@ from .const import (
 
 from .exceptions import *
 from .Token import Token
-from .utils import get_child_value, get_index_into_hex_temp, get_hex_temp_into_index
-from .Vehicle import Vehicle, DailyDrivingStats
+from .utils import (
+    get_child_value,
+    get_index_into_hex_temp,
+    get_hex_temp_into_index,
+)
+from .Vehicle import (
+    Vehicle,
+    DailyDrivingStats,
+    MonthTripInfo,
+    DayTripInfo,
+    TripInfo,
+    DayTripCounts,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +72,8 @@ SUPPORTED_LANGUAGES_LIST = [
 
 def _check_response_for_errors(response: dict) -> None:
     """
-    Checks for errors in the API response. If an error is found, an exception is raised.
+    Checks for errors in the API response.
+    If an error is found, an exception is raised.
     retCode known values:
     - S: success
     - F: failure
@@ -188,7 +202,7 @@ class KiaUvoApiEU(ApiImpl):
             authorization_code = self._get_authorization_code_with_redirect_url(
                 username, password, cookies
             )
-        except Exception as ex1:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
             authorization_code = self._get_authorization_code_with_form(
                 username, password, cookies
@@ -196,13 +210,11 @@ class KiaUvoApiEU(ApiImpl):
 
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
-        (
-            token_type,
-            access_token,
-            authorization_code,
-        ) = self._get_access_token(stamp, authorization_code)
 
-        token_type, refresh_token = self._get_refresh_token(stamp, authorization_code)
+        _, access_token, authorization_code = self._get_access_token(
+            stamp, authorization_code
+        )
+        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
 
         return Token(
@@ -826,11 +838,126 @@ class KiaUvoApiEU(ApiImpl):
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
-        _check_response_for_errors()
+        _check_response_for_errors(response)
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
         if response["resMsg"] is not None:
             return response["resMsg"]
+
+    def _get_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip_period_type: int,
+    ) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
+        if trip_period_type == 0:  # month
+            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
+        else:
+            payload = {"tripPeriodType": 1, "setTripDay": date_string}
+
+        _LOGGER.debug(f"{DOMAIN} - get_trip_info Request {payload}")
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(token),
+        )
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
+        _check_response_for_errors(response)
+        return response
+
+    def update_month_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymm_string,
+    ) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        vehicle.month_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymm_string,
+            0,  # month trip info
+        )
+        msg = json_result["resMsg"]
+        if msg["monthTripDayCnt"] > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+
+            for day in msg["tripDayList"]:
+                processed_day = DayTripCounts(
+                    yyyymmdd=day["tripDayInMonth"],
+                    trip_count=day["tripCntDay"],
+                )
+                result.day_list.append(processed_day)
+
+            vehicle.month_trip_info = result
+
+    def update_day_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymmdd_string,
+    ) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
+        vehicle.day_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymmdd_string,
+            1,  # day trip info
+        )
+        day_trip_list = json_result["resMsg"]["dayTripList"]
+        if len(day_trip_list) > 0:
+            msg = day_trip_list[0]
+            result = DayTripInfo(
+                yyyymmdd=yyyymmdd_string,
+                trip_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for trip in msg["tripList"]:
+                processed_trip = TripInfo(
+                    hhmmss=trip["tripTime"],
+                    drive_time=trip["tripDrvTime"],
+                    idle_time=trip["tripIdleTime"],
+                    distance=trip["tripDist"],
+                    avg_speed=trip["tripAvgSpeed"],
+                    max_speed=trip["tripMaxSpeed"],
+                )
+                result.trip_list.append(processed_trip)
+            vehicle.day_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
@@ -842,6 +969,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         responseAlltime = responseAlltime.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
+        _check_response_for_errors(responseAlltime)
 
         response30d = requests.post(
             url,
@@ -850,6 +978,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+        _check_response_for_errors(response30d)
         if get_child_value(responseAlltime, "resMsg.drivingInfoDetail.0"):
             drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
 
@@ -957,7 +1086,7 @@ class KiaUvoApiEU(ApiImpl):
         return device_id
 
     def _get_cookies(self) -> dict:
-        ### Get Cookies ###
+        # Get Cookies #
         url = (
             self.USER_API_URL
             + "oauth2/authorize?response_type=code&state=test&client_id="
@@ -967,35 +1096,20 @@ class KiaUvoApiEU(ApiImpl):
             + "oauth2/redirect&lang="
             + self.LANGUAGE
         )
-        payload = {}
-        headers = {
-            "Host": self.BASE_URL,
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "User-Agent": USER_AGENT_MOZILLA,
-            "Accept": ACCEPT_HEADER_ALL,
-            "X-Requested-With": "com.kia.uvo.eu",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-User": "?1",
-            "Sec-Fetch-Dest": "document",
-            "Accept-Encoding": "gzip, deflate",
-            "Accept-Language": "en,en-US," + self.LANGUAGE + ";q=0.9",
-        }
 
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = requests.Session()
-        response = session.get(url)
+        _ = session.get(url)
         _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
         # return session
 
     def _set_session_language(self, cookies) -> None:
-        ### Set Language for Session ###
+        # Set Language for Session #
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
         payload = {"lang": self.LANGUAGE}
-        response = requests.post(url, json=payload, headers=headers, cookies=cookies)
+        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
@@ -1111,7 +1225,10 @@ class KiaUvoApiEU(ApiImpl):
             "ccsp-service-id": self.CCSP_SERVICE_ID,
         }
         response = requests.post(
-            url, headers=headers, json={"intUserId": intUserId}, cookies=cookies
+            url,
+            headers=headers,
+            json={"intUserId": intUserId},
+            cookies=cookies,
         ).json()
         _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")
         parsed_url = urlparse(response["redirectUrl"])
@@ -1119,7 +1236,7 @@ class KiaUvoApiEU(ApiImpl):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        ### Get Access Token ###
+        # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
@@ -1149,7 +1266,7 @@ class KiaUvoApiEU(ApiImpl):
         return token_type, access_token, authorization_code
 
     def _get_refresh_token(self, stamp, authorization_code):
-        ### Get Refresh Token ###
+        # Get Refresh Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
