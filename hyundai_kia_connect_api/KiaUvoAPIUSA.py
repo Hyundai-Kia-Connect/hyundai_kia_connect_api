@@ -418,7 +418,12 @@ class KiaUvoAPIUSA(ApiImpl):
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
-            DISTANCE_UNITS[3],
+            DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    )
+                ],
         )
         if get_child_value(
                 state,
