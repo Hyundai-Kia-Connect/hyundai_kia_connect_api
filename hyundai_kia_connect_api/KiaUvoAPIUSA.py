@@ -421,9 +421,9 @@ class KiaUvoAPIUSA(ApiImpl):
             DISTANCE_UNITS[3],
         )
         if get_child_value(
-                state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-            ):
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+        ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
