@@ -380,7 +380,7 @@ class KiaUvoAPIUSA(ApiImpl):
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
-        vehicle.ev_driving_distance = (
+        vehicle.ev_driving_range = (
             get_child_value(
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
