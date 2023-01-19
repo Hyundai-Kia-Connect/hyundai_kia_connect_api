@@ -251,13 +251,6 @@ class KiaUvoAPIUSA(ApiImpl):
                 state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.syncDate.utc"
             )
         )
-        vehicle.total_driving_range = (
-            get_child_value(
-                state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-            ),
-            DISTANCE_UNITS[3],
-        )
         vehicle.odometer = (
             get_child_value(state, "vehicleConfig.vehicleDetail.vehicle.mileage"),
             DISTANCE_UNITS[3],
@@ -420,19 +413,47 @@ class KiaUvoAPIUSA(ApiImpl):
             ),
             "m",
         )
-
-        vehicle.fuel_driving_range = (
+        vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
+        if get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+        ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
+            )
+        else:
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
+                    )
+                ],
+            )
         vehicle.fuel_level_is_low = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.lowFuelLight"
         )
