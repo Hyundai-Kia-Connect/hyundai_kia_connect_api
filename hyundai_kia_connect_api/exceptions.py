@@ -1,3 +1,7 @@
+# pylint:disable=unnecessary-pass
+"""exceptions.py"""
+
+
 class HyundaiKiaException(Exception):
     """
     Generic hyundaiKiaException exception.
@@ -33,6 +37,14 @@ class RateLimitingError(APIError):
 class NoDataFound(APIError):
     """
     Raised when the API doesn't have data for that car. Disabling the car is the solution.
+    """
+
+    pass
+
+
+class ServiceTemporaryUnavailable(APIError):
+    """
+    Raised when Service Temporary Unavailable
     """
 
     pass
