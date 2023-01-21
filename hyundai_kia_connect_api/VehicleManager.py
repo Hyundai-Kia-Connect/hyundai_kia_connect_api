@@ -150,7 +150,7 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )
 
-    def check_action_status(self, vehicle_id: str, action_id: str):
+    def check_action_status(self, vehicle_id: str, action_id: str) -> bool:
         return self.api.check_last_action_status(
             self.token, self.get_vehicle(vehicle_id), action_id
         )
