@@ -8,13 +8,13 @@ repos:
           - "--py38-plus"
 
   - repo: https://github.com/psf/black
-    rev: 22.3.0
+    rev: stable
     hooks:
       - id: black
         stages: [manual]
+        language: python
         args:
           - --safe
-        files: ^((custom_components|script|tests)/.+)?[^/]+\.py$
 
   - repo: https://github.com/codespell-project/codespell
     rev: v1.17.1
@@ -32,9 +32,13 @@ repos:
         stages: [manual]
       - id: check-json
         stages: [manual]
+      - id: check-yaml
+        stages: [manual]
       - id: requirements-txt-fixer
         stages: [manual]
       - id: check-ast
+        stages: [manual]
+      - id: trailing-whitespace
         stages: [manual]
       - id: mixed-line-ending
         stages: [manual]

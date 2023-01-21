@@ -38,7 +38,10 @@ HEAT_STATUS = {
     1: "Steering Wheel and Rear Window",
     2: "Rear Window",
     3: "Steering Wheel",
+    # Seems to be the same as 1 but different region (EU):
+    4: "Steering Wheel and Rear Window",
 }
+
 
 class ENGINE_TYPES(Enum):
     ICE = "ICE"
@@ -51,9 +54,11 @@ class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
 
+
 class CHARGE_PORT_ACTION(Enum):
     CLOSE = "close"
     OPEN = "open"
+
 
 class EvChargeLimit(IntEnum):
     50, 60, 70, 80, 90, 100

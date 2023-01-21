@@ -1,18 +1,54 @@
+# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name
+"""Vehicle class"""
 import logging
-
-import dataclasses
 import datetime
-import re
 import typing
-
-import pytz
+from dataclasses import dataclass, field
 
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclasses.dataclass
+@dataclass
+class TripInfo:
+    """Trip Info"""
+
+    hhmmss: str = None  # will not be filled by summary
+    drive_time: int = None
+    idle_time: int = None
+    distance: int = None
+    avg_speed: float = None
+    max_speed: int = None
+
+
+@dataclass
+class DayTripCounts:
+    """Day trip counts"""
+
+    yyyymmdd: str = None
+    trip_count: int = None
+
+
+@dataclass
+class MonthTripInfo:
+    """Month Trip Info"""
+
+    yyyymm: str = None
+    summary: TripInfo = None
+    day_list: list[DayTripCounts] = field(default_factory=list)
+
+
+@dataclass
+class DayTripInfo:
+    """Day Trip Info"""
+
+    yyyymmdd: str = None
+    summary: TripInfo = None
+    trip_list: list[TripInfo] = field(default_factory=list)
+
+
+@dataclass
 class DailyDrivingStats:
     # energy stats are expressed in watthours (Wh)
     date: datetime.datetime = None
@@ -22,12 +58,13 @@ class DailyDrivingStats:
     onboard_electronics_consumption: int = None
     battery_care_consumption: int = None
     regenerated_energy: int = None
-    # distance is expressed in (I assume) whatever unit the vehicle is configured in. KMs (rounded) in my case
+    # distance is expressed in (I assume) whatever unit the vehicle is
+    # configured in. KMs (rounded) in my case
     distance: int = None
-    distance_unit = DISTANCE_UNITS[1]  # set to kms by default for now
+    distance_unit = DISTANCE_UNITS[1]  # set to kms by default
 
 
-@dataclasses.dataclass
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -36,9 +73,11 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
+    # Not part of the API, enabled in our library for scanning.
+    enabled: bool = True
 
     # Shared (EV/PHEV/HEV/IC)
-    ## General
+    # General
     _total_driving_range: float = None
     _total_driving_range_value: float = None
     _total_driving_range_unit: str = None
@@ -50,18 +89,18 @@ class Vehicle:
     _geocode_address: str = None
     _geocode_name: str = None
 
-
-
     car_battery_percentage: int = None
     engine_is_running: bool = None
-    last_updated_at: datetime.datetime = datetime.datetime.min
+    last_updated_at: datetime.datetime = None
     timezone: datetime.timezone = None
+    dtc_count: typing.Union[int, None] = None
+    dtc_descriptions: typing.Union[dict, None] = None
 
     smart_key_battery_warning_is_on: bool = None
     washer_fluid_warning_is_on: bool = None
     brake_fluid_warning_is_on: bool = None
 
-    ## Climate
+    # Climate
     _air_temperature: float = None
     _air_temperature_value: float = None
     _air_temperature_unit: str = None
@@ -76,7 +115,7 @@ class Vehicle:
     rear_left_seat_status: str = None
     rear_right_seat_status: str = None
 
-    ## Door Status
+    # Door Status
     is_locked: bool = None
     front_left_door_is_open: bool = None
     front_right_door_is_open: bool = None
@@ -108,18 +147,23 @@ class Vehicle:
     # EV fields (EV/PHEV)
 
     ev_charge_port_door_is_open: typing.Union[bool, None] = None
-    
+
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
-    
-    # energy consumed since the vehicle was paired with the account (so not necessarily for the vehicle's lifetime)
+
+    # energy consumed since the vehicle was paired with the account
+    # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
-    total_power_consumed: float = None
+    total_power_consumed: float = None  # Europe feature only
     # energy consumed in the last ~30 days
     # expressed in watt-hours (Wh)
-    power_consumption_30d: float = None
+    power_consumption_30d: float = None  # Europe feature only
 
-    daily_stats: list[DailyDrivingStats] = dataclasses.field(default_factory=list)
+    # Europe feature only
+    daily_stats: list[DailyDrivingStats] = field(default_factory=list)
+
+    month_trip_info: MonthTripInfo = None  # Europe feature only
+    day_trip_info: DayTripInfo = None  # Europe feature only
 
     ev_battery_percentage: int = None
     ev_battery_is_charging: bool = None
@@ -152,6 +196,19 @@ class Vehicle:
     _ev_target_range_charge_DC: typing.Union[float, None] = None
     _ev_target_range_charge_DC_value: typing.Union[float, None] = None
     _ev_target_range_charge_DC_unit: typing.Union[str, None] = None
+
+    ev_first_departure_enabled: typing.Union[bool, None] = None
+    ev_second_departure_enabled: typing.Union[bool, None] = None
+
+    ev_first_departure_days: typing.Union[list, None] = None
+    ev_second_departure_days: typing.Union[list, None] = None
+
+    ev_first_departure_time: typing.Union[datetime.time, None] = None
+    ev_second_departure_time: typing.Union[datetime.time, None] = None
+
+    ev_off_peak_start_time: typing.Union[datetime.time, None] = None
+    ev_off_peak_end_time: typing.Union[datetime.time, None] = None
+    ev_off_peak_charge_only_enabled: typing.Union[bool, None] = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
@@ -217,6 +274,15 @@ class Vehicle:
     @property
     def location(self):
         return self._location_longitude, self._location_latitude
+
+    @property
+    def location_last_updated_at(self):
+        """
+        return last location datetime.
+        last_updated_at and location_last_updated_at can be different.
+        The newest of those 2 can be computed by the caller.
+        """
+        return self._location_last_set_time
 
     @location.setter
     def location(self, value):
@@ -311,7 +377,7 @@ class Vehicle:
     @ev_target_range_charge_DC.setter
     def ev_target_range_charge_DC(self, value):
         self._ev_target_range_charge_DC_value = value[0]
-        self._ev_target_range_charge_DC_unit= value[1]
+        self._ev_target_range_charge_DC_unit = value[1]
         self._ev_target_range_charge_DC = value[0]
 
     @property
