@@ -91,7 +91,7 @@ def _check_response_for_errors(response: dict) -> None:
     error_code_mapping = {
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
-        "5031": APIError,
+        "5031": ServiceTemporaryUnavailable,
         "5091": RateLimitingError,
         "5921": NoDataFound,
         "9999": RequestTimeoutError,
