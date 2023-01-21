@@ -59,7 +59,7 @@ class ApiImpl:
 
     def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str) -> bool:
         """Check if a previous placed call was successful. Returns true if complete. False if not.  Does not confirm if successful only confirms if complete"""
-        pass
+        return True
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Triggers the system to contact the car and get fresh data"""
