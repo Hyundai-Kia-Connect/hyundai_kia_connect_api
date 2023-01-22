@@ -18,8 +18,6 @@ class AuthenticationError(HyundaiKiaException):
     pass
 
 
-
-
 class APIError(HyundaiKiaException):
     """
     Generic API error
