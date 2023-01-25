@@ -439,7 +439,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         try:
-            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            headers["pAuth"] = self._get_pauth(token, vehicle)
 
             response = requests.post(
                 url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -453,7 +453,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
-    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_pauth(self, token: Token, vehicle: Vehicle) -> None:
         url = self.API_URL + "vrfypin"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -479,7 +479,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -501,7 +501,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
 
         if options.climate is None:
             options.climate = True
@@ -580,7 +580,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -622,7 +622,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge headers {headers}")
         data = json.dumps({"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
@@ -641,7 +641,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
 
         response = requests.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -683,7 +683,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pauth(token, vehicle)
 
         payload = {
             "tsoc": [
