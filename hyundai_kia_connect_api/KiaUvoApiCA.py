@@ -592,9 +592,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.last_action_id = response_headers["transactionId"]
         return vehicle.last_action_id
 
-    def check_last_action_status(
-        self, token: Token, vehicle: Vehicle
-    ) -> bool:
+    def check_last_action_status(self, token: Token, vehicle: Vehicle) -> bool:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
