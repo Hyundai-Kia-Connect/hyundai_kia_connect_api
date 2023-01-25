@@ -607,11 +607,13 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Last action_status API response: {response}")
 
         api_result = response["result"]["transaction"]["apiResult"]
-        last_action_completed = ( api_result != "P" )
+        last_action_completed = api_result != "P"
         if last_action_completed:
             if api_result == "C":
-                state = { "status": response['result']['vehicle'] }
-                _LOGGER.debug(f"{DOMAIN} - Last action completed, updating vehicle state with payload: {state}")
+                state = {"status": response["result"]["vehicle"]}
+                _LOGGER.debug(
+                    f"{DOMAIN} - Last action completed, updating vehicle state with payload: {state}"
+                )
                 self._update_vehicle_properties_base(vehicle, state)
         return last_action_completed
 
