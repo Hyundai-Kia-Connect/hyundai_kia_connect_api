@@ -35,6 +35,7 @@ class KiaUvoApiCA(ApiImpl):
     temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
     temperature_range_model_year = 2020
+    last_pauth: str = None
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         self.LANGUAGE: str = language
@@ -464,7 +465,7 @@ class KiaUvoApiCA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
-        token.last_action_pin_token = result["pAuth"]
+        self.last_pauth = result["pAuth"]
 
         return result["pAuth"]
 
@@ -597,7 +598,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["transactionId"] = action_id
-        headers["pAuth"] = token.last_action_pin_token
+        headers["pAuth"] = self.last_pauth
         response = requests.post(url, headers=headers)
         response = response.json()
 

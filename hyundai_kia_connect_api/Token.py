@@ -12,4 +12,3 @@ class Token:
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
     pin: str = None
-    last_action_pin_token: str = None
