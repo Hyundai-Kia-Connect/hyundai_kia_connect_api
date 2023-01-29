@@ -442,9 +442,12 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.ev_charge_port_door_is_open = True
         elif ev_charge_port_door_is_open == 2:
             vehicle.ev_charge_port_door_is_open = False
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+        if (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            )
+            is not None
         ):
             vehicle.total_driving_range = (
                 round(
@@ -463,9 +466,12 @@ class KiaUvoApiEU(ApiImpl):
                     )
                 ],
             )
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+        if (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+            )
+            is not None
         ):
             vehicle.ev_driving_range = (
                 round(
@@ -513,9 +519,12 @@ class KiaUvoApiEU(ApiImpl):
             ][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+        if (
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+            )
+            is not None
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
