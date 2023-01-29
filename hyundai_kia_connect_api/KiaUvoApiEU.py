@@ -445,7 +445,7 @@ class KiaUvoApiEU(ApiImpl):
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
-        ):
+        ) is not None:
             vehicle.total_driving_range = (
                 round(
                     float(
@@ -466,7 +466,7 @@ class KiaUvoApiEU(ApiImpl):
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-        ):
+        ) is not None:
             vehicle.ev_driving_range = (
                 round(
                     float(
@@ -516,7 +516,7 @@ class KiaUvoApiEU(ApiImpl):
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-        ):
+        ) is not None:
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
