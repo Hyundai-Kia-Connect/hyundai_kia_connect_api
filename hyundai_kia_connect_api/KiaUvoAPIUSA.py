@@ -19,7 +19,8 @@ from .const import (
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     TEMPERATURE_UNITS,
-    DISTANCE_UNITS, OrderStatus,
+    DISTANCE_UNITS,
+    OrderStatus,
 )
 from .utils import get_child_value
 
@@ -542,8 +543,14 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         response_body = response.json()
 
-    def check_action_status(self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False,
-                            timeout: int = 0) -> OrderStatus:
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> OrderStatus:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(

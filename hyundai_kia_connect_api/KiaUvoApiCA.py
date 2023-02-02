@@ -19,7 +19,8 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
     ENGINE_TYPES,
-    VEHICLE_LOCK_ACTION, OrderStatus,
+    VEHICLE_LOCK_ACTION,
+    OrderStatus,
 )
 from .exceptions import *
 from .utils import (
@@ -84,7 +85,6 @@ class KiaUvoApiCA(ApiImpl):
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
     def login(self, username: str, password: str) -> Token:
-
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "lgn"
         data = {"loginId": username, "password": password}
@@ -345,7 +345,6 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.data["status"] = state["status"]
 
     def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
-
         vehicle.odometer = (
             get_child_value(state, "currentOdometer"),
             DISTANCE_UNITS[get_child_value(state, "currentOdometerUnit")],
@@ -364,7 +363,6 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_location(
         self, vehicle: Vehicle, state: dict
     ) -> None:
-
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
@@ -589,7 +587,12 @@ class KiaUvoApiCA(ApiImpl):
         return response_headers["transactionId"]
 
     def check_action_status(
-        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
     ) -> OrderStatus:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS

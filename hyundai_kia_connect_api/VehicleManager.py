@@ -22,7 +22,8 @@ from .const import (
     REGION_USA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
-    CHARGE_PORT_ACTION, OrderStatus,
+    CHARGE_PORT_ACTION,
+    OrderStatus,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -150,8 +151,13 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )
 
-    def check_action_status(self, vehicle_id: str, action_id: str, synchronous: bool = False,
-                            timeout: int = 120) -> OrderStatus:
+    def check_action_status(
+        self,
+        vehicle_id: str,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 120,
+    ) -> OrderStatus:
         """
         Check for the status of a sent action/command.
 

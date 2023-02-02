@@ -56,7 +56,12 @@ class ApiImpl:
         pass
 
     def check_action_status(
-        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
     ) -> OrderStatus:
         pass
 
@@ -67,7 +72,6 @@ class ApiImpl:
     def update_geocoded_location(
         self, token: Token, vehicle: Vehicle, use_email: bool
     ) -> None:
-
         email_parameter = ""
         if use_email is True:
             email_parameter = "&email=" + token.username

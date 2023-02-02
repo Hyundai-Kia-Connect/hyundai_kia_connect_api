@@ -36,7 +36,8 @@ from .const import (
     SEAT_STATUS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
-    ENGINE_TYPES, OrderStatus,
+    ENGINE_TYPES,
+    OrderStatus,
 )
 from .exceptions import *
 from .utils import (
@@ -193,7 +194,6 @@ class KiaUvoApiEU(ApiImpl):
         }
 
     def login(self, username: str, password: str) -> Token:
-
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
@@ -1285,20 +1285,25 @@ class KiaUvoApiEU(ApiImpl):
         return token_type, refresh_token
 
     def check_action_status(
-        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
     ) -> OrderStatus:
         url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
 
         if synchronous:
-
             if timeout < 1:
                 raise Exception("Timeout must be 1 or higher")
 
             end_time = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
             while end_time > datetime.datetime.now():
-
                 # recursive call with Synchronous set to False
-                state = self.check_action_status(token, vehicle, action_id, synchronous=False)
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
                 if state == OrderStatus.PENDING:
                     # state pending: recheck regularly (until we get a final state or exceed the timeout)
                     sleep(5)
@@ -1310,7 +1315,6 @@ class KiaUvoApiEU(ApiImpl):
             return OrderStatus.TIMEOUT
 
         else:
-
             response = requests.get(
                 url, headers=self._get_authenticated_headers(token)
             ).json()
@@ -1326,7 +1330,9 @@ class KiaUvoApiEU(ApiImpl):
                     elif action["result"] == "non-response":
                         return OrderStatus.TIMEOUT
                     elif action["result"] is None:
-                        _LOGGER.info("Action status not set yet by server - try again in a few seconds")
+                        _LOGGER.info(
+                            "Action status not set yet by server - try again in a few seconds"
+                        )
                         return OrderStatus.PENDING
 
             # if iterate the whole notifications list and can't find the action, raise an exception
