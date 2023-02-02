@@ -1,9 +1,11 @@
 # pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 """KiaUvoApiEU.py"""
+import datetime
 import datetime as dt
 import logging
 import re
 import uuid
+from time import sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytz
@@ -15,6 +17,15 @@ from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
 )
+from .Token import Token
+from .Vehicle import (
+    Vehicle,
+    DailyDrivingStats,
+    MonthTripInfo,
+    DayTripInfo,
+    TripInfo,
+    DayTripCounts,
+)
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -25,23 +36,13 @@ from .const import (
     SEAT_STATUS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
-    ENGINE_TYPES,
+    ENGINE_TYPES, OrderStatus,
 )
-
 from .exceptions import *
-from .Token import Token
 from .utils import (
     get_child_value,
     get_index_into_hex_temp,
     get_hex_temp_into_index,
-)
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -711,7 +712,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> None:
+    ) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
 
         payload = {"action": action.value, "deviceId": token.device_id}
@@ -721,10 +722,11 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
-    ) -> None:
+    ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
 
         payload = {"action": action.value, "deviceId": token.device_id}
@@ -734,10 +736,11 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> None:
+    ) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
 
         # Defaults are located here to be region specific
@@ -773,8 +776,9 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
 
         payload = {
@@ -793,8 +797,9 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
 
         payload = {"action": "start", "deviceId": token.device_id}
@@ -804,8 +809,9 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
 
         payload = {"action": "stop", "deviceId": token.device_id}
@@ -815,6 +821,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
+        return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.  Most likely this forces the car the update it.
@@ -1017,10 +1024,10 @@ class KiaUvoApiEU(ApiImpl):
         }
         response = requests.post(
             url, json=body, headers=self._get_authenticated_headers(token)
-        )
+        ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
-
-        return str(response.status_code == 200)
+        _check_response_for_errors(response)
+        return response["msgId"]
 
     def _get_stamp(self) -> str:
         if self.stamps is None:
@@ -1276,3 +1283,51 @@ class KiaUvoApiEU(ApiImpl):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def check_action_status(
+        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+    ) -> OrderStatus:
+        url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
+
+        if synchronous:
+
+            if timeout < 1:
+                raise Exception("Timeout must be 1 or higher")
+
+            end_time = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
+            while end_time > datetime.datetime.now():
+
+                # recursive call with Synchronous set to False
+                state = self.check_action_status(token, vehicle, action_id, synchronous=False)
+                if state == OrderStatus.PENDING:
+                    # state pending: recheck regularly (until we get a final state or exceed the timeout)
+                    sleep(5)
+                else:
+                    # any other state is final
+                    return state
+
+            # if we exit the loop after the set timeout, return a Timeout state
+            return OrderStatus.TIMEOUT
+
+        else:
+
+            response = requests.get(
+                url, headers=self._get_authenticated_headers(token)
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
+            _check_response_for_errors(response)
+
+            for action in response["resMsg"]:
+                if action["recordId"] == action_id:
+                    if action["result"] == "success":
+                        return OrderStatus.SUCCESS
+                    elif action["result"] == "fail":
+                        return OrderStatus.FAILED
+                    elif action["result"] == "non-response":
+                        return OrderStatus.TIMEOUT
+                    elif action["result"] is None:
+                        _LOGGER.info("Action status not set yet by server - try again in a few seconds")
+                        return OrderStatus.PENDING
+
+            # if iterate the whole notifications list and can't find the action, raise an exception
+            raise APIError(f"No action found with ID {action_id}")

@@ -6,10 +6,9 @@ from dataclasses import dataclass
 
 import requests
 
-from .const import *
 from .Token import Token
 from .Vehicle import Vehicle
-
+from .const import *
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,11 +55,9 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
-    def check_last_action_status(
-        self, token: Token, vehicle: Vehicle, action_id: str
-    ) -> bool:
-        """Check if a previous placed call was successful. Returns true if complete.
-        False if not.  Does not confirm if successful only confirms if complete"""
+    def check_action_status(
+        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+    ) -> OrderStatus:
         pass
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:

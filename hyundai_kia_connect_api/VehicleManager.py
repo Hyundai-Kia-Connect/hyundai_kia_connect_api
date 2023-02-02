@@ -6,6 +6,12 @@ import logging
 import pytz
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
+from .KiaUvoAPIUSA import KiaUvoAPIUSA
+from .KiaUvoApiCA import KiaUvoApiCA
+from .KiaUvoApiEU import KiaUvoApiEU
+from .Token import Token
+from .Vehicle import Vehicle
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -16,14 +22,8 @@ from .const import (
     REGION_USA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
-    CHARGE_PORT_ACTION,
+    CHARGE_PORT_ACTION, OrderStatus,
 )
-from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
-from .KiaUvoApiCA import KiaUvoApiCA
-from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoAPIUSA import KiaUvoAPIUSA
-from .Vehicle import Vehicle
-from .Token import Token
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -148,6 +148,29 @@ class VehicleManager:
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
         return self.api.set_charge_limits(
             self.token, self.get_vehicle(vehicle_id), ac, dc
+        )
+
+    def check_action_status(self, vehicle_id: str, action_id: str, synchronous: bool = False,
+                            timeout: int = 120) -> OrderStatus:
+        """
+        Check for the status of a sent action/command.
+
+        Actions can have 4 states:
+        - pending: request sent to vehicle, waiting for response
+        - success: vehicle confirmed that the action was performed
+        - fail: vehicle could not perform the action (most likely because a condition was not met)
+        - vehicle timeout: request sent to vehicle, no response received.
+
+        In case of timeout, the API can return "pending" for up to 2 minutes before it returns a final state.
+
+        :param vehicle_id: ID of the vehicle
+        :param action_id: ID of the action
+        :param synchronous: Whether to wait for pending actions to reach a final state (success/fail/timeout)
+        :param timeout: Time in seconds to wait for pending actions to reach a final state.
+        :return: status of the order
+        """
+        return self.api.check_action_status(
+            self.token, self.get_vehicle(vehicle_id), action_id, synchronous, timeout
         )
 
     def open_charge_port(self, vehicle_id: str) -> str:

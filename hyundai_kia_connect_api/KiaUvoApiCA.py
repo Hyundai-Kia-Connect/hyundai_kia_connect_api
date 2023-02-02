@@ -1,13 +1,15 @@
+import datetime as dt
 import json
 import logging
-import datetime as dt
 import re
+
+import pytz
+import requests
 from dateutil.tz import *
 
-import requests
-import pytz
-
 from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .Token import Token
+from .Vehicle import Vehicle
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -17,16 +19,14 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
     ENGINE_TYPES,
-    VEHICLE_LOCK_ACTION,
+    VEHICLE_LOCK_ACTION, OrderStatus,
 )
 from .exceptions import *
-from .Token import Token
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
 )
-from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -588,9 +588,9 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
         return response_headers["transactionId"]
 
-    def check_last_action_status(
-        self, token: Token, vehicle: Vehicle, action_id: str
-    ) -> bool:
+    def check_action_status(
+        self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False, timeout: int = 0
+    ) -> OrderStatus:
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token

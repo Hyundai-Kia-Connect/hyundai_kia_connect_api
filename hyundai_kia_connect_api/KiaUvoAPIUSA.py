@@ -1,26 +1,26 @@
+import datetime as dt
 import logging
 import random
+import re
 import secrets
 import string
 import time
-from datetime import datetime
-import datetime as dt
-import re
 import typing
+from datetime import datetime
 
 import pytz
 import requests
 from requests import RequestException, Response
 
+from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .Token import Token
+from .Vehicle import Vehicle
 from .const import (
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     TEMPERATURE_UNITS,
-    DISTANCE_UNITS,
+    DISTANCE_UNITS, OrderStatus,
 )
-from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .Token import Token
-from .Vehicle import Vehicle
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -542,7 +542,8 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         response_body = response.json()
 
-    def check_last_action_status(self, token: Token, vehicle: Vehicle, action_id: str):
+    def check_action_status(self, token: Token, vehicle: Vehicle, action_id: str, synchronous: bool = False,
+                            timeout: int = 0) -> OrderStatus:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(
