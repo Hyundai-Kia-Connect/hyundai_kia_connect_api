@@ -62,3 +62,14 @@ class CHARGE_PORT_ACTION(Enum):
 
 class EvChargeLimit(IntEnum):
     50, 60, 70, 80, 90, 100
+
+
+class OrderStatus(Enum):
+    # pending (waiting for response from vehicle)
+    PENDING = "PENDING"
+    # order executed by vehicle and response returned
+    SUCCESS = "SUCCESS"
+    # order refused by vehicle and response returned
+    FAILED = "FAILED"
+    # no response received from vehicle. no way to know if the order was executed, but most likely not
+    TIMEOUT = "TIMEOUT"
