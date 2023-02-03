@@ -84,7 +84,6 @@ class KiaUvoApiCA(ApiImpl):
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
     def login(self, username: str, password: str) -> Token:
-
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "lgn"
         data = {"loginId": username, "password": password}
@@ -345,7 +344,6 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.data["status"] = state["status"]
 
     def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
-
         vehicle.odometer = (
             get_child_value(state, "currentOdometer"),
             DISTANCE_UNITS[get_child_value(state, "currentOdometerUnit")],
@@ -364,7 +362,6 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_location(
         self, vehicle: Vehicle, state: dict
     ) -> None:
-
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
@@ -644,15 +641,11 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
         try:
-            if [
-                x["level"] for x in state if x["plugType"] == 1
-            ][-1] <= 100:
+            if [x["level"] for x in state if x["plugType"] == 1][-1] <= 100:
                 vehicle.ev_charge_limits_ac = [
                     x["level"] for x in state if x["plugType"] == 1
                 ][-1]
-            if [
-                x["level"] for x in state if x["plugType"] == 0
-            ][-1] <= 100:
+            if [x["level"] for x in state if x["plugType"] == 0][-1] <= 100:
                 vehicle.ev_charge_limits_dc = [
                     x["level"] for x in state if x["plugType"] == 0
                 ][-1]

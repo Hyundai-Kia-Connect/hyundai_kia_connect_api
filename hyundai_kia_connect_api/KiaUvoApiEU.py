@@ -192,7 +192,6 @@ class KiaUvoApiEU(ApiImpl):
         }
 
     def login(self, username: str, password: str) -> Token:
-
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()

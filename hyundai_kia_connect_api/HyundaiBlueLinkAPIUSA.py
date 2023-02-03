@@ -45,7 +45,6 @@ class cipherAdapter(HTTPAdapter):
 
 
 class HyundaiBlueLinkAPIUSA(ApiImpl):
-
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
 
@@ -91,7 +90,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
     def login(self, username: str, password: str) -> Token:
-
         # Sign In with Email and Password and Get Authorization Code
 
         url = self.LOGIN_API + "oauth/token"
