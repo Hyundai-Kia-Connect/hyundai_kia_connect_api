@@ -647,12 +647,14 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
         try:
-            vehicle.ev_charge_limits_ac = [
-                x["level"] for x in state if x["plugType"] == 1
-            ][-1]
-            vehicle.ev_charge_limits_dc = [
-                x["level"] for x in state if x["plugType"] == 0
-            ][-1]
+            if [x["level"] for x in state if x["plugType"] == 1][-1] <= 100:
+                vehicle.ev_charge_limits_ac = [
+                    x["level"] for x in state if x["plugType"] == 1
+                ][-1]
+            if [x["level"] for x in state if x["plugType"] == 0][-1] <= 100:
+                vehicle.ev_charge_limits_dc = [
+                    x["level"] for x in state if x["plugType"] == 0
+                ][-1]
         except:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
