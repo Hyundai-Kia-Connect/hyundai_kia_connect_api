@@ -89,16 +89,25 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
+    def _get_authenticated_headers(self, token: Token) -> dict:
+        headers = dict(self.API_HEADERS)
+        headers["username"] = token.username
+        headers["accessToken"] = token.access_token
+        headers["blueLinkServicePin"] = token.pin
+        return headers
+
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+        headers = self._get_authenticated_headers(token)
+        headers["registrationId"] = vehicle.id
+        headers["vin"] = vehicle.VIN
+        return headers
+
     def login(self, username: str, password: str) -> Token:
         # Sign In with Email and Password and Get Authorization Code
-
         url = self.LOGIN_API + "oauth/token"
-
         data = {"username": username, "password": password}
-        headers = self.API_HEADERS
-        headers["username"] = username
 
-        response = self.sessions.post(url, json=data, headers=headers)
+        response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         access_token = response["access_token"]
@@ -383,9 +392,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["username"] = token.username
+        headers = self._get_authenticated_headers(token)
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -432,13 +439,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             url = self.API_URL + "rcs/rdo/on"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
 
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.VIN
-        headers["registrationId"] = vehicle.id
+        headers = self._get_vehicle_headers(token)
         headers["APPCLOUD-VIN"] = vehicle.VIN
-        headers["username"] = token.username
-        headers["blueLinkServicePin"] = token.pin
 
         data = {"userName": token.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
@@ -459,12 +461,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         url = self.API_URL + "rcs/rsc/start"
 
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.VIN
-        headers["registrationId"] = vehicle.id
-        headers["username"] = token.username
-        headers["blueLinkServicePin"] = token.pin
+        headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         if options.climate is None:
@@ -515,12 +512,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         url = self.API_URL + "rcs/rsc/stop"
 
-        headers = self.API_HEADERS
-        headers["accessToken"] = token.access_token
-        headers["vin"] = vehicle.VIN
-        headers["registrationId"] = vehicle.id
-        headers["username"] = token.username
-        headers["blueLinkServicePin"] = token.pin
+        headers = self._get_vehicle_headers(token, vehicle)
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
