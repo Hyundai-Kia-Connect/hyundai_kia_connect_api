@@ -408,6 +408,18 @@ class KiaUvoApiEU(ApiImpl):
             state, "vehicleStatus.doorOpen.backRight"
         )
         vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.frontLeft"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.frontRight"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.backLeft"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.backRight"
+        )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampRL")
         )
