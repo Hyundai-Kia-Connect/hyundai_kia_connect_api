@@ -294,6 +294,18 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.hood_is_open = get_child_value(state, "status.hoodOpen")
 
         vehicle.trunk_is_open = get_child_value(state, "status.trunkOpen")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.frontLeft"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.frontRight"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.backLeft"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "vehicleStatus.windowOpen.backRight"
+        )
         vehicle.ev_battery_percentage = get_child_value(
             state, "status.evStatus.batteryStatus"
         )
