@@ -353,7 +353,8 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.frontLeft"
         )
         vehicle.front_right_window_is_open = get_child_value(
-            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.frontRight"
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.frontRight",
         )
         vehicle.back_left_window_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.backLeft"
