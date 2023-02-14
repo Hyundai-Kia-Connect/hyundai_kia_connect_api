@@ -3,15 +3,12 @@ import time
 import pytz
 import datetime as dt
 import re
-from urllib.parse import parse_qs, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (
-    BRAND_HYUNDAI,
-    BRANDS,
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
@@ -61,6 +58,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         ).total_seconds()
         utc_offset_hours = int(utc_offset / 60 / 60)
 
+        origin: str = "https://" + self.BASE_URL
+        referer: str = origin + "/login"
+
         self.API_HEADERS = {
             "content-type": "application/json;charset=UTF-8",
             "accept": "application/json, text/plain, */*",
@@ -68,8 +68,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "accept-language": "en-US,en;q=0.9",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
             "host": self.BASE_URL,
-            "origin": "https://" + self.BASE_URL,
-            "referer": "https://" + self.BASE_URL + "/login",
+            "origin": origin,
+            "referer": referer,
             "from": "SPA",
             "to": "ISS",
             "language": "0",
@@ -85,7 +85,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "clientSecret": "v558o935-6nne-423i-baa8",
         }
         self.sessions = requests.Session()
-        self.sessions.mount("https://" + self.BASE_URL, cipherAdapter())
+        self.sessions.mount(origin, cipherAdapter())
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
@@ -137,7 +137,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             if entry["regid"] == vehicle.id:
                 return entry
 
-    def _get_vehicle_status(self, token: Token, vehicle: Vehicle, refresh: bool) -> dict:
+    def _get_vehicle_status(
+        self, token: Token, vehicle: Vehicle, refresh: bool
+    ) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self._get_vehicle_headers(token, vehicle)
