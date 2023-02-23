@@ -1,17 +1,16 @@
+"""HyundaiBlueLinkAPIUSA.py"""
+# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
+
 import logging
 import time
-import pytz
-import datetime as dt
 import re
-from urllib.parse import parse_qs, urlparse
-
+import datetime as dt
+import pytz
 import requests
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+from urllib3.util.ssl_ import create_urllib3_context
 
 from .const import (
-    BRAND_HYUNDAI,
-    BRANDS,
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
@@ -45,6 +44,8 @@ class cipherAdapter(HTTPAdapter):
 
 
 class HyundaiBlueLinkAPIUSA(ApiImpl):
+    """HyundaiBlueLinkAPIUSA"""
+
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
 
@@ -66,7 +67,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",  # noqa
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,
             "referer": "https://" + self.BASE_URL + "/login",
@@ -164,12 +165,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
@@ -334,23 +335,26 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
                     )
                 ],
             )
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
 
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        vehicle.location = (
-            get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
-            get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
-            get_child_value(state, "vehicleStatus.vehicleLocation.time"),
-        )
+        if get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
+                get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
+                self.get_last_updated_at(
+                    get_child_value(state, "vehicleStatus.vehicleLocation.time")
+                ),
+            )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
         vehicle.data = state
@@ -358,8 +362,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def get_location(self, token: Token, vehicle: Vehicle):
         r"""
         Get the location of the vehicle
-        This logic only checks odometer move in the update.  This call doesn't protect from overlimit as per:
-        Only update the location if the odometer moved AND if the last location update was over an hour ago.
+        This logic only checks odometer move in the update.
+        This call doesn't protect from overlimit as per:
+        Only update the location if the odometer moved AND if the last location update
+        was over an hour ago.
         Note that the "last updated" time is initially set to three hours ago.
         This will help to prevent too many calls to the API
         """
@@ -456,11 +462,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         response = self.sessions.post(url, headers=headers, json=data)
         # response_headers = response.headers
         # response = response.json()
-        # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])
+        # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])  # noqa
 
         # _LOGGER.debug(f"{DOMAIN} - Received lock_action response {action_status}")
         _LOGGER.debug(
-            f"{DOMAIN} - Received lock_action response status code: {response.status_code}"
+            f"{DOMAIN} - Received lock_action response status code: {response.status_code}"  # noqa
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
@@ -549,17 +555,26 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         pass
 
     def get_last_updated_at(self, value) -> dt.datetime:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        value = dt.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=self.data_timezone,
-        )
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+        if value is None:
+            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
+        else:
+            value = (
+                value.replace("-", "")
+                .replace("T", "")
+                .replace(":", "")
+                .replace("Z", "")
+            )
+            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+            value = dt.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=self.data_timezone,
+            )
 
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
