@@ -1,6 +1,6 @@
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 """KiaUvoApiEU.py"""
-import datetime
+# pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
+
 import datetime as dt
 import logging
 import re
@@ -50,8 +50,8 @@ _LOGGER = logging.getLogger(__name__)
 
 INVALID_STAMP_RETRY_COUNT = 10
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
 
 SUPPORTED_LANGUAGES_LIST = [
     "en",  # English
@@ -134,7 +134,7 @@ class KiaUvoApiEU(ApiImpl):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
+            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
@@ -152,7 +152,7 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LOGIN_FORM_HOST
                 + "/auth/realms/eukiaidm/protocol/openid-connect/auth?client_id="
                 + auth_client_id
-                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
+                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
                 + self.USER_API_URL
                 + "integration/redirect/login&ui_locales="
                 + self.LANGUAGE
@@ -165,7 +165,7 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LOGIN_FORM_HOST
                 + "/auth/realms/euhyundaiidm/protocol/openid-connect/auth?client_id="
                 + auth_client_id
-                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="
+                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
                 + self.USER_API_URL
                 + "integration/redirect/login&ui_locales="
                 + self.LANGUAGE
@@ -258,9 +258,11 @@ class KiaUvoApiEU(ApiImpl):
         return result
 
     def get_last_updated_at(self, value) -> dt.datetime:
-        if value is not None:
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
+        if value is None:
+            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
+        else:
             m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
             value = dt.datetime(
                 year=int(m.group(1)),
                 month=int(m.group(2)),
@@ -270,7 +272,8 @@ class KiaUvoApiEU(ApiImpl):
                 second=int(m.group(6)),
                 tzinfo=self.data_timezone,
             )
-            _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
@@ -296,9 +299,9 @@ class KiaUvoApiEU(ApiImpl):
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
-                # we don't know if all car types (ex: ICE cars) provide this information.
-                # we also don't know what the API returns if the info is unavailable.
-                # so, catch any exception and move on.
+                # we don't know if all car types (ex: ICE cars) provide this
+                # information. We also don't know what the API returns if
+                # the info is unavailable. So, catch any exception and move on.
                 _LOGGER.exception(
                     """Failed to parse driving info. Possible reasons:
                                     - incompatible vehicle (ICE)
@@ -314,7 +317,8 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-        # Only call for driving info on cars we know have a chance of supporting it.   Could be expanded if other types do support it.
+        # Only call for driving info on cars we know have a chance of supporting it.
+        # Could be expanded if other types do support it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
@@ -354,7 +358,8 @@ class KiaUvoApiEU(ApiImpl):
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
 
-        # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
+        # Converts temp to usable number. Currently only support celsius.
+        # Future to do is check unit in case the care itself is set to F.
         if get_child_value(state, "vehicleStatus.airTemp.value"):
             tempIndex = get_hex_temp_into_index(
                 get_child_value(state, "vehicleStatus.airTemp.value")
@@ -458,7 +463,7 @@ class KiaUvoApiEU(ApiImpl):
         if (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
             )
             is not None
         ):
@@ -467,7 +472,7 @@ class KiaUvoApiEU(ApiImpl):
                     float(
                         get_child_value(
                             state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
                         )
                     ),
                     1,
@@ -475,7 +480,7 @@ class KiaUvoApiEU(ApiImpl):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
                     )
                 ],
             )
@@ -491,7 +496,7 @@ class KiaUvoApiEU(ApiImpl):
                     float(
                         get_child_value(
                             state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
                         )
                     ),
                     1,
@@ -499,7 +504,7 @@ class KiaUvoApiEU(ApiImpl):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
                     )
                 ],
             )
@@ -542,12 +547,12 @@ class KiaUvoApiEU(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
                     )
                 ],
             )
@@ -566,96 +571,96 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
+                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
+                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
         vehicle.ev_first_departure_enabled = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",  # noqa
         )
         vehicle.ev_second_departure_enabled = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",  # noqa
         )
         vehicle.ev_first_departure_days = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",  # noqa
         )
         vehicle.ev_second_departure_days = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",  # noqa
         )
 
         vehicle.ev_first_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",
+                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",
+                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_second_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",
+                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",
+                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_off_peak_start_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",
+                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",
+                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_off_peak_end_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",
+                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",
+                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",  # noqa
             ),
         )
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+            "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
         ):
             if (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
                 )
                 == 1
             ):
@@ -663,7 +668,7 @@ class KiaUvoApiEU(ApiImpl):
             elif (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
                 )
                 == 2
             ):
@@ -845,7 +850,8 @@ class KiaUvoApiEU(ApiImpl):
         return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
-        # Not currently used as value is in the general get.  Most likely this forces the car the update it.
+        # Not currently used as value is in the general get.
+        # Most likely this forces the car the update it.
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
@@ -855,7 +861,8 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
         _check_response_for_errors(response)
         # API sometimes returns multiple entries per plug type and they conflict.
-        # The car itself says the last entry per plug type is the truth when tested (EU Ioniq Electric Facelift MY 2019)
+        # The car itself says the last entry per plug type is the truth when tested
+        # (EU Ioniq Electric Facelift MY 2019)
         if response["resMsg"] is not None:
             return response["resMsg"]
 
@@ -1022,7 +1029,7 @@ class KiaUvoApiEU(ApiImpl):
             return drivingInfo
         else:
             _LOGGER.debug(
-                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."
+                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
             )
             return None
 
@@ -1063,7 +1070,7 @@ class KiaUvoApiEU(ApiImpl):
         )
         stamp_count = len(self.stamps["stamps"])
         _LOGGER.debug(
-            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0) / frequency}"
+            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0) / frequency}"  # noqa
         )
         if (position * 100.0) / stamp_count > 90:
             self.stamps = None
@@ -1181,11 +1188,11 @@ class KiaUvoApiEU(ApiImpl):
         )
         cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
-            f"{DOMAIN} - LoginFormSubmit {login_form_action_url} - Response {response.status_code} - {response.headers}"
+            f"{DOMAIN} - LoginFormSubmit {login_form_action_url} - Response {response.status_code} - {response.headers}"  # noqa
         )
         if response.status_code != 302:
             _LOGGER.debug(
-                f"{DOMAIN} - LoginFormSubmit Error {login_form_action_url} - Response {response.status_code} - {response.text}"
+                f"{DOMAIN} - LoginFormSubmit Error {login_form_action_url} - Response {response.status_code} - {response.text}"  # noqa
             )
             return
 
@@ -1194,7 +1201,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.get(redirect_url, headers=headers, cookies=cookies)
         cookies = cookies | response.cookies.get_dict()
         _LOGGER.debug(
-            f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"
+            f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"  # noqa
         )
 
         intUserId = 0
@@ -1216,7 +1223,7 @@ class KiaUvoApiEU(ApiImpl):
 
             if response.status_code != 302:
                 _LOGGER.debug(
-                    f"{DOMAIN} - AccountFindLink Error {login_form_action_url} - Response {response.status_code}"
+                    f"{DOMAIN} - AccountFindLink Error {login_form_action_url} - Response {response.status_code}"  # noqa
                 )
                 return
 
@@ -1225,7 +1232,7 @@ class KiaUvoApiEU(ApiImpl):
             headers = {"User-Agent": USER_AGENT_MOZILLA}
             response = requests.get(redirect_url, headers=headers, cookies=cookies)
             _LOGGER.debug(
-                f"{DOMAIN} - Redirect User Id 2 {redirect_url} - Response {response.url}"
+                f"{DOMAIN} - Redirect User Id 2 {redirect_url} - Response {response.url}"  # noqa
             )
             _LOGGER.debug(f"{DOMAIN} - Redirect 2 - Response Text {response.text}")
             parsed_url = urlparse(response.url)
@@ -1294,7 +1301,7 @@ class KiaUvoApiEU(ApiImpl):
         }
 
         data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
+            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
             + authorization_code
         )
         _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data: {data}")
@@ -1317,16 +1324,17 @@ class KiaUvoApiEU(ApiImpl):
 
         if synchronous:
             if timeout < 1:
-                raise Exception("Timeout must be 1 or higher")
+                raise APIError("Timeout must be 1 or higher")
 
-            end_time = datetime.datetime.now() + datetime.timedelta(seconds=timeout)
-            while end_time > datetime.datetime.now():
+            end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
+            while end_time > dt.datetime.now():
                 # recursive call with Synchronous set to False
                 state = self.check_action_status(
                     token, vehicle, action_id, synchronous=False
                 )
                 if state == OrderStatus.PENDING:
-                    # state pending: recheck regularly (until we get a final state or exceed the timeout)
+                    # state pending: recheck regularly
+                    # (until we get a final state or exceed the timeout)
                     sleep(5)
                 else:
                     # any other state is final
@@ -1352,9 +1360,10 @@ class KiaUvoApiEU(ApiImpl):
                         return OrderStatus.TIMEOUT
                     elif action["result"] is None:
                         _LOGGER.info(
-                            "Action status not set yet by server - try again in a few seconds"
+                            "Action status not set yet by server - try again in a few seconds"  # noqa
                         )
                         return OrderStatus.PENDING
 
-            # if iterate the whole notifications list and can't find the action, raise an exception
+            # if iterate the whole notifications list and
+            # can't find the action, raise an exception
             raise APIError(f"No action found with ID {action_id}")

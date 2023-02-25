@@ -1,3 +1,6 @@
+"""KiaUvoApiCA.py"""
+# pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
+
 import datetime as dt
 import json
 import logging
@@ -5,7 +8,8 @@ import re
 
 import pytz
 import requests
-from dateutil.tz import *
+
+from dateutil.tz import tzoffset
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -22,7 +26,8 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OrderStatus,
 )
-from .exceptions import *
+
+from .exceptions import AuthenticationError, APIError
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
@@ -33,11 +38,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class KiaUvoApiCA(ApiImpl):
+    """KiaUvoApiCA"""
+
     temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
     temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
     temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+        self.vehicle_timezone = self.data_timezone
         self.LANGUAGE: str = language
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "www.kiaconnect.ca"
@@ -50,7 +58,7 @@ class KiaUvoApiCA(ApiImpl):
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",  # noqa
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,
             "referer": "https://" + self.BASE_URL + "/login",
@@ -64,7 +72,8 @@ class KiaUvoApiCA(ApiImpl):
 
     def _check_response_for_errors(self, response: dict) -> None:
         """
-        Checks for errors in the API response. If an error is found, an exception is raised.
+        Checks for errors in the API response.
+        If an error is found, an exception is raised.
         retCode known values:
         - S: success
         - F: failure
@@ -154,7 +163,8 @@ class KiaUvoApiCA(ApiImpl):
             location = self.get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
-        # Update service after the fact so we still have the old odometer reading available for above.
+        # Update service after the fact so we still have the old odometer
+        # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
@@ -164,8 +174,9 @@ class KiaUvoApiCA(ApiImpl):
         state = self._get_forced_vehicle_state(token, vehicle)
 
         # Calculate offset between vehicle last_updated_at and UTC
+        self.vehicle_timezone = vehicle.timezone
         last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate"), vehicle
+            get_child_value(state, "status.lastStatusDate")
         )
         now_utc: dt = dt.datetime.now(pytz.utc)
         offset = round((last_updated_at - now_utc).total_seconds() / 3600)
@@ -189,7 +200,8 @@ class KiaUvoApiCA(ApiImpl):
             location = self.get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
-        # Update service after the fact so we still have the old odometer reading available for above.
+        # Update service after the fact so we still have the old odometer
+        # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -198,13 +210,15 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
+        self.vehicle_timezone = vehicle.timezone
         vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate"), vehicle
+            get_child_value(state, "status.lastStatusDate")
         )
         _LOGGER.debug(
             f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}"
         )
-        # Converts temp to usable number. Currently only support celsius. Future to do is check unit in case the care itself is set to F.
+        # Converts temp to usable number. Currently only support celsius.
+        # Future to do is check unit in case the care itself is set to F.
         tempIndex = get_hex_temp_into_index(
             get_child_value(state, "status.airTemp.value")
         )
@@ -227,7 +241,7 @@ class KiaUvoApiCA(ApiImpl):
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
@@ -376,27 +390,31 @@ class KiaUvoApiCA(ApiImpl):
         self, vehicle: Vehicle, state: dict
     ) -> None:
         if get_child_value(state, "coord.lat"):
+            self.vehicle_timezone = vehicle.timezone
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
-                get_child_value(state, "time"),
+                self.get_last_updated_at(get_child_value(state, "time")),
             )
         vehicle.data["vehicleLocation"] = state
 
-    def get_last_updated_at(self, value, vehicle) -> dt.datetime:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+    def get_last_updated_at(self, value) -> dt.datetime:
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        value = dt.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=vehicle.timezone,
-        )
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+        if value is None:
+            value = dt.datetime(2000, 1, 1, tzinfo=self.vehicle_timezone)
+        else:
+            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+            value = dt.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=self.vehicle_timezone,
+            )
 
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -457,7 +475,7 @@ class KiaUvoApiCA(ApiImpl):
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
             if response["responseHeader"]["responseCode"] != 0:
-                raise Exception("No Location Located")
+                raise APIError("No Location Located")
             return response["result"]
         except:
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
