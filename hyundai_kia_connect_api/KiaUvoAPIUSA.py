@@ -1,3 +1,5 @@
+"""KiaUvoAPIUSA.py"""
+# pylint:disable=logging-fstring-interpolation,unused-argument,missing-timeout,bare-except,missing-function-docstring,invalid-name,unnecessary-pass,broad-exception-raised
 import datetime as dt
 import logging
 import random
@@ -28,6 +30,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class AuthError(RequestException):
+    """AuthError"""
+
     pass
 
 
@@ -44,7 +48,7 @@ def request_with_active_session(func):
             vehicle = kwargs["vehicle"]
             new_token = self.login(token.username, token.password)
             _LOGGER.debug(
-                f"{DOMAIN} - Old token:{token.access_token}, new token:{new_token.access_token}"
+                f"{DOMAIN} - Old token:{token.access_token}, new token:{new_token.access_token}"  # noqa
             )
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
@@ -85,6 +89,8 @@ def request_with_logging(func):
 
 
 class KiaUvoAPIUSA(ApiImpl):
+    """KiaUvoAPIUSA"""
+
     def __init__(self, region: int, brand: int, language) -> None:
         self.LANGUAGE: str = language
         self.temperature_range = range(62, 82)
@@ -122,7 +128,8 @@ class KiaUvoAPIUSA(ApiImpl):
             "tokentype": "G",
             "user-agent": "okhttp/3.12.1",
         }
-        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT". May require adjusting locale to en_US
+        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
+        # May require adjusting locale to en_US
         date = datetime.now(tz=pytz.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
@@ -166,7 +173,7 @@ class KiaUvoAPIUSA(ApiImpl):
         session_id = response.headers.get("sid")
         if not session_id:
             raise Exception(
-                f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
+                f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"  # noqa
             )
         _LOGGER.debug(f"got session id {session_id}")
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=1)
@@ -199,7 +206,10 @@ class KiaUvoAPIUSA(ApiImpl):
     def refresh_vehicles(
         self, token: Token, vehicles: typing.Union[list[Vehicle], Vehicle]
     ) -> typing.Union[list[Vehicle], Vehicle]:
-        """Refresh the vehicle data provided in get_vehicles. Required for Kia USA as key is session specific"""
+        """
+        Refresh the vehicle data provided in get_vehicles.
+        Required for Kia USA as key is session specific
+        """
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
@@ -209,7 +219,7 @@ class KiaUvoAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
 
         response = response.json()
-        if type(vehicles) is dict:
+        if isinstance(vehicles, dict):
             for entry in response["payload"]["vehicleSummary"]:
                 if vehicles[entry["vehicleIdentifier"]]:
                     vehicles[entry["vehicleIdentifier"]].name = entry["nickName"]
@@ -225,7 +235,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     vehicles.append(vehicle)
                 return vehicles
         else:
-            # For readability work with vechile without s
+            # For readability work with vehicle without s
             vehicle = vehicles
             for entry in response["payload"]["vehicleSummary"]:
                 if vehicle.id == entry["vehicleIdentifier"]:
@@ -240,9 +250,10 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         self._get_forced_vehicle_state(token, vehicle)
-        # TODO: Force update needs work to return the correct data for processing
+        # Force update needs work to return the correct data for processing
         # self._update_vehicle_properties(vehicle, state)
-        # Temp call a cached state since we are removing this from parent logic in other commits should be removed when the above is fixed
+        # Temp call a cached state since we are removing this from parent logic in
+        # other commits should be removed when the above is fixed
         self.update_vehicle_with_cached_state(token, vehicle)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
@@ -266,7 +277,7 @@ class KiaUvoAPIUSA(ApiImpl):
         )
         vehicle.car_battery_percentage = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",  # noqa
         )
         vehicle.engine_is_running = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine"
@@ -280,7 +291,7 @@ class KiaUvoAPIUSA(ApiImpl):
             TEMPERATURE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit",  # noqa
                 )
             ],
         )
@@ -300,31 +311,31 @@ class KiaUvoAPIUSA(ApiImpl):
 
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",  # noqa
         )
         vehicle.back_window_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",  # noqa
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",  # noqa
         )
         vehicle.front_left_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",  # noqa
         )
         vehicle.front_right_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",  # noqa
         )
         vehicle.rear_left_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",  # noqa
         )
         vehicle.rear_right_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",  # noqa
         )
         vehicle.is_locked = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorLock"
@@ -390,68 +401,68 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.ev_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
                 )
             ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",  # noqa
             ),
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",  # noqa
             ),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",  # noqa
             ),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",  # noqa
             ),
             "m",
         )
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
         if get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
                     )
                 ],
             )
@@ -459,12 +470,12 @@ class KiaUvoAPIUSA(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",  # noqa
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",  # noqa
                     )
                 ],
             )
@@ -478,11 +489,14 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airCtrl"
         )
 
-        vehicle.location = (
-            get_child_value(state, "lastVehicleInfo.location.coord.lat"),
-            get_child_value(state, "lastVehicleInfo.location.coord.lon"),
-            get_child_value(state, "lastVehicleInfo.location.syncDate.utc"),
-        )
+        if get_child_value(state, "lastVehicleInfo.location.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "lastVehicleInfo.location.coord.lat"),
+                get_child_value(state, "lastVehicleInfo.location.coord.lon"),
+                self.get_last_updated_at(
+                    get_child_value(state, "lastVehicleInfo.location.syncDate.utc")
+                ),
+            )
 
         vehicle.next_service_distance = (
             get_child_value(state, "vehicleConfig.maintenance.nextServiceMile"),
@@ -499,19 +513,22 @@ class KiaUvoAPIUSA(ApiImpl):
         vehicle.data = state
 
     def get_last_updated_at(self, value) -> dt.datetime:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        value = dt.datetime(
-            year=int(m.group(1)),
-            month=int(m.group(2)),
-            day=int(m.group(3)),
-            hour=int(m.group(4)),
-            minute=int(m.group(5)),
-            second=int(m.group(6)),
-            tzinfo=self.data_timezone,
-        )
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
+        if value is None:
+            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
+        else:
+            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+            value = dt.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=self.data_timezone,
+            )
 
+        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -549,12 +566,14 @@ class KiaUvoAPIUSA(ApiImpl):
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rems/rvs"
         body = {
-            "requestType": 0  # value of 1 would return cached results instead of forcing update
+            "requestType": 0
+            # value of 1 would return cached results instead of forcing update
         }
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_body = response.json()
+        return response_body
 
     def check_action_status(
         self,

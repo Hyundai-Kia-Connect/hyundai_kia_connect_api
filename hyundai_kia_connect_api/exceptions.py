@@ -1,5 +1,5 @@
-# pylint:disable=unnecessary-pass
 """exceptions.py"""
+# pylint:disable=unnecessary-pass
 
 
 class HyundaiKiaException(Exception):
@@ -36,7 +36,8 @@ class RateLimitingError(APIError):
 
 class NoDataFound(APIError):
     """
-    Raised when the API doesn't have data for that car. Disabling the car is the solution.
+    Raised when the API doesn't have data for that car.
+    Disabling the car is the solution.
     """
 
     pass
@@ -52,8 +53,8 @@ class ServiceTemporaryUnavailable(APIError):
 
 class DuplicateRequestError(APIError):
     """
-    Raised when (supposedly) a previous request is already queued server-side and the server temporarily rejects
-    requests.
+    Raised when (supposedly) a previous request is already queued server-side
+    and the server temporarily rejects requests.
     """
 
     pass
