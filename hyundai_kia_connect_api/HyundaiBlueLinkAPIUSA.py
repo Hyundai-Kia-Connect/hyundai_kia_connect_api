@@ -393,7 +393,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
 
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        if get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
+
+        if get_child_value(state, "vehicleLocation.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "vehicleLocation.coord.lat"),
+                get_child_value(state, "vehicleLocation.coord.lon"),
+                self.get_last_updated_at(
+                    get_child_value(state, "vehicleLocation.time")
+                ),
+            )
+        elif get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
             vehicle.location = (
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
@@ -442,6 +451,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 VIN=entry["vin"],
                 model=entry["modelCode"],
                 registration_date=["enrollmentDate"],
+                timezone=self.data_timezone,
             )
             result.append(vehicle)
 
