@@ -1,4 +1,7 @@
-from enum import Enum, IntEnum
+"""const.py"""
+# pylint:disable=invalid-name,missing-class-docstring
+
+from enum import Enum
 
 DOMAIN: str = "hyundai_kia_connect_api"
 
@@ -60,10 +63,6 @@ class CHARGE_PORT_ACTION(Enum):
     OPEN = "open"
 
 
-class EvChargeLimit(IntEnum):
-    50, 60, 70, 80, 90, 100
-
-
 class OrderStatus(Enum):
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"
@@ -71,5 +70,6 @@ class OrderStatus(Enum):
     SUCCESS = "SUCCESS"
     # order refused by vehicle and response returned
     FAILED = "FAILED"
-    # no response received from vehicle. no way to know if the order was executed, but most likely not
+    # no response received from vehicle.
+    # no way to know if the order was executed, but most likely not
     TIMEOUT = "TIMEOUT"

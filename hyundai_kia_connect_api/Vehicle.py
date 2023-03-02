@@ -124,6 +124,12 @@ class Vehicle:
     trunk_is_open: bool = None
     hood_is_open: bool = None
 
+    # Window Status
+    front_left_window_is_open: bool = None
+    front_right_window_is_open: bool = None
+    back_left_window_is_open: bool = None
+    back_right_window_is_open: bool = None
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None

@@ -1,5 +1,6 @@
-# pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
 """VehicleManager.py"""
+# pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
+
 import datetime as dt
 import logging
 
@@ -83,13 +84,14 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        # Force refresh only if current data is older than the value bassed in seconds.  Otherwise runs a cached update.
+        # Force refresh only if current data is older than the value bassed in seconds.
+        # Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
         for vehicle_id in self.vehicles.keys():
             vehicle = self.get_vehicle(vehicle_id)
             if vehicle.last_updated_at is not None:
                 _LOGGER.debug(
-                    f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
+                    f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"  # noqa
                 )
                 if (
                     started_at_utc - vehicle.last_updated_at
@@ -164,15 +166,19 @@ class VehicleManager:
         Actions can have 4 states:
         - pending: request sent to vehicle, waiting for response
         - success: vehicle confirmed that the action was performed
-        - fail: vehicle could not perform the action (most likely because a condition was not met)
+        - fail: vehicle could not perform the action
+                (most likely because a condition was not met)
         - vehicle timeout: request sent to vehicle, no response received.
 
-        In case of timeout, the API can return "pending" for up to 2 minutes before it returns a final state.
+        In case of timeout, the API can return "pending" for up to 2 minutes before
+        it returns a final state.
 
         :param vehicle_id: ID of the vehicle
         :param action_id: ID of the action
-        :param synchronous: Whether to wait for pending actions to reach a final state (success/fail/timeout)
-        :param timeout: Time in seconds to wait for pending actions to reach a final state.
+        :param synchronous: Whether to wait for pending actions to reach a final
+                            state (success/fail/timeout)
+        :param timeout:
+            Time in seconds to wait for pending actions to reach a final state.
         :return: status of the order
         """
         return self.api.check_action_status(
