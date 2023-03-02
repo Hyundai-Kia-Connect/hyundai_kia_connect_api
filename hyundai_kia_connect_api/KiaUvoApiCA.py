@@ -36,6 +36,7 @@ CIPHERS = "DEFAULT@SECLEVEL=1"
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class cipherAdapter(HTTPAdapter):
     """
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
@@ -50,6 +51,7 @@ class cipherAdapter(HTTPAdapter):
         context = create_urllib3_context(ciphers=CIPHERS)
         kwargs["ssl_context"] = context
         return super().proxy_manager_for(*args, **kwargs)
+
 
 class KiaUvoApiCA(ApiImpl):
     temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
