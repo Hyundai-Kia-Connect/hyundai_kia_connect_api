@@ -1,5 +1,6 @@
-# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument
 """ApiImpl.py"""
+# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout
+
 import datetime as dt
 import logging
 from dataclasses import dataclass
