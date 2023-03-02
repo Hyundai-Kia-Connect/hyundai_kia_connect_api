@@ -204,6 +204,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
             )
 
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location result is None")
+        return None
+
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.last_updated_at = self.get_last_updated_at(
             get_child_value(state, "vehicleStatus.dateTime")
@@ -394,15 +397,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
 
-        if get_child_value(state, "vehicleLocation.coord.lat"):
-            vehicle.location = (
-                get_child_value(state, "vehicleLocation.coord.lat"),
-                get_child_value(state, "vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleLocation.time")
-                ),
-            )
-        elif get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
+        if get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
             vehicle.location = (
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
@@ -419,13 +414,28 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
         state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
 
-        if vehicle.odometer:
-            if vehicle.odometer < get_child_value(state["vehicleDetails"], "odometer"):
-                state["vehicleLocation"] = self._get_vehicle_location(token, vehicle)
+        if state["vehicleStatus"] is not None:
+            vehicle_location_result = None
+            if vehicle.odometer:
+                if vehicle.odometer < get_child_value(
+                    state["vehicleDetails"], "odometer"
+                ):
+                    vehicle_location_result = self._get_vehicle_location(token, vehicle)
+                else:
+                    cached_location = state["vehicleStatus"]["vehicleLocation"]
+                    _LOGGER.debug(
+                        f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback {cached_location}"  # noqa
+                    )
             else:
-                state["vehicleLocation"] = None
-        else:
-            state["vehicleLocation"] = self._get_vehicle_location(token, vehicle)
+                vehicle_location_result = self._get_vehicle_location(token, vehicle)
+
+            if vehicle_location_result is not None:
+                state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
+            else:
+                cached_location = state["vehicleStatus"]["vehicleLocation"]
+                _LOGGER.debug(
+                    f"{DOMAIN} - update_vehicle_with_cached_state Location fallback {cached_location}"  # noqa
+                )
 
         self._update_vehicle_properties(vehicle, state)
 
@@ -433,7 +443,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         state = {}
         state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
         state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, True)
-        state["vehicleLocation"] = self._get_vehicle_location(token, vehicle)
+        if state["vehicleStatus"] is not None:
+            vehicle_location_result = self._get_vehicle_location(token, vehicle)
+            if vehicle_location_result is not None:
+                state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
+            else:
+                cached_location = state["vehicleStatus"]["vehicleLocation"]
+                _LOGGER.debug(
+                    f"{DOMAIN} - force_refresh_vehicle_state Location fallback {cached_location}"  # noqa
+                )
+
         self._update_vehicle_properties(vehicle, state)
 
     def get_vehicles(self, token: Token):
