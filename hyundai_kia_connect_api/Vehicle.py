@@ -92,7 +92,7 @@ class Vehicle:
     car_battery_percentage: int = None
     engine_is_running: bool = None
     last_updated_at: datetime.datetime = None
-    timezone: datetime.timezone = None
+    timezone: datetime.timezone = datetime.timezone.utc  # default UTC
     dtc_count: typing.Union[int, None] = None
     dtc_descriptions: typing.Union[dict, None] = None
 
