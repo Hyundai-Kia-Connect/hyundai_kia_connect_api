@@ -199,6 +199,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
+                timezone=self.data_timezone,
             )
             result.append(vehicle)
         return result
@@ -231,6 +232,7 @@ class KiaUvoAPIUSA(ApiImpl):
                         name=entry["nickName"],
                         model=entry["modelName"],
                         key=entry["vehicleKey"],
+                        timezone=self.data_timezone,
                     )
                     vehicles.append(vehicle)
                 return vehicles
