@@ -9,10 +9,12 @@ with open("README.rst") as readme_file:
 
 with open("HISTORY.rst") as history_file:
     history = history_file.read()
+    
+with open("requirements.txt") as f:
+    requirements = f.read().splitlines()
 
 long_description = readme + "\n\n" + history
 long_description = readme
-requirements = ["curlify", "bs4"]
 
 test_requirements = [
     "pytest>=3",
