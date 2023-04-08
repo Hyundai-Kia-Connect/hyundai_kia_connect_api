@@ -252,6 +252,7 @@ class KiaUvoApiEU(ApiImpl):
                 model=entry["vehicleName"],
                 registration_date=entry["regDate"],
                 VIN=entry["vin"],
+                timezone=self.data_timezone,
                 engine_type=entry_engine_type,
             )
             result.append(vehicle)
@@ -1204,7 +1205,6 @@ class KiaUvoApiEU(ApiImpl):
             f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"  # noqa
         )
 
-        intUserId = 0
         if "account-find-link" in response.text:
             soup = BeautifulSoup(response.content, "html.parser")
             login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
@@ -1212,6 +1212,7 @@ class KiaUvoApiEU(ApiImpl):
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded",
                 "User-Agent": USER_AGENT_MOZILLA,
+                "followRedirects": "false",
             }
             response = requests.post(
                 login_form_action_url,
@@ -1228,18 +1229,6 @@ class KiaUvoApiEU(ApiImpl):
                 return
 
             cookies = cookies | response.cookies.get_dict()
-            redirect_url = response.headers["Location"]
-            headers = {"User-Agent": USER_AGENT_MOZILLA}
-            response = requests.get(redirect_url, headers=headers, cookies=cookies)
-            _LOGGER.debug(
-                f"{DOMAIN} - Redirect User Id 2 {redirect_url} - Response {response.url}"  # noqa
-            )
-            _LOGGER.debug(f"{DOMAIN} - Redirect 2 - Response Text {response.text}")
-            parsed_url = urlparse(response.url)
-            intUserId = "".join(parse_qs(parsed_url.query)["int_user_id"])
-        else:
-            parsed_url = urlparse(response.url)
-            intUserId = "".join(parse_qs(parsed_url.query)["intUserId"])
 
         url = self.USER_API_URL + "silentsignin"
         headers = {
@@ -1249,7 +1238,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(
             url,
             headers=headers,
-            json={"intUserId": intUserId},
+            json={"intUserId": "0"},
             cookies=cookies,
         ).json()
         _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")

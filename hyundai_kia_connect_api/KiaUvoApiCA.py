@@ -56,6 +56,22 @@ class cipherAdapter(HTTPAdapter):
         kwargs["ssl_context"] = context
         return super().proxy_manager_for(*args, **kwargs)
 
+class cipherAdapter(HTTPAdapter):
+    """
+    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
+    """
+
+    def init_poolmanager(self, *args, **kwargs):
+        context = create_urllib3_context(ciphers=CIPHERS)
+        kwargs["ssl_context"] = context
+        return super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, *args, **kwargs):
+        context = create_urllib3_context(ciphers=CIPHERS)
+        kwargs["ssl_context"] = context
+        return super().proxy_manager_for(*args, **kwargs)
+
+
 class KiaUvoApiCA(ApiImpl):
     """KiaUvoApiCA"""
 
