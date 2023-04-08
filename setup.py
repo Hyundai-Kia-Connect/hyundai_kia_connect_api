@@ -13,8 +13,8 @@ with open("HISTORY.rst") as history_file:
 # with open("requirements.txt") as f:
 #    requirements = f.read().splitlines()
 requirements = ["curlify", "bs4"]
-    
-    
+
+
 long_description = readme + "\n\n" + history
 long_description = readme
 

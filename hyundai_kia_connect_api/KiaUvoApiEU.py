@@ -146,7 +146,7 @@ class KiaUvoApiEU(ApiImpl):
         self.GCM_SENDER_ID = 199360397125
 
         if BRANDS[brand] == BRAND_KIA:
-            auth_client_id = "f4d531c7-1043-444d-b09a-ad24bd913dd4"
+            auth_client_id = "572e0304-5f8d-4b4c-9dd5-41aa84eed160"
             self.LOGIN_FORM_URL: str = (
                 "https://"
                 + self.LOGIN_FORM_HOST
