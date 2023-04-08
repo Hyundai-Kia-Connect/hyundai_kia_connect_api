@@ -1205,7 +1205,6 @@ class KiaUvoApiEU(ApiImpl):
             f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"  # noqa
         )
 
-        intUserId = 0
         if "account-find-link" in response.text:
             soup = BeautifulSoup(response.content, "html.parser")
             login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
@@ -1236,11 +1235,6 @@ class KiaUvoApiEU(ApiImpl):
                 f"{DOMAIN} - Redirect User Id 2 {redirect_url} - Response {response.url}"  # noqa
             )
             _LOGGER.debug(f"{DOMAIN} - Redirect 2 - Response Text {response.text}")
-            parsed_url = urlparse(response.url)
-            intUserId = "".join(parse_qs(parsed_url.query)["int_user_id"])
-        else:
-            parsed_url = urlparse(response.url)
-            intUserId = "".join(parse_qs(parsed_url.query)["intUserId"])
 
         url = self.USER_API_URL + "silentsignin"
         headers = {
