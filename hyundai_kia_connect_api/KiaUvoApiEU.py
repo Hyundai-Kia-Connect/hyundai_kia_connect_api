@@ -1238,7 +1238,7 @@ class KiaUvoApiEU(ApiImpl):
         response = requests.post(
             url,
             headers=headers,
-            json={"intUserId": '0'},
+            json={"intUserId": "0"},
             cookies=cookies,
         ).json()
         _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")
