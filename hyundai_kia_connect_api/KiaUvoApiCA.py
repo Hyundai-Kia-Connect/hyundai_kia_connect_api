@@ -83,7 +83,7 @@ class KiaUvoApiCA(ApiImpl):
         self.vehicle_timezone = self.data_timezone
         self.LANGUAGE: str = language
         if BRANDS[brand] == BRAND_KIA:
-            self.BASE_URL: str = "www.kiaconnect.ca"
+            self.BASE_URL: str = "kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "mybluelink.ca"
         self.old_vehicle_status = {}
