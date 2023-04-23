@@ -102,7 +102,7 @@ class KiaUvoApiCN(ApiImpl):
     def __init__(self, region: int, brand: int,language: str) -> None:
         self.stamps = None
 
-        if BRANDS[brand] == BRAND_KIA: 
+        if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
@@ -1197,7 +1197,7 @@ class KiaUvoApiCN(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         return token_type, access_token, authorization_code
 
-    def _get_refresh_token(self, authorization_code): 
+    def _get_refresh_token(self, authorization_code):
         # Get Refresh Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
@@ -1220,7 +1220,7 @@ class KiaUvoApiCN(ApiImpl):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-    
+
     def _get_control_token(self,token:Token) -> Token:
         url = self.USER_API_URL + 'pin?token='
         headers = {

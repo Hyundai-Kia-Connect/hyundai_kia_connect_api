@@ -1,5 +1,5 @@
 import os
-import logging 
+import logging
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
 logging.basicConfig(level=logging.DEBUG)
