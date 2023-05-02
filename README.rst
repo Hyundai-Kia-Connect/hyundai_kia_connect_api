@@ -20,7 +20,7 @@ Python 3.9 or newer is required to use this package. Vehicle manager is the key 
 
 Key values for the int exist in the constant(https://github.com/fuatakgun/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI}
 
 Once this is done you can now make the following calls against the vehicle manager::
