@@ -240,4 +240,4 @@ class VehicleManager:
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
             return KiaUvoAPIUSA(region, brand, language)
         elif REGIONS[region] == REGION_CHINA:
-            return KiaUvoApiCN(region,brand,language)
+            return KiaUvoApiCN(region, brand, language)

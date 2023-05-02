@@ -56,7 +56,6 @@ USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
 
 
-
 def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
@@ -99,16 +98,14 @@ class KiaUvoApiCN(ApiImpl):
     data_timezone = tz.gettz("Asia/ShangHai")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
-    def __init__(self, region: int, brand: int,language: str) -> None:
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.stamps = None
 
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
-            )
+            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
@@ -133,8 +130,9 @@ class KiaUvoApiCN(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-    def _get_control_headers(self,token:Token) -> dict:
-        control_token,_ = self._get_control_token(token)
+
+    def _get_control_headers(self, token: Token) -> dict:
+        control_token, _ = self._get_control_token(token)
         return {
             "Authorization": control_token,
             "AuthorizationCCSP": control_token,
@@ -146,9 +144,10 @@ class KiaUvoApiCN(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
+
     def login(self, username: str, password: str) -> Token:
         device_id = self._get_device_id()
-        #device_id = '2e062595-28e0-4bcb-a75a-1b395cde337c'
+        # device_id = '2e062595-28e0-4bcb-a75a-1b395cde337c'
         cookies = self._get_cookies()
         self._set_session_language(cookies)
         authorization_code = None
@@ -162,9 +161,7 @@ class KiaUvoApiCN(ApiImpl):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code = self._get_access_token(
-            authorization_code
-        )
+        _, access_token, authorization_code = self._get_access_token(authorization_code)
         _, refresh_token = self._get_refresh_token(authorization_code)
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
 
@@ -303,9 +300,7 @@ class KiaUvoApiCN(ApiImpl):
                 )
             ],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "status.battery.batSoc"
-        )
+        vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
         vehicle.engine_is_running = get_child_value(state, "status.engine")
 
         # Converts temp to usable number. Currently only support celsius.
@@ -1000,15 +995,14 @@ class KiaUvoApiCN(ApiImpl):
         return response["msgId"]
 
     def _get_device_id(self):
-        registration_id = '1'
-        provider_device_id = '59af09e554a9442ab8589c9500d04d2e'
+        registration_id = "1"
+        provider_device_id = "59af09e554a9442ab8589c9500d04d2e"
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "providerDeviceId": provider_device_id,
             "pushRegId": registration_id,
             "pushType": "GCM",
             "uuid": str(uuid.uuid4()),
-
         }
 
         headers = {
@@ -1037,7 +1031,9 @@ class KiaUvoApiCN(ApiImpl):
             + "oauth2/authorize?response_type=code&state=test&client_id="
             + self.CLIENT_ID
             + "&redirect_uri="
-            + "https://" + self.BASE_URL + ":443/api/v1/user/"
+            + "https://"
+            + self.BASE_URL
+            + ":443/api/v1/user/"
             + "oauth2/redirect&lang="
         )
 
@@ -1052,7 +1048,7 @@ class KiaUvoApiCN(ApiImpl):
         # Set Language for Session #
         url = self.USER_API_URL
         headers = {"Content-type": "application/json"}
-        payload = {"lang":'zh'}
+        payload = {"lang": "zh"}
         _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_authorization_code_with_redirect_url(
@@ -1172,7 +1168,7 @@ class KiaUvoApiCN(ApiImpl):
         url = self.USER_API_URL + "oauth2/token"
         headers = {
             "Authorization": self.BASIC_AUTHORIZATION,
-            #"Stamp": stamp,
+            # "Stamp": stamp,
             "Content-type": "application/x-www-form-urlencoded",
             "Host": self.BASE_URL,
             "Connection": "close",
@@ -1221,8 +1217,8 @@ class KiaUvoApiCN(ApiImpl):
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
 
-    def _get_control_token(self,token:Token) -> Token:
-        url = self.USER_API_URL + 'pin?token='
+    def _get_control_token(self, token: Token) -> Token:
+        url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
             "Content-type": "application/json",
@@ -1231,14 +1227,16 @@ class KiaUvoApiCN(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-        data = {"deviceId":token.device_id , "pin" : token.pin}
+        data = {"deviceId": token.device_id, "pin": token.pin}
         _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
-        response = requests.put(url,json=data,headers=headers)
+        response = requests.put(url, json=data, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
         control_token = "Bearer " + response["controlToken"]
-        control_token_expire_at = math.floor(dt.datetime.now().timestamp() + response["expiresTime"])
-        return control_token,control_token_expire_at
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response["expiresTime"]
+        )
+        return control_token, control_token_expire_at
 
     def check_action_status(
         self,
