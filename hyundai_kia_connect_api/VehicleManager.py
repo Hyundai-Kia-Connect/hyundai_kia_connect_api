@@ -11,6 +11,7 @@ from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
+from .KiaUvoApiCN import KiaUvoApiCN
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -21,6 +22,7 @@ from .const import (
     REGION_CANADA,
     REGION_EUROPE,
     REGION_USA,
+    REGION_CHINA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
@@ -237,3 +239,5 @@ class VehicleManager:
             return HyundaiBlueLinkAPIUSA(region, brand, language)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
             return KiaUvoAPIUSA(region, brand, language)
+        elif REGIONS[region] == REGION_CHINA:
+            return KiaUvoApiCN(region, brand, language)
