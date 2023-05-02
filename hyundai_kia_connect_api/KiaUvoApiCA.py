@@ -404,6 +404,7 @@ class KiaUvoApiCA(ApiImpl):
             DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
         )
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
+        vehicle.fuel_level = get_child_value(state, "status.fuelLevel")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         if vehicle.data is None:
             vehicle.data = {}
