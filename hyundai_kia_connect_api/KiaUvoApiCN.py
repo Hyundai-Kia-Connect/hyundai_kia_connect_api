@@ -95,7 +95,7 @@ def _check_response_for_errors(response: dict) -> None:
 
 
 class KiaUvoApiCN(ApiImpl):
-    data_timezone = tz.gettz("Asia/ShangHai")
+    data_timezone = tz.gettz("Asia/Shanghai")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -292,11 +292,11 @@ class KiaUvoApiCN(ApiImpl):
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
+            get_child_value(state, "status.odometer.value"),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "odometer.unit",
+                    "status.odometer.unit",
                 )
             ],
         )
@@ -652,7 +652,7 @@ class KiaUvoApiCN(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        response = response["resMsg"]["status"]
+        response = response["resMsg"]
 
         return response
 
@@ -665,7 +665,7 @@ class KiaUvoApiCN(ApiImpl):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
