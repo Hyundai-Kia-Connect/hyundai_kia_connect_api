@@ -37,7 +37,7 @@ from .utils import (
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
-CIPHERS = "DEFAULT@SECLEVEL=1"
+CIPHERS = "DEFAULT:!aNULL:!eNULL:!MD5:!3DES:!DES:!RC4:!IDEA:!SEED:!aDSS:!SRP:!PSK"
 
 _LOGGER = logging.getLogger(__name__)
 
