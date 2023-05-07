@@ -37,7 +37,7 @@ from .utils import (
 import ssl
 import urllib3
 
-CIPHERS = "DEFAULT@SECLEVEL=1"
+CIPHERS = "ALL:@SECLEVEL=0"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class cipherAdapter(requests.adapters.HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, block=False):
         context = ssl.create_default_context()
         context.set_ciphers(CIPHERS)
-        context.options |= 0x4
+        context.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
         self.poolmanager = urllib3.poolmanager.PoolManager(
             ssl_version=ssl.PROTOCOL_TLS,
             ssl_context=context)
