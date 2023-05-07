@@ -34,44 +34,25 @@ from .utils import (
     get_index_into_hex_temp,
 )
 
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+import ssl
+import urllib3
 
-CIPHERS = "DEFAULT:!aNULL:!eNULL:!MD5:!3DES:!DES:!RC4:!IDEA:!SEED:!aDSS:!SRP:!PSK"
+CIPHERS = "DEFAULT@SECLEVEL=1"
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class cipherAdapter(HTTPAdapter):
+class cipherAdapter(requests.adapters.HTTPAdapter):
     """
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
     """
 
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-    def proxy_manager_for(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
-        return super().proxy_manager_for(*args, **kwargs)
-
-
-class cipherAdapter(HTTPAdapter):
-    """
-    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
-    """
-
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-    def proxy_manager_for(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
-        return super().proxy_manager_for(*args, **kwargs)
+    def init_poolmanager(self, connections, maxsize, block=False):
+        context = ssl.create_default_context()
+        context.set_ciphers(CIPHERS)
+        self.poolmanager = urllib3.poolmanager.PoolManager(
+            ssl_version=ssl.PROTOCOL_TLS,
+            ssl_context=context)
 
 
 class KiaUvoApiCA(ApiImpl):
