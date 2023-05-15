@@ -52,8 +52,8 @@ class cipherAdapter(requests.adapters.HTTPAdapter):
         context.set_ciphers(CIPHERS)
         context.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
         self.poolmanager = urllib3.poolmanager.PoolManager(
-            ssl_version=ssl.PROTOCOL_TLS,
-            ssl_context=context)
+            ssl_version=ssl.PROTOCOL_TLS, ssl_context=context
+        )
 
 
 class KiaUvoApiCA(ApiImpl):
