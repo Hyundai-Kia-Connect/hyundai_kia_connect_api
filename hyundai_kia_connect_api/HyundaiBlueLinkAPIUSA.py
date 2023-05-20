@@ -254,17 +254,14 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             state, "vehicleStatus.smartKeyBatteryWarning"
         )
 
-        air_temp = (
-            get_child_value(state, "vehicleStatus.evStatus.airTemp.value"),
-            "f",
-        )
+        air_temp = get_child_value(state, "vehicleStatus.evStatus.airTemp.value")
 
         if air_temp == "LO":
             air_temp = self.temperature_range[0]
         if air_temp == "HI":
             air_temp = self.temperature_range[-1]
-
-        vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+        if air_temp:
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
