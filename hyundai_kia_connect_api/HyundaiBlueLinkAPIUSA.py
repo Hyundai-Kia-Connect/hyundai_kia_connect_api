@@ -254,7 +254,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             state, "vehicleStatus.smartKeyBatteryWarning"
         )
 
-        air_temp = get_child_value(state, "vehicleStatus.evStatus.airTemp.value")
+        air_temp = get_child_value(state, "vehicleStatus.airTemp.value")
 
         if air_temp == "LO":
             air_temp = self.temperature_range[0]
