@@ -1084,7 +1084,7 @@ class KiaUvoApiEU(ApiImpl):
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "pushRegId": registration_id,
-            "pushType": "GCM",
+            "pushType": "APNS",
             "uuid": str(uuid.uuid4()),
         }
 
