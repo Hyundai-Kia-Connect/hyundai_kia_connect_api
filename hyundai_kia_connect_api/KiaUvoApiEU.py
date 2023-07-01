@@ -143,7 +143,6 @@ class KiaUvoApiEU(ApiImpl):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-        self.GCM_SENDER_ID = 199360397125
 
         if BRANDS[brand] == BRAND_KIA:
             auth_client_id = "572e0304-5f8d-4b4c-9dd5-41aa84eed160"
