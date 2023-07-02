@@ -1,6 +1,7 @@
 """KiaUvoApiEU.py"""
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
+import random
 import datetime as dt
 import logging
 import re
