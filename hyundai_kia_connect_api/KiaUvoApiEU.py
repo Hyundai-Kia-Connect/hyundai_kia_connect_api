@@ -126,7 +126,7 @@ class KiaUvoApiEU(ApiImpl):
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "e7bcd186-a5fd-410d-92cb-6876a42288bd"
+            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.BASIC_AUTHORIZATION: str = (
                 "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
             )
