@@ -122,8 +122,9 @@ class KiaUvoApiEU(ApiImpl):
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"  # fallback to English
         self.LANGUAGE: str = language
+        self.brand: int = brand
 
-        if BRANDS[brand] == BRAND_KIA:
+        if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
@@ -131,12 +132,14 @@ class KiaUvoApiEU(ApiImpl):
                 "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
             )
             self.LOGIN_FORM_HOST = "eu-account.kia.com"
-        elif BRANDS[brand] == BRAND_HYUNDAI:
+            self.PUSH_TYPE = "APNS"
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
+            self.PUSH_TYPE = "GCM"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
@@ -146,7 +149,7 @@ class KiaUvoApiEU(ApiImpl):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.GCM_SENDER_ID = 199360397125
 
-        if BRANDS[brand] == BRAND_KIA:
+        if BRANDS[self.brand] == BRAND_KIA:
             auth_client_id = "572e0304-5f8d-4b4c-9dd5-41aa84eed160"
             self.LOGIN_FORM_URL: str = (
                 "https://"
@@ -159,7 +162,7 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LANGUAGE
                 + "&state=$service_id:$user_id"
             )
-        elif BRANDS[brand] == BRAND_HYUNDAI:
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
             auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
             self.LOGIN_FORM_URL: str = (
                 "https://"
@@ -175,7 +178,7 @@ class KiaUvoApiEU(ApiImpl):
 
         self.stamps_url: str = (
             "https://raw.githubusercontent.com/neoPix/bluelinky-stamps/master/"
-            + BRANDS[brand].lower()
+            + BRANDS[self.brand].lower()
             + "-"
             + self.APP_ID
             + ".v2.json"
@@ -1086,7 +1089,7 @@ class KiaUvoApiEU(ApiImpl):
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "pushRegId": registration_id,
-            "pushType": "APNS",
+            "pushType": self.PUSH_TYPE,
             "uuid": str(uuid.uuid4()),
         }
 
