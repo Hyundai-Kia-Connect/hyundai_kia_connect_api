@@ -1,6 +1,7 @@
 """KiaUvoApiEU.py"""
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
+import random
 import datetime as dt
 import logging
 import re
@@ -1080,7 +1081,8 @@ class KiaUvoApiEU(ApiImpl):
             return self.stamps["stamps"][position]
 
     def _get_device_id(self, stamp: str):
-        registration_id = 1
+        my_hex = "%064x" % random.randrange(10**80)
+        registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "pushRegId": registration_id,
