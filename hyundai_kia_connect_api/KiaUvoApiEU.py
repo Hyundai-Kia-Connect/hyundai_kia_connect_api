@@ -1081,13 +1081,12 @@ class KiaUvoApiEU(ApiImpl):
             return self.stamps["stamps"][position]
 
     def _get_device_id(self, stamp: str):
-        ran = random.randrange(10**80)
-        myhex = "%064x" % ran
-        registration_id = myhex[:64]
+        my_hex = "%064x" % random.randrange(10**80)
+        registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             "pushRegId": registration_id,
-            "pushType": "GCM",
+            "pushType": "APNS",
             "uuid": str(uuid.uuid4()),
         }
 
