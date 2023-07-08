@@ -82,7 +82,7 @@ def _check_response_for_errors(response: dict) -> None:
     - F: failure
     resCode / resMsg known values:
     - 0000: no error
-    - 4002:  "Invalid request body - invalid deviceId", relogin will resolve but a bandaid. 
+    - 4002:  "Invalid request body - invalid deviceId", relogin will resolve but a bandaid.
     - 4004: "Duplicate request"
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
