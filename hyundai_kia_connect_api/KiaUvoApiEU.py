@@ -82,6 +82,7 @@ def _check_response_for_errors(response: dict) -> None:
     - F: failure
     resCode / resMsg known values:
     - 0000: no error
+    - 4002:  "Invalid request body - invalid deviceId", relogin will resolve but a bandaid.
     - 4004: "Duplicate request"
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
@@ -92,6 +93,7 @@ def _check_response_for_errors(response: dict) -> None:
     """
 
     error_code_mapping = {
+        "4002": DeviceIDError,
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
         "5031": ServiceTemporaryUnavailable,
@@ -108,7 +110,9 @@ def _check_response_for_errors(response: dict) -> None:
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
         else:
-            raise APIError(f"Server returned: '{response['resMsg']}'")
+            raise APIError(
+                f"Server returned:  '{response['rescode']}' '{response['resMsg']}'"
+            )
 
 
 class KiaUvoApiEU(ApiImpl):
