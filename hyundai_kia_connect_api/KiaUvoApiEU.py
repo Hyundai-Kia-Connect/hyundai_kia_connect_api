@@ -88,7 +88,7 @@ def _check_response_for_errors(response: dict) -> None:
     - 5091: "Exceeds number of requests"
     - 5921: "No Data Found v2 - No Data Found v2"
     - 9999: "Undefined Error - Response timeout"
-    - Unknown:  "Invalid request body - invalid deviceId", relogin oftend required.
+    - 4002:  "Invalid request body - invalid deviceId", relogin oftend required.
     :param response: the API's JSON response
     """
 
