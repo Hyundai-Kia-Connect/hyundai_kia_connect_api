@@ -82,17 +82,18 @@ def _check_response_for_errors(response: dict) -> None:
     - F: failure
     resCode / resMsg known values:
     - 0000: no error
+    - 4002:  "Invalid request body - invalid deviceId", relogin will resolve but a bandaid. 
     - 4004: "Duplicate request"
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
     - 5091: "Exceeds number of requests"
     - 5921: "No Data Found v2 - No Data Found v2"
     - 9999: "Undefined Error - Response timeout"
-    - 4002:  "Invalid request body - invalid deviceId", relogin oftend required.
     :param response: the API's JSON response
     """
 
     error_code_mapping = {
+        "4002": DeviceIDError,
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
         "5031": ServiceTemporaryUnavailable,
