@@ -32,14 +32,20 @@ class cipherAdapter(HTTPAdapter):
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
     """
 
-    def init_poolmanager(self, *args, **kwargs):
+    def _setup_ssl_context(self):
         context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
+        context.options |= 0x4
+
+        return context
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._setup_ssl_context()
+
         return super().init_poolmanager(*args, **kwargs)
 
     def proxy_manager_for(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        kwargs["ssl_context"] = context
+        kwargs["ssl_context"] = self._setup_ssl_context()
+
         return super().proxy_manager_for(*args, **kwargs)
 
 
