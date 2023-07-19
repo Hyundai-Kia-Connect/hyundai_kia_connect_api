@@ -67,6 +67,7 @@ To avoid this, you can pass the optional parameter language (default is "en") to
     vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234", language="nl")
 
 Note: this is only implemented for Europe currently.
+
 For a list of language codes, see here: https://www.science.co.il/language/Codes.php. Currently in Europe the Bluelink App shows the following languages::
 
 - "en" English
