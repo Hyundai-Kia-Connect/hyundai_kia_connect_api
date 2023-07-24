@@ -1,5 +1,5 @@
 beautifulsoup4>=4.10.0
-black==23.3.0
+black==23.7.0
 bump2version==1.0.1
 Click==8.1.4
 coverage==7.2.7
