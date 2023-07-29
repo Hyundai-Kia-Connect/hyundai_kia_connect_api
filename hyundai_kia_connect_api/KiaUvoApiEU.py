@@ -1079,7 +1079,7 @@ class KiaUvoApiEU(ApiImpl):
             )
         else:
             raise ValueError("Invalid brand")
-        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode("utf-8")
+        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
         result = bytes(b1 ^ b2 for b1, b2 in zip(cfb, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
