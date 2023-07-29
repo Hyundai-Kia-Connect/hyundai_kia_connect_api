@@ -1,6 +1,7 @@
 """KiaUvoApiEU.py"""
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
+import base64
 import random
 import datetime as dt
 import logging
@@ -12,7 +13,7 @@ from urllib.parse import parse_qs, urlparse
 import pytz
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz, parser
+from dateutil import tz
 
 from .ApiImpl import (
     ApiImpl,
@@ -82,7 +83,8 @@ def _check_response_for_errors(response: dict) -> None:
     - F: failure
     resCode / resMsg known values:
     - 0000: no error
-    - 4002:  "Invalid request body - invalid deviceId", relogin will resolve but a bandaid.
+    - 4002:  "Invalid request body - invalid deviceId",
+             relogin will resolve but a bandaid.
     - 4004: "Duplicate request"
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
@@ -1067,28 +1069,24 @@ class KiaUvoApiEU(ApiImpl):
         return response["msgId"]
 
     def _get_stamp(self) -> str:
-        if self.stamps is None:
-            self.stamps = requests.get(self.stamps_url).json()
-
-        frequency = self.stamps["frequency"]
-        generated_at = parser.isoparse(self.stamps["generated"])
-        position = int(
-            (dt.datetime.now(pytz.utc) - generated_at).total_seconds()
-            * 1000.0
-            / frequency
-        )
-        stamp_count = len(self.stamps["stamps"])
-        _LOGGER.debug(
-            f"{DOMAIN} - get_stamp {generated_at} {frequency} {position} {stamp_count} {((dt.datetime.now(pytz.utc) - generated_at).total_seconds() * 1000.0) / frequency}"  # noqa
-        )
-        if (position * 100.0) / stamp_count > 90:
-            self.stamps = None
-            return self._get_stamp()
+        if BRANDS[self.brand] == BRAND_KIA:
+            cfb = base64.b64decode(
+                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+            )
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
+            cfb = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+            )
         else:
-            return self.stamps["stamps"][position]
+            raise ValueError("Invalid brand")
+        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
+        result = bytes(b1 ^ b2 for b1, b2 in zip(cfb, raw_data))
+        return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp: str):
-        my_hex = "%064x" % random.randrange(10**80)
+        my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
+            10**80
+        )
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {
@@ -1108,10 +1106,10 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
         _check_response_for_errors(response)
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
