@@ -7,7 +7,8 @@ DOMAIN: str = "hyundai_kia_connect_api"
 
 BRAND_KIA = "Kia"
 BRAND_HYUNDAI = "Hyundai"
-BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI}
+BRAND_GENESIS = "Genesis"
+BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
 
 REGION_EUROPE = "Europe"
 REGION_CANADA = "Canada"
