@@ -31,6 +31,7 @@ from .Vehicle import (
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
+    BRAND_GENESIS,
     BRANDS,
     DOMAIN,
     DISTANCE_UNITS,
@@ -145,6 +146,13 @@ class KiaUvoApiEU(ApiImpl):
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
+            self.PUSH_TYPE = "GCM"
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            self.BASE_DOMAIN: str = "prd.eu-ccapi.genesis.com"
+            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
+            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.LOGIN_FORM_HOST = "eu-account.genesis.com"
             self.PUSH_TYPE = "GCM"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
