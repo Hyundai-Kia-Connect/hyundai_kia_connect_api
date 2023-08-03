@@ -17,6 +17,7 @@ from .Vehicle import Vehicle
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
+    BRAND_GENESIS,
     BRANDS,
     DOMAIN,
     DISTANCE_UNITS,
@@ -70,6 +71,9 @@ class KiaUvoApiCA(ApiImpl):
             self.BASE_URL: str = "kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "mybluelink.ca"
+        elif BRANDS[brand] == BRAND_GENESIS:
+            self.BASE_URL: str = "genesisconnect.ca"
+
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
