@@ -189,6 +189,19 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LANGUAGE
                 + "&state=$service_id:$user_id"
             )
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            auth_client_id = "Need this still"
+            self.LOGIN_FORM_URL: str = (
+                "https://"
+                + self.LOGIN_FORM_HOST
+                + "/auth/realms/eugenesisidm/protocol/openid-connect/auth?client_id="
+                + auth_client_id
+                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
+                + self.USER_API_URL
+                + "integration/redirect/login&ui_locales="
+                + self.LANGUAGE
+                + "&state=$service_id:$user_id"
+            )
 
         self.stamps_url: str = (
             "https://raw.githubusercontent.com/neoPix/bluelinky-stamps/master/"
@@ -1084,6 +1097,10 @@ class KiaUvoApiEU(ApiImpl):
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             cfb = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+            )
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            cfb = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
         else:
             raise ValueError("Invalid brand")
