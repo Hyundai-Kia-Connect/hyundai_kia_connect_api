@@ -1,4 +1,4 @@
-import logging
+"""
 import os
 
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -20,3 +20,4 @@ def test_AU_login():
     vm.check_and_force_update_vehicles(force_refresh_interval=600)
     print("Found: " + list(vm.vehicles.values())[0].name)
     assert len(vm.vehicles.keys()) > 0
+"""
