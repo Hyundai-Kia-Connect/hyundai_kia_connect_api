@@ -1,10 +1,11 @@
-"""KiaUvoApiEU.py"""
+"""KiaUvoApiAU"""
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
-import random
 import datetime as dt
+import math
 import logging
+import random
 import re
 import uuid
 from time import sleep
@@ -12,7 +13,6 @@ from urllib.parse import parse_qs, urlparse
 
 import pytz
 import requests
-from bs4 import BeautifulSoup
 from dateutil import tz
 
 from .ApiImpl import (
@@ -31,7 +31,6 @@ from .Vehicle import (
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
-    BRAND_GENESIS,
     BRANDS,
     DOMAIN,
     DISTANCE_UNITS,
@@ -53,25 +52,6 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
-
-SUPPORTED_LANGUAGES_LIST = [
-    "en",  # English
-    "de",  # German
-    "fr",  # French
-    "it",  # Italian
-    "es",  # Spanish
-    "sv",  # Swedish
-    "nl",  # Dutch
-    "no",  # Norwegian
-    "cs",  # Czech
-    "sk",  # Slovak
-    "hu",  # Hungarian
-    "da",  # Danish
-    "pl",  # Polish
-    "fi",  # Finnish
-    "pt",  # Portuguese
-]
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -83,8 +63,6 @@ def _check_response_for_errors(response: dict) -> None:
     - F: failure
     resCode / resMsg known values:
     - 0000: no error
-    - 4002:  "Invalid request body - invalid deviceId",
-             relogin will resolve but a bandaid.
     - 4004: "Duplicate request"
     - 4081: "Request timeout"
     - 5031: "Unavailable remote control - Service Temporary Unavailable"
@@ -95,7 +73,6 @@ def _check_response_for_errors(response: dict) -> None:
     """
 
     error_code_mapping = {
-        "4002": DeviceIDError,
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
         "5031": ServiceTemporaryUnavailable,
@@ -111,116 +88,55 @@ def _check_response_for_errors(response: dict) -> None:
     if response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
-        raise APIError(f"Server returned:  '{response['rescode']}' '{response['resMsg']}'")
+        else:
+            raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
-class KiaUvoApiEU(ApiImpl):
-    data_timezone = tz.gettz("Europe/Berlin")
-    temperature_range = [x * 0.5 for x in range(28, 60)]
+class KiaUvoApiAU(ApiImpl):
+    data_timezone = tz.gettz("Australia/Sydney")
+    temperature_range = [x * 0.5 for x in range(34, 54)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        if language not in SUPPORTED_LANGUAGES_LIST:
-            _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
-            language = "en"  # fallback to English
-        self.LANGUAGE: str = language
-        self.brand: int = brand
+        self.brand = brand
+        if BRANDS[brand] == BRAND_KIA:
+            raise APIError("Kia is not supported in Australia yet")
+        elif BRANDS[brand] == BRAND_HYUNDAI:
+            self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
+            self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
+            self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
+            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
 
-        if BRANDS[self.brand] == BRAND_KIA:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
-            self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB: str = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
-            )
-            self.LOGIN_FORM_HOST = "eu-account.kia.com"
-            self.PUSH_TYPE = "APNS"
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
-            self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
-            self.CFB: str = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
-            self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
-            self.PUSH_TYPE = "GCM"
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.genesis.com"
-            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
-            self.LOGIN_FORM_HOST = "eu-account.genesis.com"
-            self.PUSH_TYPE = "GCM"
-
-        self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
-
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-        self.GCM_SENDER_ID = 199360397125
-
-        if BRANDS[self.brand] == BRAND_KIA:
-            auth_client_id = "572e0304-5f8d-4b4c-9dd5-41aa84eed160"
-            self.LOGIN_FORM_URL: str = (
-                "https://"
-                + self.LOGIN_FORM_HOST
-                + "/auth/realms/eukiaidm/protocol/openid-connect/auth?client_id="
-                + auth_client_id
-                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
-                + self.USER_API_URL
-                + "integration/redirect/login&ui_locales="
-                + self.LANGUAGE
-                + "&state=$service_id:$user_id"
-            )
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
-            self.LOGIN_FORM_URL: str = (
-                "https://"
-                + self.LOGIN_FORM_HOST
-                + "/auth/realms/euhyundaiidm/protocol/openid-connect/auth?client_id="
-                + auth_client_id
-                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
-                + self.USER_API_URL
-                + "integration/redirect/login&ui_locales="
-                + self.LANGUAGE
-                + "&state=$service_id:$user_id"
-            )
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            auth_client_id = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.LOGIN_FORM_URL: str = (
-                "https://"
-                + self.LOGIN_FORM_HOST
-                + "/auth/realms/eugenesisidm/protocol/openid-connect/auth?client_id="
-                + auth_client_id
-                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
-                + self.USER_API_URL
-                + "integration/redirect/login&ui_locales="
-                + self.LANGUAGE
-                + "&state=$service_id:$user_id"
-            )
 
     def _get_authenticated_headers(self, token: Token) -> dict:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
             "ccsp-device-id": token.device_id,
+            "Stamp": self._get_stamp(),
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
+    def _get_control_headers(self, token: Token) -> dict:
+        control_token, _ = self._get_control_token(token)
+        authenticated_headers = self._get_authenticated_headers(token)
+        return authenticated_headers | {
+            "Authorization": control_token,
+            "AuthorizationCCSP": control_token,
+        }
+
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
-        self._set_session_language(cookies)
+        # self._set_session_language(cookies)
         authorization_code = None
         try:
             authorization_code = self._get_authorization_code_with_redirect_url(
@@ -228,17 +144,14 @@ class KiaUvoApiEU(ApiImpl):
             )
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
-            authorization_code = self._get_authorization_code_with_form(
-                username, password, cookies
-            )
 
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
         _, access_token, authorization_code = self._get_access_token(
-            stamp, authorization_code
+            authorization_code, stamp
         )
-        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
+        _, refresh_token = self._get_refresh_token(authorization_code, stamp)
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
 
         return Token(
@@ -360,32 +273,28 @@ class KiaUvoApiEU(ApiImpl):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "vehicleStatus.time"):
+        if get_child_value(state, "status.time"):
             vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "vehicleStatus.time")
+                get_child_value(state, "status.time")
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
         vehicle.odometer = (
-            get_child_value(state, "odometer.value"),
+            get_child_value(state, "status.odometer.value"),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "odometer.unit",
+                    "status.odometer.unit",
                 )
             ],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
-        )
-        vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
+        vehicle.engine_is_running = get_child_value(state, "status.engine")
 
-        # Converts temp to usable number. Currently only support celsius.
-        # Future to do is check unit in case the care itself is set to F.
-        if get_child_value(state, "vehicleStatus.airTemp.value"):
+        if get_child_value(state, "status.airTemp.value"):
             tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "vehicleStatus.airTemp.value")
+                get_child_value(state, "status.airTemp.value")
             )
 
             vehicle.air_temperature = (
@@ -393,90 +302,90 @@ class KiaUvoApiEU(ApiImpl):
                 TEMPERATURE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.airTemp.unit",
+                        "status.airTemp.unit",
                     )
                 ],
             )
-        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
-        steer_wheel_heat = get_child_value(state, "vehicleStatus.steerWheelHeat")
+        vehicle.defrost_is_on = get_child_value(state, "status.defrost")
+        steer_wheel_heat = get_child_value(state, "status.steerWheelHeat")
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
 
         vehicle.back_window_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideBackWindowHeat"
+            state, "status.sideBackWindowHeat"
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideMirrorHeat"
+            state, "status.sideMirrorHeat"
         )
         vehicle.front_left_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.flSeatHeatState")
+            get_child_value(state, "status.seatHeaterVentState.flSeatHeatState")
         ]
         vehicle.front_right_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.frSeatHeatState")
+            get_child_value(state, "status.seatHeaterVentState.frSeatHeatState")
         ]
         vehicle.rear_left_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState")
+            get_child_value(state, "status.seatHeaterVentState.rlSeatHeatState")
         ]
         vehicle.rear_right_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
+            get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
         ]
-        vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
+        vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontLeft"
+            state, "status.doorOpen.frontLeft"
         )
         vehicle.front_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontRight"
+            state, "status.doorOpen.frontRight"
         )
         vehicle.back_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backLeft"
+            state, "status.doorOpen.backLeft"
         )
         vehicle.back_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backRight"
+            state, "status.doorOpen.backRight"
         )
-        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
+        vehicle.hood_is_open = get_child_value(state, "status.hoodOpen")
         vehicle.front_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontLeft"
+            state, "status.windowOpen.frontLeft"
         )
         vehicle.front_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontRight"
+            state, "status.windowOpen.frontRight"
         )
         vehicle.back_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backLeft"
+            state, "status.windowOpen.backLeft"
         )
         vehicle.back_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backRight"
+            state, "status.windowOpen.backRight"
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampRL")
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRL")
         )
         vehicle.tire_pressure_front_left_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampFL")
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFL")
         )
         vehicle.tire_pressure_front_right_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampFR")
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFR")
         )
         vehicle.tire_pressure_rear_right_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampRR")
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRR")
         )
         vehicle.tire_pressure_all_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampAll")
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampAll")
         )
-        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
+        vehicle.trunk_is_open = get_child_value(state, "status.trunkOpen")
         vehicle.ev_battery_percentage = get_child_value(
-            state, "vehicleStatus.evStatus.batteryStatus"
+            state, "status.evStatus.batteryStatus"
         )
         vehicle.ev_battery_is_charging = get_child_value(
-            state, "vehicleStatus.evStatus.batteryCharge"
+            state, "status.evStatus.batteryCharge"
         )
 
         vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "vehicleStatus.evStatus.batteryPlugin"
+            state, "status.evStatus.batteryPlugin"
         )
 
         ev_charge_port_door_is_open = get_child_value(
-            state, "vehicleStatus.evStatus.chargePortDoorOpenStatus"
+            state, "status.evStatus.chargePortDoorOpenStatus"
         )
 
         if ev_charge_port_door_is_open == 1:
@@ -486,7 +395,7 @@ class KiaUvoApiEU(ApiImpl):
         if (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
             )
             is not None
         ):
@@ -495,7 +404,7 @@ class KiaUvoApiEU(ApiImpl):
                     float(
                         get_child_value(
                             state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                            "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
                         )
                     ),
                     1,
@@ -503,14 +412,14 @@ class KiaUvoApiEU(ApiImpl):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
                     )
                 ],
             )
         if (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             )
             is not None
         ):
@@ -519,7 +428,7 @@ class KiaUvoApiEU(ApiImpl):
                     float(
                         get_child_value(
                             state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
+                            "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
                         )
                     ),
                     1,
@@ -527,29 +436,29 @@ class KiaUvoApiEU(ApiImpl):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
                     )
                 ],
             )
         vehicle.ev_estimated_current_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
+            get_child_value(state, "status.evStatus.remainTime2.atc.value"),
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
+            get_child_value(state, "status.evStatus.remainTime2.etc1.value"),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
+            get_child_value(state, "status.evStatus.remainTime2.etc2.value"),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
+            get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
             "m",
         )
 
         target_soc_list = get_child_value(
-            state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
+            state, "status.evStatus.reservChargeInfos.targetSOClist"
         )
         try:
             vehicle.ev_charge_limits_ac = [
@@ -563,127 +472,127 @@ class KiaUvoApiEU(ApiImpl):
         if (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
             )
             is not None
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
                     )
                 ],
             )
         elif get_child_value(
             state,
-            "vehicleStatus.dte.value",
+            "status.dte.value",
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.dte.value",
+                    "status.dte.value",
                 ),
-                DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
+                DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
             )
 
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",  # noqa
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
                 )
             ],
         )
         vehicle.ev_first_departure_enabled = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",  # noqa
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",  # noqa
         )
         vehicle.ev_second_departure_enabled = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",  # noqa
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",  # noqa
         )
         vehicle.ev_first_departure_days = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",  # noqa
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",  # noqa
         )
         vehicle.ev_second_departure_days = get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",  # noqa
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",  # noqa
         )
 
         vehicle.ev_first_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",  # noqa
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_second_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",  # noqa
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_off_peak_start_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",  # noqa
             ),
         )
 
         vehicle.ev_off_peak_end_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",  # noqa
             ),
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",  # noqa
             ),
         )
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+            "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
         ):
             if (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
                 )
                 == 1
             ):
@@ -691,20 +600,20 @@ class KiaUvoApiEU(ApiImpl):
             elif (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
                 )
                 == 2
             ):
                 vehicle.ev_off_peak_charge_only_enabled = False
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
-            state, "vehicleStatus.washerFluidStatus"
+            state, "status.washerFluidStatus"
         )
-        vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
-        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
+        vehicle.fuel_level = get_child_value(state, "status.fuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
+        vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         vehicle.smart_key_battery_warning_is_on = get_child_value(
-            state, "vehicleStatus.smartKeyBatteryWarning"
+            state, "status.smartKeyBatteryWarning"
         )
 
         if get_child_value(state, "vehicleLocation.coord.lat"):
@@ -730,12 +639,12 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        response = response["resMsg"]["vehicleStatusInfo"]
+        response = response["resMsg"]
 
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
             response = requests.get(
@@ -743,9 +652,9 @@ class KiaUvoApiEU(ApiImpl):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except:
-            _LOGGER.warning(f"{DOMAIN} - _get_location failed")
+            _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -776,6 +685,7 @@ class KiaUvoApiEU(ApiImpl):
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
+        # TODO: needs verification
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
 
         payload = {"action": action.value, "deviceId": token.device_id}
@@ -790,7 +700,7 @@ class KiaUvoApiEU(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
 
         # Defaults are located here to be region specific
 
@@ -811,7 +721,7 @@ class KiaUvoApiEU(ApiImpl):
 
         payload = {
             "action": "start",
-            "hvacType": 0,
+            "hvacType": 1,
             "options": {
                 "defrost": options.defrost,
                 "heating1": int(options.heating),
@@ -828,21 +738,13 @@ class KiaUvoApiEU(ApiImpl):
         return response["msgId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
-
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
         payload = {
             "action": "stop",
-            "hvacType": 0,
-            "options": {
-                "defrost": True,
-                "heating1": 1,
-            },
-            "tempCode": "10H",
-            "unit": "C",
         }
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -1082,37 +984,33 @@ class KiaUvoApiEU(ApiImpl):
 
     def _get_stamp(self) -> str:
         if BRANDS[self.brand] == BRAND_KIA:
-            cfb = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
+            raise APIError("Kia is not supported in Australia")
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             cfb = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            )
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            cfb = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
+                "V60WkEmyRQaAfrBF1623/7QL62MjLVbCHdItGzQ1g5T/hkmKmMVTaMHv4cKGzgD3gL8="
             )
         else:
             raise ValueError("Invalid brand")
         raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
-        result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
+        result = bytes(b1 ^ b2 for b1, b2 in zip(cfb, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
-    def _get_device_id(self, stamp: str):
+    def _get_device_id(self, stamp):
         my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
             10**80
         )
         registration_id = my_hex[:64]
+        # provider_device_id = "59af09e554a9442ab8589c9500d04d2e"
         url = self.SPA_API_URL + "notifications/register"
         payload = {
+            # "providerDeviceId": provider_device_id,
             "pushRegId": registration_id,
-            "pushType": self.PUSH_TYPE,
+            "pushType": "GCM",
             "uuid": str(uuid.uuid4()),
         }
 
         headers = {
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-service-id": self.CLIENT_ID,
             "ccsp-application-id": self.APP_ID,
             "Stamp": stamp,
             "Content-Type": "application/json;charset=UTF-8",
@@ -1122,7 +1020,7 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
         _check_response_for_errors(response)
@@ -1135,12 +1033,12 @@ class KiaUvoApiEU(ApiImpl):
         # Get Cookies #
         url = (
             self.USER_API_URL
-            + "oauth2/authorize?response_type=code&state=test&client_id="
+            + "oauth2/authorize?response_type=code&client_id="
             + self.CLIENT_ID
             + "&redirect_uri="
-            + self.USER_API_URL
-            + "oauth2/redirect&lang="
-            + self.LANGUAGE
+            + "https://"
+            + self.BASE_URL
+            + "/api/v1/user/oauth2/redirect&lang=en"
         )
 
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
@@ -1152,9 +1050,9 @@ class KiaUvoApiEU(ApiImpl):
 
     def _set_session_language(self, cookies) -> None:
         # Set Language for Session #
-        url = self.USER_API_URL + "language"
+        url = self.USER_API_URL
         headers = {"Content-type": "application/json"}
-        payload = {"lang": self.LANGUAGE}
+        payload = {"lang": "en"}
         _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_authorization_code_with_redirect_url(
@@ -1171,105 +1069,7 @@ class KiaUvoApiEU(ApiImpl):
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
 
-    def _get_authorization_code_with_form(self, username, password, cookies) -> str:
-        url = self.USER_API_URL + "integrationinfo"
-        headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - IntegrationInfo Response: {response}")
-        user_id = response["userId"]
-        service_id = response["serviceId"]
-
-        login_form_url = self.LOGIN_FORM_URL
-        login_form_url = login_form_url.replace("$service_id", service_id)
-        login_form_url = login_form_url.replace("$user_id", user_id)
-
-        response = requests.get(login_form_url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - LoginForm {login_form_url} - Response: {response.text}"
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
-        login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
-
-        data = {
-            "username": username,
-            "password": password,
-            "credentialId": "",
-            "rememberMe": "on",
-        }
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": USER_AGENT_MOZILLA,
-        }
-        response = requests.post(
-            login_form_action_url,
-            data=data,
-            headers=headers,
-            allow_redirects=False,
-            cookies=cookies,
-        )
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - LoginFormSubmit {login_form_action_url} - Response {response.status_code} - {response.headers}"  # noqa
-        )
-        if response.status_code != 302:
-            _LOGGER.debug(
-                f"{DOMAIN} - LoginFormSubmit Error {login_form_action_url} - Response {response.status_code} - {response.text}"  # noqa
-            )
-            return
-
-        redirect_url = response.headers["Location"]
-        headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(redirect_url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"  # noqa
-        )
-
-        if "account-find-link" in response.text:
-            soup = BeautifulSoup(response.content, "html.parser")
-            login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
-            data = {"actionType": "FIND", "createToUVO": "UVO", "email": ""}
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": USER_AGENT_MOZILLA,
-                "followRedirects": "false",
-            }
-            response = requests.post(
-                login_form_action_url,
-                data=data,
-                headers=headers,
-                allow_redirects=False,
-                cookies=cookies,
-            )
-
-            if response.status_code != 302:
-                _LOGGER.debug(
-                    f"{DOMAIN} - AccountFindLink Error {login_form_action_url} - Response {response.status_code}"  # noqa
-                )
-                return
-
-            cookies = cookies | response.cookies.get_dict()
-
-        url = self.USER_API_URL + "silentsignin"
-        headers = {
-            "User-Agent": USER_AGENT_MOZILLA,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-        }
-        response = requests.post(
-            url,
-            headers=headers,
-            json={"intUserId": "0"},
-            cookies=cookies,
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")
-        parsed_url = urlparse(response["redirectUrl"])
-        authorization_code = "".join(parse_qs(parsed_url.query)["code"])
-        return authorization_code
-
-    def _get_access_token(self, stamp, authorization_code):
+    def _get_access_token(self, authorization_code, stamp):
         # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
@@ -1284,8 +1084,8 @@ class KiaUvoApiEU(ApiImpl):
 
         data = (
             "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
-            + self.BASE_DOMAIN
-            + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
+            + self.BASE_URL
+            + "%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
         _LOGGER.debug(f"{DOMAIN} - Get Access Token Data: {headers}{data}")
@@ -1299,7 +1099,7 @@ class KiaUvoApiEU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         return token_type, access_token, authorization_code
 
-    def _get_refresh_token(self, stamp, authorization_code):
+    def _get_refresh_token(self, authorization_code, stamp):
         # Get Refresh Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
@@ -1312,10 +1112,7 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-        data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
-            + authorization_code
-        )
+        data = "grant_type=refresh_token&refresh_token=" + authorization_code
         _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data: {data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
@@ -1323,6 +1120,27 @@ class KiaUvoApiEU(ApiImpl):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def _get_control_token(self, token: Token) -> Token:
+        url = self.USER_API_URL + "pin?token="
+        headers = {
+            "Authorization": token.access_token,
+            "Content-type": "application/json",
+            "Host": self.BASE_URL,
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        data = {"deviceId": token.device_id, "pin": token.pin}
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
+        response = requests.put(url, json=data, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        control_token = "Bearer " + response["controlToken"]
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response["expiresTime"]
+        )
+        return control_token, control_token_expire_at
 
     def check_action_status(
         self,
@@ -1371,7 +1189,7 @@ class KiaUvoApiEU(ApiImpl):
                     elif action["result"] == "non-response":
                         return OrderStatus.TIMEOUT
                     elif action["result"] is None:
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "Action status not set yet by server - try again in a few seconds"  # noqa
                         )
                         return OrderStatus.PENDING

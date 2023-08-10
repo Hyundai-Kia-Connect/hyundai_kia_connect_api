@@ -11,9 +11,8 @@ from urllib.parse import parse_qs, urlparse
 
 import pytz
 import requests
-import json
 from bs4 import BeautifulSoup
-from dateutil import tz, parser
+from dateutil import tz
 
 from .ApiImpl import (
     ApiImpl,
@@ -50,7 +49,6 @@ from .utils import (
 
 _LOGGER = logging.getLogger(__name__)
 
-INVALID_STAMP_RETRY_COUNT = 10
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
@@ -99,8 +97,6 @@ class KiaUvoApiCN(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        self.stamps = None
-
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
@@ -147,7 +143,6 @@ class KiaUvoApiCN(ApiImpl):
 
     def login(self, username: str, password: str) -> Token:
         device_id = self._get_device_id()
-        # device_id = '2e062595-28e0-4bcb-a75a-1b395cde337c'
         cookies = self._get_cookies()
         self._set_session_language(cookies)
         authorization_code = None
@@ -1061,104 +1056,6 @@ class KiaUvoApiCN(ApiImpl):
             url, json=data, headers=headers, cookies=cookies
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
-        parsed_url = urlparse(response["redirectUrl"])
-        authorization_code = "".join(parse_qs(parsed_url.query)["code"])
-        return authorization_code
-
-    def _get_authorization_code_with_form(self, username, password, cookies) -> str:
-        url = self.USER_API_URL + "integrationinfo"
-        headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - IntegrationInfo Response: {response}")
-        user_id = response["userId"]
-        service_id = response["serviceId"]
-
-        login_form_url = self.LOGIN_FORM_URL
-        login_form_url = login_form_url.replace("$service_id", service_id)
-        login_form_url = login_form_url.replace("$user_id", user_id)
-
-        response = requests.get(login_form_url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - LoginForm {login_form_url} - Response: {response.text}"
-        )
-        soup = BeautifulSoup(response.content, "html.parser")
-        login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
-
-        data = {
-            "username": username,
-            "password": password,
-            "credentialId": "",
-            "rememberMe": "on",
-        }
-        headers = {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": USER_AGENT_MOZILLA,
-        }
-        response = requests.post(
-            login_form_action_url,
-            data=data,
-            headers=headers,
-            allow_redirects=False,
-            cookies=cookies,
-        )
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - LoginFormSubmit {login_form_action_url} - Response {response.status_code} - {response.headers}"  # noqa
-        )
-        if response.status_code != 302:
-            _LOGGER.debug(
-                f"{DOMAIN} - LoginFormSubmit Error {login_form_action_url} - Response {response.status_code} - {response.text}"  # noqa
-            )
-            return
-
-        redirect_url = response.headers["Location"]
-        headers = {"User-Agent": USER_AGENT_MOZILLA}
-        response = requests.get(redirect_url, headers=headers, cookies=cookies)
-        cookies = cookies | response.cookies.get_dict()
-        _LOGGER.debug(
-            f"{DOMAIN} - Redirect User Id {redirect_url} - Response {response.url} - {response.text}"  # noqa
-        )
-
-        if "account-find-link" in response.text:
-            soup = BeautifulSoup(response.content, "html.parser")
-            login_form_action_url = soup.find("form")["action"].replace("&amp;", "&")
-            data = {"actionType": "FIND", "createToUVO": "UVO", "email": ""}
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": USER_AGENT_MOZILLA,
-                "followRedirects": "false",
-            }
-            response = requests.post(
-                login_form_action_url,
-                data=data,
-                headers=headers,
-                allow_redirects=False,
-                cookies=cookies,
-            )
-
-            if response.status_code != 302:
-                _LOGGER.debug(
-                    f"{DOMAIN} - AccountFindLink Error {login_form_action_url} - Response {response.status_code}"  # noqa
-                )
-                return
-
-            cookies = cookies | response.cookies.get_dict()
-
-        url = self.USER_API_URL + "silentsignin"
-        headers = {
-            "User-Agent": USER_AGENT_MOZILLA,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-        }
-        response = requests.post(
-            url,
-            headers=headers,
-            json={"intUserId": "0"},
-            cookies=cookies,
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - silentsignin Response {response}")
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
