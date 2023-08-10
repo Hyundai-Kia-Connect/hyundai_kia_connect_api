@@ -31,6 +31,7 @@ from .Vehicle import (
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
+    BRAND_GENESIS,
     BRANDS,
     DOMAIN,
     DISTANCE_UNITS,
@@ -110,7 +111,9 @@ def _check_response_for_errors(response: dict) -> None:
     if response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
-        raise APIError(f"Server returned:  '{response['rescode']}' '{response['resMsg']}'")
+        raise APIError(
+            f"Server returned:  '{response['rescode']}' '{response['resMsg']}'"
+        )
 
 
 class KiaUvoApiEU(ApiImpl):
@@ -146,6 +149,13 @@ class KiaUvoApiEU(ApiImpl):
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            self.BASE_DOMAIN: str = "prd.eu-ccapi.genesis.com"
+            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
+            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.LOGIN_FORM_HOST = "eu-account.genesis.com"
+            self.PUSH_TYPE = "GCM"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
@@ -174,6 +184,19 @@ class KiaUvoApiEU(ApiImpl):
                 "https://"
                 + self.LOGIN_FORM_HOST
                 + "/auth/realms/euhyundaiidm/protocol/openid-connect/auth?client_id="
+                + auth_client_id
+                + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
+                + self.USER_API_URL
+                + "integration/redirect/login&ui_locales="
+                + self.LANGUAGE
+                + "&state=$service_id:$user_id"
+            )
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            auth_client_id = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.LOGIN_FORM_URL: str = (
+                "https://"
+                + self.LOGIN_FORM_HOST
+                + "/auth/realms/eugenesisidm/protocol/openid-connect/auth?client_id="
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
                 + self.USER_API_URL
@@ -1060,6 +1083,20 @@ class KiaUvoApiEU(ApiImpl):
         return response["msgId"]
 
     def _get_stamp(self) -> str:
+        if BRANDS[self.brand] == BRAND_KIA:
+            cfb = base64.b64decode(
+                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+            )
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
+            cfb = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+            )
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            cfb = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
+            )
+        else:
+            raise ValueError("Invalid brand")
         raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
         result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
         return base64.b64encode(result).decode("utf-8")
