@@ -190,7 +190,7 @@ class KiaUvoApiEU(ApiImpl):
                 + "&state=$service_id:$user_id"
             )
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            auth_client_id = "Need this still"
+            auth_client_id = "3020afa2-30ff-412a-aa51-d28fbe901e10"
             self.LOGIN_FORM_URL: str = (
                 "https://"
                 + self.LOGIN_FORM_HOST
