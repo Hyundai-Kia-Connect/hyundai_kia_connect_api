@@ -50,7 +50,6 @@ from .utils import (
 
 _LOGGER = logging.getLogger(__name__)
 
-INVALID_STAMP_RETRY_COUNT = 10
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
@@ -111,10 +110,7 @@ def _check_response_for_errors(response: dict) -> None:
     if response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
-        else:
-            raise APIError(
-                f"Server returned:  '{response['rescode']}' '{response['resMsg']}'"
-            )
+        raise APIError(f"Server returned:  '{response['rescode']}' '{response['resMsg']}'")
 
 
 class KiaUvoApiEU(ApiImpl):
@@ -122,8 +118,6 @@ class KiaUvoApiEU(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        self.stamps = None
-
         if language not in SUPPORTED_LANGUAGES_LIST:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"  # fallback to English
@@ -134,6 +128,9 @@ class KiaUvoApiEU(ApiImpl):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+            self.CFB: str = base64.b64decode(
+                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+            )
             self.BASIC_AUTHORIZATION: str = (
                 "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
             )
@@ -143,6 +140,9 @@ class KiaUvoApiEU(ApiImpl):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
+            self.CFB: str = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+            )
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
@@ -181,14 +181,6 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LANGUAGE
                 + "&state=$service_id:$user_id"
             )
-
-        self.stamps_url: str = (
-            "https://raw.githubusercontent.com/neoPix/bluelinky-stamps/master/"
-            + BRANDS[self.brand].lower()
-            + "-"
-            + self.APP_ID
-            + ".v2.json"
-        )
 
     def _get_authenticated_headers(self, token: Token) -> dict:
         return {
@@ -234,7 +226,6 @@ class KiaUvoApiEU(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             device_id=device_id,
-            stamp=stamp,
             valid_until=valid_until,
         )
 
@@ -1069,18 +1060,8 @@ class KiaUvoApiEU(ApiImpl):
         return response["msgId"]
 
     def _get_stamp(self) -> str:
-        if BRANDS[self.brand] == BRAND_KIA:
-            cfb = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            cfb = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            )
-        else:
-            raise ValueError("Invalid brand")
         raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
-        result = bytes(b1 ^ b2 for b1, b2 in zip(cfb, raw_data))
+        result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp: str):
