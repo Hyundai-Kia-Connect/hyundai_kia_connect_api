@@ -25,6 +25,7 @@ class APIError(HyundaiKiaException):
 
     pass
 
+
 class DeviceIDError(APIError):
     """
     Raised upon receipt of an Invalid Device ID error.
