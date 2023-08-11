@@ -18,17 +18,17 @@ class AuthenticationError(HyundaiKiaException):
     pass
 
 
-class DeviceIDError(AuthenticationError):
+class APIError(HyundaiKiaException):
     """
-    Raised upon receipt of an Invalid Device ID error.
+    Generic API error
     """
 
     pass
 
 
-class APIError(HyundaiKiaException):
+class DeviceIDError(APIError):
     """
-    Generic API error
+    Raised upon receipt of an Invalid Device ID error.
     """
 
     pass
