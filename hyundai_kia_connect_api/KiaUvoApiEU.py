@@ -130,7 +130,7 @@ class KiaUvoApiEU(ApiImpl):
         if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_URL: str = "prd.eu-ccapi.kia.com:8080"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74" 
+            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.CFB: str = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMQeU="
             )
