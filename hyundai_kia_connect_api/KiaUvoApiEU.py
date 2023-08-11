@@ -130,25 +130,27 @@ class KiaUvoApiEU(ApiImpl):
         if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_URL: str = "prd.eu-ccapi.kia.com:8080"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74" 
             self.CFB: str = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMQeU="
             )
             self.BASIC_AUTHORIZATION: str = (
                 "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
             )
             self.LOGIN_FORM_HOST = "eu-account.kia.com"
-            self.PUSH_TYPE = "APNS"
+            self.PUSH_TYPE = "GCM"
+            self.GCM_SENDER_ID = 345127537656
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "prd.eu-ccapi.hyundai.com:8080"
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
+            self.APP_ID: str = "1eba27d2-9a5b-4eba-8ec7-97eb6c62fb51"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
+            self.GCM_SENDER_ID = 414998006775
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self.BASE_URL: str = "prd-eu-ccapi.genesis.com:443"
             self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
@@ -159,13 +161,13 @@ class KiaUvoApiEU(ApiImpl):
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
             self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
+            self.GCM_SENDER_ID = 199360397125
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-        self.GCM_SENDER_ID = 199360397125
 
         if BRANDS[self.brand] == BRAND_KIA:
             auth_client_id = "572e0304-5f8d-4b4c-9dd5-41aa84eed160"
