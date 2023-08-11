@@ -128,7 +128,7 @@ class KiaUvoApiEU(ApiImpl):
         self.brand: int = brand
 
         if BRANDS[self.brand] == BRAND_KIA:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
+            self.BASE_URL: str = "prd.eu-ccapi.kia.com:8080"
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.CFB: str = base64.b64decode(
@@ -140,7 +140,7 @@ class KiaUvoApiEU(ApiImpl):
             self.LOGIN_FORM_HOST = "eu-account.kia.com"
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
+            self.BASE_URL: str = "prd.eu-ccapi.hyundai.com:8080"
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.CFB: str = base64.b64decode(
@@ -150,7 +150,7 @@ class KiaUvoApiEU(ApiImpl):
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
+            self.BASE_URL: str = "prd-eu-ccapi.genesis.com:443"
             self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
             self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
             self.CFB: str = base64.b64decode(
@@ -160,7 +160,6 @@ class KiaUvoApiEU(ApiImpl):
             self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
-        self.BASE_URL: str = self.BASE_DOMAIN + ":8080"
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
