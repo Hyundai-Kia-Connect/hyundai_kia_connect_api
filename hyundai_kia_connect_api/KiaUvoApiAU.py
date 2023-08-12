@@ -229,7 +229,7 @@ class KiaUvoApiAU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties(vehicle, {"status": state})
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -252,7 +252,7 @@ class KiaUvoApiAU(ApiImpl):
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties(vehicle, {"status": state})
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
