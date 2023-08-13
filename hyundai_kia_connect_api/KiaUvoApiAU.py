@@ -228,8 +228,15 @@ class KiaUvoApiAU(ApiImpl):
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, {"status": state})
+        status = self._get_cached_vehicle_state(token, vehicle)
+        location = self._get_location(token, vehicle)
+        self._update_vehicle_properties(
+            vehicle,
+            {
+                "status": status,
+                "vehicleLocation": location,
+            },
+        )
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -250,9 +257,15 @@ class KiaUvoApiAU(ApiImpl):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_forced_vehicle_state(token, vehicle)
-        state["vehicleLocation"] = self._get_location(token, vehicle)
-        self._update_vehicle_properties(vehicle, {"status": state})
+        status = self._get_forced_vehicle_state(token, vehicle)
+        location = self._get_location(token, vehicle)
+        self._update_vehicle_properties(
+            vehicle,
+            {
+                "status": status,
+                "vehicleLocation": location,
+            },
+        )
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -652,7 +665,7 @@ class KiaUvoApiAU(ApiImpl):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return response["resMsg"]["gpsDetail"]
         except:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
@@ -676,7 +689,7 @@ class KiaUvoApiAU(ApiImpl):
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
@@ -691,7 +704,7 @@ class KiaUvoApiAU(ApiImpl):
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
@@ -731,7 +744,7 @@ class KiaUvoApiAU(ApiImpl):
         }
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -756,7 +769,7 @@ class KiaUvoApiAU(ApiImpl):
         payload = {"action": "start", "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
@@ -768,7 +781,7 @@ class KiaUvoApiAU(ApiImpl):
         payload = {"action": "stop", "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
@@ -976,7 +989,7 @@ class KiaUvoApiAU(ApiImpl):
             ]
         }
         response = requests.post(
-            url, json=body, headers=self._get_authenticated_headers(token)
+            url, json=body, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
