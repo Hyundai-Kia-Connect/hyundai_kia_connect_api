@@ -1,5 +1,5 @@
 """KiaUvoApiKR.py"""
-#Korea Implemention. Identical to EU. 
+# Korea Implemention. Identical to EU.
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
@@ -148,9 +148,9 @@ class KiaUvoApiKR(ApiImpl):
             self.PORT: int = 443
             self.CCSP_SERVICE_ID: str = "25fa8900-60b0-4f5d-802b-04c7168f64ea"
             self.APP_ID: str = "a47e09cc-1e30-48de-a625-a9d9da1da7cd"
-            #self.CFB: str = base64.b64decode(
+            # self.CFB: str = base64.b64decode(
             #    "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            #)
+            # )
             self.BASIC_AUTHORIZATION: str = "Basic eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiI1YTVmZWM2NDhjNzViYTFjNDFhYTJlN2YiLCJ1aWQiOiIzODY3ZmU5OC1lZGNhLTRhYTQtYTI5Ny03YjM4OGJjOTBlZmIiLCJkaWQiOiI1ZTVmMjMzMC1jNWE5LTQ5ZGQtYTdjNi0yY2UyMzk3ZjAwZjYiLCJzaWQiOiIyNWZhODkwMC02MGIwLTRmNWQtODAyYi0wNGM3MTY4ZjY0ZWEiLCJleHAiOjE2OTE4OTQ0OTAsImlhdCI6MTY5MTg5Mzg5MCwiaXNzIjoiYmx1ZWxpbmsifQ.d0pKmM4YtKrawv8In7SnCfpsY3rAcQhzSSdPdfO3u4WYeU4uLFdkFY8DZ65MrmnyfxtGbuPlwtpWmyhMZvFzqddRIq351MLn6aPcVrWlszfFJYcgb3o4iJvSNZ-QT78IIdjeGO90WBZeRsdEfVQ6QTSooH2NkrS2K0xsfY_Dt5p1uIAm2o5UYgXskmcgH8f6RwGc7k4_fEo0oIKHS9mqpkAO6XrCrltu7zwSblHtv_9ludJnP7b3Gs3w7GitNyuKqFaG-0Cr6tWGYhiIYbQMdy6Z5mz9YtTagnabG-brD7inMi-yTpeTwPi_4NTIN2qwW0a5dUbASDZk9foay8ISkQ"  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
