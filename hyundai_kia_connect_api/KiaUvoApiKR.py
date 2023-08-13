@@ -104,12 +104,12 @@ def _check_response_for_errors(response: dict) -> None:
         "5921": NoDataFound,
         "9999": RequestTimeoutError,
     }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+    _LOGGER.debug(f"Response {response}")
+    if not any(x in response for x in ["retCode", "resCode", "resMsg", "resultCode"]):
         _LOGGER.error(f"Unknown API response format: {response}")
         raise InvalidAPIResponseError()
 
-    if response["retCode"] == "F":
+    if response["resultCode"] == "F":
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
         raise APIError(
@@ -148,11 +148,12 @@ class KiaUvoApiKR(ApiImpl):
             self.PORT: int = 443
             self.CCSP_SERVICE_ID: str = "25fa8900-60b0-4f5d-802b-04c7168f64ea"
             self.APP_ID: str = "a47e09cc-1e30-48de-a625-a9d9da1da7cd"
-            # self.CFB: str = base64.b64decode(
-            #    "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            # )
+            self.CFB: str = base64.b64decode(
+                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+            )
             self.BASIC_AUTHORIZATION: str = "Basic eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaWQiOiI1YTVmZWM2NDhjNzViYTFjNDFhYTJlN2YiLCJ1aWQiOiIzODY3ZmU5OC1lZGNhLTRhYTQtYTI5Ny03YjM4OGJjOTBlZmIiLCJkaWQiOiI1ZTVmMjMzMC1jNWE5LTQ5ZGQtYTdjNi0yY2UyMzk3ZjAwZjYiLCJzaWQiOiIyNWZhODkwMC02MGIwLTRmNWQtODAyYi0wNGM3MTY4ZjY0ZWEiLCJleHAiOjE2OTE4OTQ0OTAsImlhdCI6MTY5MTg5Mzg5MCwiaXNzIjoiYmx1ZWxpbmsifQ.d0pKmM4YtKrawv8In7SnCfpsY3rAcQhzSSdPdfO3u4WYeU4uLFdkFY8DZ65MrmnyfxtGbuPlwtpWmyhMZvFzqddRIq351MLn6aPcVrWlszfFJYcgb3o4iJvSNZ-QT78IIdjeGO90WBZeRsdEfVQ6QTSooH2NkrS2K0xsfY_Dt5p1uIAm2o5UYgXskmcgH8f6RwGc7k4_fEo0oIKHS9mqpkAO6XrCrltu7zwSblHtv_9ludJnP7b3Gs3w7GitNyuKqFaG-0Cr6tWGYhiIYbQMdy6Z5mz9YtTagnabG-brD7inMi-yTpeTwPi_4NTIN2qwW0a5dUbASDZk9foay8ISkQ"  # noqa
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
+            self.hazpw = "c3NvOjhjZjhlZDA3LTdhMjYtNGI5YS1hMjFhLWE2Y2Q1MWRiOGI0OA%3D%3D.8b4041183c31c16462e24272412de8c139e32c36"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             """
@@ -232,6 +233,7 @@ class KiaUvoApiKR(ApiImpl):
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
+        cookies["_hazkpw"] = self.hazpw
         self._set_session_language(cookies)
         authorization_code = None
         try:
@@ -1102,7 +1104,8 @@ class KiaUvoApiKR(ApiImpl):
             10**80
         )
         registration_id = my_hex[:64]
-        url = self.SPA_API_URL + "notifications/register"
+        #url = self.SPA_API_URL + "notifications/register"
+        url = "https://prd.kr-ccapi.hyundai.com/api/v1/notifications/device/register"
         payload = {
             "pushRegId": registration_id,
             "pushType": self.PUSH_TYPE,
@@ -1126,7 +1129,7 @@ class KiaUvoApiKR(ApiImpl):
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
-        device_id = response["resMsg"]["deviceId"]
+        device_id = response["deviceId"]
         return device_id
 
     def _get_cookies(self) -> dict:
