@@ -14,6 +14,7 @@ from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiAU import KiaUvoApiAU
+from .KiaUvoApiKR import KiaUvoApiKR
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -26,6 +27,7 @@ from .const import (
     REGION_EUROPE,
     REGION_USA,
     REGION_CHINA,
+    REGION_KOREA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
@@ -246,5 +248,7 @@ class VehicleManager:
             return KiaUvoApiCN(region, brand, language)
         elif REGIONS[region] == REGION_AUSTRALIA:
             return KiaUvoApiAU(region, brand, language)
+        elif REGIONS[region] == REGION_KOREA:
+            return KiaUvoApiKR(region, brand, language)
         else:
             raise APIError(f"Unknown region {region}")
