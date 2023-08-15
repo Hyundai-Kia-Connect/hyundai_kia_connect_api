@@ -285,18 +285,14 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine"
         )
 
-        vehicle.air_temperature = (
-            get_child_value(
-                state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value",
-            ),
-            TEMPERATURE_UNITS[
-                get_child_value(
-                    state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.unit",  # noqa
-                )
-            ],
-        )
+        air_temp = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value")
+
+        if air_temp == "LOW":
+            air_temp = self.temperature_range[0]
+        if air_temp == "HIGH":
+            air_temp = self.temperature_range[-1]
+        if air_temp:
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.defrost"
         )
