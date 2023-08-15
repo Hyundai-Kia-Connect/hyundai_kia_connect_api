@@ -285,7 +285,10 @@ class KiaUvoAPIUSA(ApiImpl):
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine"
         )
 
-        air_temp = get_child_value(state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value")
+        air_temp = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.airTemp.value",
+        )
 
         if air_temp == "LOW":
             air_temp = self.temperature_range[0]
