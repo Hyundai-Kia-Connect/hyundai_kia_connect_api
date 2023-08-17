@@ -684,7 +684,7 @@ class KiaUvoApiAU(ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/door"
 
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
@@ -713,7 +713,7 @@ class KiaUvoApiAU(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
 
         # Defaults are located here to be region specific
 
