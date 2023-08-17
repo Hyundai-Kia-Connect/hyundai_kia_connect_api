@@ -17,7 +17,11 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
 )
-from .utils import get_child_value
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+)
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
@@ -264,10 +268,14 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         if air_temp == "LO":
             air_temp = self.temperature_range[0]
-        if air_temp == "HI":
+        elif air_temp == "HI":
             air_temp = self.temperature_range[-1]
+        elif air_temp:
+            tempIndex = get_hex_temp_into_index(air_temp)
+            air_temp = self.temperature_range[tempIndex]
         if air_temp:
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state, "vehicleStatus.steerWheelHeat"
