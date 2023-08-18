@@ -28,6 +28,14 @@ class ClimateRequestOptions:
     rear_right_seat: int = None
 
 
+@dataclass
+class WindowRequestOptions:
+    back_left: WINDOW_STATE
+    back_right: WINDOW_STATE
+    front_left: WINDOW_STATE
+    front_right: WINDOW_STATE
+
+
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None

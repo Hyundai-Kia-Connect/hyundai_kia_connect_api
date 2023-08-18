@@ -18,6 +18,7 @@ from dateutil import tz
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
+    WindowRequestOptions,
 )
 from .Token import Token
 from .Vehicle import (
@@ -692,6 +693,25 @@ class KiaUvoApiAU(ApiImpl):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    def set_windows(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/windowcurtain"
+
+        payload = {
+            "backLeft": options.back_left,
+            "backRight": options.back_right,
+            "frontLeft": options.front_left,
+            "frontRight": options.front_right,
+        }
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
 

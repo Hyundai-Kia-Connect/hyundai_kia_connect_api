@@ -82,3 +82,9 @@ class OrderStatus(Enum):
     # no response received from vehicle.
     # no way to know if the order was executed, but most likely not
     TIMEOUT = "TIMEOUT"
+
+
+class WINDOW_STATE(Enum):
+    CLOSED = 0
+    OPEN = 1
+    VENTILATION = 2
