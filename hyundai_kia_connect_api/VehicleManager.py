@@ -7,7 +7,7 @@ import logging
 import pytz
 
 from .exceptions import APIError
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -156,6 +156,11 @@ class VehicleManager:
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
         return self.api.set_charge_limits(
             self.token, self.get_vehicle(vehicle_id), ac, dc
+        )
+
+    def set_windows_state(self, vehicle_id: str, options: WindowRequestOptions) -> str:
+        return self.api.set_windows_state(
+            self.token, self.get_vehicle(vehicle_id), options
         )
 
     def check_action_status(

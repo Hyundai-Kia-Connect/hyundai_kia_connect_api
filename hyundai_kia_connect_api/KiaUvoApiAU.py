@@ -696,7 +696,7 @@ class KiaUvoApiAU(ApiImpl):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def set_windows(
+    def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
     ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/windowcurtain"

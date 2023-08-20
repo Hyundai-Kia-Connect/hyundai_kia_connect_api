@@ -30,10 +30,10 @@ class ClimateRequestOptions:
 
 @dataclass
 class WindowRequestOptions:
-    back_left: WINDOW_STATE
-    back_right: WINDOW_STATE
-    front_left: WINDOW_STATE
-    front_right: WINDOW_STATE
+    back_left: WINDOW_STATE = None
+    back_right: WINDOW_STATE = None
+    front_left: WINDOW_STATE = None
+    front_right: WINDOW_STATE = None
 
 
 class ApiImpl:
@@ -126,6 +126,12 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
         """Sets charge limits. Returns the tracking ID"""
+        pass
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Opens or closes a particular window. Returns the tracking ID"""
         pass
 
     def charge_port_action(
