@@ -1,7 +1,7 @@
 """const.py"""
 # pylint:disable=invalid-name,missing-class-docstring
 
-from enum import Enum
+from enum import Enum, IntEnum
 
 DOMAIN: str = "hyundai_kia_connect_api"
 
@@ -84,7 +84,7 @@ class OrderStatus(Enum):
     TIMEOUT = "TIMEOUT"
 
 
-class WINDOW_STATE(Enum):
+class WINDOW_STATE(IntEnum):
     CLOSED = 0
     OPEN = 1
     VENTILATION = 2
