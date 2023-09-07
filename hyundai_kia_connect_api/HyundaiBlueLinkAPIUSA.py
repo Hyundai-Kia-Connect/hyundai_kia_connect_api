@@ -557,7 +557,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             }
 
         elif action == VEHICLE_ENGINE_CONTROL_ACTION.STOP:
-            url = self.API_URL + "rcs/rcs/stop"
+            url = self.API_URL + "rcs/rsc/stop"
             data = None
 
         headers = self._get_vehicle_headers(token, vehicle)
