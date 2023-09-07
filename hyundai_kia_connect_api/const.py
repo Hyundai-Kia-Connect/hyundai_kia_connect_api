@@ -66,6 +66,10 @@ class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
 
+class VEHICLE_ENGINE_CONTROL_ACTION(Enum):
+    START = "start"
+    STOP = "stop"
+
 
 class CHARGE_PORT_ACTION(Enum):
     CLOSE = "close"

@@ -13,6 +13,7 @@ from urllib3.util.ssl_ import create_urllib3_context
 from .const import (
     DOMAIN,
     VEHICLE_LOCK_ACTION,
+    VEHICLE_ENGINE_CONTROL_ACTION,
     SEAT_STATUS,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
@@ -504,73 +505,70 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
-    def start_climate(
-        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> str:
-        _LOGGER.debug(f"{DOMAIN} - Start engine..")
-
-        url = self.API_URL + "rcs/rsc/start"
+    def engine_control_action(
+        self, token: Token, vehicle: Vehicle, action, options: ClimateRequestOptions) -> None:
 
         headers = self._get_vehicle_headers(token, vehicle)
-        _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
+        engine_action = str(action.value).capitalize()
 
-        if options.climate is None:
-            options.climate = True
-        if options.set_temp is None:
-            options.set_temp = 70
-        if options.duration is None:
-            options.duration = 5
-        if options.heating is None:
-            options.heating = 0
-        if options.defrost is None:
-            options.defrost = False
-        if options.front_left_seat is None:
-            options.front_left_seat = 0
-        if options.front_right_seat is None:
-            options.front_right_seat = 0
-        if options.rear_left_seat is None:
-            options.rear_left_seat = 0
-        if options.rear_right_seat is None:
-            options.rear_right_seat = 0
+        if action == VEHICLE_ENGINE_CONTROL_ACTION.START:
+            url = self.API_URL + "rcs/rsc/start"
 
-        data = {
-            "Ims": 0,
-            "airCtrl": int(options.climate),
-            "airTemp": {"unit": 1, "value": options.set_temp},
-            "defrost": options.defrost,
-            "heating1": int(options.heating),
-            "igniOnDuration": options.duration,
-            "seatHeaterVentInfo": {
-                "drvSeatHeatState": options.front_left_seat,
-                "astSeatHeatState": options.front_right_seat,
-                "rlSeatHeatState": options.rear_left_seat,
-                "rrSeatHeatState": options.rear_right_seat,
-            },
-            "username": token.username,
-            "vin": vehicle.id,
-        }
-        _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
+            if options is None:
+                options = ClimateRequestOptions(70, 5, False, True, 0, 0, 0, 0, 0)
+            elif options.climate is None:
+                options.climate = True
+            elif options.set_temp is None:
+                options.set_temp = 70
+            elif options.duration is None:
+                options.duration = 5
+            elif options.heating is None:
+                options.heating = 0
+            elif options.defrost is None:
+                options.defrost = False
+            elif options.front_left_seat is None:
+                options.front_left_seat = 0
+            elif options.front_right_seat is None:
+                options.front_right_seat = 0
+            elif options.rear_left_seat is None:
+                options.rear_left_seat = 0
+            elif options.rear_right_seat is None:
+                options.rear_right_seat = 0
 
+            data = {
+                "Ims": 0,
+                "airCtrl": int(options.climate),
+                "airTemp": {"unit": 1, "value": options.set_temp},
+                "defrost": options.defrost,
+                "heating1": int(options.heating),
+                "igniOnDuration": options.duration,
+                "seatHeaterVentInfo": {
+                    "drvSeatHeatState": options.front_left_seat,
+                    "astSeatHeatState": options.front_right_seat,
+                    "rlSeatHeatState": options.rear_left_seat,
+                    "rrSeatHeatState": options.rear_right_seat,
+                },
+                "username": token.username,
+                "vin": vehicle.id,
+            }
+
+        elif action == VEHICLE_ENGINE_CONTROL_ACTION.STOP:
+            url = self.API_URL + "rcs/rcs/stop"
+            data = None
+
+        headers = self._get_vehicle_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - {engine_action} engine..")
+        _LOGGER.debug(f"{DOMAIN} - {engine_action} engine headers: {headers}")
+        _LOGGER.debug(f"{DOMAIN} - {engine_action} engine data: {data}")
+        
         response = self.sessions.post(url, json=data, headers=headers)
+
         _LOGGER.debug(
-            f"{DOMAIN} - Start engine response status code: {response.status_code}"
+            f"{DOMAIN} - {engine_action} engine response status code: {response.status_code}"
         )
-        _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
-        _LOGGER.debug(f"{DOMAIN} - Stop engine..")
-
-        url = self.API_URL + "rcs/rsc/stop"
-
-        headers = self._get_vehicle_headers(token, vehicle)
-
-        _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
-
-        response = self.sessions.post(url, headers=headers)
-        _LOGGER.debug(
-            f"{DOMAIN} - Stop engine response status code: {response.status_code}"
-        )
-        _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
+        _LOGGER.debug(f"{DOMAIN} - {engine_action} engine response: {response.text}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
