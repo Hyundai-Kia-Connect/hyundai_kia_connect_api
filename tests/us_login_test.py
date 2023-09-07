@@ -10,7 +10,7 @@ def test_US_login():
     vm = VehicleManager(
         region=3, brand=2, username=username, password=password, pin=pin
     )
-    
+
     vm.check_and_refresh_token()
     vm.update_all_vehicles_with_cached_state()
     vehicle_id = next(iter(vm.vehicles))
