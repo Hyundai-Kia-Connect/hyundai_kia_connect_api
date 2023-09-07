@@ -10,6 +10,10 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
+from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
+from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.Vehicle import Vehicle
+
 from .const import (
     DOMAIN,
     VEHICLE_LOCK_ACTION,
@@ -569,6 +573,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
 
         _LOGGER.debug(f"{DOMAIN} - {engine_action} engine response: {response.text}")
+
+    def start_climate(self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions) -> str:
+        self.engine_control_action(token, vehicle, VEHICLE_ENGINE_CONTROL_ACTION.START, options)
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        self.engine_control_action(token, vehicle, VEHICLE_ENGINE_CONTROL_ACTION.STOP)
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
