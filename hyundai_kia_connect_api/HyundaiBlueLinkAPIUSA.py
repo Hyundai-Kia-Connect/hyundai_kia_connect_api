@@ -510,8 +510,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
     def engine_control_action(
-        self, token: Token, vehicle: Vehicle, action, options: ClimateRequestOptions) -> None:
-
+        self, token: Token, vehicle: Vehicle, action, options: ClimateRequestOptions
+    ) -> None:
         headers = self._get_vehicle_headers(token, vehicle)
         engine_action = str(action.value).capitalize()
 
@@ -574,8 +574,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - {engine_action} engine response: {response.text}")
 
-    def start_climate(self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions) -> str:
-        self.engine_control_action(token, vehicle, VEHICLE_ENGINE_CONTROL_ACTION.START, options)
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        self.engine_control_action(
+            token, vehicle, VEHICLE_ENGINE_CONTROL_ACTION.START, options
+        )
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         self.engine_control_action(token, vehicle, VEHICLE_ENGINE_CONTROL_ACTION.STOP)

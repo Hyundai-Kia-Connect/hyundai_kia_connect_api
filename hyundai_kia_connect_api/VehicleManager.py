@@ -130,11 +130,23 @@ class VehicleManager:
             return True
         return False
 
-    def start_engine(self, vehicle_id: str, climateOptions: ClimateRequestOptions) -> str:
-        return self.api.engine_control_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_ENGINE_CONTROL_ACTION.START, climateOptions)
+    def start_engine(
+        self, vehicle_id: str, climateOptions: ClimateRequestOptions
+    ) -> str:
+        return self.api.engine_control_action(
+            self.token,
+            self.get_vehicle(vehicle_id),
+            VEHICLE_ENGINE_CONTROL_ACTION.START,
+            climateOptions,
+        )
 
     def stop_engine(self, vehicle_id: str) -> str:
-        return self.api.engine_control_action(self.token, self.get_vehicle(vehicle_id), VEHICLE_ENGINE_CONTROL_ACTION.STOP, None)
+        return self.api.engine_control_action(
+            self.token,
+            self.get_vehicle(vehicle_id),
+            VEHICLE_ENGINE_CONTROL_ACTION.STOP,
+            None,
+        )
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
