@@ -8,7 +8,7 @@ flake8==6.1.0
 pip>=21.1
 pytest==7.4.2
 pytz>=2021.3
-Sphinx==7.2.5
+Sphinx==7.2.6
 tox==4.11.3
 twine==4.0.2
 watchdog==3.0.0
