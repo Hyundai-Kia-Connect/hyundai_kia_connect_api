@@ -244,7 +244,9 @@ class VehicleManager:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
             return KiaUvoApiEU(region, brand, language)
-        elif REGIONS[region] == REGION_USA and (BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS):
+        elif REGIONS[region] == REGION_USA and (
+            BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
+        ):
             return HyundaiBlueLinkAPIUSA(region, brand, language)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
             return KiaUvoAPIUSA(region, brand, language)
