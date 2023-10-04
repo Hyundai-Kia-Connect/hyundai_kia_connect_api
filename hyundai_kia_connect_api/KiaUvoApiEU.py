@@ -315,11 +315,10 @@ class KiaUvoApiEU(ApiImpl):
             if int(value) > 1260:
                 value = dt.datetime.strptime(str(value), "%H%M").time()
             else:
-                if timesection == 0:
-                    value = str(value) + " AM"
-                elif timesection == 1:
-                    value = str(value) + " PM"
-                value = dt.datetime.strptime(value, "%I%M %p").time()
+                d = dt.datetime.strptime(value, "%I%M")
+                if timesection > 0:
+                    d += dt.timedelta(hours=12)
+                value = d.time()
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
