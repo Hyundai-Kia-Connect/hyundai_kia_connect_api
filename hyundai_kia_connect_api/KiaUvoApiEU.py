@@ -1031,8 +1031,8 @@ class KiaUvoApiEU(ApiImpl):
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
         _check_response_for_errors(response30d)
-        if get_child_value(responseAlltime, "resMsg.drivingInfoDetail.0"):
-            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
+        if get_child_value(responseAlltime, "resMsg.drivingInfo.0"):
+            drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
 
             drivingInfo["dailyStats"] = []
             for day in response30d["resMsg"]["drivingInfoDetail"]:
