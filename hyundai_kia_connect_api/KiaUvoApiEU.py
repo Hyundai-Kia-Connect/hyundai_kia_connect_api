@@ -1035,18 +1035,19 @@ class KiaUvoApiEU(ApiImpl):
             drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
 
             drivingInfo["dailyStats"] = []
-            for day in response30d["resMsg"]["drivingInfoDetail"]:
-                processedDay = DailyDrivingStats(
-                    date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                    total_consumed=day["totalPwrCsp"],
-                    engine_consumption=day["motorPwrCsp"],
-                    climate_consumption=day["climatePwrCsp"],
-                    onboard_electronics_consumption=day["eDPwrCsp"],
-                    battery_care_consumption=day["batteryMgPwrCsp"],
-                    regenerated_energy=day["regenPwr"],
-                    distance=day["calculativeOdo"],
-                )
-                drivingInfo["dailyStats"].append(processedDay)
+            if get_child_value(response30d, "resMsg.drivingInfoDetail.0"):
+                for day in response30d["resMsg"]["drivingInfoDetail"]:
+                    processedDay = DailyDrivingStats(
+                        date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                        total_consumed=day["totalPwrCsp"],
+                        engine_consumption=day["motorPwrCsp"],
+                        climate_consumption=day["climatePwrCsp"],
+                        onboard_electronics_consumption=day["eDPwrCsp"],
+                        battery_care_consumption=day["batteryMgPwrCsp"],
+                        regenerated_energy=day["regenPwr"],
+                        distance=day["calculativeOdo"],
+                    )
+                    drivingInfo["dailyStats"].append(processedDay)
 
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
                 if drivingInfoItem["drivingPeriod"] == 0:
