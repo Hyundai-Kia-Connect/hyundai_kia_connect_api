@@ -157,10 +157,11 @@ class Vehicle:
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
 
-    # energy consumed since the vehicle was paired with the account
+    # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
     total_power_consumed: float = None  # Europe feature only
+    total_power_regenerated: float = None  # Europe feature only
     # energy consumed in the last ~30 days
     # expressed in watt-hours (Wh)
     power_consumption_30d: float = None  # Europe feature only
