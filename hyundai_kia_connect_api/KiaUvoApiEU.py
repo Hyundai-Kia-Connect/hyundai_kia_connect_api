@@ -726,6 +726,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
+        vehicle.total_power_regenerated = get_child_value(state, "regenPwr")
         vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
         vehicle.daily_stats = get_child_value(state, "dailyStats")
 
