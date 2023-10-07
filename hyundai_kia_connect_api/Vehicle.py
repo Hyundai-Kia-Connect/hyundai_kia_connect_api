@@ -161,7 +161,7 @@ class Vehicle:
     # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
     total_power_consumed: float = None  # Europe feature only
-    power_regenerated: float = None  # Europe feature only
+    total_power_regenerated: float = None  # Europe feature only
     # energy consumed in the last ~30 days
     # expressed in watt-hours (Wh)
     power_consumption_30d: float = None  # Europe feature only
