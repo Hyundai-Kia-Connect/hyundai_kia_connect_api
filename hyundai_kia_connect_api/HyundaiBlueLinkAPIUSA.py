@@ -16,6 +16,7 @@ from .const import (
     SEAT_STATUS,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
+    ENGINE_TYPES,
 )
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
