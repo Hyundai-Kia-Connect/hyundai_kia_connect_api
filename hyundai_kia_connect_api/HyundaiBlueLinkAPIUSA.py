@@ -16,6 +16,7 @@ from .const import (
     SEAT_STATUS,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
+    ENGINE_TYPES,
 )
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -508,8 +509,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
-
-        url = self.API_URL + "rcs/rsc/start"
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            url = self.API_URL + "evc/fatc/start"
+        else:
+            url = self.API_URL + "rcs/rsc/start"
 
         headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
@@ -560,7 +563,10 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
-        url = self.API_URL + "rcs/rsc/stop"
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            url = self.API_URL + "evc/fatc/stop"
+        else:
+            url = self.API_URL + "rcs/rsc/stop"
 
         headers = self._get_vehicle_headers(token, vehicle)
 
