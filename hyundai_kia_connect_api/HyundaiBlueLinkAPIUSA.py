@@ -468,10 +468,16 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
+            entry_engine_type = None
+            if entry["evStatus"] == "N":
+                entry_engine_type = ENGINE_TYPES.ICE
+            elif entry["evStatus"] == "E":
+                entry_engine_type = ENGINE_TYPES.EV
             vehicle: Vehicle = Vehicle(
                 id=entry["regid"],
                 name=entry["nickName"],
                 VIN=entry["vin"],
+                engine_type=entry_engine_type,
                 model=entry["modelCode"],
                 registration_date=["enrollmentDate"],
                 timezone=self.data_timezone,
