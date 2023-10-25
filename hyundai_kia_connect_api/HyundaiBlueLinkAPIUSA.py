@@ -542,22 +542,30 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
 
-        data = {
-            "Ims": 0,
-            "airCtrl": int(options.climate),
-            "airTemp": {"unit": 1, "value": options.set_temp},
-            "defrost": options.defrost,
-            "heating1": int(options.heating),
-            "igniOnDuration": options.duration,
-            "seatHeaterVentInfo": {
-                "drvSeatHeatState": options.front_left_seat,
-                "astSeatHeatState": options.front_right_seat,
-                "rlSeatHeatState": options.rear_left_seat,
-                "rrSeatHeatState": options.rear_right_seat,
-            },
-            "username": token.username,
-            "vin": vehicle.id,
-        }
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            data = {
+                "airCtrl": int(options.climate),
+                "airTemp": {"value": options.set_temp, "unit": 1},
+                "defrost": options.defrost,
+                "heating1": int(options.heating),
+            }
+        else:
+            data = {
+                "Ims": 0,
+                "airCtrl": int(options.climate),
+                "airTemp": {"unit": 1, "value": options.set_temp},
+                "defrost": options.defrost,
+                "heating1": int(options.heating),
+                "igniOnDuration": options.duration,
+                "seatHeaterVentInfo": {
+                    "drvSeatHeatState": options.front_left_seat,
+                    "astSeatHeatState": options.front_right_seat,
+                    "rlSeatHeatState": options.rear_left_seat,
+                    "rrSeatHeatState": options.rear_right_seat,
+                },
+                "username": token.username,
+                "vin": vehicle.id,
+            }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
