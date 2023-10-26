@@ -545,8 +545,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             data = {
                 "airCtrl": int(options.climate),
-                "airTemp": {"value": str(options.set_temp), "unit": 1},
-                "defrost": bool(options.defrost),
+                "airTemp": {"value": options.set_temp, "unit": 1},
+                "defrost": options.defrost,
                 "heating1": int(options.heating),
             }
         else:
