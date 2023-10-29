@@ -104,6 +104,10 @@ class ApiImpl:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
         pass
 
+    def engine_control_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_ENGINE_CONTROL_ACTION, options: ClimateRequestOptions) -> str:
+        """Perform an engine control action on the vehicle"""
+        pass
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:

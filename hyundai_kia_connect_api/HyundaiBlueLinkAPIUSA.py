@@ -513,6 +513,15 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
+    def engine_control_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_ENGINE_CONTROL_ACTION, options: ClimateRequestOptions) -> str:
+        _LOGGER.debug(f"{DOMAIN} - {action.value} engine..")
+
+        match action:
+            case VEHICLE_ENGINE_CONTROL_ACTION.START:
+                self.start_climate(token, vehicle, options)
+            case VEHICLE_ENGINE_CONTROL_ACTION.STOP:
+                self.stop_climate(token, vehicle)
+
     def _determine_climate_options(self, options: ClimateRequestOptions) -> ClimateRequestOptions:
         if not options:
             options = ClimateRequestOptions()
