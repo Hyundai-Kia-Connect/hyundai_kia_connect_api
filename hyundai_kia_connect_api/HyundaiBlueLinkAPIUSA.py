@@ -9,7 +9,7 @@ import pytz
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
-from dataclasses import dataclass, fields
+from dataclasses import fields
 
 from .const import (
     DOMAIN,
@@ -543,6 +543,32 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                         options.rear_right_seat = 0
         return options
 
+    def _determine_data_payload(self, token: Token, options: ClimateRequestOptions, vehicle: Vehicle):
+        data = {
+            "airCtrl": int(options.climate),
+            "heating1": int(options.heating),
+            "defrost": options.defrost,
+        }
+        match vehicle.engine_type:
+            case ENGINE_TYPES.EV:
+                data["airTemp"] = {
+                    "value": str(options.set_temp),
+                    "unit": 1
+                }
+            case _:
+                data["Ims"] = 0
+                data["airTemp"] = {"unit": 1, "value": options.set_temp}
+                data["igniOnDuration"] = options.duration
+                data["seatHeaterVentInfo"] = {
+                        "drvSeatHeatState": options.front_left_seat,
+                        "astSeatHeatState": options.front_right_seat,
+                        "rlSeatHeatState": options.rear_left_seat,
+                        "rrSeatHeatState": options.rear_right_seat,
+                    }
+                data["username"] = token.username
+                data["vin"] = vehicle.id
+        return data
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
@@ -556,31 +582,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         determined_climate_options = self._determine_climate_options(options)
+        data = self._determine_data_payload(token, determined_climate_options, vehicle)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
-            data = {
-                "airCtrl": int(options.climate),
-                "airTemp": {"value": str(options.set_temp), "unit": 1},
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-            }
-        else:
-            data = {
-                "Ims": 0,
-                "airCtrl": int(options.climate),
-                "airTemp": {"unit": 1, "value": options.set_temp},
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-                "igniOnDuration": options.duration,
-                "seatHeaterVentInfo": {
-                    "drvSeatHeatState": options.front_left_seat,
-                    "astSeatHeatState": options.front_right_seat,
-                    "rlSeatHeatState": options.rear_left_seat,
-                    "rrSeatHeatState": options.rear_right_seat,
-                },
-                "username": token.username,
-                "vin": vehicle.id,
-            }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
