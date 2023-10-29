@@ -5,6 +5,7 @@ import datetime
 import typing
 from dataclasses import dataclass, field
 
+from .utils import get_float
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
@@ -301,11 +302,16 @@ class Vehicle:
     def odometer(self):
         return self._odometer
 
+    @property
+    def odometer_unit(self):
+        return self._odometer_unit
+
     @odometer.setter
     def odometer(self, value):
-        self._odometer_value = value[0]
+        float_value = get_float(value[0])
+        self._odometer_value = float_value
         self._odometer_unit = value[1]
-        self._odometer = value[0]
+        self._odometer = float_value
 
     @property
     def air_temperature(self):
