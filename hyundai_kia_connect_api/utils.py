@@ -15,6 +15,21 @@ def get_child_value(data, key):
     return value
 
 
+def get_float(value):
+    if value is None:
+        return None
+    if isinstance(value, float):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return value  # original fallback
+    return value  # original fallback
+
+
 def get_hex_temp_into_index(value):
     if value is not None:
         value = value.replace("H", "")
