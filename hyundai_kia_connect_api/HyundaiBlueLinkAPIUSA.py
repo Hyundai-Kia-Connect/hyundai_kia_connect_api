@@ -9,6 +9,7 @@ import pytz
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
+from dataclasses import dataclass, fields
 
 from .const import (
     DOMAIN,
@@ -17,6 +18,7 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
+    VEHICLE_ENGINE_CONTROL_ACTION
 )
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -511,6 +513,36 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
+    def _determine_climate_options(self, options: ClimateRequestOptions) -> ClimateRequestOptions:
+        if not options:
+            options = ClimateRequestOptions()
+        # Iterate over every field
+        for field in fields(options):
+            # Get the value of the field
+            field_value = getattr(options, field.name)
+            # If there isn't a field value set, set it
+            if not field_value:
+                match field.name:
+                    case "climate":
+                        options.climate = True
+                    case "set_temp":
+                        options.set_temp = 70
+                    case "duration":
+                        options.duration = 5
+                    case "heating":
+                        options.heating = 0
+                    case "defrost":
+                        options.defrost = False
+                    case "front_left_seat":
+                        options.front_left_seat = 0
+                    case "front_right_seat":
+                        options.front_right_seat = 0
+                    case "rear_left_seat":
+                        options.rear_left_seat = 0
+                    case "rear_right_seat":
+                        options.rear_right_seat = 0
+        return options
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
@@ -523,24 +555,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
-        if options.climate is None:
-            options.climate = True
-        if options.set_temp is None:
-            options.set_temp = 70
-        if options.duration is None:
-            options.duration = 5
-        if options.heating is None:
-            options.heating = 0
-        if options.defrost is None:
-            options.defrost = False
-        if options.front_left_seat is None:
-            options.front_left_seat = 0
-        if options.front_right_seat is None:
-            options.front_right_seat = 0
-        if options.rear_left_seat is None:
-            options.rear_left_seat = 0
-        if options.rear_right_seat is None:
-            options.rear_right_seat = 0
+        determined_climate_options = self._determine_climate_options(options)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             data = {
