@@ -105,7 +105,7 @@ class ApiImpl:
         pass
 
     def engine_control_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_ENGINE_CONTROL_ACTION, options: ClimateRequestOptions) -> str:
-        """Perform an engine control action on the vehicle"""
+        """Starts or stops an engine depending on the action provided."""
         pass
 
     def start_climate(

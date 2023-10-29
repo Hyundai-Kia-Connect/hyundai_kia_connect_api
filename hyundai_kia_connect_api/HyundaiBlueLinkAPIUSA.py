@@ -518,9 +518,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         match action:
             case VEHICLE_ENGINE_CONTROL_ACTION.START:
-                self.start_climate(token, vehicle, options)
+                self.start_engine(token, vehicle, options)
             case VEHICLE_ENGINE_CONTROL_ACTION.STOP:
-                self.stop_climate(token, vehicle)
+                self.stop_engine(token, vehicle)
 
     def _determine_climate_options(self, options: ClimateRequestOptions) -> ClimateRequestOptions:
         if not options:
@@ -581,6 +581,11 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
+        self.start_engine(token, vehicle, options)
+
+    def start_engine(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
         if vehicle.engine_type == ENGINE_TYPES.EV:
             url = self.API_URL + "evc/fatc/start"
@@ -601,7 +606,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_engine(self, token: Token, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -618,6 +623,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             f"{DOMAIN} - Stop engine response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+        self.stop_engine(token, vehicle)
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         pass
