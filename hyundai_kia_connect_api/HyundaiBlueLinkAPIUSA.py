@@ -18,7 +18,7 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
-    VEHICLE_ENGINE_CONTROL_ACTION
+    VEHICLE_ENGINE_CONTROL_ACTION,
 )
 from .utils import get_child_value
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -513,7 +513,13 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
-    def engine_control_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_ENGINE_CONTROL_ACTION, options: ClimateRequestOptions) -> str:
+    def engine_control_action(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action: VEHICLE_ENGINE_CONTROL_ACTION,
+        options: ClimateRequestOptions,
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - {action.value} engine..")
 
         match action:
@@ -522,7 +528,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             case VEHICLE_ENGINE_CONTROL_ACTION.STOP:
                 self.stop_engine(token, vehicle)
 
-    def _determine_climate_options(self, options: ClimateRequestOptions) -> ClimateRequestOptions:
+    def _determine_climate_options(
+        self, options: ClimateRequestOptions
+    ) -> ClimateRequestOptions:
         if not options:
             options = ClimateRequestOptions()
         # Iterate over every field
@@ -552,7 +560,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                         options.rear_right_seat = 0
         return options
 
-    def _determine_data_payload(self, token: Token, options: ClimateRequestOptions, vehicle: Vehicle):
+    def _determine_data_payload(
+        self, token: Token, options: ClimateRequestOptions, vehicle: Vehicle
+    ):
         data = {
             "airCtrl": int(options.climate),
             "heating1": int(options.heating),
@@ -560,20 +570,17 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         }
         match vehicle.engine_type:
             case ENGINE_TYPES.EV:
-                data["airTemp"] = {
-                    "value": str(options.set_temp),
-                    "unit": 1
-                }
+                data["airTemp"] = {"value": str(options.set_temp), "unit": 1}
             case _:
                 data["Ims"] = 0
                 data["airTemp"] = {"unit": 1, "value": options.set_temp}
                 data["igniOnDuration"] = options.duration
                 data["seatHeaterVentInfo"] = {
-                        "drvSeatHeatState": options.front_left_seat,
-                        "astSeatHeatState": options.front_right_seat,
-                        "rlSeatHeatState": options.rear_left_seat,
-                        "rrSeatHeatState": options.rear_right_seat,
-                    }
+                    "drvSeatHeatState": options.front_left_seat,
+                    "astSeatHeatState": options.front_right_seat,
+                    "rlSeatHeatState": options.rear_left_seat,
+                    "rrSeatHeatState": options.rear_right_seat,
+                }
                 data["username"] = token.username
                 data["vin"] = vehicle.id
         return data
