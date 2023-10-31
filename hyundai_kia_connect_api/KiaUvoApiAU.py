@@ -623,6 +623,9 @@ class KiaUvoApiAU(ApiImpl):
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "status.washerFluidStatus"
         )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "status.breakOilStatus"
+        )
         vehicle.fuel_level = get_child_value(state, "status.fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")

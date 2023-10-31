@@ -257,6 +257,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "vehicleStatus.washerFluidStatus"
         )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "vehicleStatus.breakOilStatus"
+        )
         vehicle.smart_key_battery_warning_is_on = get_child_value(
             state, "vehicleStatus.smartKeyBatteryWarning"
         )
