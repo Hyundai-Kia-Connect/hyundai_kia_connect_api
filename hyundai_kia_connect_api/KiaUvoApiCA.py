@@ -276,6 +276,9 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "status.washerFluidStatus"
         )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "status.breakOilStatus"
+        )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "status.tirePressureLamp.tirePressureLampRL")
         )
