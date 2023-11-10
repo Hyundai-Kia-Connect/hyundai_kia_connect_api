@@ -782,6 +782,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def charge_port_action(
@@ -796,6 +797,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def start_climate(
@@ -836,6 +838,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -857,6 +860,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -869,6 +873,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -881,6 +886,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
