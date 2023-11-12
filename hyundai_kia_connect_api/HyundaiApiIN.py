@@ -955,6 +955,7 @@ class HyundaiApiIN(ApiImpl):
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         # FIXME: Gowtham - No force refresh
+        _LOGGER.error(f'Disabling force refresh')
         return
         state = self._get_forced_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
