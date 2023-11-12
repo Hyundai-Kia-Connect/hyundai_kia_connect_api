@@ -1,5 +1,6 @@
 # pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name
 """Vehicle class"""
+import decimal
 import logging
 import datetime
 import typing
@@ -10,17 +11,27 @@ from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
+@dataclass
+class Location:
+    lat: decimal = None
+    lon: decimal = None
+
 
 @dataclass
 class TripInfo:
     """Trip Info"""
 
-    hhmmss: str = None  # will not be filled by summary
-    drive_time: int = None
-    idle_time: int = None
-    distance: int = None
-    avg_speed: float = None
-    max_speed: int = None
+    # hhmmss: str = None  # will not be filled by summary
+    start_time: int = None
+    end_time: int = None
+    start_loc: Location = None
+    end_loc: Location = None
+
+    # drive_time: int = None
+    # idle_time: int = None
+    # distance: int = None
+    # avg_speed: float = None
+    # max_speed: int = None
 
 
 @dataclass
@@ -45,7 +56,15 @@ class DayTripInfo:
     """Day Trip Info"""
 
     yyyymmdd: str = None
-    summary: TripInfo = None
+    trip_count: int = None
+    drive_time: int = None
+    idle_time: int = None
+    distance: int = None
+    avg_speed: int = None
+    max_speed: int = None
+    start_loc: Location = None
+    end_loc: Location = None
+    # summary: TripInfo = None
     trip_list: list[TripInfo] = field(default_factory=list)
 
 

@@ -22,6 +22,7 @@ from .Vehicle import (
     DayTripInfo,
     TripInfo,
     DayTripCounts,
+    Location
 )
 from .const import (
     BRAND_HYUNDAI,
@@ -295,7 +296,7 @@ class HyundaiApiIN(ApiImpl):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
             return None
@@ -530,12 +531,71 @@ class HyundaiApiIN(ApiImpl):
             yyyymmdd_string,
             1,  # day trip info
         )
+        print(json_result)
         day_trip_list = json_result["resMsg"]["dayTripList"]
         if len(day_trip_list) > 0:
             msg = day_trip_list[0]
             result = DayTripInfo(
                 yyyymmdd=yyyymmdd_string,
+                trip_count=msg['dayTripCnt'],
+                drive_time=msg['tripDrvTime'],
+                idle_time=msg['tripIdleTime'],
+                distance=msg['tripDist'],
+                avg_speed=msg['tripAvgSpeed'],
+                max_speed=msg['tripMaxSpeed'],
+                start_loc=Location(lat=msg['startLat'], lon=msg['startLon']),
+                end_loc=Location(lat=msg['endLat'], lon=msg['endLon']),
                 trip_list=[],
+                # summary=TripInfo(
+                #     drive_time=msg["tripDrvTime"],
+                #     idle_time=msg["tripIdleTime"],
+                #     distance=msg["tripDist"],
+                #     avg_speed=msg["tripAvgSpeed"],
+                #     max_speed=msg["tripMaxSpeed"],
+                # ),
+            )
+            for trip in msg["tripList"]:
+                processed_trip = TripInfo(
+                    start_time=trip['tripStartTime'],
+                    end_time=trip['tripEndTime'],
+                    start_loc=Location(lat=trip['tripStartCoord']['lat'], lon=trip['tripStartCoord']['lon']),
+                    end_loc=Location(lat=trip['tripEndCoord']['lat'], lon=trip['tripEndCoord']['lon']),
+                    # hhmmss=trip["tripTime"],
+                    # drive_time=trip["tripDrvTime"],
+                    # idle_time=trip["tripIdleTime"],
+                    # distance=trip["tripDist"],
+                    # avg_speed=trip["tripAvgSpeed"],
+                    # max_speed=trip["tripMaxSpeed"],
+                )
+                result.trip_list.append(processed_trip)
+            vehicle.day_trip_info = result
+
+    def update_month_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymm_string,
+    ) -> None:
+        """
+        Europe feature only.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        vehicle.month_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymm_string,
+            0,  # month trip info
+        )
+        msg = json_result["resMsg"]
+        if msg["monthTripDayCnt"] > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
                 summary=TripInfo(
                     drive_time=msg["tripDrvTime"],
                     idle_time=msg["tripIdleTime"],
@@ -544,17 +604,15 @@ class HyundaiApiIN(ApiImpl):
                     max_speed=msg["tripMaxSpeed"],
                 ),
             )
-            for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
+
+            for day in msg["tripDayList"]:
+                processed_day = DayTripCounts(
+                    yyyymmdd=day["tripDayInMonth"],
+                    trip_count=day["tripCntDay"],
                 )
-                result.trip_list.append(processed_trip)
-            vehicle.day_trip_info = result
+                result.day_list.append(processed_day)
+
+            vehicle.month_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
@@ -706,6 +764,16 @@ class HyundaiApiIN(ApiImpl):
 
         return response
 
+    def _update_vehicle_location(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "coord.lat"),
+                get_child_value(state, "coord.lon"),
+                self.get_last_updated_at(
+                    get_child_value(state, "time")
+                ),
+            )
+
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "time"):
             vehicle.last_updated_at = self.get_last_updated_at(
@@ -818,6 +886,8 @@ class HyundaiApiIN(ApiImpl):
             state, "smartKeyBatteryWarning"
         )
 
+
+
         vehicle.data = state
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
@@ -882,3 +952,12 @@ class HyundaiApiIN(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        # FIXME: Gowtham - No force refresh
+        return
+        state = self._get_forced_vehicle_state(token, vehicle)
+        self._update_vehicle_properties(vehicle, state)
+        state = self._get_location(token, vehicle)
+        self._update_vehicle_location(vehicle, state)
+
