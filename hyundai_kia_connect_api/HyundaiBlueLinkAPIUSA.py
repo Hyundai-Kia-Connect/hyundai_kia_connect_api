@@ -18,10 +18,11 @@ from .const import (
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
 )
-from .utils import get_child_value
+from .utils import get_child_value, get_float
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
+
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
@@ -424,8 +425,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         if state["vehicleStatus"] is not None:
             vehicle_location_result = None
             if vehicle.odometer:
-                if vehicle.odometer < get_child_value(
-                    state["vehicleDetails"], "odometer"
+                if vehicle.odometer < get_float(
+                    get_child_value(state["vehicleDetails"], "odometer")
                 ):
                     vehicle_location_result = self._get_vehicle_location(token, vehicle)
                 else:
