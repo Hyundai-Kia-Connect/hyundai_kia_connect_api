@@ -315,7 +315,7 @@ class KiaUvoApiEU(ApiImpl):
             if int(value) > 1260:
                 value = dt.datetime.strptime(str(value), "%H%M").time()
             else:
-                d = dt.datetime.strptime(value, "%I%M")
+                d = dt.datetime.strptime(str(value), "%I%M")
                 if timesection > 0:
                     d += dt.timedelta(hours=12)
                 value = d.time()
