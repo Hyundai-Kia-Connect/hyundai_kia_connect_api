@@ -288,13 +288,13 @@ class HyundaiApiIN(ApiImpl):
         # return session
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
-
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
+        _LOGGER.error(f'Getting location from {url}')
         try:
             response = requests.get(
                 url, headers=self._get_authenticated_headers(token)
             ).json()
-            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
+            _LOGGER.error(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]
         except:
@@ -751,18 +751,36 @@ class HyundaiApiIN(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        state = self._get_maintenance_alert(token, vehicle)
+        self._update_vehicle_maintenance_alert(vehicle, state)
+        state = self._get_location(token, vehicle)
+        self._update_vehicle_location(vehicle, state)
+
+    def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, 'odometer'):
+            vehicle.odometer = (get_child_value(state, 'odometer'), DISTANCE_UNITS[1])
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-
+        _LOGGER.error(f'Getting cached vehicle state from {url}')
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
+        _LOGGER.error(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
         response = response["resMsg"]
+        _LOGGER.error(f'Cached vehicle state response')
+        _LOGGER.error(response)
 
         return response
+
+    def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
+        _LOGGER.error(f'Getting maintenance alert from {url}')
+        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.error(response)
+        _check_response_for_errors(response)
+        return response['resMsg']
 
     def _update_vehicle_location(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "coord.lat"):
