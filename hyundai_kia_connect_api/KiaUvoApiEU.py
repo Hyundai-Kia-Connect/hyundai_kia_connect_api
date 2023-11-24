@@ -1049,13 +1049,13 @@ class KiaUvoApiEU(ApiImpl):
                 for day in response30d["resMsg"]["drivingInfoDetail"]:
                     processedDay = DailyDrivingStats(
                         date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                        total_consumed=day["totalPwrCsp"],
-                        engine_consumption=day["motorPwrCsp"],
-                        climate_consumption=day["climatePwrCsp"],
-                        onboard_electronics_consumption=day["eDPwrCsp"],
-                        battery_care_consumption=day["batteryMgPwrCsp"],
-                        regenerated_energy=day["regenPwr"],
-                        distance=day["calculativeOdo"],
+                        total_consumed=get_child_value(day, "totalPwrCsp"),
+                        engine_consumption=get_child_value(day, "motorPwrCsp"),
+                        climate_consumption=get_child_value(day, "climatePwrCsp"),
+                        onboard_electronics_consumption=get_child_value(day, "eDPwrCsp"),
+                        battery_care_consumption=get_child_value(day, "batteryMgPwrCsp"),
+                        regenerated_energy=get_child_value(day, "regenPwr"),
+                        distance=get_child_value(day, "calculativeOdo"),
                     )
                     drivingInfo["dailyStats"].append(processedDay)
 
