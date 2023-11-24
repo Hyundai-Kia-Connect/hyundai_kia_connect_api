@@ -1060,7 +1060,7 @@ class KiaUvoApiEU(ApiImpl):
                     drivingInfo["dailyStats"].append(processedDay)
 
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if drivingInfoItem["drivingPeriod"] == 0:
+                if drivingInfoItem["drivingPeriod"] == 0 and drivingInfoItem["calculativeOdo"] > 0:
                     drivingInfo["consumption30d"] = round(
                         drivingInfoItem["totalPwrCsp"]
                         / drivingInfoItem["calculativeOdo"]
