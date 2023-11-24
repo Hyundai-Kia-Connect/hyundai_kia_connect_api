@@ -1052,8 +1052,12 @@ class KiaUvoApiEU(ApiImpl):
                         total_consumed=get_child_value(day, "totalPwrCsp"),
                         engine_consumption=get_child_value(day, "motorPwrCsp"),
                         climate_consumption=get_child_value(day, "climatePwrCsp"),
-                        onboard_electronics_consumption=get_child_value(day, "eDPwrCsp"),
-                        battery_care_consumption=get_child_value(day, "batteryMgPwrCsp"),
+                        onboard_electronics_consumption=get_child_value(
+                            day, "eDPwrCsp"
+                        ),
+                        battery_care_consumption=get_child_value(
+                            day, "batteryMgPwrCsp"
+                        ),
                         regenerated_energy=get_child_value(day, "regenPwr"),
                         distance=get_child_value(day, "calculativeOdo"),
                     )
