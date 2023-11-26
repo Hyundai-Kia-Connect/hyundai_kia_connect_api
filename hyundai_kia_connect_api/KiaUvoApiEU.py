@@ -164,9 +164,10 @@ class KiaUvoApiEU(ApiImpl):
             self.PUSH_TYPE = "GCM"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
-        self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
-        self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
+        # self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
+        self.SPA_API_URL: str = self.SPA_API_URL_V2
+
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.GCM_SENDER_ID = 199360397125
