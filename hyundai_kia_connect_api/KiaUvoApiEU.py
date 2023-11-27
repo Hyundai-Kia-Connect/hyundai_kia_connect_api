@@ -166,8 +166,7 @@ class KiaUvoApiEU(ApiImpl):
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
-        # self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
-        self.SPA_API_URL: str = self.SPA_API_URL_V2
+        self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.GCM_SENDER_ID = 199360397125
@@ -260,7 +259,7 @@ class KiaUvoApiEU(ApiImpl):
         )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL + "vehicles"
+        url = self.SPA_API_URL_V2 + "vehicles"
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
