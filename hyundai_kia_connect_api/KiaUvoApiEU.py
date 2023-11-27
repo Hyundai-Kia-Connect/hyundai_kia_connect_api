@@ -259,7 +259,7 @@ class KiaUvoApiEU(ApiImpl):
         )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL_V2 + "vehicles"
+        url = self.SPA_API_URL + "vehicles"
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
@@ -734,7 +734,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.daily_stats = get_child_value(state, "dailyStats")
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/status/latest"
 
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
