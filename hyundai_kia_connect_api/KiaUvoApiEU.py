@@ -121,6 +121,9 @@ class KiaUvoApiEU(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+        # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
+        if language[0] == "e" and language[1] == "n" and len(language) > 2:
+            language == "en"
         if language not in SUPPORTED_LANGUAGES_LIST:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"  # fallback to English
