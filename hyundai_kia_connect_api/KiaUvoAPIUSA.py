@@ -638,22 +638,30 @@ class KiaUvoAPIUSA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
 
-        if options.front_left_seat in (3, 4, 5):
-            front_left_heatVentType = 2
+        front_left_heatVentType = 0
+        front_right_heatVentType = 0
+        rear_left_heatVentType = 0
+        rear_right_heatVentType = 0
+
+        # heated
         if options.front_left_seat in (6, 7, 8):
             front_left_heatVentType = 1
-        if options.front_right_seat in (3, 4, 5):
-            front_right_heatVentType = 2
         if options.front_right_seat in (6, 7, 8):
             front_right_heatVentType = 1
-        if options.rear_left_seat in (3, 4, 5):
-            rear_left_heatVentType = 2
         if options.rear_left_seat in (6, 7, 8):
             rear_left_heatVentType = 1
-        if options.rear_right_seat in (3, 4, 5):
-            rear_right_heatVentType = 2
         if options.rear_right_seat in (6, 7, 8):
             rear_right_heatVentType = 1
+
+        # ventilated
+        if options.front_left_seat in (3, 4, 5):
+            front_left_heatVentType = 2
+        if options.front_right_seat in (3, 4, 5):
+            front_right_heatVentType = 2
+        if options.rear_left_seat in (3, 4, 5):
+            rear_left_heatVentType = 2
+        if options.rear_right_seat in (3, 4, 5):
+            rear_right_heatVentType = 2
 
         body = {
             "remoteClimate": {
