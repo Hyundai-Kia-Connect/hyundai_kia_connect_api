@@ -1,6 +1,7 @@
 """const.py"""
 # pylint:disable=invalid-name,missing-class-docstring
 
+import datetime
 from enum import Enum, IntEnum
 
 DOMAIN: str = "hyundai_kia_connect_api"
@@ -22,6 +23,8 @@ REGIONS = {
     4: REGION_CHINA,
     5: REGION_AUSTRALIA,
 }
+
+LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
 
 LENGTH_KILOMETERS = "km"
 LENGTH_MILES = "mi"

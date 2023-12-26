@@ -29,18 +29,19 @@ from .Vehicle import (
     DayTripCounts,
 )
 from .const import (
+    BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
-    BRAND_GENESIS,
     BRANDS,
-    DOMAIN,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    SEAT_STATUS,
-    VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
+    DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import *
 from .utils import (
@@ -250,7 +251,7 @@ class KiaUvoApiEU(ApiImpl):
             stamp, authorization_code
         )
         _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,

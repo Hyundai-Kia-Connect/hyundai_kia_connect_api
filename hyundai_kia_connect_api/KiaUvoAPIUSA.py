@@ -18,11 +18,12 @@ from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
-    DOMAIN,
-    VEHICLE_LOCK_ACTION,
-    TEMPERATURE_UNITS,
     DISTANCE_UNITS,
+    DOMAIN,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .utils import get_child_value
 
@@ -176,7 +177,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"  # noqa
             )
         _LOGGER.debug(f"got session id {session_id}")
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=1)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
             password=password,
