@@ -254,7 +254,7 @@ class KiaUvoApiCA(ApiImpl):
                     state["status"]["airTemp"]["value"] = self.temperature_range_c_new[
                         tempIndex
                     ]
-    
+
                 else:
                     state["status"]["airTemp"]["value"] = self.temperature_range_c_old[
                         tempIndex
