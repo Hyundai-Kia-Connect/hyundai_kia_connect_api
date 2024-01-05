@@ -21,10 +21,7 @@ from .const import (
 from .utils import get_child_value, get_float
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
-from .Vehicle import (
-    DailyDrivingStats,
-    Vehicle
-)
+from .Vehicle import DailyDrivingStats, Vehicle
 
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -441,12 +438,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 total_consumed=get_child_value(trip, "totalused"),
                 engine_consumption=get_child_value(trip, "drivetrain"),
                 climate_consumption=get_child_value(trip, "climate"),
-                onboard_electronics_consumption=get_child_value(
-                    trip, "accessories"
-                ),
-                battery_care_consumption=get_child_value(
-                    trip, "batterycare"
-                ),
+                onboard_electronics_consumption=get_child_value(trip, "accessories"),
+                battery_care_consumption=get_child_value(trip, "batterycare"),
                 regenerated_energy=get_child_value(trip, "regen"),
                 distance=get_child_value(trip, "distance"),
             )
