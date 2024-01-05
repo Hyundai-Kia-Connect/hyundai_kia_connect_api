@@ -21,7 +21,10 @@ from .const import (
 from .utils import get_child_value, get_float
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import (
+    DailyDrivingStats,
+    Vehicle
+)
 
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -175,6 +178,21 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
 
         return status
+
+    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.API_URL + "ts/alerts/maintenance/evTripDetails"
+        headers = self._get_vehicle_headers(token, vehicle)
+        headers["userId"] = headers["username"]
+        # This header is sent by the MyHyundai app, but doesn't seem to do anything
+        # headers["offset"] = "-5"
+
+        _LOGGER.debug(f"{DOMAIN} - using API headers: {headers}")
+
+        response = self.sessions.get(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
+
+        return response
 
     def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
         """
@@ -415,12 +433,34 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
+        tripStats = []
+        tripDetails = get_child_value(state, "evTripDetails.tripdetails")
+        for trip in tripDetails:
+            processedTrip = DailyDrivingStats(
+                date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S.%f"),
+                total_consumed=get_child_value(trip, "totalused"),
+                engine_consumption=get_child_value(trip, "drivetrain"),
+                climate_consumption=get_child_value(trip, "climate"),
+                onboard_electronics_consumption=get_child_value(
+                    trip, "accessories"
+                ),
+                battery_care_consumption=get_child_value(
+                    trip, "batterycare"
+                ),
+                regenerated_energy=get_child_value(trip, "regen"),
+                distance=get_child_value(trip, "distance"),
+            )
+            tripStats.append(processedTrip)
+
+        vehicle.daily_stats = tripStats
+
         vehicle.data = state
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = {}
         state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
         state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
+        state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
 
         if state["vehicleStatus"] is not None:
             vehicle_location_result = None
@@ -451,6 +491,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         state = {}
         state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
         state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, True)
+        state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
+
         if state["vehicleStatus"] is not None:
             vehicle_location_result = self._get_vehicle_location(token, vehicle)
             if vehicle_location_result is not None:
