@@ -177,6 +177,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         return status
 
     def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict:
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
         url = self.API_URL + "ts/alerts/maintenance/evTripDetails"
         headers = self._get_vehicle_headers(token, vehicle)
         headers["userId"] = headers["username"]
@@ -431,7 +434,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
         tripStats = []
-        tripDetails = get_child_value(state, "evTripDetails.tripdetails")
+        tripDetails = get_child_value(state, "evTripDetails.tripdetails") or {}
         for trip in tripDetails:
             processedTrip = DailyDrivingStats(
                 date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S.%f"),
