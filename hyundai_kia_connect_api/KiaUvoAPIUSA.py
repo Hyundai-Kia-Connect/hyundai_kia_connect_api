@@ -94,7 +94,7 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def __init__(self, region: int, brand: int, language) -> None:
         self.LANGUAGE: str = language
-        self.temperature_range = range(62, 82)
+        self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
         self.device_id = (
