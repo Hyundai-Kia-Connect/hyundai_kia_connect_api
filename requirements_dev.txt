@@ -9,7 +9,7 @@ pip>=21.1
 pytest==7.4.4
 pytz>=2021.3
 Sphinx==7.2.6
-tox==4.11.4
+tox==4.12.0
 twine==4.0.2
 watchdog==3.0.0
 wheel==0.42.0
