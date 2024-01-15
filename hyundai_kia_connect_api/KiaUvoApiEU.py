@@ -383,7 +383,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.car_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
-        #TO_DO:missing  vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        # TO_DO:missing  vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
 
         vehicle.total_driving_range = (
             float(
@@ -400,28 +400,47 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
 
-        vehicle.front_left_door_is_open = get_child_value(state, "Cabin.Door.Row1.Driver.Open")
-        vehicle.front_right_door_is_open = get_child_value(state, "Cabin.Door.Row1.Passenger.Open")
-        vehicle.back_left_door_is_open = get_child_value(state, "Cabin.Door.Row2.Left.Open")
-        vehicle.back_right_door_is_open = get_child_value(state, "Cabin.Door.Row2.Right.Open")
-        vehicle.front_left_window_is_open = get_child_value(state, "Cabin.Window.Row1.Open.Driver.Open")
-        vehicle.front_right_window_is_open = get_child_value(state, "Cabin.Window.Row1.Open.Passenger.Open")
-        vehicle.back_left_window_is_open = get_child_value(state, "Cabin.Window.Row2.Left.Open")
-        vehicle.back_right_window_is_open = get_child_value(state, "Cabin.Window.Row2.Right.Open")
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Open"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Left.Open"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Right.Open"
+        )
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Driver.Open"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Passenger.Open"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Left.Open"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Right.Open"
+        )
 
         # TO_DO: fill in the rest of the fields
 
-        vehicle.washer_fluid_warning_is_on = get_child_value(state, "Body.Windshield.Front.WasherFluid.LevelLow")
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
 
-        vehicle.brake_fluid_warning_is_on = get_child_value(state, "Chassis.Brake.Fluid.Warning")
-
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "Chassis.Brake.Fluid.Warning"
+        )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             vehicle.location = (
                 get_child_value(state, "Location.GeoCoord.Latitude"),
                 get_child_value(state, "Location.GeoCoord.Longitude"),
-                get_child_value(state, "Location.TimeStamp")
+                get_child_value(state, "Location.TimeStamp"),
             )
 
         vehicle.data = state
@@ -807,7 +826,7 @@ class KiaUvoApiEU(ApiImpl):
         if vehicle.ccuCCS2ProtocolSupport == 0:
             response = response["resMsg"]["vehicleStatusInfo"]
         else:
-            response = response["resMsg"]['state']['Vehicle']
+            response = response["resMsg"]["state"]["Vehicle"]
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
