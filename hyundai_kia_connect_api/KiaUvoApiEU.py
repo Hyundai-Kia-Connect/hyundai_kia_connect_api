@@ -288,6 +288,8 @@ class KiaUvoApiEU(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
+                protocolType=entry["protocolType"],
+                ccuCCS2ProtocolSupport=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
         return result
@@ -327,25 +329,28 @@ class KiaUvoApiEU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
-
-        if vehicle.engine_type == ENGINE_TYPES.EV:
-            try:
-                state = self._get_driving_info(token, vehicle)
-            except Exception as e:
-                # we don't know if all car types (ex: ICE cars) provide this
-                # information. We also don't know what the API returns if
-                # the info is unavailable. So, catch any exception and move on.
-                _LOGGER.exception(
-                    """Failed to parse driving info. Possible reasons:
-                                    - incompatible vehicle (ICE)
-                                    - new API format
-                                    - API outage
-                            """,
-                    exc_info=e,
-                )
-            else:
-                self._update_vehicle_drive_info(vehicle, state)
+        if vehicle.ccuCCS2ProtocolSupport == 0:
+            self._update_vehicle_properties(vehicle, state)
+            if vehicle.engine_type == ENGINE_TYPES.EV:
+                try:
+                    state = self._get_driving_info(token, vehicle)
+                except Exception as e:
+                    # we don't know if all car types (ex: ICE cars) provide this
+                    # information. We also don't know what the API returns if
+                    # the info is unavailable. So, catch any exception and move on.
+                    _LOGGER.exception(
+                        """Failed to parse driving info. Possible reasons:
+                                        - incompatible vehicle (ICE)
+                                        - new API format
+                                        - API outage
+                                """,
+                        exc_info=e,
+                    )
+                else:
+                    self._update_vehicle_drive_info(vehicle, state)
+        else:
+            self._update_vehicle_properties_ccs2(vehicle, state)
+            # TO_DO: _get_driving_info
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -369,6 +374,57 @@ class KiaUvoApiEU(ApiImpl):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+        vehicle.odometer = (
+            get_child_value(state, "Drivetrain.Odometer"),
+            DISTANCE_UNITS[1],
+        )
+        vehicle.car_battery_percentage = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Ratio"
+        )
+        #TO_DO:missing  vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+
+        vehicle.total_driving_range = (
+            float(
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                )
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+
+        vehicle.front_left_door_is_open = get_child_value(state, "Cabin.Door.Row1.Driver.Open")
+        vehicle.front_right_door_is_open = get_child_value(state, "Cabin.Door.Row1.Passenger.Open")
+        vehicle.back_left_door_is_open = get_child_value(state, "Cabin.Door.Row2.Left.Open")
+        vehicle.back_right_door_is_open = get_child_value(state, "Cabin.Door.Row2.Right.Open")
+        vehicle.front_left_window_is_open = get_child_value(state, "Cabin.Window.Row1.Open.Driver.Open")
+        vehicle.front_right_window_is_open = get_child_value(state, "Cabin.Window.Row1.Open.Passenger.Open")
+        vehicle.back_left_window_is_open = get_child_value(state, "Cabin.Window.Row2.Left.Open")
+        vehicle.back_right_window_is_open = get_child_value(state, "Cabin.Window.Row2.Right.Open")
+
+        # TO_DO: fill in the rest of the fields
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "Body.Windshield.Front.WasherFluid.LevelLow")
+        vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
+
+        vehicle.brake_fluid_warning_is_on = get_child_value(state, "Chassis.Brake.Fluid.Warning")
+
+
+        if get_child_value(state, "Location.GeoCoord.Latitude"):
+            vehicle.location = (
+                get_child_value(state, "Location.GeoCoord.Latitude"),
+                get_child_value(state, "Location.GeoCoord.Longitude"),
+                get_child_value(state, "Location.TimeStamp")
+            )
+
+        vehicle.data = state
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
@@ -738,15 +794,20 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.daily_stats = get_child_value(state, "dailyStats")
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id
+        if vehicle.ccuCCS2ProtocolSupport == 0:
+            url = url + "/status/latest"
+        else:
+            url = url + "/ccs2/carstatus/latest"
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        response = response["resMsg"]["vehicleStatusInfo"]
-
+        if vehicle.ccuCCS2ProtocolSupport == 0:
+            response = response["resMsg"]["vehicleStatusInfo"]
+        else:
+            response = response["resMsg"]['state']['Vehicle']
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
