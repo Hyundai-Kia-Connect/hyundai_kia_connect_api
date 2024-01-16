@@ -288,8 +288,7 @@ class KiaUvoApiEU(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
-                protocolType=entry["protocolType"],
-                ccuCCS2ProtocolSupport=entry["ccuCCS2ProtocolSupport"],
+                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
         return result
@@ -329,7 +328,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        if vehicle.ccuCCS2ProtocolSupport == 0:
+        if vehicle.ccu_ccs2_protocol_support == 0:
             self._update_vehicle_properties(vehicle, state)
             if vehicle.engine_type == ENGINE_TYPES.EV:
                 try:
@@ -431,6 +430,32 @@ class KiaUvoApiEU(ApiImpl):
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
         )
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
+
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
+        )
+
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            "m",
+        )
 
         vehicle.brake_fluid_warning_is_on = get_child_value(
             state, "Chassis.Brake.Fluid.Warning"
@@ -814,7 +839,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
-        if vehicle.ccuCCS2ProtocolSupport == 0:
+        if vehicle.ccu_ccs2_protocol_support == 0:
             url = url + "/status/latest"
         else:
             url = url + "/ccs2/carstatus/latest"
@@ -823,7 +848,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        if vehicle.ccuCCS2ProtocolSupport == 0:
+        if vehicle.ccu_ccs2_protocol_support == 0:
             response = response["resMsg"]["vehicleStatusInfo"]
         else:
             response = response["resMsg"]["state"]["Vehicle"]
