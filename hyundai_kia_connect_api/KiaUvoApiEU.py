@@ -330,26 +330,26 @@ class KiaUvoApiEU(ApiImpl):
         state = self._get_cached_vehicle_state(token, vehicle)
         if vehicle.ccu_ccs2_protocol_support == 0:
             self._update_vehicle_properties(vehicle, state)
-            if vehicle.engine_type == ENGINE_TYPES.EV:
-                try:
-                    state = self._get_driving_info(token, vehicle)
-                except Exception as e:
-                    # we don't know if all car types (ex: ICE cars) provide this
-                    # information. We also don't know what the API returns if
-                    # the info is unavailable. So, catch any exception and move on.
-                    _LOGGER.exception(
-                        """Failed to parse driving info. Possible reasons:
-                                        - incompatible vehicle (ICE)
-                                        - new API format
-                                        - API outage
-                                """,
-                        exc_info=e,
-                    )
-                else:
-                    self._update_vehicle_drive_info(vehicle, state)
         else:
             self._update_vehicle_properties_ccs2(vehicle, state)
-            # TO_DO: _get_driving_info
+
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            try:
+                state = self._get_driving_info(token, vehicle)
+            except Exception as e:
+                # we don't know if all car types (ex: ICE cars) provide this
+                # information. We also don't know what the API returns if
+                # the info is unavailable. So, catch any exception and move on.
+                _LOGGER.exception(
+                    """Failed to parse driving info. Possible reasons:
+                                    - incompatible vehicle (ICE)
+                                    - new API format
+                                    - API outage
+                            """,
+                    exc_info=e,
+                )
+            else:
+                self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -380,8 +380,12 @@ class KiaUvoApiEU(ApiImpl):
             DISTANCE_UNITS[1],
         )
         vehicle.car_battery_percentage = get_child_value(
+            state, "Electronics.Battery.Level"
+        )
+        vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+
         # TO_DO:missing  vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
 
         vehicle.total_driving_range = (
