@@ -123,6 +123,7 @@ class KiaUvoApiEU(ApiImpl):
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
+        self.ccu_ccs2_protocol_support = None
         if language[0] == "e" and language[1] == "n" and len(language) > 2:
             language == "en"
         if language not in SUPPORTED_LANGUAGES_LIST:
@@ -225,6 +226,7 @@ class KiaUvoApiEU(ApiImpl):
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
@@ -328,6 +330,8 @@ class KiaUvoApiEU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
+        self.ccu_ccs2_protocol_support = str(vehicle.ccu_ccs2_protocol_support)
+
         if vehicle.ccu_ccs2_protocol_support == 0:
             self._update_vehicle_properties(vehicle, state)
         else:
@@ -449,11 +453,11 @@ class KiaUvoApiEU(ApiImpl):
         )
 
         vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
