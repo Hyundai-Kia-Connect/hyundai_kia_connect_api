@@ -380,9 +380,9 @@ class KiaUvoApiEU(ApiImpl):
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
-             vehicle.last_updated_at = self.get_last_updated_at(
-                 get_child_value(state, "Date")
-             )
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "Date")
+            )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
@@ -478,7 +478,6 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
 
-
         # TODO: fill in the rest of the fields
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
@@ -518,7 +517,9 @@ class KiaUvoApiEU(ApiImpl):
         )
 
         vehicle.fuel_level = get_child_value(state, "Drivetrain.FuelSystem.FuelLevel")
-        vehicle.fuel_level_is_low = get_child_value(state, "Drivetrain.FuelSystem.LowFuelWarning")
+        vehicle.fuel_level_is_low = get_child_value(
+            state, "Drivetrain.FuelSystem.LowFuelWarning"
+        )
         # TODO: vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
         # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
         # TODO:     state, "status.smartKeyBatteryWarning"
