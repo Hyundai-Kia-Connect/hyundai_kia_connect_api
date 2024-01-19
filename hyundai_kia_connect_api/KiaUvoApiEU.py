@@ -379,6 +379,13 @@ class KiaUvoApiEU(ApiImpl):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "Date"):
+             vehicle.last_updated_at = self.get_last_updated_at(
+                 get_child_value(state, "Date")
+             )
+        else:
+            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
+
         vehicle.odometer = (
             get_child_value(state, "Drivetrain.Odometer"),
             DISTANCE_UNITS[1],
@@ -386,11 +393,75 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.car_battery_percentage = get_child_value(
             state, "Electronics.Battery.Level"
         )
+
+        vehicle.engine_is_running = get_child_value(state, "DrivingReady")
+
+        # TODO: vehicle.air_temperature
+        # TODO: vehicle.defrost_is_on
+
+        steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
+        if steer_wheel_heat in [0, 2]:
+            vehicle.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            vehicle.steering_wheel_heater_is_on = True
+
+        # TODO: status.sideBackWindowHeat
+        # TODO: status.sideMirrorHeat
+        # TODO: status.seatHeaterVentState.flSeatHeatState
+        # TODO: status.seatHeaterVentState.frSeatHeatState
+        # TODO: status.seatHeaterVentState.rlSeatHeatState
+        # TODO: status.seatHeaterVentState.rrSeatHeatState
+        # TODO: status.doorLock
+
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Open"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Left.Open"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Right.Open"
+        )
+        vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Driver.Open"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Passenger.Open"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Left.Open"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Right.Open"
+        )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Tire.PressureLow")
+        )
+        vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
+
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
-
-        # TO_DO:missing  vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+        # TODO: vehicle.ev_battery_is_charging
+        # TODO: vehicle.ev_battery_is_plugged_in
+        # TODO: ev_charge_port_door_is_open
+        # TODO: vehicle.ev_driving_range
 
         vehicle.total_driving_range = (
             float(
@@ -407,51 +478,14 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
 
-        vehicle.front_left_door_is_open = get_child_value(
-            state, "Cabin.Door.Row1.Driver.Open"
-        )
-        vehicle.front_right_door_is_open = get_child_value(
-            state, "Cabin.Door.Row1.Passenger.Open"
-        )
-        vehicle.back_left_door_is_open = get_child_value(
-            state, "Cabin.Door.Row2.Left.Open"
-        )
-        vehicle.back_right_door_is_open = get_child_value(
-            state, "Cabin.Door.Row2.Right.Open"
-        )
-        vehicle.front_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Open.Driver.Open"
-        )
-        vehicle.front_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Open.Passenger.Open"
-        )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Left.Open"
-        )
-        vehicle.back_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Right.Open"
-        )
 
-        # TO_DO: fill in the rest of the fields
+        # TODO: fill in the rest of the fields
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
         )
-        vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
 
-        vehicle.tire_pressure_rear_left_warning_is_on = bool(
-            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
-        )
-        vehicle.tire_pressure_front_left_warning_is_on = bool(
-            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
-        )
-        vehicle.tire_pressure_front_right_warning_is_on = bool(
-            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
-        )
-        vehicle.tire_pressure_rear_right_warning_is_on = bool(
-            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
-        )
-
+        # TODO: vehicle.ev_estimated_current_charge_duration <- status.evStatus.remainTime2.atc.value
         vehicle.ev_estimated_fast_charge_duration = (
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
             "m",
@@ -464,10 +498,31 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
+        # TODO: vehicle.ev_charge_limits_ac
+        # TODO: vehicle.ev_charge_limits_dc
+        # TODO: vehicle.ev_target_range_charge_AC
+        # TODO: vehicle.ev_target_range_charge_DC
+        # TODO: vehicle.ev_first_departure_enabled
+        # TODO: vehicle.ev_second_departure_enabled
+        # TODO: vehicle.ev_first_departure_days
+        # TODO: vehicle.ev_second_departure_days
+        # TODO: vehicle.ev_first_departure_time
+        # TODO: vehicle.ev_second_departure_time
+        # TODO: vehicle.ev_off_peak_charge_only_enabled
 
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
         vehicle.brake_fluid_warning_is_on = get_child_value(
             state, "Chassis.Brake.Fluid.Warning"
         )
+
+        vehicle.fuel_level = get_child_value(state, "Drivetrain.FuelSystem.FuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(state, "Drivetrain.FuelSystem.LowFuelWarning")
+        # TODO: vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
+        # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
+        # TODO:     state, "status.smartKeyBatteryWarning"
+        # TODO: )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             vehicle.location = (
