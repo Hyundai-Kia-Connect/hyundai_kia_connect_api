@@ -397,7 +397,9 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
-        vehicle.defrost_is_on = get_child_value(state, "Cabin.Body.Windshield.Front.Defog")
+        vehicle.defrost_is_on = get_child_value(
+            state, "Cabin.Body.Windshield.Front.Defog"
+        )
         steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
@@ -504,10 +506,15 @@ class KiaUvoApiEU(ApiImpl):
             "m",
         )
         vehicle.ev_charge_limits_ac = (
-            get_child_value(state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard"),
+            get_child_value(
+                state,
+                "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard",
+            ),
         )
         vehicle.ev_charge_limits_dc = (
-            get_child_value(state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"),
+            get_child_value(
+                state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"
+            ),
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
@@ -518,21 +525,21 @@ class KiaUvoApiEU(ApiImpl):
                 get_child_value(
                     state,
                     "Drivetrain.FuelSystem.DTE.Unit",  # noqa
-                    )
-                ],
-            )
+                )
+            ],
+        )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
                 "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
-                ),
+            ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
                     "Drivetrain.FuelSystem.DTE.Unit",  # noqa
-                    )
-                ],
-            )
+                )
+            ],
+        )
         vehicle.ev_first_departure_enabled = (
             get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable"),
         )
@@ -557,7 +564,9 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(
             state, "Drivetrain.FuelSystem.LowFuelWarning"
         )
-        vehicle.air_control_is_on = get_child_value(state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel")
+        vehicle.air_control_is_on = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
         # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
         # TODO:     state, "status.smartKeyBatteryWarning"
         # TODO: )
