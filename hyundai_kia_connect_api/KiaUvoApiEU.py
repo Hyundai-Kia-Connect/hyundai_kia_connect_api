@@ -398,7 +398,9 @@ class KiaUvoApiEU(ApiImpl):
 
         # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
 
-        defrost_is_on = get_child_value(state, "Cabin.Body.Windshield.Front.Defog.State")
+        defrost_is_on = get_child_value(
+            state, "Cabin.Body.Windshield.Front.Defog.State"
+        )
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
         elif defrost_is_on == 1:
@@ -432,10 +434,12 @@ class KiaUvoApiEU(ApiImpl):
         )
 
         # TODO: should the windows and trunc also be checked?
-        if (vehicle.front_left_door_is_open == False and
-            vehicle.front_right_door_is_open == False and
-            vehicle.back_left_door_is_open == False and
-            vehicle.back_right_door_is_open == False):
+        if (
+            vehicle.front_left_door_is_open == False
+            and vehicle.front_right_door_is_open == False
+            and vehicle.back_left_door_is_open == False
+            and vehicle.back_right_door_is_open == False
+        ):
             vehicle.is_locked = True
         else:
             vehicle.is_locked = False
@@ -557,13 +561,17 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        ev_first_departure_enabled = get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        ev_first_departure_enabled = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Enable"
+        )
         if ev_first_departure_enabled == 0:
-           vehicle.ev_first_departure_enabled = False
+            vehicle.ev_first_departure_enabled = False
         elif ev_first_departure_enabled == 1:
             vehicle.ev_first_departure_enabled = True
 
-        ev_second_departure_enabled = get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        ev_second_departure_enabled = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Enable"
+        )
         if ev_second_departure_enabled == 0:
             vehicle.ev_second_departure_enabled = False
         elif ev_second_departure_enabled == 1:
