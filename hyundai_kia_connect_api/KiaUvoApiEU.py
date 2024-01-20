@@ -122,8 +122,8 @@ class KiaUvoApiEU(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
         self.ccu_ccs2_protocol_support = None
+        # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
         if language[0] == "e" and language[1] == "n" and len(language) > 2:
             language == "en"
         if language not in SUPPORTED_LANGUAGES_LIST:
@@ -396,9 +396,8 @@ class KiaUvoApiEU(ApiImpl):
 
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
-        # TODO: vehicle.air_temperature
-        # TODO: vehicle.defrost_is_on
-
+        # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
+        vehicle.defrost_is_on = get_child_value(state, "Cabin.Body.Windshield.Front.Defog")
         steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
@@ -458,9 +457,15 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
-        # TODO: vehicle.ev_battery_is_charging
-        # TODO: vehicle.ev_battery_is_plugged_in
-        # TODO: ev_charge_port_door_is_open
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ConnectorFastening.State"
+        )
+        vehicle.ev_charge_port_door_is_open = get_child_value(
+            state, "Green.ChargingDoor.State"
+        )
         # TODO: vehicle.ev_driving_range
 
         vehicle.total_driving_range = (
@@ -478,13 +483,14 @@ class KiaUvoApiEU(ApiImpl):
             ],
         )
 
-        # TODO: fill in the rest of the fields
-
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
         )
 
-        # TODO: vehicle.ev_estimated_current_charge_duration <- status.evStatus.remainTime2.atc.value
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.Charging.RemainTime"),
+            "m",
+        )
         vehicle.ev_estimated_fast_charge_duration = (
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
             "m",
@@ -497,17 +503,48 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
-        # TODO: vehicle.ev_charge_limits_ac
-        # TODO: vehicle.ev_charge_limits_dc
-        # TODO: vehicle.ev_target_range_charge_AC
-        # TODO: vehicle.ev_target_range_charge_DC
-        # TODO: vehicle.ev_first_departure_enabled
-        # TODO: vehicle.ev_second_departure_enabled
-        # TODO: vehicle.ev_first_departure_days
-        # TODO: vehicle.ev_second_departure_days
-        # TODO: vehicle.ev_first_departure_time
-        # TODO: vehicle.ev_second_departure_time
-        # TODO: vehicle.ev_off_peak_charge_only_enabled
+        vehicle.ev_charge_limits_ac = (
+            get_child_value(state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard"),
+        )
+        vehicle.ev_charge_limits_dc = (
+            get_child_value(state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"),
+        )
+        vehicle.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    )
+                ],
+            )
+        vehicle.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+                ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    )
+                ],
+            )
+        vehicle.ev_first_departure_enabled = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable"),
+        )
+        vehicle.ev_first_departure_enabled = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable"),
+        )
+
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour)
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour)
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -520,7 +557,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(
             state, "Drivetrain.FuelSystem.LowFuelWarning"
         )
-        # TODO: vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
+        vehicle.air_control_is_on = get_child_value(state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel")
         # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
         # TODO:     state, "status.smartKeyBatteryWarning"
         # TODO: )
