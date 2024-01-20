@@ -397,9 +397,13 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
-        vehicle.defrost_is_on = get_child_value(
-            state, "Cabin.Body.Windshield.Front.Defog"
-        )
+
+        defrost_is_on = get_child_value(state, "Cabin.Body.Windshield.Front.Defog.State")
+        if defrost_is_on in [0, 2]:
+            vehicle.defrost_is_on = False
+        elif defrost_is_on == 1:
+            vehicle.defrost_is_on = True
+
         steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
@@ -426,6 +430,16 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.back_right_door_is_open = get_child_value(
             state, "Cabin.Door.Row2.Right.Open"
         )
+
+        # TODO: should the windows and trunc also be checked?
+        if (vehicle.front_left_door_is_open == False and
+            vehicle.front_right_door_is_open == False and
+            vehicle.back_left_door_is_open == False and
+            vehicle.back_right_door_is_open == False):
+            vehicle.is_locked = True
+        else:
+            vehicle.is_locked = False
+
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
         vehicle.front_left_window_is_open = get_child_value(
             state, "Cabin.Window.Row1.Open.Driver.Open"
@@ -465,9 +479,12 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
-        vehicle.ev_charge_port_door_is_open = get_child_value(
-            state, "Green.ChargingDoor.State"
-        )
+        charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
+        if charging_door_state in [0, 2]:
+            vehicle.ev_charge_port_door_is_open = False
+        elif charging_door_state == 1:
+            vehicle.ev_charge_port_door_is_open = True
+
         # TODO: vehicle.ev_driving_range
 
         vehicle.total_driving_range = (
@@ -540,12 +557,17 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        vehicle.ev_first_departure_enabled = (
-            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable"),
-        )
-        vehicle.ev_first_departure_enabled = (
-            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable"),
-        )
+        ev_first_departure_enabled = get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        if ev_first_departure_enabled == 0:
+           vehicle.ev_first_departure_enabled = False
+        elif ev_first_departure_enabled == 1:
+            vehicle.ev_first_departure_enabled = True
+
+        ev_second_departure_enabled = get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        if ev_second_departure_enabled == 0:
+            vehicle.ev_second_departure_enabled = False
+        elif ev_second_departure_enabled == 1:
+            vehicle.ev_second_departure_enabled = True
 
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
