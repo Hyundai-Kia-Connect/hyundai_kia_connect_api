@@ -74,6 +74,7 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
+    ccu_ccs2_protocol_support: int = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
