@@ -122,6 +122,7 @@ class KiaUvoApiEU(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+        self.ccu_ccs2_protocol_support = None
         # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
         if language[0] == "e" and language[1] == "n" and len(language) > 2:
             language == "en"
@@ -225,6 +226,7 @@ class KiaUvoApiEU(ApiImpl):
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
@@ -288,6 +290,7 @@ class KiaUvoApiEU(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
         return result
@@ -327,7 +330,12 @@ class KiaUvoApiEU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self.ccu_ccs2_protocol_support = str(vehicle.ccu_ccs2_protocol_support)
+
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            self._update_vehicle_properties(vehicle, state)
+        else:
+            self._update_vehicle_properties_ccs2(vehicle, state)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -369,6 +377,238 @@ class KiaUvoApiEU(ApiImpl):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "Date"):
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "Date")
+            )
+        else:
+            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
+
+        vehicle.odometer = (
+            get_child_value(state, "Drivetrain.Odometer"),
+            DISTANCE_UNITS[1],
+        )
+        vehicle.car_battery_percentage = get_child_value(
+            state, "Electronics.Battery.Level"
+        )
+
+        vehicle.engine_is_running = get_child_value(state, "DrivingReady")
+
+        # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
+
+        defrost_is_on = get_child_value(
+            state, "Cabin.Body.Windshield.Front.Defog.State"
+        )
+        if defrost_is_on in [0, 2]:
+            vehicle.defrost_is_on = False
+        elif defrost_is_on == 1:
+            vehicle.defrost_is_on = True
+
+        steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
+        if steer_wheel_heat in [0, 2]:
+            vehicle.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            vehicle.steering_wheel_heater_is_on = True
+
+        # TODO: status.sideBackWindowHeat
+        # TODO: status.sideMirrorHeat
+        # TODO: status.seatHeaterVentState.flSeatHeatState
+        # TODO: status.seatHeaterVentState.frSeatHeatState
+        # TODO: status.seatHeaterVentState.rlSeatHeatState
+        # TODO: status.seatHeaterVentState.rrSeatHeatState
+        # TODO: status.doorLock
+
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Open"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Left.Open"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Right.Open"
+        )
+
+        # TODO: should the windows and trunc also be checked?
+        if (
+            vehicle.front_left_door_is_open == False
+            and vehicle.front_right_door_is_open == False
+            and vehicle.back_left_door_is_open == False
+            and vehicle.back_right_door_is_open == False
+        ):
+            vehicle.is_locked = True
+        else:
+            vehicle.is_locked = False
+
+        vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Driver.Open"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Open.Passenger.Open"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Left.Open"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Right.Open"
+        )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Tire.PressureLow")
+        )
+        vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
+
+        vehicle.ev_battery_percentage = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Ratio"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ConnectorFastening.State"
+        )
+        charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
+        if charging_door_state in [0, 2]:
+            vehicle.ev_charge_port_door_is_open = False
+        elif charging_door_state == 1:
+            vehicle.ev_charge_port_door_is_open = True
+
+        # TODO: vehicle.ev_driving_range
+
+        vehicle.total_driving_range = (
+            float(
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                )
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.Charging.RemainTime"),
+            "m",
+        )
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            "m",
+        )
+        vehicle.ev_charge_limits_ac = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard",
+            ),
+        )
+        vehicle.ev_charge_limits_dc = (
+            get_child_value(
+                state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"
+            ),
+        )
+        vehicle.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        vehicle.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        ev_first_departure_enabled = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Enable"
+        )
+        if ev_first_departure_enabled == 0:
+            vehicle.ev_first_departure_enabled = False
+        elif ev_first_departure_enabled == 1:
+            vehicle.ev_first_departure_enabled = True
+
+        ev_second_departure_enabled = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Enable"
+        )
+        if ev_second_departure_enabled == 0:
+            vehicle.ev_second_departure_enabled = False
+        elif ev_second_departure_enabled == 1:
+            vehicle.ev_second_departure_enabled = True
+
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour)
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour)
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "Chassis.Brake.Fluid.Warning"
+        )
+
+        vehicle.fuel_level = get_child_value(state, "Drivetrain.FuelSystem.FuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(
+            state, "Drivetrain.FuelSystem.LowFuelWarning"
+        )
+        vehicle.air_control_is_on = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
+        # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
+        # TODO:     state, "status.smartKeyBatteryWarning"
+        # TODO: )
+
+        if get_child_value(state, "Location.GeoCoord.Latitude"):
+            vehicle.location = (
+                get_child_value(state, "Location.GeoCoord.Latitude"),
+                get_child_value(state, "Location.GeoCoord.Longitude"),
+                get_child_value(state, "Location.TimeStamp"),
+            )
+
+        vehicle.data = state
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
@@ -738,15 +978,20 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.daily_stats = get_child_value(state, "dailyStats")
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            url = url + "/status/latest"
+        else:
+            url = url + "/ccs2/carstatus/latest"
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        response = response["resMsg"]["vehicleStatusInfo"]
-
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            response = response["resMsg"]["vehicleStatusInfo"]
+        else:
+            response = response["resMsg"]["state"]["Vehicle"]
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
