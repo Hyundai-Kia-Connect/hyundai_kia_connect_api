@@ -446,10 +446,10 @@ class KiaUvoApiEU(ApiImpl):
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
         vehicle.front_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Open.Driver.Open"
+            state, "Cabin.Window.Row1.Driver.Open"
         )
         vehicle.front_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Open.Passenger.Open"
+            state, "Cabin.Window.Row1.Passenger.Open"
         )
         vehicle.back_left_window_is_open = get_child_value(
             state, "Cabin.Window.Row2.Left.Open"
