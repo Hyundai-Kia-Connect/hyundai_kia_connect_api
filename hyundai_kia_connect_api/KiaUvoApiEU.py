@@ -123,9 +123,10 @@ class KiaUvoApiEU(ApiImpl):
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         self.ccu_ccs2_protocol_support = None
-        # Users were complaining about the warning message.   Stating it is already english.  The below handles this but still throws warnings for non english items.
-        if language[0] == "e" and language[1] == "n" and len(language) > 2:
-            language == "en"
+        language = language.lower()
+        # Strip language variants (e.g. en-Gb)
+        if len(language) > 2:
+            language = language[0:2]
         if language not in SUPPORTED_LANGUAGES_LIST:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"  # fallback to English
@@ -435,10 +436,10 @@ class KiaUvoApiEU(ApiImpl):
 
         # TODO: should the windows and trunc also be checked?
         if (
-            vehicle.front_left_door_is_open == False
-            and vehicle.front_right_door_is_open == False
-            and vehicle.back_left_door_is_open == False
-            and vehicle.back_right_door_is_open == False
+            not vehicle.front_left_door_is_open
+            and not vehicle.front_right_door_is_open
+            and not vehicle.back_left_door_is_open
+            and not vehicle.back_right_door_is_open
         ):
             vehicle.is_locked = True
         else:
@@ -602,10 +603,25 @@ class KiaUvoApiEU(ApiImpl):
         # TODO: )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
+            location_last_updated_at = dt.datetime(
+                2000, 1, 1, tzinfo=self.data_timezone
+            )
+            timestamp = get_child_value(state, "Location.TimeStamp")
+            if timestamp is not None:
+                location_last_updated_at = dt.datetime(
+                    year=int(get_child_value(timestamp, "Year")),
+                    month=int(get_child_value(timestamp, "Mon")),
+                    day=int(get_child_value(timestamp, "Day")),
+                    hour=int(get_child_value(timestamp, "Hour")),
+                    minute=int(get_child_value(timestamp, "Min")),
+                    second=int(get_child_value(timestamp, "Sec")),
+                    tzinfo=self.data_timezone,
+                )
+
             vehicle.location = (
                 get_child_value(state, "Location.GeoCoord.Latitude"),
                 get_child_value(state, "Location.GeoCoord.Longitude"),
-                get_child_value(state, "Location.TimeStamp"),
+                location_last_updated_at,
             )
 
         vehicle.data = state
