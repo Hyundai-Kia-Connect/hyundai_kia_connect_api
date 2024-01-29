@@ -1,4 +1,5 @@
 """Token.py"""
+
 # pylint:disable=invalid-name
 
 import datetime as dt

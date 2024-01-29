@@ -1,4 +1,5 @@
 """HyundaiBlueLinkAPIUSA.py"""
+
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
 import logging
