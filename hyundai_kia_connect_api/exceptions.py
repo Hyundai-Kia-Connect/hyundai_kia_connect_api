@@ -1,4 +1,5 @@
 """exceptions.py"""
+
 # pylint:disable=unnecessary-pass
 
 
