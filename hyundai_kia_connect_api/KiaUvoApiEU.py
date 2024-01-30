@@ -560,13 +560,13 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_charge_limits_ac = (
             get_child_value(
                 state,
-                "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard",
-            ),
+                "Green.ChargingInformation.TargetSoC.Standard"
+            )
         )
         vehicle.ev_charge_limits_dc = (
             get_child_value(
-                state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"
-            ),
+                state, "Green.ChargingInformation.TargetSoC.Quick"
+            )
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
