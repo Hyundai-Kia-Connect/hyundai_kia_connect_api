@@ -425,9 +425,7 @@ class KiaUvoApiEU(ApiImpl):
         # TODO: status.sideBackWindowHeat
         # TODO: status.sideMirrorHeat
 
-        flSeatHeatState = get_child_value(
-            state, "Cabin.Seat.Row1.Driver.Climate.State"
-        )
+        flSeatHeatState = get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
         if flSeatHeatState in [0, 2]:
             vehicle.front_left_seat_status = False
         elif flSeatHeatState == 1:
@@ -441,17 +439,13 @@ class KiaUvoApiEU(ApiImpl):
         elif frSeatHeatState == 1:
             vehicle.front_right_seat_status = True
 
-        rlSeatHeatState = get_child_value(
-            state, "Cabin.Seat.Row2.Left.Climate.State"
-        )
+        rlSeatHeatState = get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
         if rlSeatHeatState in [0, 2]:
             vehicle.rear_left_seat_status = False
         elif rlSeatHeatState == 1:
             vehicle.rear_left_seat_status = True
 
-        rrSeatHeatState = get_child_value(
-            state, "Cabin.Seat.Row2.Right.Climate.State"
-        )
+        rrSeatHeatState = get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
         if rrSeatHeatState in [0, 2]:
             vehicle.rear_right_seat_status = False
         elif rrSeatHeatState == 1:
