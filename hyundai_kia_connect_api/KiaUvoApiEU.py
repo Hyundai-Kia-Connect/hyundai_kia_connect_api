@@ -409,7 +409,7 @@ class KiaUvoApiEU(ApiImpl):
         # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
 
         defrost_is_on = get_child_value(
-            state, "Cabin.Body.Windshield.Front.Defog.State"
+            state, "Body.Windshield.Front.Defog.State"
         )
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
