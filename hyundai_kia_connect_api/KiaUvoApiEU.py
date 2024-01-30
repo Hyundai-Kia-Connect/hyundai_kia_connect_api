@@ -598,9 +598,13 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
         )
-        # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
-        # TODO:     state, "status.smartKeyBatteryWarning"
-        # TODO: )
+        smart_key_battery_warning_is_on = get_child_value(
+            state, "Electronics.FOB.LowBattery"
+        )
+        if smart_key_battery_warning_is_on == 0:
+            vehicle.smart_key_battery_warning_is_on = False
+        elif smart_key_battery_warning_is_on == 1:
+            vehicle.smart_key_battery_warning_is_on = True
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
