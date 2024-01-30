@@ -1,4 +1,5 @@
 """Top-level package for Hyundai / Kia Connect."""
+
 # flake8: noqa
 from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
