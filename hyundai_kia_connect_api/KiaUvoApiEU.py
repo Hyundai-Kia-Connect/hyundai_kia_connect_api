@@ -577,21 +577,13 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        ev_first_departure_enabled = get_child_value(
+        vehicle.ev_first_departure_enabled = bool(get_child_value(
             state, "Green.Reservation.Departure.Schedule1.Enable"
-        )
-        if ev_first_departure_enabled == 0:
-            vehicle.ev_first_departure_enabled = False
-        elif ev_first_departure_enabled == 1:
-            vehicle.ev_first_departure_enabled = True
+        ))
 
-        ev_second_departure_enabled = get_child_value(
+        vehicle.ev_second_departure_enabled = bool(get_child_value(
             state, "Green.Reservation.Departure.Schedule2.Enable"
-        )
-        if ev_second_departure_enabled == 0:
-            vehicle.ev_second_departure_enabled = False
-        elif ev_second_departure_enabled == 1:
-            vehicle.ev_second_departure_enabled = True
+        ))
 
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
@@ -613,13 +605,7 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
         )
-        smart_key_battery_warning_is_on = get_child_value(
-            state, "Electronics.FOB.LowBattery"
-        )
-        if smart_key_battery_warning_is_on == 0:
-            vehicle.smart_key_battery_warning_is_on = False
-        elif smart_key_battery_warning_is_on == 1:
-            vehicle.smart_key_battery_warning_is_on = True
+        vehicle.smart_key_battery_warning_is_on = bool(get_child_value(state, "Electronics.FOB.LowBattery"))
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
