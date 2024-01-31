@@ -175,6 +175,9 @@ class Vehicle:
     day_trip_info: DayTripInfo = None  # Europe feature only
 
     ev_battery_percentage: int = None
+    ev_battery_soh_percentage: int = None
+    ev_battery_remain: int = None
+    ev_battery_capacity: int = None
     ev_battery_is_charging: bool = None
     ev_battery_is_plugged_in: bool = None
 
