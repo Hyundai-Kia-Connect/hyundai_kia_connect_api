@@ -428,7 +428,6 @@ class KiaUvoApiEU(ApiImpl):
         elif defrost_rear_is_on == 1:
             vehicle.back_window_heater_is_on = True
 
-        # TODO: status.sideBackWindowHeat
         # TODO: status.sideMirrorHeat
 
         vehicle.front_left_seat_status = SEAT_STATUS[
