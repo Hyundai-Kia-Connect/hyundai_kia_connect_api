@@ -577,13 +577,13 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        vehicle.ev_first_departure_enabled = bool(get_child_value(
-            state, "Green.Reservation.Departure.Schedule1.Enable"
-        ))
+        vehicle.ev_first_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        )
 
-        vehicle.ev_second_departure_enabled = bool(get_child_value(
-            state, "Green.Reservation.Departure.Schedule2.Enable"
-        ))
+        vehicle.ev_second_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        )
 
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
@@ -605,7 +605,9 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
         )
-        vehicle.smart_key_battery_warning_is_on = bool(get_child_value(state, "Electronics.FOB.LowBattery"))
+        vehicle.smart_key_battery_warning_is_on = bool(
+            get_child_value(state, "Electronics.FOB.LowBattery")
+        )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
