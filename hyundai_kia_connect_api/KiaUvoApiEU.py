@@ -423,21 +423,21 @@ class KiaUvoApiEU(ApiImpl):
         # TODO: status.sideBackWindowHeat
         # TODO: status.sideMirrorHeat
 
-        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "Cabin.Seat.Row1.Driver.Climate.State"
-        )]
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
+        ]
 
-        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "Cabin.Seat.Row1.Passenger.Climate.State"
-        )]
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
+        ]
 
-        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
-            state, "Cabin.Seat.Row2.Left.Climate.State"
-        )]
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
+        ]
 
-        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
-            state, "Cabin.Seat.Row2.Right.Climate.State"
-        )]
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        ]
 
         # TODO: status.doorLock
 
