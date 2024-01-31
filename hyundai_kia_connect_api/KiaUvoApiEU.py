@@ -408,9 +408,7 @@ class KiaUvoApiEU(ApiImpl):
 
         # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
 
-        defrost_is_on = get_child_value(
-            state, "Cabin.Body.Windshield.Front.Defog.State"
-        )
+        defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
         elif defrost_is_on == 1:
@@ -424,10 +422,23 @@ class KiaUvoApiEU(ApiImpl):
 
         # TODO: status.sideBackWindowHeat
         # TODO: status.sideMirrorHeat
-        # TODO: status.seatHeaterVentState.flSeatHeatState
-        # TODO: status.seatHeaterVentState.frSeatHeatState
-        # TODO: status.seatHeaterVentState.rlSeatHeatState
-        # TODO: status.seatHeaterVentState.rrSeatHeatState
+
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
+        ]
+
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
+        ]
+
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
+        ]
+
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        ]
+
         # TODO: status.doorLock
 
         vehicle.front_left_door_is_open = get_child_value(
@@ -487,6 +498,15 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+        vehicle.ev_battery_remain = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Value"
+        )
+        vehicle.ev_battery_capacity = get_child_value(
+            state, "Green.BatteryManagement.BatteryCapacity.Value"
+        )
+        vehicle.ev_battery_soh_percentage = get_child_value(
+            state, "Green.BatteryManagement.SoH.Ratio"
+        )
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
         )
@@ -536,16 +556,11 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
-        vehicle.ev_charge_limits_ac = (
-            get_child_value(
-                state,
-                "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard",
-            ),
+        vehicle.ev_charge_limits_ac = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Standard"
         )
-        vehicle.ev_charge_limits_dc = (
-            get_child_value(
-                state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"
-            ),
+        vehicle.ev_charge_limits_dc = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Quick"
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
@@ -571,21 +586,13 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
-        ev_first_departure_enabled = get_child_value(
-            state, "Green.Reservation.Departure.Schedule1.Enable"
+        vehicle.ev_first_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
         )
-        if ev_first_departure_enabled == 0:
-            vehicle.ev_first_departure_enabled = False
-        elif ev_first_departure_enabled == 1:
-            vehicle.ev_first_departure_enabled = True
 
-        ev_second_departure_enabled = get_child_value(
-            state, "Green.Reservation.Departure.Schedule2.Enable"
+        vehicle.ev_second_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
-        if ev_second_departure_enabled == 0:
-            vehicle.ev_second_departure_enabled = False
-        elif ev_second_departure_enabled == 1:
-            vehicle.ev_second_departure_enabled = True
 
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
@@ -607,9 +614,9 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
         )
-        # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
-        # TODO:     state, "status.smartKeyBatteryWarning"
-        # TODO: )
+        vehicle.smart_key_battery_warning_is_on = bool(
+            get_child_value(state, "Electronics.FOB.LowBattery")
+        )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
