@@ -423,33 +423,23 @@ class KiaUvoApiEU(ApiImpl):
         # TODO: status.sideBackWindowHeat
         # TODO: status.sideMirrorHeat
 
-        flSeatHeatState = get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
-        if flSeatHeatState in [0, 2]:
-            vehicle.front_left_seat_status = False
-        elif flSeatHeatState == 1:
-            vehicle.front_left_seat_status = True
+        vehicle.front_left_seat_status = SEAT_STATUS[get_child_value(
+            state, "Cabin.Seat.Row1.Driver.Climate.State"
+        )]
 
-        frSeatHeatState = get_child_value(
+        vehicle.front_right_seat_status = SEAT_STATUS[get_child_value(
             state, "Cabin.Seat.Row1.Passenger.Climate.State"
-        )
-        if frSeatHeatState in [0, 2]:
-            vehicle.front_right_seat_status = False
-        elif frSeatHeatState == 1:
-            vehicle.front_right_seat_status = True
+        )]
 
-        rlSeatHeatState = get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
-        if rlSeatHeatState in [0, 2]:
-            vehicle.rear_left_seat_status = False
-        elif rlSeatHeatState == 1:
-            vehicle.rear_left_seat_status = True
+        vehicle.rear_left_seat_status = SEAT_STATUS[get_child_value(
+            state, "Cabin.Seat.Row2.Left.Climate.State"
+        )]
 
-        rrSeatHeatState = get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
-        if rrSeatHeatState in [0, 2]:
-            vehicle.rear_right_seat_status = False
-        elif rrSeatHeatState == 1:
-            vehicle.rear_right_seat_status = True
+        vehicle.rear_right_seat_status = SEAT_STATUS[get_child_value(
+            state, "Cabin.Seat.Row2.Right.Climate.State"
+        )]
 
-            # TODO: status.doorLock
+        # TODO: status.doorLock
 
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
