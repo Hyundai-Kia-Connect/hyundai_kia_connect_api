@@ -498,6 +498,15 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+        vehicle.ev_battery_remain = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Value"
+        )
+        vehicle.ev_battery_capacity = get_child_value(
+            state, "Green.BatteryManagement.BatteryCapacity.Value"
+        )
+        vehicle.ev_battery_soh_percentage = get_child_value(
+            state, "Green.BatteryManagement.SoH.Ratio"
+        )
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
         )
