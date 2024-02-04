@@ -249,6 +249,10 @@ class Vehicle:
     def total_driving_range(self):
         return self._total_driving_range
 
+    @property
+    def total_driving_range_unit(self):
+        return self._total_driving_range_unit
+
     @total_driving_range.setter
     def total_driving_range(self, value):
         self._total_driving_range_value = value[0]
@@ -331,6 +335,10 @@ class Vehicle:
     def ev_driving_range(self):
         return self._ev_driving_range
 
+    @property
+    def ev_driving_range_unit(self):
+        return self._ev_driving_range_unit
+
     @ev_driving_range.setter
     def ev_driving_range(self, value):
         self._ev_driving_range_value = value[0]
@@ -381,6 +389,10 @@ class Vehicle:
     def ev_target_range_charge_AC(self):
         return self._ev_target_range_charge_AC
 
+    @property
+    def ev_target_range_charge_AC_unit(self):
+        return self._ev_target_range_charge_AC_unit
+
     @ev_target_range_charge_AC.setter
     def ev_target_range_charge_AC(self, value):
         self._ev_target_range_charge_AC_value = value[0]
@@ -390,6 +402,10 @@ class Vehicle:
     @property
     def ev_target_range_charge_DC(self):
         return self._ev_target_range_charge_DC
+
+    @property
+    def ev_target_range_charge_DC_unit(self):
+        return self._ev_target_range_charge_DC_unit
 
     @ev_target_range_charge_DC.setter
     def ev_target_range_charge_DC(self, value):
