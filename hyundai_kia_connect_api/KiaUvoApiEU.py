@@ -406,7 +406,13 @@ class KiaUvoApiEU(ApiImpl):
 
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
-        # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
+        air_temp = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Value",
+        )
+
+        if air_temp != "OFF":
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
