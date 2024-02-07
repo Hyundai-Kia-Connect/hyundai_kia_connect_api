@@ -466,15 +466,12 @@ class KiaUvoApiEU(ApiImpl):
         )
 
         # TODO: should the windows and trunc also be checked?
-        if (
-            not vehicle.front_left_door_is_open
-            and not vehicle.front_right_door_is_open
-            and not vehicle.back_left_door_is_open
-            and not vehicle.back_right_door_is_open
-        ):
-            vehicle.is_locked = True
-        else:
-            vehicle.is_locked = False
+        vehicle.is_locked = not (
+            vehicle.front_left_door_is_open
+            or vehicle.front_right_door_is_open
+            or vehicle.back_left_door_is_open
+            or vehicle.back_right_door_is_open
+        )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
         vehicle.front_left_window_is_open = get_child_value(
@@ -608,11 +605,11 @@ class KiaUvoApiEU(ApiImpl):
             get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour)
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour)
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1267,6 +1264,9 @@ class KiaUvoApiEU(ApiImpl):
                 )
                 result.day_list.append(processed_day)
 
+            if len(result.day_list) > 0:  # sort on increasing yyyymmdd
+                result.day_list.sort(key=lambda k: k.yyyymmdd)
+
             vehicle.month_trip_info = result
 
     def update_day_trip_info(
@@ -1314,6 +1314,10 @@ class KiaUvoApiEU(ApiImpl):
                     max_speed=trip["tripMaxSpeed"],
                 )
                 result.trip_list.append(processed_trip)
+
+            if len(result.trip_list) > 0:  # sort on descending hhmmss
+                result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
+
             vehicle.day_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
