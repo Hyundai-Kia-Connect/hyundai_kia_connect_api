@@ -32,14 +32,15 @@ from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
-    DOMAIN,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    SEAT_STATUS,
-    VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
+    DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import *
 from .utils import (
@@ -167,7 +168,7 @@ class KiaUvoApiCN(ApiImpl):
 
         _, access_token, authorization_code = self._get_access_token(authorization_code)
         _, refresh_token = self._get_refresh_token(authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,

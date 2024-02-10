@@ -103,7 +103,10 @@ class KiaUvoApiAU(ApiImpl):
     def __init__(self, region: int, brand: int, language: str) -> None:
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA:
-            raise APIError("Kia is not supported in Australia yet")
+            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
+            self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
+            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
             self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
@@ -1025,7 +1028,9 @@ class KiaUvoApiAU(ApiImpl):
 
     def _get_stamp(self) -> str:
         if BRANDS[self.brand] == BRAND_KIA:
-            raise APIError("Kia is not supported in Australia")
+            cfb = base64.b64decode(
+                "IDbMgWBXgic4MAyMgf5PFFRAdGX5O3IyC3uvN3scCs0gDpTFDuyvBorlAH9JMM2/wMc="
+            )
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             cfb = base64.b64decode(
                 "V60WkEmyRQaAfrBF1623/7QL62MjLVbCHdItGzQ1g5T/hkmKmMVTaMHv4cKGzgD3gL8="

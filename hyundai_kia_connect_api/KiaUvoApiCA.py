@@ -16,17 +16,18 @@ from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
+    BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
-    BRAND_GENESIS,
     BRANDS,
-    DOMAIN,
     DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    SEAT_STATUS,
+    DOMAIN,
     ENGINE_TYPES,
-    VEHICLE_LOCK_ACTION,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 
 from .exceptions import AuthenticationError, APIError
@@ -134,7 +135,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -245,19 +246,20 @@ class KiaUvoApiCA(ApiImpl):
         )
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
-        tempIndex = get_hex_temp_into_index(
-            get_child_value(state, "status.airTemp.value")
-        )
-        if get_child_value(state, "status.airTemp.unit") == 0:
-            if vehicle.year >= self.temperature_range_model_year:
-                state["status"]["airTemp"]["value"] = self.temperature_range_c_new[
-                    tempIndex
-                ]
+        if get_child_value(state, "status.airTemp.value") != "OFF":
+            tempIndex = get_hex_temp_into_index(
+                get_child_value(state, "status.airTemp.value")
+            )
+            if get_child_value(state, "status.airTemp.unit") == 0:
+                if vehicle.year >= self.temperature_range_model_year:
+                    state["status"]["airTemp"]["value"] = self.temperature_range_c_new[
+                        tempIndex
+                    ]
 
-            else:
-                state["status"]["airTemp"]["value"] = self.temperature_range_c_old[
-                    tempIndex
-                ]
+                else:
+                    state["status"]["airTemp"]["value"] = self.temperature_range_c_old[
+                        tempIndex
+                    ]
 
         vehicle.total_driving_range = (
             get_child_value(

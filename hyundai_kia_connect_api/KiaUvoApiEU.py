@@ -30,18 +30,19 @@ from .Vehicle import (
     DayTripCounts,
 )
 from .const import (
+    BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
-    BRAND_GENESIS,
     BRANDS,
-    DOMAIN,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    SEAT_STATUS,
-    VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
+    DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import *
 from .utils import (
@@ -126,6 +127,11 @@ class KiaUvoApiEU(ApiImpl):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+        self.ccu_ccs2_protocol_support = None
+        language = language.lower()
+        # Strip language variants (e.g. en-Gb)
+        if len(language) > 2:
+            language = language[0:2]
         if language not in SUPPORTED_LANGUAGES_LIST:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"  # fallback to English
@@ -230,6 +236,7 @@ class KiaUvoApiEU(ApiImpl):
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
@@ -256,7 +263,7 @@ class KiaUvoApiEU(ApiImpl):
             stamp, authorization_code
         )
         _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -293,6 +300,7 @@ class KiaUvoApiEU(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
         return result
@@ -324,7 +332,7 @@ class KiaUvoApiEU(ApiImpl):
             if int(value) > 1260:
                 value = dt.datetime.strptime(str(value), "%H%M").time()
             else:
-                d = dt.datetime.strptime(value, "%I%M")
+                d = dt.datetime.strptime(str(value), "%I%M")
                 if timesection > 0:
                     d += dt.timedelta(hours=12)
                 value = d.time()
@@ -332,7 +340,12 @@ class KiaUvoApiEU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
-        self._update_vehicle_properties(vehicle, state)
+        self.ccu_ccs2_protocol_support = str(vehicle.ccu_ccs2_protocol_support)
+
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            self._update_vehicle_properties(vehicle, state)
+        else:
+            self._update_vehicle_properties_ccs2(vehicle, state)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -374,6 +387,271 @@ class KiaUvoApiEU(ApiImpl):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "Date"):
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "Date")
+            )
+        else:
+            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
+
+        vehicle.odometer = (
+            get_child_value(state, "Drivetrain.Odometer"),
+            DISTANCE_UNITS[1],
+        )
+        vehicle.car_battery_percentage = get_child_value(
+            state, "Electronics.Battery.Level"
+        )
+
+        vehicle.engine_is_running = get_child_value(state, "DrivingReady")
+
+        air_temp = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Value",
+        )
+
+        if air_temp != "OFF":
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+
+        defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
+        if defrost_is_on in [0, 2]:
+            vehicle.defrost_is_on = False
+        elif defrost_is_on == 1:
+            vehicle.defrost_is_on = True
+
+        steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
+        if steer_wheel_heat in [0, 2]:
+            vehicle.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            vehicle.steering_wheel_heater_is_on = True
+
+        defrost_rear_is_on = get_child_value(state, "Body.Windshield.Rear.Defog.State")
+        if defrost_rear_is_on in [0, 2]:
+            vehicle.back_window_heater_is_on = False
+        elif defrost_rear_is_on == 1:
+            vehicle.back_window_heater_is_on = True
+
+        # TODO: status.sideMirrorHeat
+
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
+        ]
+
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
+        ]
+
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
+        ]
+
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        ]
+
+        # TODO: status.doorLock
+
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Open"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Left.Open"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Right.Open"
+        )
+
+        # TODO: should the windows and trunc also be checked?
+        vehicle.is_locked = not (
+            vehicle.front_left_door_is_open
+            or vehicle.front_right_door_is_open
+            or vehicle.back_left_door_is_open
+            or vehicle.back_right_door_is_open
+        )
+
+        vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Driver.Open"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Passenger.Open"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Left.Open"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Right.Open"
+        )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Tire.PressureLow")
+        )
+        vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
+
+        vehicle.ev_battery_percentage = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Ratio"
+        )
+        vehicle.ev_battery_remain = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Value"
+        )
+        vehicle.ev_battery_capacity = get_child_value(
+            state, "Green.BatteryManagement.BatteryCapacity.Value"
+        )
+        vehicle.ev_battery_soh_percentage = get_child_value(
+            state, "Green.BatteryManagement.SoH.Ratio"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
+        )
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ConnectorFastening.State"
+        )
+        charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
+        if charging_door_state in [0, 2]:
+            vehicle.ev_charge_port_door_is_open = False
+        elif charging_door_state == 1:
+            vehicle.ev_charge_port_door_is_open = True
+
+        # TODO: vehicle.ev_driving_range
+
+        vehicle.total_driving_range = (
+            float(
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                )
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.Charging.RemainTime"),
+            "m",
+        )
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            "m",
+        )
+        vehicle.ev_charge_limits_ac = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Standard"
+        )
+        vehicle.ev_charge_limits_dc = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Quick"
+        )
+        vehicle.ev_v2l_discharge_limit = get_child_value(
+            state, "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
+        )
+        vehicle.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        vehicle.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        vehicle.ev_first_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        )
+
+        vehicle.ev_second_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        )
+
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "Chassis.Brake.Fluid.Warning"
+        )
+
+        vehicle.fuel_level = get_child_value(state, "Drivetrain.FuelSystem.FuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(
+            state, "Drivetrain.FuelSystem.LowFuelWarning"
+        )
+        vehicle.air_control_is_on = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
+        vehicle.smart_key_battery_warning_is_on = bool(
+            get_child_value(state, "Electronics.FOB.LowBattery")
+        )
+
+        if get_child_value(state, "Location.GeoCoord.Latitude"):
+            location_last_updated_at = dt.datetime(
+                2000, 1, 1, tzinfo=self.data_timezone
+            )
+            timestamp = get_child_value(state, "Location.TimeStamp")
+            if timestamp is not None:
+                location_last_updated_at = dt.datetime(
+                    year=int(get_child_value(timestamp, "Year")),
+                    month=int(get_child_value(timestamp, "Mon")),
+                    day=int(get_child_value(timestamp, "Day")),
+                    hour=int(get_child_value(timestamp, "Hour")),
+                    minute=int(get_child_value(timestamp, "Min")),
+                    second=int(get_child_value(timestamp, "Sec")),
+                    tzinfo=self.data_timezone,
+                )
+
+            vehicle.location = (
+                get_child_value(state, "Location.GeoCoord.Latitude"),
+                get_child_value(state, "Location.GeoCoord.Longitude"),
+                location_last_updated_at,
+            )
+
+        vehicle.data = state
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
@@ -743,15 +1021,20 @@ class KiaUvoApiEU(ApiImpl):
         vehicle.daily_stats = get_child_value(state, "dailyStats")
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            url = url + "/status/latest"
+        else:
+            url = url + "/ccs2/carstatus/latest"
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
-        response = response["resMsg"]["vehicleStatusInfo"]
-
+        if vehicle.ccu_ccs2_protocol_support == 0:
+            response = response["resMsg"]["vehicleStatusInfo"]
+        else:
+            response = response["resMsg"]["state"]["Vehicle"]
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
@@ -791,6 +1074,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def charge_port_action(
@@ -798,13 +1082,14 @@ class KiaUvoApiEU(ApiImpl):
     ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
 
-        payload = {"action": action.value, "deviceId": token.device_id}
+        payload = {"action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
             url, json=payload, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def start_climate(
@@ -845,6 +1130,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -866,6 +1152,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -878,6 +1165,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -890,6 +1178,7 @@ class KiaUvoApiEU(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
@@ -975,6 +1264,9 @@ class KiaUvoApiEU(ApiImpl):
                 )
                 result.day_list.append(processed_day)
 
+            if len(result.day_list) > 0:  # sort on increasing yyyymmdd
+                result.day_list.sort(key=lambda k: k.yyyymmdd)
+
             vehicle.month_trip_info = result
 
     def update_day_trip_info(
@@ -1022,6 +1314,10 @@ class KiaUvoApiEU(ApiImpl):
                     max_speed=trip["tripMaxSpeed"],
                 )
                 result.trip_list.append(processed_trip)
+
+            if len(result.trip_list) > 0:  # sort on descending hhmmss
+                result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
+
             vehicle.day_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
@@ -1052,18 +1348,25 @@ class KiaUvoApiEU(ApiImpl):
                 for day in response30d["resMsg"]["drivingInfoDetail"]:
                     processedDay = DailyDrivingStats(
                         date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                        total_consumed=day["totalPwrCsp"],
-                        engine_consumption=day["motorPwrCsp"],
-                        climate_consumption=day["climatePwrCsp"],
-                        onboard_electronics_consumption=day["eDPwrCsp"],
-                        battery_care_consumption=day["batteryMgPwrCsp"],
-                        regenerated_energy=day["regenPwr"],
-                        distance=day["calculativeOdo"],
+                        total_consumed=get_child_value(day, "totalPwrCsp"),
+                        engine_consumption=get_child_value(day, "motorPwrCsp"),
+                        climate_consumption=get_child_value(day, "climatePwrCsp"),
+                        onboard_electronics_consumption=get_child_value(
+                            day, "eDPwrCsp"
+                        ),
+                        battery_care_consumption=get_child_value(
+                            day, "batteryMgPwrCsp"
+                        ),
+                        regenerated_energy=get_child_value(day, "regenPwr"),
+                        distance=get_child_value(day, "calculativeOdo"),
                     )
                     drivingInfo["dailyStats"].append(processedDay)
 
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if drivingInfoItem["drivingPeriod"] == 0:
+                if (
+                    drivingInfoItem["drivingPeriod"] == 0
+                    and drivingInfoItem["calculativeOdo"] > 0
+                ):
                     drivingInfo["consumption30d"] = round(
                         drivingInfoItem["totalPwrCsp"]
                         / drivingInfoItem["calculativeOdo"]

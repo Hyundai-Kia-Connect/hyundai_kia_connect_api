@@ -19,11 +19,12 @@ from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
-    DOMAIN,
-    VEHICLE_LOCK_ACTION,
-    TEMPERATURE_UNITS,
     DISTANCE_UNITS,
+    DOMAIN,
+    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 from .utils import get_child_value
 
@@ -94,7 +95,7 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def __init__(self, region: int, brand: int, language) -> None:
         self.LANGUAGE: str = language
-        self.temperature_range = range(62, 82)
+        self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
         self.device_id = (
@@ -177,7 +178,7 @@ class KiaUvoAPIUSA(ApiImpl):
                 f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"  # noqa
             )
         _LOGGER.debug(f"got session id {session_id}")
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=1)
+        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
             password=password,
@@ -630,6 +631,52 @@ class KiaUvoAPIUSA(ApiImpl):
             options.defrost = False
         if options.duration is None:
             options.duration = 5
+        if options.front_left_seat is None:
+            options.front_left_seat = 0
+        if options.front_right_seat is None:
+            options.front_right_seat = 0
+        if options.rear_left_seat is None:
+            options.rear_left_seat = 0
+        if options.rear_right_seat is None:
+            options.rear_right_seat = 0
+
+        front_left_heatVentType = 0
+        front_right_heatVentType = 0
+        rear_left_heatVentType = 0
+        rear_right_heatVentType = 0
+        front_left_heatVentLevel = 0
+        front_right_heatVentLevel = 0
+        rear_left_heatVentLevel = 0
+        rear_right_heatVentLevel = 0
+
+        # heated
+        if options.front_left_seat in (6, 7, 8):
+            front_left_heatVentType = 1
+            front_left_heatVentLevel = options.front_left_seat - 4
+        if options.front_right_seat in (6, 7, 8):
+            front_right_heatVentType = 1
+            front_right_heatVentLevel = options.front_right_seat - 4
+        if options.rear_left_seat in (6, 7, 8):
+            rear_left_heatVentType = 1
+            rear_left_heatVentLevel = options.rear_left_seat - 4
+        if options.rear_right_seat in (6, 7, 8):
+            rear_right_heatVentType = 1
+            rear_right_heatVentLevel = options.rear_right_seat - 4
+
+        # ventilated
+        if options.front_left_seat in (3, 4, 5):
+            front_left_heatVentType = 2
+            front_left_heatVentLevel = options.front_left_seat - 1
+        if options.front_right_seat in (3, 4, 5):
+            front_right_heatVentType = 2
+            front_right_heatVentLevel = options.front_right_seat - 1
+        if options.rear_left_seat in (3, 4, 5):
+            rear_left_heatVentType = 2
+            rear_left_heatVentLevel = options.rear_left_seat - 1
+        if options.rear_right_seat in (3, 4, 5):
+            rear_right_heatVentType = 2
+            rear_right_heatVentLevel = options.rear_right_seat - 1
+
         body = {
             "remoteClimate": {
                 "airCtrl": options.climate,
@@ -646,6 +693,28 @@ class KiaUvoAPIUSA(ApiImpl):
                 "ignitionOnDuration": {
                     "unit": 4,
                     "value": options.duration,
+                },
+                "heatVentSeat": {
+                    "driverSeat": {
+                        "heatVentType": front_left_heatVentType,
+                        "heatVentLevel": front_left_heatVentLevel,
+                        "heatVentStep": 1,
+                    },
+                    "passengerSeat": {
+                        "heatVentType": front_right_heatVentType,
+                        "heatVentLevel": front_right_heatVentLevel,
+                        "heatVentStep": 1,
+                    },
+                    "rearLeftSeat": {
+                        "heatVentType": rear_left_heatVentType,
+                        "heatVentLevel": rear_left_heatVentLevel,
+                        "heatVentStep": 1,
+                    },
+                    "rearRightSeat": {
+                        "heatVentType": rear_right_heatVentType,
+                        "heatVentLevel": rear_right_heatVentLevel,
+                        "heatVentStep": 1,
+                    },
                 },
             }
         }
