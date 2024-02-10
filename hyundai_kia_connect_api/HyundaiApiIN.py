@@ -22,7 +22,7 @@ from .Vehicle import (
     DayTripInfo,
     TripInfo,
     DayTripCounts,
-    Location
+    Location,
 )
 from .const import (
     BRAND_HYUNDAI,
@@ -91,7 +91,6 @@ def _check_response_for_errors(response: dict) -> None:
         )
 
 
-
 class HyundaiApiIN(ApiImpl):
     data_timezone = tz.gettz("Asia/Kolkata")
     temperature_range = [x * 0.5 for x in range(28, 60)]
@@ -104,7 +103,9 @@ class HyundaiApiIN(ApiImpl):
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "e5b3f6d0-7f83-43c9-aff3-a254db7af368"
             self.APP_ID: str = "5a27df80-4ca1-4154-8c09-6f4029d91cf7"
-            self.BASIC_AUTHORIZATION: str = "Basic ZTViM2Y2ZDAtN2Y4My00M2M5LWFmZjMtYTI1NGRiN2FmMzY4OjVKRk9DcjZDMjRPZk96bERxWnA3RXdxcmtMMFd3MDRVYXhjRGlFNlVkM3FJNVNFNA=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic ZTViM2Y2ZDAtN2Y4My00M2M5LWFmZjMtYTI1NGRiN2FmMzY4OjVKRk9DcjZDMjRPZk96bERxWnA3RXdxcmtMMFd3MDRVYXhjRGlFNlVkM3FJNVNFNA=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "prd.in-ccapi.hyundai.connected-car.io"
             self.PUSH_TYPE = "GCM"
             self.GCM_SENDER_ID = 974204007939
@@ -289,7 +290,7 @@ class HyundaiApiIN(ApiImpl):
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
-        _LOGGER.error(f'Getting location from {url}')
+        _LOGGER.error(f"Getting location from {url}")
         try:
             response = requests.get(
                 url, headers=self._get_authenticated_headers(token)
@@ -537,14 +538,14 @@ class HyundaiApiIN(ApiImpl):
             msg = day_trip_list[0]
             result = DayTripInfo(
                 yyyymmdd=yyyymmdd_string,
-                trip_count=msg['dayTripCnt'],
-                drive_time=msg['tripDrvTime'],
-                idle_time=msg['tripIdleTime'],
-                distance=msg['tripDist'],
-                avg_speed=msg['tripAvgSpeed'],
-                max_speed=msg['tripMaxSpeed'],
-                start_loc=Location(lat=msg['startLat'], lon=msg['startLon']),
-                end_loc=Location(lat=msg['endLat'], lon=msg['endLon']),
+                trip_count=msg["dayTripCnt"],
+                drive_time=msg["tripDrvTime"],
+                idle_time=msg["tripIdleTime"],
+                distance=msg["tripDist"],
+                avg_speed=msg["tripAvgSpeed"],
+                max_speed=msg["tripMaxSpeed"],
+                start_loc=Location(lat=msg["startLat"], lon=msg["startLon"]),
+                end_loc=Location(lat=msg["endLat"], lon=msg["endLon"]),
                 trip_list=[],
                 # summary=TripInfo(
                 #     drive_time=msg["tripDrvTime"],
@@ -556,10 +557,15 @@ class HyundaiApiIN(ApiImpl):
             )
             for trip in msg["tripList"]:
                 processed_trip = TripInfo(
-                    start_time=trip['tripStartTime'],
-                    end_time=trip['tripEndTime'],
-                    start_loc=Location(lat=trip['tripStartCoord']['lat'], lon=trip['tripStartCoord']['lon']),
-                    end_loc=Location(lat=trip['tripEndCoord']['lat'], lon=trip['tripEndCoord']['lon']),
+                    start_time=trip["tripStartTime"],
+                    end_time=trip["tripEndTime"],
+                    start_loc=Location(
+                        lat=trip["tripStartCoord"]["lat"],
+                        lon=trip["tripStartCoord"]["lon"],
+                    ),
+                    end_loc=Location(
+                        lat=trip["tripEndCoord"]["lat"], lon=trip["tripEndCoord"]["lon"]
+                    ),
                     # hhmmss=trip["tripTime"],
                     # drive_time=trip["tripDrvTime"],
                     # idle_time=trip["tripIdleTime"],
@@ -691,7 +697,6 @@ class HyundaiApiIN(ApiImpl):
         _check_response_for_errors(response)
         return response["msgId"]
 
-
     def check_action_status(
         self,
         token: Token,
@@ -757,39 +762,39 @@ class HyundaiApiIN(ApiImpl):
         self._update_vehicle_location(vehicle, state)
 
     def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, 'odometer'):
-            vehicle.odometer = (get_child_value(state, 'odometer'), DISTANCE_UNITS[1])
+        if get_child_value(state, "odometer"):
+            vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-        _LOGGER.error(f'Getting cached vehicle state from {url}')
+        _LOGGER.error(f"Getting cached vehicle state from {url}")
         response = requests.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.error(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
         response = response["resMsg"]
-        _LOGGER.error(f'Cached vehicle state response')
+        _LOGGER.error(f"Cached vehicle state response")
         _LOGGER.error(response)
 
         return response
 
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
-        _LOGGER.error(f'Getting maintenance alert from {url}')
-        response = requests.get(url, headers=self._get_authenticated_headers(token)).json()
+        _LOGGER.error(f"Getting maintenance alert from {url}")
+        response = requests.get(
+            url, headers=self._get_authenticated_headers(token)
+        ).json()
         _LOGGER.error(response)
         _check_response_for_errors(response)
-        return response['resMsg']
+        return response["resMsg"]
 
     def _update_vehicle_location(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "time")
-                ),
+                self.get_last_updated_at(get_child_value(state, "time")),
             )
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
@@ -805,9 +810,7 @@ class HyundaiApiIN(ApiImpl):
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
         if get_child_value(state, "airTemp.value"):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "airTemp.value")
-            )
+            tempIndex = get_hex_temp_into_index(get_child_value(state, "airTemp.value"))
 
             vehicle.air_temperature = (
                 self.temperature_range[tempIndex],
@@ -825,9 +828,7 @@ class HyundaiApiIN(ApiImpl):
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
 
-        vehicle.back_window_heater_is_on = get_child_value(
-            state, "sideBackWindowHeat"
-        )
+        vehicle.back_window_heater_is_on = get_child_value(state, "sideBackWindowHeat")
         vehicle.front_left_seat_status = SEAT_STATUS[
             get_child_value(state, "seatHeaterVentState.astSeatHeatState")
         ]
@@ -841,18 +842,10 @@ class HyundaiApiIN(ApiImpl):
             get_child_value(state, "seatHeaterVentState.rrSeatHeatState")
         ]
         vehicle.is_locked = get_child_value(state, "doorLock")
-        vehicle.front_left_door_is_open = get_child_value(
-            state, "doorOpen.frontLeft"
-        )
-        vehicle.front_right_door_is_open = get_child_value(
-            state, "doorOpen.frontRight"
-        )
-        vehicle.back_left_door_is_open = get_child_value(
-            state, "doorOpen.backLeft"
-        )
-        vehicle.back_right_door_is_open = get_child_value(
-            state, "doorOpen.backRight"
-        )
+        vehicle.front_left_door_is_open = get_child_value(state, "doorOpen.frontLeft")
+        vehicle.front_right_door_is_open = get_child_value(state, "doorOpen.frontRight")
+        vehicle.back_left_door_is_open = get_child_value(state, "doorOpen.backLeft")
+        vehicle.back_right_door_is_open = get_child_value(state, "doorOpen.backRight")
         vehicle.hood_is_open = get_child_value(state, "hoodOpen")
         vehicle.front_left_window_is_open = get_child_value(
             state, "windowOpen.frontLeft"
@@ -860,9 +853,7 @@ class HyundaiApiIN(ApiImpl):
         vehicle.front_right_window_is_open = get_child_value(
             state, "windowOpen.frontRight"
         )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "windowOpen.backLeft"
-        )
+        vehicle.back_left_window_is_open = get_child_value(state, "windowOpen.backLeft")
         vehicle.back_right_window_is_open = get_child_value(
             state, "windowOpen.backRight"
         )
@@ -894,17 +885,13 @@ class HyundaiApiIN(ApiImpl):
                 DISTANCE_UNITS[get_child_value(state, "dte.unit")],
             )
 
-        vehicle.brake_fluid_warning_is_on = get_child_value(
-            state, "breakOilStatus"
-        )
+        vehicle.brake_fluid_warning_is_on = get_child_value(state, "breakOilStatus")
         vehicle.fuel_level = get_child_value(state, "fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "airCtrlOn")
         vehicle.smart_key_battery_warning_is_on = get_child_value(
             state, "smartKeyBatteryWarning"
         )
-
-
 
         vehicle.data = state
 
@@ -973,10 +960,9 @@ class HyundaiApiIN(ApiImpl):
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         # FIXME: Gowtham - No force refresh
-        _LOGGER.error(f'Disabling force refresh')
+        _LOGGER.error(f"Disabling force refresh")
         return
         state = self._get_forced_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
         state = self._get_location(token, vehicle)
         self._update_vehicle_location(vehicle, state)
-

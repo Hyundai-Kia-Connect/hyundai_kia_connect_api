@@ -1,4 +1,5 @@
 """KiaUvoApiEU.py"""
+
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
@@ -52,8 +53,12 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+USER_AGENT_MOZILLA: str = (
+    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+)
+ACCEPT_HEADER_ALL: str = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+)
 
 SUPPORTED_LANGUAGES_LIST = [
     "en",  # English
@@ -148,7 +153,9 @@ class KiaUvoApiEU(ApiImpl):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
@@ -159,7 +166,9 @@ class KiaUvoApiEU(ApiImpl):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 

@@ -1,4 +1,5 @@
 """KiaUvoApiCN"""
+
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import datetime as dt
@@ -50,8 +51,12 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+USER_AGENT_MOZILLA: str = (
+    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+)
+ACCEPT_HEADER_ALL: str = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+)
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -101,12 +106,16 @@ class KiaUvoApiCN(ApiImpl):
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
-            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
+            )
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
             self.APP_ID: str = "ed01581a-380f-48cd-83d4-ed1490c272d0"
-            self.BASIC_AUTHORIZATION: str = "Basic NzJiM2QwMTktNWJjNy00NDNkLWE0MzctMDhmMzA3Y2YwNmUyOnNlY3JldA=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NzJiM2QwMTktNWJjNy00NDNkLWE0MzctMDhmMzA3Y2YwNmUyOnNlY3JldA=="  # noqa
+            )
 
         self.BASE_URL: str = self.BASE_DOMAIN
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"

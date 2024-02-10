@@ -1,4 +1,5 @@
 """const.py"""
+
 # pylint:disable=invalid-name,missing-class-docstring
 
 from enum import Enum, IntEnum

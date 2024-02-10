@@ -11,6 +11,7 @@ from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
+
 @dataclass
 class Location:
     lat: decimal = None
