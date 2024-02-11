@@ -41,7 +41,7 @@ class KiaSSLAdapter(HTTPAdapter):
         context = create_urllib3_context(
             ciphers='DEFAULT:@SECLEVEL=1', ssl_version=ssl.PROTOCOL_TLSv1_2)
         kwargs['ssl_context'] = context
-        return super(KiaSSLAdapter, self).init_poolmanager(*args, **kwargs)
+        return super().init_poolmanager(*args, **kwargs)
 
 
 class AuthError(RequestException):
