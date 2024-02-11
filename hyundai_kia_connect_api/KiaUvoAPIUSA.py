@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import secrets
+import ssl
 import string
 import time
 import typing
@@ -14,6 +15,8 @@ from datetime import datetime
 import pytz
 import requests
 from requests import RequestException, Response
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -30,15 +33,13 @@ from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
 
-import ssl
-from requests.adapters import HTTPAdapter
-from urllib3.util.ssl_ import create_urllib3_context
 
 # This is the key part of our patch. We get the standard SSLContext that requests would
 # normally use, and add ciphers that Kia USA may need for compatibility.
 class KiaSSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers='DEFAULT:@SECLEVEL=1', ssl_version=ssl.PROTOCOL_TLSv1_2)
+        context = create_urllib3_context(
+            ciphers='DEFAULT:@SECLEVEL=1', ssl_version=ssl.PROTOCOL_TLSv1_2)
         kwargs['ssl_context'] = context
         return super(KiaSSLAdapter, self).init_poolmanager(*args, **kwargs)
 
