@@ -6,6 +6,7 @@ import logging
 import random
 import re
 import secrets
+import ssl
 import string
 import time
 import typing
@@ -14,6 +15,8 @@ from datetime import datetime
 import pytz
 import requests
 from requests import RequestException, Response
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -29,6 +32,16 @@ from .const import (
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# This is the key part of our patch. We get the standard SSLContext that requests would
+# normally use, and add ciphers that Kia USA may need for compatibility.
+class KiaSSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        context = create_urllib3_context(
+            ciphers='DEFAULT:@SECLEVEL=1', ssl_version=ssl.PROTOCOL_TLSv1_2)
+        kwargs['ssl_context'] = context
+        return super().init_poolmanager(*args, **kwargs)
 
 
 class AuthError(RequestException):
@@ -108,6 +121,8 @@ class KiaUvoAPIUSA(ApiImpl):
 
         self.BASE_URL: str = "api.owners.kia.com"
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
+        self.session = requests.Session()
+        self.session.mount("https://", KiaSSLAdapter())
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
@@ -149,7 +164,7 @@ class KiaUvoAPIUSA(ApiImpl):
         self, token: Token, url: str, json_body: dict, vehicle: Vehicle
     ) -> Response:
         headers = self.authed_api_headers(token, vehicle)
-        return requests.post(url, json=json_body, headers=headers)
+        return self.session.post(url, json=json_body, headers=headers)
 
     @request_with_active_session
     @request_with_logging
@@ -157,7 +172,7 @@ class KiaUvoAPIUSA(ApiImpl):
         self, token: Token, url: str, vehicle: Vehicle
     ) -> Response:
         headers = self.authed_api_headers(token, vehicle)
-        return requests.get(url, headers=headers)
+        return self.session.get(url, headers=headers)
 
     def login(self, username: str, password: str) -> Token:
         """Login into cloud endpoints and return Token"""
@@ -170,7 +185,7 @@ class KiaUvoAPIUSA(ApiImpl):
             "userCredential": {"userId": username, "password": password},
         }
         headers = self.api_headers()
-        response = requests.post(url, json=data, headers=headers)
+        response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         session_id = response.headers.get("sid")
         if not session_id:
@@ -191,7 +206,7 @@ class KiaUvoAPIUSA(ApiImpl):
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
-        response = requests.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         result = []
@@ -216,7 +231,7 @@ class KiaUvoAPIUSA(ApiImpl):
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
-        response = requests.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
