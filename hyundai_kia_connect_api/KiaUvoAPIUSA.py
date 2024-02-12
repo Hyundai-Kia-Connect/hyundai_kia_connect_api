@@ -39,8 +39,9 @@ _LOGGER = logging.getLogger(__name__)
 class KiaSSLAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         context = create_urllib3_context(
-            ciphers='DEFAULT:@SECLEVEL=1', ssl_version=ssl.PROTOCOL_TLSv1_2)
-        kwargs['ssl_context'] = context
+            ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
+        )
+        kwargs["ssl_context"] = context
         return super().init_poolmanager(*args, **kwargs)
 
 
