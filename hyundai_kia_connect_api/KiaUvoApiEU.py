@@ -349,7 +349,10 @@ class KiaUvoApiEU(ApiImpl):
         else:
             self._update_vehicle_properties_ccs2(vehicle, state)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV or vehicle.engine_type == ENGINE_TYPES.PHEV:
+        if (
+            vehicle.engine_type == ENGINE_TYPES.EV
+            or vehicle.engine_type == ENGINE_TYPES.PHEV
+        ):
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
@@ -373,7 +376,10 @@ class KiaUvoApiEU(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
-        if vehicle.engine_type == ENGINE_TYPES.EV or vehicle.engine_type == ENGINE_TYPES.PHEV:
+        if (
+            vehicle.engine_type == ENGINE_TYPES.EV
+            or vehicle.engine_type == ENGINE_TYPES.PHEV
+        ):
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
