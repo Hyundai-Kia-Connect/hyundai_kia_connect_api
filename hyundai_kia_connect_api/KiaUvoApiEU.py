@@ -240,6 +240,14 @@ class KiaUvoApiEU(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
+    def _get_control_headers(self, token: Token) -> dict:
+        control_token, _ = self._get_control_token(token)
+        authenticated_headers = self._get_authenticated_headers(token)
+        return authenticated_headers | {
+            "Authorization": control_token,
+            "AuthorizationCCSP": control_token,
+        }
+
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
@@ -1085,7 +1093,7 @@ class KiaUvoApiEU(ApiImpl):
         payload = {"action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
@@ -1634,6 +1642,27 @@ class KiaUvoApiEU(ApiImpl):
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
 
+    def _get_control_token(self, token: Token) -> Token:
+        url = self.USER_API_URL + "pin?token="
+        headers = {
+            "Authorization": token.access_token,
+            "Content-type": "application/json",
+            "Host": self.BASE_URL,
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        data = {"deviceId": token.device_id, "pin": token.pin}
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
+        response = requests.put(url, json=data, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        control_token = "Bearer " + response["controlToken"]
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response["expiresTime"]
+        )
+        return control_token, control_token_expire_at
+        
     def check_action_status(
         self,
         token: Token,
