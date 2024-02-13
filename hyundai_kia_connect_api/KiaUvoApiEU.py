@@ -292,6 +292,8 @@ class KiaUvoApiEU(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.PHEV
             elif entry["type"] == "HV":
                 entry_engine_type = ENGINE_TYPES.HEV
+            elif entry["type"] == "PE":
+                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -347,7 +349,7 @@ class KiaUvoApiEU(ApiImpl):
         else:
             self._update_vehicle_properties_ccs2(vehicle, state)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == ENGINE_TYPES.EV or vehicle.engine_type == ENGINE_TYPES.PHEV
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
