@@ -1662,7 +1662,7 @@ class KiaUvoApiEU(ApiImpl):
             dt.datetime.now().timestamp() + response["expiresTime"]
         )
         return control_token, control_token_expire_at
-        
+
     def check_action_status(
         self,
         token: Token,
