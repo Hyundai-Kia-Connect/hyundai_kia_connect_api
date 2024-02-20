@@ -535,8 +535,6 @@ class KiaUvoApiEU(ApiImpl):
         elif charging_door_state == 1:
             vehicle.ev_charge_port_door_is_open = True
 
-        # TODO: vehicle.ev_driving_range
-
         vehicle.total_driving_range = (
             float(
                 get_child_value(
@@ -551,6 +549,14 @@ class KiaUvoApiEU(ApiImpl):
                 )
             ],
         )
+
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            # ev_driving_range is the same as total_driving_range for pure EV
+            vehicle.ev_driving_range = (
+                vehicle.total_driving_range,
+                vehicle.total_driving_range_unit,
+            )
+        # TODO: vehicle.ev_driving_range for non EV
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
