@@ -1387,6 +1387,12 @@ class KiaUvoApiEU(ApiImpl):
                     )
                     break
 
+            daily_stats = drivingInfo["dailyStats"]
+            _LOGGER.debug(f"KiaUvoApiEU: before daily_stats: {daily_stats}")  # noqa
+            if len(daily_stats) > 0:  # sort on decreasing date
+                daily_stats.sort(reverse=True, key=lambda k: k.date)
+                drivingInfo["dailyStats"] = daily_stats
+                _LOGGER.debug(f"KiaUvoApiEU: after  daily_stats: {daily_stats}")  # noqa
             return drivingInfo
         else:
             _LOGGER.debug(
