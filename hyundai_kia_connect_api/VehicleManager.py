@@ -30,6 +30,7 @@ from .const import (
     REGION_CHINA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
+    VEHICLE_ENGINE_CONTROL_ACTION,
     CHARGE_PORT_ACTION,
     OrderStatus,
 )
