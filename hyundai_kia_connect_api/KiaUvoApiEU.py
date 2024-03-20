@@ -1379,7 +1379,15 @@ class KiaUvoApiEU(ApiImpl):
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
                 if (
                     drivingInfoItem["drivingPeriod"] == 0
-                    and drivingInfoItem["calculativeOdo"] > 0
+                    and next(
+                        (
+                            v
+                            for k, v in drivingInfoItem.items()
+                            if k.lower() == "calculativeodo"
+                        ),
+                        0,
+                    )
+                    > 0
                 ):
                     drivingInfo["consumption30d"] = round(
                         drivingInfoItem["totalPwrCsp"]
