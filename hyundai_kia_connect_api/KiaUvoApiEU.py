@@ -118,7 +118,7 @@ def _check_response_for_errors(response: dict) -> None:
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
         raise APIError(
-            f"Server returned:  '{response['rescode']}' '{response['resMsg']}'"
+            f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
         )
 
 

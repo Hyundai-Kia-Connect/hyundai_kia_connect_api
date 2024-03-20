@@ -1,8 +1,8 @@
 beautifulsoup4>=4.10.0
-black==24.2.0
+black==24.3.0
 bump2version==1.0.1
 Click==8.1.7
-coverage==7.4.3
+coverage==7.4.4
 curlify>=2.2.1
 flake8==7.0.0
 pip>=21.1
@@ -12,4 +12,4 @@ Sphinx==7.2.6
 tox==4.14.1
 twine==5.0.0
 watchdog==4.0.0
-wheel==0.42.0
+wheel==0.43.0
