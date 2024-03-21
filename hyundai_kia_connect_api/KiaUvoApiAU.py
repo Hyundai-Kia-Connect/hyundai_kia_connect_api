@@ -246,9 +246,9 @@ class KiaUvoApiAU(ApiImpl):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
         if is_ccs2:
-            url += "/status/latest"
-        else:
             url += "/ccs2/carstatus/latest"
+        else:
+            url += "/status/latest"
 
         response = requests.get(
             url,
