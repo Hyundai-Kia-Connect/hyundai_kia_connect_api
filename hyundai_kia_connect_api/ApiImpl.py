@@ -57,10 +57,6 @@ class ApiImpl:
         Required for Kia USA as key is session specific"""
         return vehicles
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        """Convert last updated value of vehicle into into datetime"""
-        pass
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass

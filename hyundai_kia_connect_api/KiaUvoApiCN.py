@@ -5,7 +5,6 @@
 import datetime as dt
 import math
 import logging
-import re
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
@@ -47,6 +46,7 @@ from .utils import (
     get_child_value,
     get_index_into_hex_temp,
     get_hex_temp_into_index,
+    parse_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -209,25 +209,6 @@ class KiaUvoApiCN(ApiImpl):
             result.append(vehicle)
         return result
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
-
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
             lastTwo = int(value[-2:])
@@ -290,8 +271,8 @@ class KiaUvoApiCN(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
-            vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "status.time")
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "status.time"), self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -641,8 +622,8 @@ class KiaUvoApiCN(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleLocation.time")
+                parse_datetime(
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
                 ),
             )
         vehicle.data = state

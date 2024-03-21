@@ -5,7 +5,7 @@ import datetime
 import typing
 from dataclasses import dataclass, field
 
-from .utils import get_child_value, get_float
+from .utils import get_child_value, get_float, parse_datetime
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
@@ -424,13 +424,13 @@ class Vehicle:
         self._fuel_driving_range_unit = value[1]
         self._fuel_driving_range = value[0]
 
-    def update_ccs2(self, state: dict):
+    def update_ccs2(self, timezone: datetime.tzinfo, state: dict):
         if get_child_value(state, "Date"):
-            self.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "Date")
+            self.last_updated_at = parse_datetime(
+                get_child_value(state, "Date"), timezone
             )
         else:
-            self.last_updated_at = datetime.datetime.now(self.data_timezone)
+            self.last_updated_at = datetime.datetime.now(timezone)
 
         self.odometer = (
             get_child_value(state, "Drivetrain.Odometer"),
@@ -672,9 +672,7 @@ class Vehicle:
         )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
-            location_last_updated_at = datetime.datetime(
-                2000, 1, 1, tzinfo=self.data_timezone
-            )
+            location_last_updated_at = datetime.datetime(2000, 1, 1, tzinfo=timezone)
             timestamp = get_child_value(state, "Location.TimeStamp")
             if timestamp is not None:
                 location_last_updated_at = datetime.datetime(
@@ -684,7 +682,7 @@ class Vehicle:
                     hour=int(get_child_value(timestamp, "Hour")),
                     minute=int(get_child_value(timestamp, "Min")),
                     second=int(get_child_value(timestamp, "Sec")),
-                    tzinfo=self.data_timezone,
+                    tzinfo=timezone,
                 )
 
             self.location = (

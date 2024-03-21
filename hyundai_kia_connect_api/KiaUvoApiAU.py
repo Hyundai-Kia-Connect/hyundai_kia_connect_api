@@ -7,11 +7,10 @@ import datetime as dt
 import math
 import logging
 import random
-import re
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
-from typing import Union
+from typing import Optional
 
 import pytz
 import requests
@@ -49,6 +48,7 @@ from .utils import (
     get_child_value,
     get_index_into_hex_temp,
     get_hex_temp_into_index,
+    parse_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ class KiaUvoApiAU(ApiImpl):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Union[int, None]
+        self, token: Token, ccs2_support: Optional[int] = None
     ) -> dict:
         return {
             "Authorization": token.access_token,
@@ -136,7 +136,7 @@ class KiaUvoApiAU(ApiImpl):
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
-            "Ccuccs2protocolsupport": ccs2_support,
+            "Ccuccs2protocolsupport": str(ccs2_support or 0),
         }
 
     def _get_control_headers(self, token: Token) -> dict:
@@ -209,25 +209,6 @@ class KiaUvoApiAU(ApiImpl):
             result.append(vehicle)
         return result
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
-
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
             lastTwo = int(value[-2:])
@@ -244,11 +225,11 @@ class KiaUvoApiAU(ApiImpl):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
-        # is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
-        # if is_ccs2:
-        url += "/ccs2/carstatus/latest"
-        # else:
-        #     url += "/status/latest"
+        is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
+        if is_ccs2:
+            url += "/ccs2/carstatus/latest"
+        else:
+            url += "/status/latest"
 
         response = requests.get(
             url,
@@ -260,17 +241,17 @@ class KiaUvoApiAU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
 
-        # if is_ccs2:
-        vehicle.update_ccs2(response["resMsg"]["state"]["Vehicle"])
-        # else:
-        #     location = self._get_location(token, vehicle)
-        #     self._update_vehicle_properties(
-        #         vehicle,
-        #         {
-        #             "status": response["resMsg"],
-        #             "vehicleLocation": location,
-        #         },
-        #     )
+        if is_ccs2:
+            vehicle.update_ccs2(response["resMsg"]["state"]["Vehicle"])
+        else:
+            location = self._get_location(token, vehicle)
+            self._update_vehicle_properties(
+                vehicle,
+                {
+                    "status": response["resMsg"],
+                    "vehicleLocation": location,
+                },
+            )
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -321,8 +302,9 @@ class KiaUvoApiAU(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
-            vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "status.time")
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "status.time"),
+                self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -670,9 +652,7 @@ class KiaUvoApiAU(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleLocation.time")
-                ),
+                parse_datetime(get_child_value(state, "vehicleLocation.time"), self.data_timezone),
             )
         vehicle.data = state
 
