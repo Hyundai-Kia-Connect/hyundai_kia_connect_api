@@ -4,6 +4,7 @@ import logging
 import datetime
 import typing
 from dataclasses import dataclass, field
+from utils import get_child_value
 
 from .utils import get_float
 from .const import *
@@ -423,3 +424,274 @@ class Vehicle:
         self._fuel_driving_range_value = value[0]
         self._fuel_driving_range_unit = value[1]
         self._fuel_driving_range = value[0]
+
+    def update_ccs2(self, state: dict):
+        if get_child_value(state, "Date"):
+            self.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "Date")
+            )
+        else:
+            self.last_updated_at = datetime.datetime.now(self.data_timezone)
+
+        self.odometer = (
+            get_child_value(state, "Drivetrain.Odometer"),
+            DISTANCE_UNITS[1],
+        )
+        self.car_battery_percentage = get_child_value(
+            state, "Electronics.Battery.Level"
+        )
+
+        self.engine_is_running = get_child_value(state, "DrivingReady")
+
+        air_temp = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Value",
+        )
+
+        if air_temp != "OFF":
+            self.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+
+        defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
+        if defrost_is_on in [0, 2]:
+            self.defrost_is_on = False
+        elif defrost_is_on == 1:
+            self.defrost_is_on = True
+
+        steer_wheel_heat = get_child_value(state, "Cabin.SteeringWheel.Heat.State")
+        if steer_wheel_heat in [0, 2]:
+            self.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            self.steering_wheel_heater_is_on = True
+
+        defrost_rear_is_on = get_child_value(state, "Body.Windshield.Rear.Defog.State")
+        if defrost_rear_is_on in [0, 2]:
+            self.back_window_heater_is_on = False
+        elif defrost_rear_is_on == 1:
+            self.back_window_heater_is_on = True
+
+        # TODO: status.sideMirrorHeat
+
+        self.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
+        ]
+
+        self.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
+        ]
+
+        self.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
+        ]
+
+        self.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        ]
+
+        # TODO: status.doorLock
+
+        self.front_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        self.front_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Open"
+        )
+        self.back_left_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Left.Open"
+        )
+        self.back_right_door_is_open = get_child_value(
+            state, "Cabin.Door.Row2.Right.Open"
+        )
+
+        # TODO: should the windows and trunc also be checked?
+        self.is_locked = not (
+            self.front_left_door_is_open
+            or self.front_right_door_is_open
+            or self.back_left_door_is_open
+            or self.back_right_door_is_open
+        )
+
+        self.hood_is_open = get_child_value(state, "Body.Hood.Open")
+        self.front_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Driver.Open"
+        )
+        self.front_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row1.Passenger.Open"
+        )
+        self.back_left_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Left.Open"
+        )
+        self.back_right_window_is_open = get_child_value(
+            state, "Cabin.Window.Row2.Right.Open"
+        )
+        self.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
+        )
+        self.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.PressureLow")
+        )
+        self.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.PressureLow")
+        )
+        self.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.PressureLow")
+        )
+        self.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "Chassis.Axle.Tire.PressureLow")
+        )
+        self.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
+
+        self.ev_battery_percentage = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Ratio"
+        )
+        self.ev_battery_remain = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Value"
+        )
+        self.ev_battery_capacity = get_child_value(
+            state, "Green.BatteryManagement.BatteryCapacity.Value"
+        )
+        self.ev_battery_soh_percentage = get_child_value(
+            state, "Green.BatteryManagement.SoH.Ratio"
+        )
+        self.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
+        )
+        self.ev_battery_is_plugged_in = get_child_value(
+            state, "Green.ChargingInformation.ConnectorFastening.State"
+        )
+        charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
+        if charging_door_state in [0, 2]:
+            self.ev_charge_port_door_is_open = False
+        elif charging_door_state == 1:
+            self.ev_charge_port_door_is_open = True
+
+        self.total_driving_range = (
+            float(
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                )
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+
+        if self.engine_type == ENGINE_TYPES.EV:
+            # ev_driving_range is the same as total_driving_range for pure EV
+            self.ev_driving_range = (
+                self.total_driving_range,
+                self.total_driving_range_unit,
+            )
+        # TODO: self.ev_driving_range for non EV
+
+        self.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+
+        self.ev_estimated_current_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.Charging.RemainTime"),
+            "m",
+        )
+        self.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            "m",
+        )
+        self.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.ICCB"),
+            "m",
+        )
+        self.ev_estimated_station_charge_duration = (
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            "m",
+        )
+        self.ev_charge_limits_ac = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Standard"
+        )
+        self.ev_charge_limits_dc = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Quick"
+        )
+        self.ev_v2l_discharge_limit = get_child_value(
+            state, "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
+        )
+        self.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        self.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                )
+            ],
+        )
+        self.ev_first_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        )
+
+        self.ev_second_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        )
+
+        # TODO: self.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: self.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: self.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
+        # TODO: self.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
+        # TODO: self.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+
+        self.washer_fluid_warning_is_on = get_child_value(
+            state, "Body.Windshield.Front.WasherFluid.LevelLow"
+        )
+        self.brake_fluid_warning_is_on = get_child_value(
+            state, "Chassis.Brake.Fluid.Warning"
+        )
+
+        self.fuel_level = get_child_value(state, "Drivetrain.FuelSystem.FuelLevel")
+        self.fuel_level_is_low = get_child_value(
+            state, "Drivetrain.FuelSystem.LowFuelWarning"
+        )
+        self.air_control_is_on = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
+        self.smart_key_battery_warning_is_on = bool(
+            get_child_value(state, "Electronics.FOB.LowBattery")
+        )
+
+        if get_child_value(state, "Location.GeoCoord.Latitude"):
+            location_last_updated_at = datetime.datetime(
+                2000, 1, 1, tzinfo=self.data_timezone
+            )
+            timestamp = get_child_value(state, "Location.TimeStamp")
+            if timestamp is not None:
+                location_last_updated_at = datetime.datetime(
+                    year=int(get_child_value(timestamp, "Year")),
+                    month=int(get_child_value(timestamp, "Mon")),
+                    day=int(get_child_value(timestamp, "Day")),
+                    hour=int(get_child_value(timestamp, "Hour")),
+                    minute=int(get_child_value(timestamp, "Min")),
+                    second=int(get_child_value(timestamp, "Sec")),
+                    tzinfo=self.data_timezone,
+                )
+
+            self.location = (
+                get_child_value(state, "Location.GeoCoord.Latitude"),
+                get_child_value(state, "Location.GeoCoord.Longitude"),
+                location_last_updated_at,
+            )
+
+        self.data = state
