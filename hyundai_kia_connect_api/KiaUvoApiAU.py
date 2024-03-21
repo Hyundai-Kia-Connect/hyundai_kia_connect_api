@@ -260,17 +260,17 @@ class KiaUvoApiAU(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
 
-        if is_ccs2:
-            vehicle.update_ccs2(response["resMsg"]["state"]["Vehicle"])
-        else:
-            location = self._get_location(token, vehicle)
-            self._update_vehicle_properties(
-                vehicle,
-                {
-                    "status": response["resMsg"],
-                    "vehicleLocation": location,
-                },
-            )
+        # if is_ccs2:
+        vehicle.update_ccs2(response["resMsg"]["state"]["Vehicle"])
+        # else:
+        #     location = self._get_location(token, vehicle)
+        #     self._update_vehicle_properties(
+        #         vehicle,
+        #         {
+        #             "status": response["resMsg"],
+        #             "vehicleLocation": location,
+        #         },
+        #     )
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
