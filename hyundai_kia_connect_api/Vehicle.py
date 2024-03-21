@@ -171,7 +171,7 @@ class Vehicle:
     power_consumption_30d: float = None  # Europe feature only
 
     # Europe feature only
-    daily_stats: list[DailyDrivingStats] = field(default_factory=list)
+    daily_stats: list[DailyDrivingStats] = field(default=[])
 
     month_trip_info: MonthTripInfo = None  # Europe feature only
     day_trip_info: DayTripInfo = None  # Europe feature only
