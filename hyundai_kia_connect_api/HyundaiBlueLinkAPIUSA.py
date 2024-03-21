@@ -235,8 +235,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         vehicle.last_updated_at = parse_datetime(
-            get_child_value(state, "vehicleStatus.dateTime"),
-            self.data_timezone
+            get_child_value(state, "vehicleStatus.dateTime"), self.data_timezone
         )
         vehicle.total_driving_range = (
             get_child_value(

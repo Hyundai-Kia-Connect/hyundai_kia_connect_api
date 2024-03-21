@@ -203,8 +203,7 @@ class KiaUvoApiCA(ApiImpl):
         # Calculate offset between vehicle last_updated_at and UTC
         self.vehicle_timezone = vehicle.timezone
         last_updated_at = parse_datetime(
-            get_child_value(state, "status.lastStatusDate"),
-            self.data_timezone
+            get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
         now_utc: dt = dt.datetime.now(pytz.utc)
         offset = round((last_updated_at - now_utc).total_seconds() / 3600)
@@ -240,8 +239,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         self.vehicle_timezone = vehicle.timezone
         vehicle.last_updated_at = parse_datetime(
-            get_child_value(state, "status.lastStatusDate"),
-            self.data_timezone
+            get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
         _LOGGER.debug(
             f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}"

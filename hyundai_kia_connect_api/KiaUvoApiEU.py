@@ -733,8 +733,7 @@ class KiaUvoApiEU(ApiImpl):
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
                 parse_datetime(
-                    get_child_value(state, "vehicleLocation.time"),
-                    self.data_timezone
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
                 ),
             )
         vehicle.data = state

@@ -303,8 +303,7 @@ class KiaUvoApiAU(ApiImpl):
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "status.time"),
-                self.data_timezone
+                get_child_value(state, "status.time"), self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -652,7 +651,9 @@ class KiaUvoApiAU(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
-                parse_datetime(get_child_value(state, "vehicleLocation.time"), self.data_timezone),
+                parse_datetime(
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
+                ),
             )
         vehicle.data = state
 
