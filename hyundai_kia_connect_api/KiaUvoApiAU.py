@@ -287,8 +287,8 @@ class KiaUvoApiAU(ApiImpl):
                             """,
                     exc_info=e,
                 )
-            else:
-                self._update_vehicle_drive_info(vehicle, state)
+        else:
+            self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         status = self._get_forced_vehicle_state(token, vehicle)
