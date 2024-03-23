@@ -86,7 +86,7 @@ class ApiImpl:
             email_parameter = ""
             if use_email is True:
                 email_parameter = "&email=" + token.username
-    
+
             url = (
                 "https://nominatim.openstreetmap.org/reverse?lat="
                 + str(vehicle.location_latitude)
