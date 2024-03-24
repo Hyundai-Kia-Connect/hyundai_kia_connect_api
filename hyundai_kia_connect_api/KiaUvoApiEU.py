@@ -17,9 +17,10 @@ from bs4 import BeautifulSoup
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
 )
+from .ApiImplType1 import stampApiImpl
+
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -122,7 +123,7 @@ def _check_response_for_errors(response: dict) -> None:
         )
 
 
-class KiaUvoApiEU(ApiImpl):
+class KiaUvoApiEU(ApiImplType1):
     data_timezone = tz.gettz("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
@@ -225,20 +226,6 @@ class KiaUvoApiEU(ApiImpl):
                 + self.LANGUAGE
                 + "&state=$service_id:$user_id"
             )
-
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        return {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": self._get_stamp(),
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
