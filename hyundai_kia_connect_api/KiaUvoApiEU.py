@@ -227,7 +227,6 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
-
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
