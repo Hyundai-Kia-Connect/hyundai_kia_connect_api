@@ -119,7 +119,7 @@ def _check_response_for_errors(response: dict) -> None:
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
         raise APIError(
-            f"Server returned:  '{response['rescode']}' '{response['resMsg']}'"
+            f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
         )
 
 
@@ -280,6 +280,8 @@ class KiaUvoApiEU(ApiImplType1):
                 entry_engine_type = ENGINE_TYPES.PHEV
             elif entry["type"] == "HV":
                 entry_engine_type = ENGINE_TYPES.HEV
+            elif entry["type"] == "PE":
+                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -335,7 +337,10 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             self._update_vehicle_properties_ccs2(vehicle, state)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if (
+            vehicle.engine_type == ENGINE_TYPES.EV
+            or vehicle.engine_type == ENGINE_TYPES.PHEV
+        ):
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
@@ -359,7 +364,10 @@ class KiaUvoApiEU(ApiImplType1):
         self._update_vehicle_properties(vehicle, state)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if (
+            vehicle.engine_type == ENGINE_TYPES.EV
+            or vehicle.engine_type == ENGINE_TYPES.PHEV
+        ):
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
@@ -394,11 +402,15 @@ class KiaUvoApiEU(ApiImplType1):
 
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
-        # TODO: vehicle.air_temperature = get_child_value(state, "Cabin.HVAC.Driver.Temperature.Value")
-
-        defrost_is_on = get_child_value(
-            state, "Cabin.Body.Windshield.Front.Defog.State"
+        air_temp = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Value",
         )
+
+        if air_temp != "OFF":
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+
+        defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
         elif defrost_is_on == 1:
@@ -410,12 +422,30 @@ class KiaUvoApiEU(ApiImplType1):
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
 
-        # TODO: status.sideBackWindowHeat
+        defrost_rear_is_on = get_child_value(state, "Body.Windshield.Rear.Defog.State")
+        if defrost_rear_is_on in [0, 2]:
+            vehicle.back_window_heater_is_on = False
+        elif defrost_rear_is_on == 1:
+            vehicle.back_window_heater_is_on = True
+
         # TODO: status.sideMirrorHeat
-        # TODO: status.seatHeaterVentState.flSeatHeatState
-        # TODO: status.seatHeaterVentState.frSeatHeatState
-        # TODO: status.seatHeaterVentState.rlSeatHeatState
-        # TODO: status.seatHeaterVentState.rrSeatHeatState
+
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
+        ]
+
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
+        ]
+
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
+        ]
+
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        ]
+
         # TODO: status.doorLock
 
         vehicle.front_left_door_is_open = get_child_value(
@@ -432,15 +462,12 @@ class KiaUvoApiEU(ApiImplType1):
         )
 
         # TODO: should the windows and trunc also be checked?
-        if (
-            not vehicle.front_left_door_is_open
-            and not vehicle.front_right_door_is_open
-            and not vehicle.back_left_door_is_open
-            and not vehicle.back_right_door_is_open
-        ):
-            vehicle.is_locked = True
-        else:
-            vehicle.is_locked = False
+        vehicle.is_locked = not (
+            vehicle.front_left_door_is_open
+            or vehicle.front_right_door_is_open
+            or vehicle.back_left_door_is_open
+            or vehicle.back_right_door_is_open
+        )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
         vehicle.front_left_window_is_open = get_child_value(
@@ -475,6 +502,15 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+        vehicle.ev_battery_remain = get_child_value(
+            state, "Green.BatteryManagement.BatteryRemain.Value"
+        )
+        vehicle.ev_battery_capacity = get_child_value(
+            state, "Green.BatteryManagement.BatteryCapacity.Value"
+        )
+        vehicle.ev_battery_soh_percentage = get_child_value(
+            state, "Green.BatteryManagement.SoH.Ratio"
+        )
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
         )
@@ -486,8 +522,6 @@ class KiaUvoApiEU(ApiImplType1):
             vehicle.ev_charge_port_door_is_open = False
         elif charging_door_state == 1:
             vehicle.ev_charge_port_door_is_open = True
-
-        # TODO: vehicle.ev_driving_range
 
         vehicle.total_driving_range = (
             float(
@@ -503,6 +537,14 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             ],
         )
+
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            # ev_driving_range is the same as total_driving_range for pure EV
+            vehicle.ev_driving_range = (
+                vehicle.total_driving_range,
+                vehicle.total_driving_range_unit,
+            )
+        # TODO: vehicle.ev_driving_range for non EV
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -524,16 +566,14 @@ class KiaUvoApiEU(ApiImplType1):
             get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
-        vehicle.ev_charge_limits_ac = (
-            get_child_value(
-                state,
-                "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Standard",
-            ),
+        vehicle.ev_charge_limits_ac = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Standard"
         )
-        vehicle.ev_charge_limits_dc = (
-            get_child_value(
-                state, "Green.ChargingInformation.ElectricCurrentLevel.TargetSoC.Quick"
-            ),
+        vehicle.ev_charge_limits_dc = get_child_value(
+            state, "Green.ChargingInformation.TargetSoC.Quick"
+        )
+        vehicle.ev_v2l_discharge_limit = get_child_value(
+            state, "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
@@ -559,27 +599,19 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             ],
         )
-        ev_first_departure_enabled = get_child_value(
-            state, "Green.Reservation.Departure.Schedule1.Enable"
+        vehicle.ev_first_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
         )
-        if ev_first_departure_enabled == 0:
-            vehicle.ev_first_departure_enabled = False
-        elif ev_first_departure_enabled == 1:
-            vehicle.ev_first_departure_enabled = True
 
-        ev_second_departure_enabled = get_child_value(
-            state, "Green.Reservation.Departure.Schedule2.Enable"
+        vehicle.ev_second_departure_enabled = bool(
+            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
-        if ev_second_departure_enabled == 0:
-            vehicle.ev_second_departure_enabled = False
-        elif ev_second_departure_enabled == 1:
-            vehicle.ev_second_departure_enabled = True
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour)
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour)
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -595,9 +627,9 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
         )
-        # TODO: vehicle.smart_key_battery_warning_is_on = get_child_value(
-        # TODO:     state, "status.smartKeyBatteryWarning"
-        # TODO: )
+        vehicle.smart_key_battery_warning_is_on = bool(
+            get_child_value(state, "Electronics.FOB.LowBattery")
+        )
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
@@ -1234,6 +1266,9 @@ class KiaUvoApiEU(ApiImplType1):
                 )
                 result.day_list.append(processed_day)
 
+            if len(result.day_list) > 0:  # sort on increasing yyyymmdd
+                result.day_list.sort(key=lambda k: k.yyyymmdd)
+
             vehicle.month_trip_info = result
 
     def update_day_trip_info(
@@ -1281,6 +1316,10 @@ class KiaUvoApiEU(ApiImplType1):
                     max_speed=trip["tripMaxSpeed"],
                 )
                 result.trip_list.append(processed_trip)
+
+            if len(result.trip_list) > 0:  # sort on descending hhmmss
+                result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
+
             vehicle.day_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
@@ -1328,7 +1367,15 @@ class KiaUvoApiEU(ApiImplType1):
             for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
                 if (
                     drivingInfoItem["drivingPeriod"] == 0
-                    and drivingInfoItem["calculativeOdo"] > 0
+                    and next(
+                        (
+                            v
+                            for k, v in drivingInfoItem.items()
+                            if k.lower() == "calculativeodo"
+                        ),
+                        0,
+                    )
+                    > 0
                 ):
                     drivingInfo["consumption30d"] = round(
                         drivingInfoItem["totalPwrCsp"]
@@ -1336,6 +1383,12 @@ class KiaUvoApiEU(ApiImplType1):
                     )
                     break
 
+            daily_stats = drivingInfo["dailyStats"]
+            _LOGGER.debug(f"KiaUvoApiEU: before daily_stats: {daily_stats}")  # noqa
+            if len(daily_stats) > 0:  # sort on decreasing date
+                daily_stats.sort(reverse=True, key=lambda k: k.date)
+                drivingInfo["dailyStats"] = daily_stats
+                _LOGGER.debug(f"KiaUvoApiEU: after  daily_stats: {daily_stats}")  # noqa
             return drivingInfo
         else:
             _LOGGER.debug(
