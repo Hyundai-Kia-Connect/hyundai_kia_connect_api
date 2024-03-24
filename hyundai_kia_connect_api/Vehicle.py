@@ -158,6 +158,7 @@ class Vehicle:
 
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
+    ev_v2l_discharge_limit: typing.Union[int, None] = None
 
     # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
@@ -175,6 +176,9 @@ class Vehicle:
     day_trip_info: DayTripInfo = None  # Europe feature only
 
     ev_battery_percentage: int = None
+    ev_battery_soh_percentage: int = None
+    ev_battery_remain: int = None
+    ev_battery_capacity: int = None
     ev_battery_is_charging: bool = None
     ev_battery_is_plugged_in: bool = None
 
@@ -245,6 +249,10 @@ class Vehicle:
     @property
     def total_driving_range(self):
         return self._total_driving_range
+
+    @property
+    def total_driving_range_unit(self):
+        return self._total_driving_range_unit
 
     @total_driving_range.setter
     def total_driving_range(self, value):
@@ -328,6 +336,10 @@ class Vehicle:
     def ev_driving_range(self):
         return self._ev_driving_range
 
+    @property
+    def ev_driving_range_unit(self):
+        return self._ev_driving_range_unit
+
     @ev_driving_range.setter
     def ev_driving_range(self, value):
         self._ev_driving_range_value = value[0]
@@ -378,6 +390,10 @@ class Vehicle:
     def ev_target_range_charge_AC(self):
         return self._ev_target_range_charge_AC
 
+    @property
+    def ev_target_range_charge_AC_unit(self):
+        return self._ev_target_range_charge_AC_unit
+
     @ev_target_range_charge_AC.setter
     def ev_target_range_charge_AC(self, value):
         self._ev_target_range_charge_AC_value = value[0]
@@ -387,6 +403,10 @@ class Vehicle:
     @property
     def ev_target_range_charge_DC(self):
         return self._ev_target_range_charge_DC
+
+    @property
+    def ev_target_range_charge_DC_unit(self):
+        return self._ev_target_range_charge_DC_unit
 
     @ev_target_range_charge_DC.setter
     def ev_target_range_charge_DC(self, value):
