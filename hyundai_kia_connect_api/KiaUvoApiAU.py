@@ -17,10 +17,10 @@ import requests
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -96,7 +96,7 @@ def _check_response_for_errors(response: dict) -> None:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
-class KiaUvoApiAU(ApiImpl):
+class KiaUvoApiAU(ApiImplType1):
     data_timezone = tz.gettz("Australia/Sydney")
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
@@ -121,19 +121,6 @@ class KiaUvoApiAU(ApiImpl):
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        return {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "ccsp-device-id": token.device_id,
-            "Stamp": self._get_stamp(),
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
     def _get_control_headers(self, token: Token) -> dict:
         control_token, _ = self._get_control_token(token)
