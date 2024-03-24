@@ -17,9 +17,10 @@ from bs4 import BeautifulSoup
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
 )
+from stampApiImpl import stampApiImpl
+
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -122,7 +123,7 @@ def _check_response_for_errors(response: dict) -> None:
         )
 
 
-class KiaUvoApiEU(ApiImpl):
+class KiaUvoApiEU(stampApiImpl):
     data_timezone = tz.gettz("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 

@@ -17,10 +17,10 @@ import requests
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
     WindowRequestOptions,
 )
+from stampApiImpl import stampApiImpl
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -96,7 +96,7 @@ def _check_response_for_errors(response: dict) -> None:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
-class KiaUvoApiAU(ApiImpl):
+class KiaUvoApiAU(stampApiImpl):
     data_timezone = tz.gettz("Australia/Sydney")
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
