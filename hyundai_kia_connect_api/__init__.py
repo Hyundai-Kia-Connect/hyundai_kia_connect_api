@@ -2,6 +2,7 @@
 
 # flake8: noqa
 from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
+from .stampApiImpl import stampApiImpl
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
