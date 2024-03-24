@@ -20,7 +20,7 @@ from .ApiImpl import (
     ClimateRequestOptions,
     WindowRequestOptions,
 )
-from stampApiImpl import stampApiImpl
+from .stampApiImpl import stampApiImpl
 from .Token import Token
 from .Vehicle import (
     Vehicle,
