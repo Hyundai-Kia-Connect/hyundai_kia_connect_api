@@ -18,7 +18,7 @@ from dateutil import tz
 from .ApiImpl import (
     ClimateRequestOptions,
 )
-from .ApiImplType1 import stampApiImpl
+from .ApiImplType1 import ApiImplType1
 
 from .Token import Token
 from .Vehicle import (
