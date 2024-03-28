@@ -42,7 +42,16 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import *
+from .exceptions import (
+    AuthenticationError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    APIError,
+    RateLimitingError,
+)
 from .utils import (
     get_child_value,
     get_index_into_hex_temp,
@@ -479,7 +488,7 @@ class KiaUvoApiCN(ApiImplType1):
             vehicle.ev_charge_limits_dc = [
                 x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
             ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
         if (
             get_child_value(
@@ -668,7 +677,7 @@ class KiaUvoApiCN(ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 
