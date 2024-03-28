@@ -54,7 +54,7 @@ from .exceptions import (
     InvalidAPIResponseError,
     APIError,
     RateLimitingError,
-    DeviceIDError
+    DeviceIDError,
 )
 from .utils import (
     get_child_value,
