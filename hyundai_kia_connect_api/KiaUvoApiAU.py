@@ -226,9 +226,8 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
 
         if is_ccs2:
-            vehicle.update_ccs2(
-                self.data_timezone, response["resMsg"]["state"]["Vehicle"]
-            )
+            state = response["resMsg"]["state"]["Vehicle"]
+            self._update_vehicle_properties_ccs2(vehicle, state)
         else:
             location = self._get_location(token, vehicle)
             self._update_vehicle_properties(

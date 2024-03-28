@@ -315,7 +315,7 @@ class KiaUvoApiEU(ApiImplType1):
         if vehicle.ccu_ccs2_protocol_support == 0:
             self._update_vehicle_properties(vehicle, state)
         else:
-            vehicle.update_ccs2(self.data_timezone, state)
+            self._update_vehicle_properties_ccs2(vehicle, state)
 
         if (
             vehicle.engine_type == ENGINE_TYPES.EV
