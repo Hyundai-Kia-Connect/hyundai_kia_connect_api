@@ -1,7 +1,11 @@
 import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiEU import _check_response_for_errors
-from hyundai_kia_connect_api.exceptions import RateLimitingError, InvalidAPIResponseError, APIError
+from hyundai_kia_connect_api.exceptions import (
+    RateLimitingError,
+    InvalidAPIResponseError,
+    APIError,
+)
 
 
 def test_invalid_api_response():
