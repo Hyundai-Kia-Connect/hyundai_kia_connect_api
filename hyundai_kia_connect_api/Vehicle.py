@@ -5,7 +5,7 @@ import datetime
 import typing
 from dataclasses import dataclass, field
 
-from .utils import get_child_value, get_float, parse_datetime
+from .utils import get_float
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)

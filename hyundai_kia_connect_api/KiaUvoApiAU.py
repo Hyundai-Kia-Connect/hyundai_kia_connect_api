@@ -10,7 +10,6 @@ import random
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
-from typing import Optional
 
 import pytz
 import requests
