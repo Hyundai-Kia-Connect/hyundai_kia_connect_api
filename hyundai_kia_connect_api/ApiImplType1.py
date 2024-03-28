@@ -37,7 +37,7 @@ class ApiImplType1(ApiImpl):
             "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-    
+
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
             vehicle.last_updated_at = self.get_last_updated_at(

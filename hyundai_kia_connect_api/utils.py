@@ -1,7 +1,6 @@
 # pylint:disable=bare-except,missing-function-docstring,invalid-name
 """utils.py"""
 
-
 import datetime
 import re
 
