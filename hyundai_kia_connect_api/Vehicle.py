@@ -1,5 +1,6 @@
 # pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name
 """Vehicle class"""
+
 import logging
 import datetime
 import typing
