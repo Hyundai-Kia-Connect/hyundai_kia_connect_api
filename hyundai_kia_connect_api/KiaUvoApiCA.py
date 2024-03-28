@@ -509,7 +509,7 @@ class KiaUvoApiCA(ApiImpl):
             if response["responseHeader"]["responseCode"] != 0:
                 raise APIError("No Location Located")
             return response["result"]
-        except:
+        except Exception:
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
@@ -717,7 +717,7 @@ class KiaUvoApiCA(ApiImpl):
                 vehicle.ev_charge_limits_dc = [
                     x["level"] for x in state if x["plugType"] == 0
                 ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
