@@ -10,10 +10,10 @@ def get_child_value(data, key):
     for x in key.split("."):
         try:
             value = value[x]
-        except:
+        except Exception:
             try:
                 value = value[int(x)]
-            except:
+            except Exception:
                 value = None
     return value
 

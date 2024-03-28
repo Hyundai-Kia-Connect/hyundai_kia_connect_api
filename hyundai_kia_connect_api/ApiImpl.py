@@ -10,7 +10,7 @@ import requests
 
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import *
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)

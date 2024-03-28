@@ -479,7 +479,7 @@ class KiaUvoApiAU(ApiImplType1):
             vehicle.ev_charge_limits_dc = [
                 x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
             ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
         if (
             get_child_value(
@@ -656,7 +656,7 @@ class KiaUvoApiAU(ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 
