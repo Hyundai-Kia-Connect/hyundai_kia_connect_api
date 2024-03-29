@@ -10,7 +10,7 @@ import requests
 
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import *
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,10 +56,6 @@ class ApiImpl:
         """Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific"""
         return vehicles
-
-    def get_last_updated_at(self, value) -> dt.datetime:
-        """Convert last updated value of vehicle into into datetime"""
-        pass
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""

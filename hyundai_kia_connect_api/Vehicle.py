@@ -7,7 +7,7 @@ import typing
 from dataclasses import dataclass, field
 
 from .utils import get_float
-from .const import *
+from .const import DISTANCE_UNITS
 
 _LOGGER = logging.getLogger(__name__)
 
