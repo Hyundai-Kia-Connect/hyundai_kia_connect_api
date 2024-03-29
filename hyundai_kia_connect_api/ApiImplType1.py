@@ -1,4 +1,5 @@
 import datetime as dt
+from typing import Optional
 
 from .ApiImpl import (
     ApiImpl,
@@ -8,6 +9,7 @@ from .Vehicle import Vehicle
 
 from .utils import (
     get_child_value,
+    parse_datetime,
 )
 
 from .const import (
@@ -24,7 +26,9 @@ class ApiImplType1(ApiImpl):
     def __init__(self) -> None:
         """Initialize."""
 
-    def _get_authenticated_headers(self, token: Token) -> dict:
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: Optional[int] = None
+    ) -> dict:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -34,14 +38,14 @@ class ApiImplType1(ApiImpl):
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
-            "Ccuccs2protocolsupport": self.ccu_ccs2_protocol_support,
+            "Ccuccs2protocolsupport": str(ccs2_support or 0),
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
-            vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "Date")
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "Date"), self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
