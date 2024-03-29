@@ -4,7 +4,6 @@
 import datetime as dt
 import logging
 import random
-import re
 import secrets
 import ssl
 import string
@@ -29,7 +28,7 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .utils import get_child_value
+from .utils import get_child_value, parse_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -278,10 +277,11 @@ class KiaUvoAPIUSA(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
-        vehicle.last_updated_at = self.get_last_updated_at(
+        vehicle.last_updated_at = parse_datetime(
             get_child_value(
                 state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.syncDate.utc"
-            )
+            ),
+            self.data_timezone,
         )
         vehicle.odometer = (
             get_child_value(state, "vehicleConfig.vehicleDetail.vehicle.mileage"),
@@ -515,8 +515,9 @@ class KiaUvoAPIUSA(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "lastVehicleInfo.location.coord.lat"),
                 get_child_value(state, "lastVehicleInfo.location.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "lastVehicleInfo.location.syncDate.utc")
+                parse_datetime(
+                    get_child_value(state, "lastVehicleInfo.location.syncDate.utc"),
+                    self.data_timezone,
                 ),
             )
 
@@ -533,25 +534,6 @@ class KiaUvoAPIUSA(ApiImpl):
         )
 
         vehicle.data = state
-
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "cmm/gvi"
