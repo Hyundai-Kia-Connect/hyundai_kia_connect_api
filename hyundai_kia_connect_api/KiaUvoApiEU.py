@@ -65,8 +65,12 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+USER_AGENT_MOZILLA: str = (
+    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+)
+ACCEPT_HEADER_ALL: str = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+)
 
 SUPPORTED_LANGUAGES_LIST = [
     "en",  # English
@@ -134,7 +138,6 @@ class KiaUvoApiEU(ApiImplType1):
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        self.ccu_ccs2_protocol_support = None
         language = language.lower()
         # Strip language variants (e.g. en-Gb)
         if len(language) > 2:
@@ -166,7 +169,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
@@ -177,7 +182,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
@@ -311,12 +318,29 @@ class KiaUvoApiEU(ApiImplType1):
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = self._get_cached_vehicle_state(token, vehicle)
-        self.ccu_ccs2_protocol_support = str(vehicle.ccu_ccs2_protocol_support)
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id
+        is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
+        if is_ccs2:
+            url += "/ccs2/carstatus/latest"
+        else:
+            url += "/status/latest"
+
+        response = requests.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+
+        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
+        _check_response_for_errors(response)
 
         if vehicle.ccu_ccs2_protocol_support == 0:
-            self._update_vehicle_properties(vehicle, state)
+            self._update_vehicle_properties(
+                vehicle, response["resMsg"]["vehicleStatusInfo"]
+            )
         else:
+            state = response["resMsg"]["state"]["Vehicle"]
             self._update_vehicle_properties_ccs2(vehicle, state)
 
         if (
@@ -740,7 +764,10 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             url = url + "/ccs2/carstatus/latest"
         response = requests.get(
-            url, headers=self._get_authenticated_headers(token)
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
