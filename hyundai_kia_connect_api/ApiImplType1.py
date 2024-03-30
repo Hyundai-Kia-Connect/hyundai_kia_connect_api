@@ -46,7 +46,7 @@ class ApiImplType1(ApiImpl):
         if get_child_value(state, "Date"):
             # `Date` field is in UTC time
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), None
+                get_child_value(state, "Date"), dt.timezone.utc
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
