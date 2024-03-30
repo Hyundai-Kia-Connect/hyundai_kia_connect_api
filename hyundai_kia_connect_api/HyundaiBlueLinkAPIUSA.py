@@ -636,7 +636,65 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
-        pass
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
+        _LOGGER.debug(f"{DOMAIN} - Start charging..")
+
+        url = self.API_URL + "evc/charge/start"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Start charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Start charge response: {response.text}")
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
-        pass
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
+        _LOGGER.debug(f"{DOMAIN} - Stop charging..")
+
+        url = self.API_URL + "evc/charge/stop"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Stop charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
+        url = self.API_URL + "evc/charge/targetsoc/set"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {headers}")
+
+        data = {
+            "targetSOClist": [
+                {
+                    "plugType": 0,
+                    "targetSOClevel": int(dc),
+                },
+                {
+                    "plugType": 1,
+                    "targetSOClevel": int(ac),
+                },
+            ]
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
+
+        response = self.sessions.post(url, json=data, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
