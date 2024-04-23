@@ -5,7 +5,6 @@
 import datetime as dt
 import json
 import logging
-import re
 
 import pytz
 import requests
@@ -35,6 +34,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    parse_datetime,
 )
 
 import ssl
@@ -202,8 +202,8 @@ class KiaUvoApiCA(ApiImpl):
 
         # Calculate offset between vehicle last_updated_at and UTC
         self.vehicle_timezone = vehicle.timezone
-        last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate")
+        last_updated_at = parse_datetime(
+            get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
         now_utc: dt = dt.datetime.now(pytz.utc)
         offset = round((last_updated_at - now_utc).total_seconds() / 3600)
@@ -238,8 +238,8 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         self.vehicle_timezone = vehicle.timezone
-        vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "status.lastStatusDate")
+        vehicle.last_updated_at = parse_datetime(
+            get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
         _LOGGER.debug(
             f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}"
@@ -426,28 +426,9 @@ class KiaUvoApiCA(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
-                self.get_last_updated_at(get_child_value(state, "time")),
+                parse_datetime(get_child_value(state, "time"), self.data_timezone),
             )
         vehicle.data["vehicleLocation"] = state
-
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.vehicle_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.vehicle_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
@@ -509,7 +490,7 @@ class KiaUvoApiCA(ApiImpl):
             if response["responseHeader"]["responseCode"] != 0:
                 raise APIError("No Location Located")
             return response["result"]
-        except:
+        except Exception:
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
@@ -717,7 +698,7 @@ class KiaUvoApiCA(ApiImpl):
                 vehicle.ev_charge_limits_dc = [
                     x["level"] for x in state if x["plugType"] == 0
                 ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:

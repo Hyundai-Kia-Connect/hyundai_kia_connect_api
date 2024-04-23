@@ -7,7 +7,6 @@ import datetime as dt
 import math
 import logging
 import random
-import re
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
@@ -17,10 +16,10 @@ import requests
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -43,19 +42,27 @@ from .const import (
     ENGINE_TYPES,
     OrderStatus,
 )
-from .exceptions import *
+from .exceptions import (
+    AuthenticationError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    APIError,
+    RateLimitingError,
+)
 from .utils import (
     get_child_value,
     get_index_into_hex_temp,
     get_hex_temp_into_index,
+    parse_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = (
-    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-)
+USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -96,7 +103,7 @@ def _check_response_for_errors(response: dict) -> None:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
-class KiaUvoApiAU(ApiImpl):
+class KiaUvoApiAU(ApiImplType1):
     data_timezone = tz.gettz("Australia/Sydney")
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
@@ -106,34 +113,17 @@ class KiaUvoApiAU(ApiImpl):
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
             self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
             self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
-            )
+            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
             self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
             self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
-            )
+            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        return {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "ccsp-device-id": token.device_id,
-            "Stamp": self._get_stamp(),
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
 
     def _get_control_headers(self, token: Token) -> dict:
         control_token, _ = self._get_control_token(token)
@@ -200,28 +190,10 @@ class KiaUvoApiAU(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
         return result
-
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
@@ -238,15 +210,35 @@ class KiaUvoApiAU(ApiImpl):
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        status = self._get_cached_vehicle_state(token, vehicle)
-        location = self._get_location(token, vehicle)
-        self._update_vehicle_properties(
-            vehicle,
-            {
-                "status": status,
-                "vehicleLocation": location,
-            },
-        )
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id
+        is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
+        if is_ccs2:
+            url += "/ccs2/carstatus/latest"
+        else:
+            url += "/status/latest"
+
+        response = requests.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+
+        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
+        _check_response_for_errors(response)
+
+        if is_ccs2:
+            state = response["resMsg"]["state"]["Vehicle"]
+            self._update_vehicle_properties_ccs2(vehicle, state)
+        else:
+            location = self._get_location(token, vehicle)
+            self._update_vehicle_properties(
+                vehicle,
+                {
+                    "status": response["resMsg"],
+                    "vehicleLocation": location,
+                },
+            )
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
@@ -263,8 +255,8 @@ class KiaUvoApiAU(ApiImpl):
                             """,
                     exc_info=e,
                 )
-            else:
-                self._update_vehicle_drive_info(vehicle, state)
+        else:
+            self._update_vehicle_drive_info(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         status = self._get_forced_vehicle_state(token, vehicle)
@@ -297,8 +289,8 @@ class KiaUvoApiAU(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
-            vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "status.time")
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "status.time"), self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -490,7 +482,7 @@ class KiaUvoApiAU(ApiImpl):
             vehicle.ev_charge_limits_dc = [
                 x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
             ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
         if (
             get_child_value(
@@ -646,8 +638,8 @@ class KiaUvoApiAU(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleLocation.time")
+                parse_datetime(
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
                 ),
             )
         vehicle.data = state
@@ -656,18 +648,6 @@ class KiaUvoApiAU(ApiImpl):
         vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
         vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
         vehicle.daily_stats = get_child_value(state, "dailyStats")
-
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
-
-        response = requests.get(
-            url, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
-        response = response["resMsg"]
-
-        return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
@@ -679,7 +659,7 @@ class KiaUvoApiAU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 

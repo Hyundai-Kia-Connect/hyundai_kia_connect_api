@@ -4,7 +4,6 @@
 
 import logging
 import time
-import re
 import datetime as dt
 import pytz
 import requests
@@ -19,7 +18,7 @@ from .const import (
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
 )
-from .utils import get_child_value, get_float
+from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import DailyDrivingStats, Vehicle
@@ -235,8 +234,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         return None
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        vehicle.last_updated_at = self.get_last_updated_at(
-            get_child_value(state, "vehicleStatus.dateTime")
+        vehicle.last_updated_at = parse_datetime(
+            get_child_value(state, "vehicleStatus.dateTime"), self.data_timezone
         )
         vehicle.total_driving_range = (
             get_child_value(
@@ -428,8 +427,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleStatus.vehicleLocation.time")
+                parse_datetime(
+                    get_child_value(state, "vehicleStatus.vehicleLocation.time"),
+                    self.data_timezone,
                 ),
             )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
@@ -636,32 +636,65 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
-        pass
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
+        _LOGGER.debug(f"{DOMAIN} - Start charging..")
+
+        url = self.API_URL + "evc/charge/start"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Start charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Start charge response: {response.text}")
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
-        pass
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            value = (
-                value.replace("-", "")
-                .replace("T", "")
-                .replace(":", "")
-                .replace("Z", "")
-            )
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
+        _LOGGER.debug(f"{DOMAIN} - Stop charging..")
 
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
+        url = self.API_URL + "evc/charge/stop"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
+
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Stop charge response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        if vehicle.engine_type != ENGINE_TYPES.EV:
+            return {}
+
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
+        url = self.API_URL + "evc/charge/targetsoc/set"
+        headers = self._get_vehicle_headers(token, vehicle)
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {headers}")
+
+        data = {
+            "targetSOClist": [
+                {
+                    "plugType": 0,
+                    "targetSOClevel": int(dc),
+                },
+                {
+                    "plugType": 1,
+                    "targetSOClevel": int(ac),
+                },
+            ]
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
+
+        response = self.sessions.post(url, json=data, headers=headers)
+        _LOGGER.debug(
+            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")

@@ -5,20 +5,19 @@
 import datetime as dt
 import math
 import logging
-import re
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytz
 import requests
-from bs4 import BeautifulSoup
 from dateutil import tz
 
 from .ApiImpl import (
-    ApiImpl,
     ClimateRequestOptions,
 )
+from .ApiImplType1 import ApiImplType1
+
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -42,22 +41,28 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import *
+from .exceptions import (
+    AuthenticationError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    APIError,
+    RateLimitingError,
+)
 from .utils import (
     get_child_value,
     get_index_into_hex_temp,
     get_hex_temp_into_index,
+    parse_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = (
-    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-)
-ACCEPT_HEADER_ALL: str = (
-    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
-)
+USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -98,7 +103,7 @@ def _check_response_for_errors(response: dict) -> None:
             raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
-class KiaUvoApiCN(ApiImpl):
+class KiaUvoApiCN(ApiImplType1):
     data_timezone = tz.gettz("Asia/Shanghai")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
@@ -107,9 +112,7 @@ class KiaUvoApiCN(ApiImpl):
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
-            )
+            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
@@ -209,25 +212,6 @@ class KiaUvoApiCN(ApiImpl):
             result.append(vehicle)
         return result
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
-        if value is None:
-            value = dt.datetime(2000, 1, 1, tzinfo=self.data_timezone)
-        else:
-            m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-            value = dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=self.data_timezone,
-            )
-
-        _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
-        return value
-
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
             lastTwo = int(value[-2:])
@@ -290,8 +274,8 @@ class KiaUvoApiCN(ApiImpl):
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
-            vehicle.last_updated_at = self.get_last_updated_at(
-                get_child_value(state, "status.time")
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "status.time"), self.data_timezone
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -485,7 +469,7 @@ class KiaUvoApiCN(ApiImpl):
             vehicle.ev_charge_limits_dc = [
                 x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
             ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
         if (
             get_child_value(
@@ -641,8 +625,8 @@ class KiaUvoApiCN(ApiImpl):
             vehicle.location = (
                 get_child_value(state, "vehicleLocation.coord.lat"),
                 get_child_value(state, "vehicleLocation.coord.lon"),
-                self.get_last_updated_at(
-                    get_child_value(state, "vehicleLocation.time")
+                parse_datetime(
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
                 ),
             )
         vehicle.data = state
@@ -674,7 +658,7 @@ class KiaUvoApiCN(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 

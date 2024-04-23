@@ -10,7 +10,7 @@ import requests
 
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import *
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,10 +57,6 @@ class ApiImpl:
         Required for Kia USA as key is session specific"""
         return vehicles
 
-    def get_last_updated_at(self, value) -> dt.datetime:
-        """Convert last updated value of vehicle into into datetime"""
-        pass
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
@@ -82,24 +78,25 @@ class ApiImpl:
     def update_geocoded_location(
         self, token: Token, vehicle: Vehicle, use_email: bool
     ) -> None:
-        email_parameter = ""
-        if use_email is True:
-            email_parameter = "&email=" + token.username
+        if vehicle.location_latitude and vehicle.location_longitude:
+            email_parameter = ""
+            if use_email is True:
+                email_parameter = "&email=" + token.username
 
-        url = (
-            "https://nominatim.openstreetmap.org/reverse?lat="
-            + str(vehicle.location_latitude)
-            + "&lon="
-            + str(vehicle.location_longitude)
-            + "&format=json&addressdetails=1&zoom=18"
-            + email_parameter
-        )
-        response = requests.get(url)
-        response = response.json()
-        vehicle.geocode = (
-            get_child_value(response, "display_name"),
-            get_child_value(response, "address"),
-        )
+            url = (
+                "https://nominatim.openstreetmap.org/reverse?lat="
+                + str(vehicle.location_latitude)
+                + "&lon="
+                + str(vehicle.location_longitude)
+                + "&format=json&addressdetails=1&zoom=18"
+                + email_parameter
+            )
+            response = requests.get(url)
+            response = response.json()
+            vehicle.geocode = (
+                get_child_value(response, "display_name"),
+                get_child_value(response, "address"),
+            )
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
