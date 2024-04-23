@@ -7,6 +7,7 @@ import random
 import datetime as dt
 import logging
 import uuid
+import math
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 
@@ -817,7 +818,7 @@ class KiaUvoApiEU(ApiImplType1):
         payload = {"action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
+            url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
@@ -1379,6 +1380,27 @@ class KiaUvoApiEU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def _get_control_token(self, token: Token) -> Token:
+        url = self.USER_API_URL + "pin?token="
+        headers = {
+            "Authorization": token.access_token,
+            "Content-type": "application/json",
+            "Host": self.BASE_URL,
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        data = {"deviceId": token.device_id, "pin": token.pin}
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
+        response = requests.put(url, json=data, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        control_token = "Bearer " + response["controlToken"]
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response["expiresTime"]
+        )
+        return control_token, control_token_expire_at
 
     def check_action_status(
         self,
