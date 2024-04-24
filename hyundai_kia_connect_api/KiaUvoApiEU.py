@@ -229,6 +229,14 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
+    def _get_control_headers(self, token: Token) -> dict:
+        control_token, _ = self._get_control_token(token)
+        authenticated_headers = self._get_authenticated_headers(token)
+        return authenticated_headers | {
+            "Authorization": control_token,
+            "AuthorizationCCSP": control_token,
+        }
+
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
