@@ -44,6 +44,7 @@ class ScheduleChargingClimateRequestOptions:
         enabled: bool = None
         days: list[int] = None  # Sun=0, Mon=1, ..., Sat=6
         time: dt.time = None
+
     first_departure: DepartureOptions = None
     second_departure: DepartureOptions = None
     charging_enabled: bool = None
@@ -184,7 +185,10 @@ class ApiImpl:
         pass
 
     def schedule_charging_and_climate(
-        self, token: Token, vehicle: Vehicle, options: ScheduleChargingClimateRequestOptions
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
     ) -> str:
         """
         Europe feature only.

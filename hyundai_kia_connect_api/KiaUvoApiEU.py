@@ -17,7 +17,8 @@ from bs4 import BeautifulSoup
 from dateutil import tz
 
 from .ApiImpl import (
-    ClimateRequestOptions, ScheduleChargingClimateRequestOptions,
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
 )
 from .ApiImplType1 import ApiImplType1
 
@@ -1160,14 +1161,17 @@ class KiaUvoApiEU(ApiImplType1):
         return response["msgId"]
 
     def schedule_charging_and_climate(
-        self, token: Token, vehicle: Vehicle, options: ScheduleChargingClimateRequestOptions
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
     ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
         url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
         url = url + "/reservation/chargehvac"
 
         def set_default_departure_options(
-            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions
+            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
         ) -> None:
             if departure_options.enabled is None:
                 departure_options.enabled = False
@@ -1177,9 +1181,13 @@ class KiaUvoApiEU(ApiImplType1):
                 departure_options.time = dt.time()
 
         if options.first_departure is None:
-            options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
         if options.second_departure is None:
-            options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
 
         set_default_departure_options(options.first_departure)
         set_default_departure_options(options.second_departure)
@@ -1205,7 +1213,7 @@ class KiaUvoApiEU(ApiImplType1):
         temperature: float = options.temperature
         if options.temperature_unit == 0:
             # Round to nearest 0.5
-            temperature = round(temperature * 2.) / 2.
+            temperature = round(temperature * 2.0) / 2.0
             # Cap at 27, floor at 17
             if temperature > 27.0:
                 temperature = 27.0
@@ -1213,14 +1221,14 @@ class KiaUvoApiEU(ApiImplType1):
                 temperature = 17.0
 
         payload = {
-            "reservChargeInfo" + str(i+1): {
+            "reservChargeInfo" + str(i + 1): {
                 "reservChargeSet": departures[i].enabled,
                 "reservInfo": {
                     "day": departures[i].days,
                     "time": {
-                        "time": departures[i].time.strftime('%I%M'),
+                        "time": departures[i].time.strftime("%I%M"),
                         "timeSection": 1 if departures[i].time >= dt.time(12, 0) else 0,
-                    }
+                    },
                 },
                 "reservFatcSet": {
                     "airCtrl": 1 if options.climate_enabled else 0,
@@ -1230,25 +1238,31 @@ class KiaUvoApiEU(ApiImplType1):
                         "unit": options.temperature_unit,
                     },
                     "heating1": 0,
-                    "defrost": options.defrost
-                }
-            } for i in range(2)}
+                    "defrost": options.defrost,
+                },
+            }
+            for i in range(2)
+        }
 
         payload = payload | {
             "offPeakPowerInfo": {
                 "offPeakPowerTime1": {
                     "endtime": {
-                        "timeSection": 1 if options.off_peak_end_time >= dt.time(12, 0) else 0,
-                        "time": options.off_peak_end_time.strftime('%I%M'),
+                        "timeSection": 1
+                        if options.off_peak_end_time >= dt.time(12, 0)
+                        else 0,
+                        "time": options.off_peak_end_time.strftime("%I%M"),
                     },
                     "starttime": {
-                        "timeSection": 1 if options.off_peak_start_time >= dt.time(12, 0) else 0,
-                        "time": options.off_peak_start_time.strftime('%I%M'),
+                        "timeSection": 1
+                        if options.off_peak_start_time >= dt.time(12, 0)
+                        else 0,
+                        "time": options.off_peak_start_time.strftime("%I%M"),
                     },
                 },
-                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1
+                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
             },
-            "reservFlag": 1 if options.charging_enabled else 0
+            "reservFlag": 1 if options.charging_enabled else 0,
         }
 
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")

@@ -8,7 +8,12 @@ import logging
 import pytz
 
 from .exceptions import APIError
-from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions, ScheduleChargingClimateRequestOptions
+from .ApiImpl import (
+    ApiImpl,
+    ClimateRequestOptions,
+    WindowRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+)
 from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
 from .KiaUvoAPIUSA import KiaUvoAPIUSA
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -237,8 +242,12 @@ class VehicleManager:
     def enable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = True
 
-    def schedule_charging_and_climate(self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions) -> None:
-        self.api.schedule_charging_and_climate(self.token, self.get_vehicle(vehicle_id), options)
+    def schedule_charging_and_climate(
+        self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
+    ) -> None:
+        self.api.schedule_charging_and_climate(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
 
     @staticmethod
     def get_implementation_by_region_brand(
