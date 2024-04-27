@@ -220,9 +220,25 @@ class Vehicle:
     ev_first_departure_time: typing.Union[datetime.time, None] = None
     ev_second_departure_time: typing.Union[datetime.time, None] = None
 
+    ev_first_departure_climate_enabled: typing.Union[bool, None] = None
+    ev_second_departure_climate_enabled: typing.Union[bool, None] = None
+
+    _ev_first_departure_climate_temperature: typing.Union[float, None] = None
+    _ev_first_departure_climate_temperature_value: typing.Union[float, None] = None
+    _ev_first_departure_climate_temperature_unit: typing.Union[str, None] = None
+
+    _ev_second_departure_climate_temperature: typing.Union[float, None] = None
+    _ev_second_departure_climate_temperature_value: typing.Union[float, None] = None
+    _ev_second_departure_climate_temperature_unit: typing.Union[str, None] = None
+
+    ev_first_departure_climate_defrost: typing.Union[bool, None] = None
+    ev_second_departure_climate_defrost: typing.Union[bool, None] = None
+
     ev_off_peak_start_time: typing.Union[datetime.time, None] = None
     ev_off_peak_end_time: typing.Union[datetime.time, None] = None
     ev_off_peak_charge_only_enabled: typing.Union[bool, None] = None
+
+    ev_schedule_charge_enabled: typing.Union[bool, None] = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
@@ -414,6 +430,34 @@ class Vehicle:
         self._ev_target_range_charge_DC_value = value[0]
         self._ev_target_range_charge_DC_unit = value[1]
         self._ev_target_range_charge_DC = value[0]
+
+    @property
+    def ev_first_departure_climate_temperature(self):
+        return self._ev_first_departure_climate_temperature
+
+    @property
+    def ev_first_departure_climate_temperature_unit(self):
+        return self._ev_first_departure_climate_temperature_unit
+
+    @ev_first_departure_climate_temperature.setter
+    def ev_first_departure_climate_temperature(self, value):
+        self._ev_first_departure_climate_temperature_value = value[0]
+        self._ev_first_departure_climate_temperature_unit = value[1]
+        self._ev_first_departure_climate_temperature = value[0]
+
+    @property
+    def ev_second_departure_climate_temperature(self):
+        return self._ev_second_departure_climate_temperature
+
+    @property
+    def ev_second_departure_climate_temperature_unit(self):
+        return self._ev_second_departure_climate_temperature_unit
+
+    @ev_second_departure_climate_temperature.setter
+    def ev_second_departure_climate_temperature(self, value):
+        self._ev_second_departure_climate_temperature_value = value[0]
+        self._ev_second_departure_climate_temperature_unit = value[1]
+        self._ev_second_departure_climate_temperature = value[0]
 
     @property
     def fuel_driving_range(self):

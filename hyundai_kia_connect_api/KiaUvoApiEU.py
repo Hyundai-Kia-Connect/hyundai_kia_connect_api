@@ -687,6 +687,56 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         )
 
+        vehicle.ev_first_departure_climate_enabled = bool(get_child_value(
+            state,
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airCtrl",  # noqa
+        ))
+
+        vehicle.ev_second_departure_climate_enabled = bool(get_child_value(
+            state,
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airCtrl",  # noqa
+        ))
+
+        if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value"):  # noqa
+            temp_index = get_hex_temp_into_index(
+                get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value")  # noqa
+            )
+
+            vehicle.ev_first_departure_climate_temperature = (
+                self.temperature_range[temp_index],
+                TEMPERATURE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.unit",  # noqa
+                    )
+                ],
+            )
+
+        if get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value"):  # noqa
+            temp_index = get_hex_temp_into_index(
+                get_child_value(state, "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value")  # noqa
+            )
+
+            vehicle.ev_second_departure_climate_temperature = (
+                self.temperature_range[temp_index],
+                TEMPERATURE_UNITS[
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.unit",  # noqa
+                    )
+                ],
+            )
+
+        vehicle.ev_first_departure_climate_defrost = get_child_value(
+            state,
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.defrost",  # noqa
+        )
+
+        vehicle.ev_second_departure_climate_defrost = get_child_value(
+            state,
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.defrost",  # noqa
+        )
+
         vehicle.ev_off_peak_start_time = self._get_time_from_string(
             get_child_value(
                 state,
@@ -729,6 +779,17 @@ class KiaUvoApiEU(ApiImplType1):
                 == 2
             ):
                 vehicle.ev_off_peak_charge_only_enabled = False
+
+        if get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.reservFlag",  # noqa
+            ) == 1:
+            vehicle.ev_schedule_charge_enabled = True
+        elif get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.reservFlag",  # noqa
+            ) == 0:
+            vehicle.ev_schedule_charge_enabled = False
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "vehicleStatus.washerFluidStatus"
