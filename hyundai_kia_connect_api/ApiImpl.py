@@ -37,6 +37,26 @@ class WindowRequestOptions:
     front_right: WINDOW_STATE = None
 
 
+@dataclass
+class ScheduleChargingClimateRequestOptions:
+    @dataclass
+    class DepartureOptions:
+        enabled: bool = None
+        days: list[int] = None  # Sun=0, Mon=1, ..., Sat=6
+        time: dt.time = None
+
+    first_departure: DepartureOptions = None
+    second_departure: DepartureOptions = None
+    charging_enabled: bool = None
+    off_peak_start_time: dt.time = None
+    off_peak_end_time: dt.time = None
+    off_peak_charge_only_enabled: bool = None
+    climate_enabled: bool = None
+    temperature: float = None
+    temperature_unit: int = None
+    defrost: bool = None
+
+
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
@@ -161,5 +181,17 @@ class ApiImpl:
         Default this information is None:
 
         day_trip_info: DayTripInfo = None
+        """
+        pass
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """
+        Europe feature only.
+        Schedule charging and climate control. Returns the tracking ID
         """
         pass
