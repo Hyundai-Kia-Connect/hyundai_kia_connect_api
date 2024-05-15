@@ -279,7 +279,7 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.get(
             url,
             headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
+                token
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
