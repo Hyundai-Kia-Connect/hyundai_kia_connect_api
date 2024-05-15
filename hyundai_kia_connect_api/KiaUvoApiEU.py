@@ -232,7 +232,9 @@ class KiaUvoApiEU(ApiImplType1):
 
     def _get_control_headers(self, token: Token) -> dict:
         control_token, _ = self._get_control_token(token)
-        authenticated_headers = self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+        authenticated_headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
         return authenticated_headers | {
             "Authorization": control_token,
             "AuthorizationCCSP": control_token,
@@ -275,7 +277,10 @@ class KiaUvoApiEU(ApiImplType1):
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = requests.get(
-            url, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
         _check_response_for_errors(response)
@@ -867,7 +872,10 @@ class KiaUvoApiEU(ApiImplType1):
 
         try:
             response = requests.get(
-                url, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+                url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
@@ -879,7 +887,10 @@ class KiaUvoApiEU(ApiImplType1):
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         response = requests.get(
-            url, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
         _check_response_for_errors(response)
@@ -895,7 +906,11 @@ class KiaUvoApiEU(ApiImplType1):
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
@@ -951,7 +966,11 @@ class KiaUvoApiEU(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -973,7 +992,11 @@ class KiaUvoApiEU(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -986,7 +1009,11 @@ class KiaUvoApiEU(ApiImplType1):
         payload = {"action": "start", "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
@@ -999,7 +1026,11 @@ class KiaUvoApiEU(ApiImplType1):
         payload = {"action": "stop", "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
@@ -1013,7 +1044,10 @@ class KiaUvoApiEU(ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
         response = requests.get(
-            url, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
         _check_response_for_errors(response)
@@ -1040,7 +1074,9 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(
             url,
             json=payload,
-            headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support),
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         )
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
@@ -1151,7 +1187,9 @@ class KiaUvoApiEU(ApiImplType1):
         responseAlltime = requests.post(
             url,
             json={"periodTarget": 1},
-            headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support),
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         )
         responseAlltime = responseAlltime.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
@@ -1160,7 +1198,9 @@ class KiaUvoApiEU(ApiImplType1):
         response30d = requests.post(
             url,
             json={"periodTarget": 0},
-            headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support),
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         )
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
@@ -1237,7 +1277,11 @@ class KiaUvoApiEU(ApiImplType1):
             ]
         }
         response = requests.post(
-            url, json=body, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
@@ -1641,7 +1685,10 @@ class KiaUvoApiEU(ApiImplType1):
 
         else:
             response = requests.get(
-                url, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+                url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
             ).json()
             _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
             _check_response_for_errors(response)
