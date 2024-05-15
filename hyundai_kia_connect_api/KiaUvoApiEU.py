@@ -278,9 +278,7 @@ class KiaUvoApiEU(ApiImplType1):
         url = self.SPA_API_URL + "vehicles"
         response = requests.get(
             url,
-            headers=self._get_authenticated_headers(
-                token
-            ),
+            headers=self._get_authenticated_headers(token),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
         _check_response_for_errors(response)
