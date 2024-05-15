@@ -230,7 +230,7 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
-    def _get_control_headers(self, token: Token) -> dict:
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
         control_token, _ = self._get_control_token(token)
         authenticated_headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support
@@ -925,7 +925,7 @@ class KiaUvoApiEU(ApiImplType1):
         payload = {"action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
@@ -1394,7 +1394,7 @@ class KiaUvoApiEU(ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
