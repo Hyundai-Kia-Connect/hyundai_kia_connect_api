@@ -10,6 +10,6 @@ pytest==8.2.1
 pytz>=2021.3
 Sphinx==7.3.7
 tox==4.15.0
-twine==5.0.0
+twine==5.1.0
 watchdog==4.0.0
 wheel==0.43.0
