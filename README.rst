@@ -90,6 +90,7 @@ For a list of language codes, see here: https://www.science.co.il/language/Codes
 - "fi" Finnish
 - "pt" Portuguese
 
+
 In Europe also trip info can be retrieved. For a month you can ask the days with trips. And you can ask for a specific day for all the trips of that specific day.::
 - First call vm.update_month_trip_info(vehicle.id, yyymm) before getting vehicle.month_trip_info for that month
 - First call vm.update_day_trip_info(vehicle.id, day.yyyymmdd) before getting vehicle.day_trip_info for that day
