@@ -681,7 +681,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     "unit": 1,
                     "value": str(options.set_temp),
                 },
-            }
+            },
             "airCtrl": options.climate,
             "defrost": options.defrost,
             "heatingAccessory": {
