@@ -677,44 +677,44 @@ class KiaUvoAPIUSA(ApiImpl):
 
         body = {
             "remoteClimate": {
-                "airCtrl": options.climate,
                 "airTemp": {
                     "unit": 1,
                     "value": str(options.set_temp),
                 },
-                "defrost": options.defrost,
-                "heatingAccessory": {
-                    "rearWindow": int(options.heating),
-                    "sideMirror": int(options.heating),
-                    "steeringWheel": int(options.heating),
+            },
+            "airCtrl": options.climate,
+            "defrost": options.defrost,
+            "heatingAccessory": {
+                "rearWindow": int(options.heating),
+                "sideMirror": int(options.heating),
+                "steeringWheel": int(options.heating),
+            },
+            "ignitionOnDuration": {
+                "unit": 4,
+                "value": options.duration,
+            },
+            "heatVentSeat": {
+                "driverSeat": {
+                    "heatVentType": front_left_heatVentType,
+                    "heatVentLevel": front_left_heatVentLevel,
+                    "heatVentStep": 1,
                 },
-                "ignitionOnDuration": {
-                    "unit": 4,
-                    "value": options.duration,
+                "passengerSeat": {
+                    "heatVentType": front_right_heatVentType,
+                    "heatVentLevel": front_right_heatVentLevel,
+                    "heatVentStep": 1,
                 },
-                "heatVentSeat": {
-                    "driverSeat": {
-                        "heatVentType": front_left_heatVentType,
-                        "heatVentLevel": front_left_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "passengerSeat": {
-                        "heatVentType": front_right_heatVentType,
-                        "heatVentLevel": front_right_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "rearLeftSeat": {
-                        "heatVentType": rear_left_heatVentType,
-                        "heatVentLevel": rear_left_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "rearRightSeat": {
-                        "heatVentType": rear_right_heatVentType,
-                        "heatVentLevel": rear_right_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
+                "rearLeftSeat": {
+                    "heatVentType": rear_left_heatVentType,
+                    "heatVentLevel": rear_left_heatVentLevel,
+                    "heatVentStep": 1,
                 },
-            }
+                "rearRightSeat": {
+                    "heatVentType": rear_right_heatVentType,
+                    "heatVentLevel": rear_right_heatVentLevel,
+                    "heatVentStep": 1,
+                },
+            },
         }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
         response = self.post_request_with_logging_and_active_session(
