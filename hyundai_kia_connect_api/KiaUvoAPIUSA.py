@@ -11,6 +11,7 @@ import time
 import typing
 from datetime import datetime
 
+import certifi
 import pytz
 import requests
 from requests import RequestException, Response
@@ -41,6 +42,7 @@ class KiaSSLAdapter(HTTPAdapter):
             ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
         )
         kwargs["ssl_context"] = context
+        kwargs["ca_certs"] = certifi.where()
         return super().init_poolmanager(*args, **kwargs)
 
 
@@ -629,51 +631,6 @@ class KiaUvoAPIUSA(ApiImpl):
             options.defrost = False
         if options.duration is None:
             options.duration = 5
-        if options.front_left_seat is None:
-            options.front_left_seat = 0
-        if options.front_right_seat is None:
-            options.front_right_seat = 0
-        if options.rear_left_seat is None:
-            options.rear_left_seat = 0
-        if options.rear_right_seat is None:
-            options.rear_right_seat = 0
-
-        front_left_heatVentType = 0
-        front_right_heatVentType = 0
-        rear_left_heatVentType = 0
-        rear_right_heatVentType = 0
-        front_left_heatVentLevel = 0
-        front_right_heatVentLevel = 0
-        rear_left_heatVentLevel = 0
-        rear_right_heatVentLevel = 0
-
-        # heated
-        if options.front_left_seat in (6, 7, 8):
-            front_left_heatVentType = 1
-            front_left_heatVentLevel = options.front_left_seat - 4
-        if options.front_right_seat in (6, 7, 8):
-            front_right_heatVentType = 1
-            front_right_heatVentLevel = options.front_right_seat - 4
-        if options.rear_left_seat in (6, 7, 8):
-            rear_left_heatVentType = 1
-            rear_left_heatVentLevel = options.rear_left_seat - 4
-        if options.rear_right_seat in (6, 7, 8):
-            rear_right_heatVentType = 1
-            rear_right_heatVentLevel = options.rear_right_seat - 4
-
-        # ventilated
-        if options.front_left_seat in (3, 4, 5):
-            front_left_heatVentType = 2
-            front_left_heatVentLevel = options.front_left_seat - 1
-        if options.front_right_seat in (3, 4, 5):
-            front_right_heatVentType = 2
-            front_right_heatVentLevel = options.front_right_seat - 1
-        if options.rear_left_seat in (3, 4, 5):
-            rear_left_heatVentType = 2
-            rear_left_heatVentLevel = options.rear_left_seat - 1
-        if options.rear_right_seat in (3, 4, 5):
-            rear_right_heatVentType = 2
-            rear_right_heatVentLevel = options.rear_right_seat - 1
 
         body = {
             "remoteClimate": {
@@ -681,19 +638,74 @@ class KiaUvoAPIUSA(ApiImpl):
                     "unit": 1,
                     "value": str(options.set_temp),
                 },
+                "airCtrl": options.climate,
+                "defrost": options.defrost,
+                "heatingAccessory": {
+                    "rearWindow": int(options.heating),
+                    "sideMirror": int(options.heating),
+                    "steeringWheel": int(options.heating),
+                },
+                "ignitionOnDuration": {
+                    "unit": 4,
+                    "value": options.duration,
+                },
             },
-            "airCtrl": options.climate,
-            "defrost": options.defrost,
-            "heatingAccessory": {
-                "rearWindow": int(options.heating),
-                "sideMirror": int(options.heating),
-                "steeringWheel": int(options.heating),
-            },
-            "ignitionOnDuration": {
-                "unit": 4,
-                "value": options.duration,
-            },
-            "heatVentSeat": {
+        }
+
+        # Kia seems to now be checking if you can set the heated/vented seats at the car level
+        # only add to body if the option is not none for any of the seats
+        if (
+            options.front_left_seat is not None
+            or options.front_right_seat is not None
+            or options.rear_left_seat is not None
+            or options.rear_right_seat is not None
+        ):
+            if options.front_left_seat is None:
+                options.front_left_seat = 0
+            if options.front_right_seat is None:
+                options.front_right_seat = 0
+            if options.rear_left_seat is None:
+                options.rear_left_seat = 0
+            if options.rear_right_seat is None:
+                options.rear_right_seat = 0
+
+            front_left_heatVentType = 0
+            front_right_heatVentType = 0
+            rear_left_heatVentType = 0
+            rear_right_heatVentType = 0
+            front_left_heatVentLevel = 0
+            front_right_heatVentLevel = 0
+            rear_left_heatVentLevel = 0
+            rear_right_heatVentLevel = 0
+
+            # heated
+            if options.front_left_seat in (6, 7, 8):
+                front_left_heatVentType = 1
+                front_left_heatVentLevel = options.front_left_seat - 4
+            if options.front_right_seat in (6, 7, 8):
+                front_right_heatVentType = 1
+                front_right_heatVentLevel = options.front_right_seat - 4
+            if options.rear_left_seat in (6, 7, 8):
+                rear_left_heatVentType = 1
+                rear_left_heatVentLevel = options.rear_left_seat - 4
+            if options.rear_right_seat in (6, 7, 8):
+                rear_right_heatVentType = 1
+                rear_right_heatVentLevel = options.rear_right_seat - 4
+
+            # ventilated
+            if options.front_left_seat in (3, 4, 5):
+                front_left_heatVentType = 2
+                front_left_heatVentLevel = options.front_left_seat - 1
+            if options.front_right_seat in (3, 4, 5):
+                front_right_heatVentType = 2
+                front_right_heatVentLevel = options.front_right_seat - 1
+            if options.rear_left_seat in (3, 4, 5):
+                rear_left_heatVentType = 2
+                rear_left_heatVentLevel = options.rear_left_seat - 1
+            if options.rear_right_seat in (3, 4, 5):
+                rear_right_heatVentType = 2
+                rear_right_heatVentLevel = options.rear_right_seat - 1
+            body["remoteClimate"]["heatVentSeat"] = {
                 "driverSeat": {
                     "heatVentType": front_left_heatVentType,
                     "heatVentLevel": front_left_heatVentLevel,
@@ -714,8 +726,7 @@ class KiaUvoAPIUSA(ApiImpl):
                     "heatVentLevel": rear_right_heatVentLevel,
                     "heatVentStep": 1,
                 },
-            },
-        }
+            }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
