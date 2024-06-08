@@ -654,11 +654,12 @@ class KiaUvoAPIUSA(ApiImpl):
 
         # Kia seems to now be checking if you can set the heated/vented seats at the car level
         # only add to body if the option is not none for any of the seats
-        if options.front_left_seat is not None or \
-            options.front_right_seat is not None or \
-            options.rear_left_seat is not None or \
-            options.rear_right_seat is not None:
-
+        if (
+            options.front_left_seat is not None
+            or options.front_right_seat is not None
+            or options.rear_left_seat is not None
+            or options.rear_right_seat is not None
+        ):
             if options.front_left_seat is None:
                 options.front_left_seat = 0
             if options.front_right_seat is None:
@@ -704,28 +705,28 @@ class KiaUvoAPIUSA(ApiImpl):
             if options.rear_right_seat in (3, 4, 5):
                 rear_right_heatVentType = 2
                 rear_right_heatVentLevel = options.rear_right_seat - 1
-            body['remoteClimate']["heatVentSeat"] = {
-                    "driverSeat": {
-                        "heatVentType": front_left_heatVentType,
-                        "heatVentLevel": front_left_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "passengerSeat": {
-                        "heatVentType": front_right_heatVentType,
-                        "heatVentLevel": front_right_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "rearLeftSeat": {
-                        "heatVentType": rear_left_heatVentType,
-                        "heatVentLevel": rear_left_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                    "rearRightSeat": {
-                        "heatVentType": rear_right_heatVentType,
-                        "heatVentLevel": rear_right_heatVentLevel,
-                        "heatVentStep": 1,
-                    },
-                }
+            body["remoteClimate"]["heatVentSeat"] = {
+                "driverSeat": {
+                    "heatVentType": front_left_heatVentType,
+                    "heatVentLevel": front_left_heatVentLevel,
+                    "heatVentStep": 1,
+                },
+                "passengerSeat": {
+                    "heatVentType": front_right_heatVentType,
+                    "heatVentLevel": front_right_heatVentLevel,
+                    "heatVentStep": 1,
+                },
+                "rearLeftSeat": {
+                    "heatVentType": rear_left_heatVentType,
+                    "heatVentLevel": rear_left_heatVentLevel,
+                    "heatVentStep": 1,
+                },
+                "rearRightSeat": {
+                    "heatVentType": rear_right_heatVentType,
+                    "heatVentLevel": rear_right_heatVentLevel,
+                    "heatVentStep": 1,
+                },
+            }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
