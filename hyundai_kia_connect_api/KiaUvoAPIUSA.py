@@ -419,7 +419,7 @@ class KiaUvoAPIUSA(ApiImpl):
             vehicle.ev_charge_limits_dc = [
                 x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
             ][-1]
-        except:
+        except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
         vehicle.ev_driving_range = (
