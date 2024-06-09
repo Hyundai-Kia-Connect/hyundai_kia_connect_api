@@ -4,6 +4,7 @@
 import datetime
 import re
 
+
 def get_child_value(data, key):
     value = data
     for x in key.split("."):
