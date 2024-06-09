@@ -7,6 +7,8 @@ import time
 import datetime as dt
 import pytz
 import requests
+import certifi
+
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
