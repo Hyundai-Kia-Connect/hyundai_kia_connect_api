@@ -7,6 +7,8 @@ import time
 import datetime as dt
 import pytz
 import requests
+import certifi
+
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
@@ -42,7 +44,7 @@ class cipherAdapter(HTTPAdapter):
 
     def init_poolmanager(self, *args, **kwargs):
         kwargs["ssl_context"] = self._setup_ssl_context()
-
+        kwargs["ca_certs"] = certifi.where()
         return super().init_poolmanager(*args, **kwargs)
 
     def proxy_manager_for(self, *args, **kwargs):
