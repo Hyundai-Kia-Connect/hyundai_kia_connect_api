@@ -42,7 +42,7 @@ class cipherAdapter(HTTPAdapter):
 
     def init_poolmanager(self, *args, **kwargs):
         kwargs["ssl_context"] = self._setup_ssl_context()
-
+        kwargs["ca_certs"] = certifi.where()
         return super().init_poolmanager(*args, **kwargs)
 
     def proxy_manager_for(self, *args, **kwargs):
