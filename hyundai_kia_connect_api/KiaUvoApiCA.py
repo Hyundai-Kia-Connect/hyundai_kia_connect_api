@@ -638,7 +638,8 @@ class KiaUvoApiCA(ApiImpl):
         synchronous: bool = False,
         timeout: int = 0,
     ) -> OrderStatus:
-        if timeout < 0: return OrderStatus.TIMEOUT
+        if timeout < 0:
+            return OrderStatus.TIMEOUT
         start_time = dt.datetime.now()
 
         url = self.API_URL + "rmtsts"
@@ -670,8 +671,10 @@ class KiaUvoApiCA(ApiImpl):
                 timedelta = dt.datetime.now() - start_time
                 time_left = timeout - timedelta.seconds - 10
                 time.sleep(10)
-                return self.check_action_status(token, vehicle, action_id, synchronous, time_left)
-        
+                return self.check_action_status(
+                    token, vehicle, action_id, synchronous, time_left
+                )
+
         return OrderStatus.FAILED
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
