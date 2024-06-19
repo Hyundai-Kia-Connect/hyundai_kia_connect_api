@@ -2,6 +2,7 @@
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
 
+import time
 import datetime as dt
 import json
 import logging
@@ -637,6 +638,9 @@ class KiaUvoApiCA(ApiImpl):
         synchronous: bool = False,
         timeout: int = 0,
     ) -> OrderStatus:
+        if timeout < 0: return OrderStatus.TIMEOUT
+        start_time = dt.datetime.now()
+
         url = self.API_URL + "rmtsts"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
@@ -645,14 +649,30 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         response = self.sessions.post(url, headers=headers)
         response = response.json()
+        print(response)
 
         last_action_completed = (
             response["result"]["transaction"]["apiStatusCode"] != "null"
         )
+
         if last_action_completed:
             action_status = response["result"]["transaction"]["apiStatusCode"]
             _LOGGER.debug(f"{DOMAIN} - Last action_status: {action_status}")
-        return last_action_completed
+
+        if response["responseHeader"]["responseCode"] == 1:
+            return OrderStatus.FAILED
+        elif response["result"]["transaction"]["apiResult"] == "C":
+            return OrderStatus.SUCCESS
+        elif response["result"]["transaction"]["apiResult"] == "P":
+            if synchronous == False:
+                return OrderStatus.PENDING
+            else:
+                timedelta = dt.datetime.now() - start_time
+                time_left = timeout - timedelta.seconds - 10
+                time.sleep(10)
+                return self.check_action_status(token, vehicle, action_id, synchronous, time_left)
+        
+        return OrderStatus.FAILED
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstrt"
