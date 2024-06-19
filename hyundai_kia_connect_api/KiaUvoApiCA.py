@@ -665,7 +665,7 @@ class KiaUvoApiCA(ApiImpl):
         elif response["result"]["transaction"]["apiResult"] == "C":
             return OrderStatus.SUCCESS
         elif response["result"]["transaction"]["apiResult"] == "P":
-            if synchronous == False:
+            if not synchronous:
                 return OrderStatus.PENDING
             else:
                 timedelta = dt.datetime.now() - start_time
