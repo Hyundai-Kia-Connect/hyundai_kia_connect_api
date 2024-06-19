@@ -650,7 +650,6 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         response = self.sessions.post(url, headers=headers)
         response = response.json()
-        print(response)
 
         last_action_completed = (
             response["result"]["transaction"]["apiStatusCode"] != "null"
