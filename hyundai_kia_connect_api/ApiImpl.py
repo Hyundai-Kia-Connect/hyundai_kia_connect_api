@@ -146,9 +146,7 @@ class ApiImpl:
         """Sets charge limits. Returns the tracking ID"""
         pass
 
-    def set_charging_current(
-        self, token: Token, vehicle: Vehicle, level: int
-    ) -> str:
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
         """Sets charge current level (1=100%, 2=90%, 3=60%). Returns the tracking ID"""
         pass
 
