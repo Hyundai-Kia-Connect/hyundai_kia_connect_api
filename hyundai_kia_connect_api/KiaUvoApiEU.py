@@ -1285,14 +1285,12 @@ class KiaUvoApiEU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def set_charging_current(
-        self, token: Token, vehicle: Vehicle, level: int
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        url = (
+            self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
+        )
 
-        body = {
-            "chargingCurrent": level
-        }
+        body = {"chargingCurrent": level}
         response = requests.post(
             url,
             json=body,
