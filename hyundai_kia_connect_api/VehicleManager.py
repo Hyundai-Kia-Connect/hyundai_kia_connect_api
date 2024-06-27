@@ -165,6 +165,11 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )
 
+    def set_charging_current(self, vehicle_id: str, level: int) -> str:
+        return self.api.set_charging_current(
+            self.token, self.get_vehicle(vehicle_id), level
+        )
+
     def set_windows_state(self, vehicle_id: str, options: WindowRequestOptions) -> str:
         return self.api.set_windows_state(
             self.token, self.get_vehicle(vehicle_id), options
