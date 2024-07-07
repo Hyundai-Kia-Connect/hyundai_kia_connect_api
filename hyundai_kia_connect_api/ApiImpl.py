@@ -10,7 +10,7 @@ import requests
 
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -111,8 +111,12 @@ class ApiImpl:
                 + "&format=json&addressdetails=1&zoom=18"
                 + email_parameter
             )
+            _LOGGER.debug(
+                f"{DOMAIN} - Running update geocode location with value: {url}"
+            )
             response = requests.get(url)
             response = response.json()
+            _LOGGER.debug(f"{DOMAIN} - geocode location response: {response}")
             vehicle.geocode = (
                 get_child_value(response, "display_name"),
                 get_child_value(response, "address"),
