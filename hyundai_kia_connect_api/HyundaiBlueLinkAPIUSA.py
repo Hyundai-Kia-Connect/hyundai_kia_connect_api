@@ -377,6 +377,19 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
         )
+        ChargeDict = get_child_value(
+            state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
+        )
+        try:
+            vehicle.ev_charge_limits_ac = [
+                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
+            ][-1]
+            vehicle.ev_charge_limits_dc = [
+                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
+            ][-1]
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+
         vehicle.ev_driving_range = (
             get_child_value(
                 state,
