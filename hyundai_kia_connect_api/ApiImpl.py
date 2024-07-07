@@ -99,7 +99,9 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, use_email: bool
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
-            _LOGGER.debug(f"{DOMAIN} - Running update geocode location with values: {vehicle.location_latitude} and: {vehicle.location_longitude}")
+            _LOGGER.debug(
+                f"{DOMAIN} - Running update geocode location with values: {vehicle.location_latitude} and: {vehicle.location_longitude}"
+            )
             email_parameter = ""
             if use_email is True:
                 email_parameter = "&email=" + token.username
