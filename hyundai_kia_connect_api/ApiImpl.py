@@ -99,9 +99,6 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, use_email: bool
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
-            _LOGGER.debug(
-                f"{DOMAIN} - Running update geocode location with values: {vehicle.location_latitude} and: {vehicle.location_longitude}"
-            )
             email_parameter = ""
             if use_email is True:
                 email_parameter = "&email=" + token.username
@@ -114,8 +111,14 @@ class ApiImpl:
                 + "&format=json&addressdetails=1&zoom=18"
                 + email_parameter
             )
+            _LOGGER.debug(
+                f"{DOMAIN} - Running update geocode location with value: {url}"
+            )
             response = requests.get(url)
             response = response.json()
+            _LOGGER.debug(
+                f"{DOMAIN} - geocode location response: {response}"
+            )
             vehicle.geocode = (
                 get_child_value(response, "display_name"),
                 get_child_value(response, "address"),
