@@ -116,9 +116,7 @@ class ApiImpl:
             )
             response = requests.get(url)
             response = response.json()
-            _LOGGER.debug(
-                f"{DOMAIN} - geocode location response: {response}"
-            )
+            _LOGGER.debug(f"{DOMAIN} - geocode location response: {response}")
             vehicle.geocode = (
                 get_child_value(response, "display_name"),
                 get_child_value(response, "address"),
