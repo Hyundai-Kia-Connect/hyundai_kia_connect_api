@@ -480,7 +480,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        
+
         if vehicle.model == "GV60":
             url = self.API_URL + "evc/fme"
 
