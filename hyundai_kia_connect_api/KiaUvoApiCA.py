@@ -476,7 +476,7 @@ class KiaUvoApiCA(ApiImpl):
         return response
 
     def get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.API_URL + "fndmcr"
+        url = self.API_URL + "evc/fme"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
