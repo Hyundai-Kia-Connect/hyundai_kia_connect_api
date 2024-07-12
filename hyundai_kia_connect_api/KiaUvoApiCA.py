@@ -1,7 +1,7 @@
 """KiaUvoApiCA.py"""
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
-# Location Fix
+# Location Fix - 0.0.1
 
 import time
 import datetime as dt
@@ -222,10 +222,13 @@ class KiaUvoApiCA(ApiImpl):
 
         # Get location if the car has moved since last call
         if vehicle.odometer:
+            _LOGGER.debug(f"{DOMAIN} - Odometer Check")
             if vehicle.odometer < get_child_value(service, "currentOdometer"):
+                _LOGGER.debug(f"{DOMAIN} - Odometer is Less")
                 location = self.get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
+            _LOGGER.debug(f"{DOMAIN} - Odometer is More")
             location = self.get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
@@ -481,6 +484,10 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+
+        if vehicle.model == "GV60":
+            url = self.API_URL + "evc/fme"
+        
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
 
