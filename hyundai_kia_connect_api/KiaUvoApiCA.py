@@ -426,7 +426,7 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_location(
         self, vehicle: Vehicle, state: dict
     ) -> None:
-        if get_child_value(state, "coord.lat"):
+        if get_child_value(state, "gpsDetail.coord.lat"):
             self.vehicle_timezone = vehicle.timezone
             vehicle.location = (
                 get_child_value(state, "gpsDetail.coord.lat"),
