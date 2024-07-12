@@ -1,7 +1,7 @@
 """KiaUvoApiCA.py"""
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
-# Location Fix - 0.0.2
+# Location Fix - 0.0.3
 
 import time
 import datetime as dt
@@ -429,8 +429,8 @@ class KiaUvoApiCA(ApiImpl):
         if get_child_value(state, "coord.lat"):
             self.vehicle_timezone = vehicle.timezone
             vehicle.location = (
-                get_child_value(state, "coord.lat"),
-                get_child_value(state, "coord.lon"),
+                get_child_value(state, "gpsDetail.coord.lat"),
+                get_child_value(state, "gpsDetail.coord.lon"),
                 parse_datetime(get_child_value(state, "time"), self.data_timezone),
             )
         vehicle.data["vehicleLocation"] = state
