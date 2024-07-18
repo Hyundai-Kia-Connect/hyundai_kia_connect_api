@@ -70,7 +70,7 @@ def parse_datetime(value, timezone) -> datetime.datetime:
 
 
 def get_safe_local_datetime(date: datetime) -> datetime:
-    """get safe local datetime"""   
+    """get safe local datetime"""
     if date is not None and hasattr(date, "tzinfo") and date.tzinfo is not None:
         date = date.astimezone()
     return date
