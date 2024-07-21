@@ -37,7 +37,6 @@ _LOGGER = logging.getLogger(__name__)
 # This is the key part of our patch. We get the standard SSLContext that requests would
 # normally use, and add ciphers that Kia USA may need for compatibility.
 class KiaSSLAdapter(HTTPAdapter):
-    
     def init_poolmanager(self, *args, **kwargs):
         context = create_urllib3_context(
             ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
