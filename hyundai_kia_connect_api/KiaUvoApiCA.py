@@ -1,7 +1,6 @@
 """KiaUvoApiCA.py"""
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
-# Location Fix - 0.0.3
 
 import time
 import datetime as dt
