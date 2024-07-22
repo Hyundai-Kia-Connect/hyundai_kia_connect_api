@@ -483,7 +483,7 @@ class KiaUvoApiCA(ApiImpl):
 
         if vehicle.model == "GV60":
             url = self.API_URL + "evc/fme"
-        
+
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
 
