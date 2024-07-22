@@ -1,7 +1,6 @@
 """KiaUvoApiCA.py"""
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
-#Master
 
 import time
 import datetime as dt
@@ -423,11 +422,11 @@ class KiaUvoApiCA(ApiImpl):
     def _update_vehicle_properties_location(
         self, vehicle: Vehicle, state: dict
     ) -> None:
-        if get_child_value(state, "coord.lat"):
+        if get_child_value(state, "gpsDetail.coord.lat"):
             self.vehicle_timezone = vehicle.timezone
             vehicle.location = (
-                get_child_value(state, "coord.lat"),
-                get_child_value(state, "coord.lon"),
+                get_child_value(state, "gpsDetail.coord.lat"),
+                get_child_value(state, "gpsDetail.coord.lon"),
                 parse_datetime(get_child_value(state, "time"), self.data_timezone),
             )
         vehicle.data["vehicleLocation"] = state
@@ -481,6 +480,10 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+
+        if vehicle.model == "GV60":
+            url = self.API_URL + "evc/fme"
+        
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
 
