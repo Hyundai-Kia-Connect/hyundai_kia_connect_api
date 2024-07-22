@@ -222,13 +222,10 @@ class KiaUvoApiCA(ApiImpl):
 
         # Get location if the car has moved since last call
         if vehicle.odometer:
-            _LOGGER.debug(f"{DOMAIN} - Odometer Check")
-            #if vehicle.odometer < get_child_value(service, "currentOdometer"):
-            _LOGGER.debug(f"{DOMAIN} - Odometer is Less")
-            location = self.get_location(token, vehicle)
-            self._update_vehicle_properties_location(vehicle, location)
+            if vehicle.odometer < get_child_value(service, "currentOdometer"):
+                location = self.get_location(token, vehicle)
+                self._update_vehicle_properties_location(vehicle, location)
         else:
-            _LOGGER.debug(f"{DOMAIN} - Odometer is More")
             location = self.get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
