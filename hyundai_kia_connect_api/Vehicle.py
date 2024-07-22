@@ -6,7 +6,7 @@ import datetime
 import typing
 from dataclasses import dataclass, field
 
-from .utils import get_float
+from .utils import get_float, get_safe_local_datetime
 from .const import DISTANCE_UNITS
 
 _LOGGER = logging.getLogger(__name__)
@@ -94,8 +94,10 @@ class Vehicle:
 
     car_battery_percentage: int = None
     engine_is_running: bool = None
-    last_updated_at: datetime.datetime = None
+
+    _last_updated_at: datetime.datetime = None
     timezone: datetime.timezone = datetime.timezone.utc  # default UTC
+
     dtc_count: typing.Union[int, None] = None
     dtc_descriptions: typing.Union[dict, None] = None
 
@@ -299,6 +301,14 @@ class Vehicle:
         self._last_service_distance = value[0]
 
     @property
+    def last_updated_at(self):
+        return self._last_updated_at
+
+    @last_updated_at.setter
+    def last_updated_at(self, value):
+        self._last_updated_at = get_safe_local_datetime(value)
+
+    @property
     def location_latitude(self):
         return self._location_latitude
 
@@ -323,7 +333,7 @@ class Vehicle:
     def location(self, value):
         self._location_latitude = value[0]
         self._location_longitude = value[1]
-        self._location_last_set_time = value[2]
+        self._location_last_set_time = get_safe_local_datetime(value[2])
 
     @property
     def odometer(self):

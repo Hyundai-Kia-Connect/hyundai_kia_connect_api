@@ -41,6 +41,7 @@ class KiaSSLAdapter(HTTPAdapter):
         context = create_urllib3_context(
             ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
         )
+        context.options |= 0x4
         kwargs["ssl_context"] = context
         kwargs["ca_certs"] = certifi.where()
         return super().init_poolmanager(*args, **kwargs)
