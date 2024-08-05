@@ -12,4 +12,4 @@ Sphinx==7.4.0
 tox==4.16.0
 twine==5.1.1
 watchdog==4.0.1
-wheel==0.43.0
+wheel==0.44.0
