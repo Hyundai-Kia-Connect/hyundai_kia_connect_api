@@ -121,6 +121,7 @@ class ApiImpl:
                 response = response.json()
             except requests.RequestsJSONDecodeError:
                 _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
+                vehicle.geocode = None
             else:
                 _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
                 vehicle.geocode = (
