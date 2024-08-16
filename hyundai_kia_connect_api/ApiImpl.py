@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 
 import requests
-from requests.exceptions import JSONDecodeError
 
 from .Token import Token
 from .Vehicle import Vehicle
