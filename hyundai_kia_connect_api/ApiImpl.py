@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import requests
 
+
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN
@@ -115,12 +116,17 @@ class ApiImpl:
                 f"{DOMAIN} - Running update geocode location with value: {url}"
             )
             response = requests.get(url)
-            response = response.json()
-            _LOGGER.debug(f"{DOMAIN} - geocode location response: {response}")
-            vehicle.geocode = (
-                get_child_value(response, "display_name"),
-                get_child_value(response, "address"),
-            )
+            _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
+            try:
+                response = response.json()
+            except requests.RequestsJSONDecodeError as e:
+                _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
+            else:
+                _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
+                vehicle.geocode = (
+                    get_child_value(response, "display_name"),
+                    get_child_value(response, "address"),
+                )
 
     def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
