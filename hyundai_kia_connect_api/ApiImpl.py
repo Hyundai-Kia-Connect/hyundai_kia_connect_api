@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 
 import requests
-from requests.exception import JSONDecodeError
+from requests.exceptions import JSONDecodeError
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN
