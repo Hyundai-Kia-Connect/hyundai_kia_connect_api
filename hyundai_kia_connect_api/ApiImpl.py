@@ -119,7 +119,7 @@ class ApiImpl:
             _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
             try:
                 response = response.json()
-            except requests.RequestsJSONDecodeError as e:
+            except requests.RequestsJSONDecodeError:
                 _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
             else:
                 _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
