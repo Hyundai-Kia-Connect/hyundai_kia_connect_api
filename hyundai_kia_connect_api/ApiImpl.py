@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 
 import requests
-
+from requests.exception import JSONDecodeError
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN
@@ -118,7 +118,7 @@ class ApiImpl:
             _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
             try:
                 response = response.json()
-            except RequestsJSONDecodeError:
+            except JSONDecodeError:
                 _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
                 vehicle.geocode = None
             else:
