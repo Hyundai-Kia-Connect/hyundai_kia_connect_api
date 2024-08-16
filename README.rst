@@ -49,7 +49,6 @@ Once this is done you can now make the following calls against the vehicle manag
  Force refreshes a single car:
  force_refresh_vehicles_states(self, vehicle_id)
 
-
 An example call would be::
 
     from hyundai_kia_connect_api import *
