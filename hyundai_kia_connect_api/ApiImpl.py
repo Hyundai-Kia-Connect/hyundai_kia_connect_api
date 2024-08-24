@@ -1,6 +1,6 @@
 """ApiImpl.py"""
 
-# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout
+# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
 
 import datetime as dt
 import logging
@@ -158,7 +158,7 @@ class ApiImpl:
 
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
         """
-        Europe feature only.
+        feature only available for some regions.
         Sets charge current level (1=100%, 2=90%, 3=60%). Returns the tracking ID
         """
         pass
@@ -179,7 +179,7 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, yyyymm_string: str
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.month_trip_info for the specified month.
 
         Default this information is None:
@@ -192,7 +192,7 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.day_trip_info information for the specified day.
 
         Default this information is None:
@@ -208,7 +208,7 @@ class ApiImpl:
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
         """
-        Europe feature only.
+        feature only available for some regions.
         Schedule charging and climate control. Returns the tracking ID
         """
         pass

@@ -706,13 +706,13 @@ class KiaUvoApiEU(ApiImplType1):
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-        ):  # noqa
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+        ):
             temp_index = get_hex_temp_into_index(
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )  # noqa
+                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+                )
             )
 
             vehicle.ev_first_departure_climate_temperature = (
@@ -727,13 +727,13 @@ class KiaUvoApiEU(ApiImplType1):
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-        ):  # noqa
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+        ):
             temp_index = get_hex_temp_into_index(
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )  # noqa
+                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+                )
             )
 
             vehicle.ev_second_departure_climate_temperature = (
@@ -1088,7 +1088,7 @@ class KiaUvoApiEU(ApiImplType1):
         yyyymm_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.month_trip_info for the specified month.
 
         Default this information is None:
@@ -1123,9 +1123,6 @@ class KiaUvoApiEU(ApiImplType1):
                 )
                 result.day_list.append(processed_day)
 
-            if len(result.day_list) > 0:  # sort on increasing yyyymmdd
-                result.day_list.sort(key=lambda k: k.yyyymmdd)
-
             vehicle.month_trip_info = result
 
     def update_day_trip_info(
@@ -1135,7 +1132,7 @@ class KiaUvoApiEU(ApiImplType1):
         yyyymmdd_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.day_trip_info information for the specified day.
 
         Default this information is None:
@@ -1173,9 +1170,6 @@ class KiaUvoApiEU(ApiImplType1):
                     max_speed=trip["tripMaxSpeed"],
                 )
                 result.trip_list.append(processed_trip)
-
-            if len(result.trip_list) > 0:  # sort on descending hhmmss
-                result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
 
             vehicle.day_trip_info = result
 
@@ -1244,12 +1238,6 @@ class KiaUvoApiEU(ApiImplType1):
                     )
                     break
 
-            daily_stats = drivingInfo["dailyStats"]
-            _LOGGER.debug(f"KiaUvoApiEU: before daily_stats: {daily_stats}")  # noqa
-            if len(daily_stats) > 0:  # sort on decreasing date
-                daily_stats.sort(reverse=True, key=lambda k: k.date)
-                drivingInfo["dailyStats"] = daily_stats
-                _LOGGER.debug(f"KiaUvoApiEU: after  daily_stats: {daily_stats}")  # noqa
             return drivingInfo
         else:
             _LOGGER.debug(
@@ -1375,7 +1363,7 @@ class KiaUvoApiEU(ApiImplType1):
                 "reservFatcSet": {
                     "airCtrl": 1 if options.climate_enabled else 0,
                     "airTemp": {
-                        "value": "{:.1f}".format(temperature),
+                        "value": f"{temperature:.1f}",
                         "hvacTempType": 1,
                         "unit": options.temperature_unit,
                     },
@@ -1390,15 +1378,15 @@ class KiaUvoApiEU(ApiImplType1):
             "offPeakPowerInfo": {
                 "offPeakPowerTime1": {
                     "endtime": {
-                        "timeSection": 1
-                        if options.off_peak_end_time >= dt.time(12, 0)
-                        else 0,
+                        "timeSection": (
+                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                        ),
                         "time": options.off_peak_end_time.strftime("%I%M"),
                     },
                     "starttime": {
-                        "timeSection": 1
-                        if options.off_peak_start_time >= dt.time(12, 0)
-                        else 0,
+                        "timeSection": (
+                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                        ),
                         "time": options.off_peak_start_time.strftime("%I%M"),
                     },
                 },

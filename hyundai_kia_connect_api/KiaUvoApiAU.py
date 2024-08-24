@@ -113,12 +113,12 @@ class KiaUvoApiAU(ApiImplType1):
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
             self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
             self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
+            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="  # noqa
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
             self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
             self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
+            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="  # noqa
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
@@ -847,7 +847,7 @@ class KiaUvoApiAU(ApiImplType1):
         yyyymm_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.month_trip_info for the specified month.
 
         Default this information is None:
@@ -891,7 +891,7 @@ class KiaUvoApiAU(ApiImplType1):
         yyyymmdd_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.day_trip_info information for the specified day.
 
         Default this information is None:

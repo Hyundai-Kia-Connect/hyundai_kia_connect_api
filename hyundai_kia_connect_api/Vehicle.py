@@ -1,4 +1,4 @@
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name
+# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation
 """Vehicle class"""
 
 import logging
@@ -173,11 +173,61 @@ class Vehicle:
     # expressed in watt-hours (Wh)
     power_consumption_30d: float = None  # Europe feature only
 
-    # Europe feature only
-    daily_stats: list[DailyDrivingStats] = field(default_factory=list)
+    # feature only available for some regions (getter/setter for sorting)
+    _daily_stats: list[DailyDrivingStats] = field(default_factory=list)
 
-    month_trip_info: MonthTripInfo = None  # Europe feature only
-    day_trip_info: DayTripInfo = None  # Europe feature only
+    @property
+    def daily_stats(self):
+        return self._daily_stats
+
+    @daily_stats.setter
+    def daily_stats(self, value):
+        result = value
+        if result is not None and len(result) > 0:  # sort on decreasing date
+            _LOGGER.debug(f"before daily_stats: {result}")
+            result.sort(reverse=True, key=lambda k: k.date)
+            _LOGGER.debug(f"after  daily_stats: {result}")
+        self._daily_stats = result
+
+    # feature only available for some regions (getter/setter for sorting)
+    _month_trip_info: MonthTripInfo = None
+
+    @property
+    def month_trip_info(self):
+        return self._month_trip_info
+
+    @month_trip_info.setter
+    def month_trip_info(self, value):
+        result = value
+        if (
+            result is not None
+            and hasattr(result, "day_list")
+            and len(result.day_list) > 0
+        ):  # sort on increasing yyyymmdd
+            _LOGGER.debug(f"before month_trip_info: {result}")
+            result.day_list.sort(key=lambda k: k.yyyymmdd)
+            _LOGGER.debug(f"after  month_trip_info: {result}")
+        self._month_trip_info = result
+
+    # feature only available for some regions (getter/setter for sorting)
+    _day_trip_info: DayTripInfo = None
+
+    @property
+    def day_trip_info(self):
+        return self._day_trip_info
+
+    @day_trip_info.setter
+    def day_trip_info(self, value):
+        result = value
+        if (
+            result is not None
+            and hasattr(result, "trip_list")
+            and len(result.trip_list) > 0
+        ):  # sort on descending hhmmss
+            _LOGGER.debug(f"before day_trip_info: {result}")
+            result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
+            _LOGGER.debug(f"after day_trip_info: {result}")
+        self._day_trip_info = result
 
     ev_battery_percentage: int = None
     ev_battery_soh_percentage: int = None

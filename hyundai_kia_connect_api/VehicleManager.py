@@ -219,7 +219,7 @@ class VehicleManager:
 
     def update_month_trip_info(self, vehicle_id: str, yyyymm_string: str) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.month_trip_info for the specified month.
 
         Default this information is None:
@@ -231,7 +231,7 @@ class VehicleManager:
 
     def update_day_trip_info(self, vehicle_id: str, yyyymmdd_string: str) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.day_trip_info information for the specified day.
 
         Default this information is None:
