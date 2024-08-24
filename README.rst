@@ -89,16 +89,16 @@ For a list of language codes, see here: https://www.science.co.il/language/Codes
 - "pt" Portuguese
 
 
-In Europe also trip info can be retrieved. For a month you can ask the days with trips. And you can ask for a specific day for all the trips of that specific day.::
-- First call vm.update_month_trip_info(vehicle.id, yyymm) before getting vehicle.month_trip_info for that month
+In Europe and some other regions also trip info can be retrieved. For a month you can ask the days with trips. And you can ask for a specific day for all the trips of that specific day.::
+- First call vm.update_month_trip_info(vehicle.id, yyyymm) before getting vehicle.month_trip_info for that month
 - First call vm.update_day_trip_info(vehicle.id, day.yyyymmdd) before getting vehicle.day_trip_info for that day
 
 Example of getting trip info of the current month and day (vm is VehicleManager instance)::
 
     now = datetime.now()
-    yyymm = now.strftime("%Y%m")
+    yyyymm = now.strftime("%Y%m")
     yyyymmdd = now.strftime("%Y%m%d")
-    vm.update_month_trip_info(vehicle.id, yyymm)
+    vm.update_month_trip_info(vehicle.id, yyyymm)
     if vehicle.month_trip_info is not None:
         for day in vehicle.month_trip_info.day_list:  # ordered on day
             if yyyymmdd == day.yyyymmdd:  # in example only interested in current day

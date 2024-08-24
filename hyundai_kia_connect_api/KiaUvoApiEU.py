@@ -67,8 +67,12 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+USER_AGENT_MOZILLA: str = (
+    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+)
+ACCEPT_HEADER_ALL: str = (
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+)
 
 SUPPORTED_LANGUAGES_LIST = [
     "en",  # English
@@ -167,7 +171,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
@@ -178,7 +184,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
+            )
             self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
@@ -706,13 +714,13 @@ class KiaUvoApiEU(ApiImplType1):
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-        ):  # noqa
+            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+        ):
             temp_index = get_hex_temp_into_index(
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )  # noqa
+                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+                )
             )
 
             vehicle.ev_first_departure_climate_temperature = (
@@ -727,13 +735,13 @@ class KiaUvoApiEU(ApiImplType1):
 
         if get_child_value(
             state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-        ):  # noqa
+            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+        ):
             temp_index = get_hex_temp_into_index(
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )  # noqa
+                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
+                )
             )
 
             vehicle.ev_second_departure_climate_temperature = (
@@ -1088,7 +1096,7 @@ class KiaUvoApiEU(ApiImplType1):
         yyyymm_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.month_trip_info for the specified month.
 
         Default this information is None:
@@ -1123,9 +1131,6 @@ class KiaUvoApiEU(ApiImplType1):
                 )
                 result.day_list.append(processed_day)
 
-            if len(result.day_list) > 0:  # sort on increasing yyyymmdd
-                result.day_list.sort(key=lambda k: k.yyyymmdd)
-
             vehicle.month_trip_info = result
 
     def update_day_trip_info(
@@ -1135,7 +1140,7 @@ class KiaUvoApiEU(ApiImplType1):
         yyyymmdd_string,
     ) -> None:
         """
-        Europe feature only.
+        feature only available for some regions.
         Updates the vehicle.day_trip_info information for the specified day.
 
         Default this information is None:
@@ -1173,9 +1178,6 @@ class KiaUvoApiEU(ApiImplType1):
                     max_speed=trip["tripMaxSpeed"],
                 )
                 result.trip_list.append(processed_trip)
-
-            if len(result.trip_list) > 0:  # sort on descending hhmmss
-                result.trip_list.sort(reverse=True, key=lambda k: k.hhmmss)
 
             vehicle.day_trip_info = result
 
@@ -1244,12 +1246,6 @@ class KiaUvoApiEU(ApiImplType1):
                     )
                     break
 
-            daily_stats = drivingInfo["dailyStats"]
-            _LOGGER.debug(f"KiaUvoApiEU: before daily_stats: {daily_stats}")  # noqa
-            if len(daily_stats) > 0:  # sort on decreasing date
-                daily_stats.sort(reverse=True, key=lambda k: k.date)
-                drivingInfo["dailyStats"] = daily_stats
-                _LOGGER.debug(f"KiaUvoApiEU: after  daily_stats: {daily_stats}")  # noqa
             return drivingInfo
         else:
             _LOGGER.debug(
@@ -1363,7 +1359,8 @@ class KiaUvoApiEU(ApiImplType1):
                 temperature = 17.0
 
         payload = {
-            "reservChargeInfo" + str(i + 1): {
+            "reservChargeInfo"
+            + str(i + 1): {
                 "reservChargeSet": departures[i].enabled,
                 "reservInfo": {
                     "day": departures[i].days,
@@ -1375,7 +1372,7 @@ class KiaUvoApiEU(ApiImplType1):
                 "reservFatcSet": {
                     "airCtrl": 1 if options.climate_enabled else 0,
                     "airTemp": {
-                        "value": "{:.1f}".format(temperature),
+                        "value": f"{temperature:.1f}",
                         "hvacTempType": 1,
                         "unit": options.temperature_unit,
                     },
@@ -1390,15 +1387,15 @@ class KiaUvoApiEU(ApiImplType1):
             "offPeakPowerInfo": {
                 "offPeakPowerTime1": {
                     "endtime": {
-                        "timeSection": 1
-                        if options.off_peak_end_time >= dt.time(12, 0)
-                        else 0,
+                        "timeSection": (
+                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                        ),
                         "time": options.off_peak_end_time.strftime("%I%M"),
                     },
                     "starttime": {
-                        "timeSection": 1
-                        if options.off_peak_start_time >= dt.time(12, 0)
-                        else 0,
+                        "timeSection": (
+                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                        ),
                         "time": options.off_peak_start_time.strftime("%I%M"),
                     },
                 },

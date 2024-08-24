@@ -1,3 +1,5 @@
+""""ApiImplType1.py"""
+
 import datetime as dt
 from typing import Optional
 
@@ -23,6 +25,8 @@ USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
 
 class ApiImplType1(ApiImpl):
+    """ApiImplType1"""
+
     def __init__(self) -> None:
         """Initialize."""
 

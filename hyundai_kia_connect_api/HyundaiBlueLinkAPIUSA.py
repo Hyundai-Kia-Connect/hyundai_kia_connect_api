@@ -710,6 +710,6 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(
-            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"
+            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
         )
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
