@@ -965,6 +965,7 @@ class KiaUvoApiAU(ApiImplType1):
                     battery_care_consumption=day["batteryMgPwrCsp"],
                     regenerated_energy=day["regenPwr"],
                     distance=day["calculativeOdo"],
+                    distance_unit=vehicle.odometer_unit,
                 )
                 drivingInfo["dailyStats"].append(processedDay)
 

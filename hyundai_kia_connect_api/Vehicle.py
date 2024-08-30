@@ -63,7 +63,7 @@ class DailyDrivingStats:
     # distance is expressed in (I assume) whatever unit the vehicle is
     # configured in. KMs (rounded) in my case
     distance: int = None
-    distance_unit = DISTANCE_UNITS[1]  # set to kms by default
+    distance_unit: str = DISTANCE_UNITS[1]  # set to kms by default
 
 
 @dataclass

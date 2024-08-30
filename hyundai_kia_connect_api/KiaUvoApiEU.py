@@ -1216,6 +1216,7 @@ class KiaUvoApiEU(ApiImplType1):
                         ),
                         regenerated_energy=get_child_value(day, "regenPwr"),
                         distance=get_child_value(day, "calculativeOdo"),
+                        distance_unit=vehicle.odometer_unit,
                     )
                     drivingInfo["dailyStats"].append(processedDay)
 
