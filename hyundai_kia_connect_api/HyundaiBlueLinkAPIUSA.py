@@ -461,6 +461,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 battery_care_consumption=get_child_value(trip, "batterycare"),
                 regenerated_energy=get_child_value(trip, "regen"),
                 distance=get_child_value(trip, "distance"),
+                distance_unit=vehicle.odometer_unit,
             )
             tripStats.append(processedTrip)
 
