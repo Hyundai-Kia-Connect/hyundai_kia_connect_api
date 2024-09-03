@@ -35,7 +35,7 @@ def get_float(value):
 
 def get_hex_temp_into_index(value):
     if value is not None:
-        value = value.replace("H", "")
+        value = value.replace("H", "").split(".")[0]
         value = int(value, 16)
         return value
     else:
