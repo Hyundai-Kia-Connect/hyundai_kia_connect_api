@@ -52,14 +52,14 @@ jobs:
               run: python -m build
             - name: Publish package to PyPi Test
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@8a08d616893759ef8e1aa1f2785787c0b97e20d6
+              uses: pypa/gh-action-pypi-publish@0ab0b79471669eb3a4d647e625009c62f9f3b241
               with:
                   user: __token__
                   password: ${{ secrets.TEST_PYPI_API_TOKEN }}
                   repository_url: https://test.pypi.org/legacy/
             - name: Publish package to PyPi Live
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@8a08d616893759ef8e1aa1f2785787c0b97e20d6
+              uses: pypa/gh-action-pypi-publish@0ab0b79471669eb3a4d647e625009c62f9f3b241
               with:
                   user: __token__
                   password: ${{ secrets.PYPI_API_TOKEN }}
