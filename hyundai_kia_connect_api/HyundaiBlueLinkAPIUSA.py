@@ -23,7 +23,14 @@ from .const import (
 from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
-from .Vehicle import DailyDrivingStats, Vehicle
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -449,6 +456,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             )
         vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
 
+        # fill vehicle.daily_stats
         tripStats = []
         tripDetails = get_child_value(state, "evTripDetails.tripdetails") or {}
         for trip in tripDetails:
@@ -467,7 +475,177 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
 
         vehicle.daily_stats = tripStats
 
+        # remember trips, store state
+        trips = []
+        for trip in tripDetails:
+            yyyymmdd_hhmmss = trip["startdate"]  # remember full date
+            drive_time = get_child_value(trip["mileagetime"], "value")
+            processed_trip = TripInfo(
+                hhmmss=yyyymmdd_hhmmss,
+                drive_time=int(drive_time),
+                idle_time=int(get_child_value(trip["duration"], "value") - drive_time),
+                distance=int(trip["distance"]),
+                avg_speed=get_child_value(trip["avgspeed"], "value"),
+                max_speed=int(get_child_value(trip["maxspeed"], "value")),
+            )
+            trips.append(processed_trip)
+
+        _LOGGER.debug(f"_update_vehicle_properties filled_trips: {trips}")
+        if len(trips) > 0:
+            state["filled_trips"] = trips
+
         vehicle.data = state
+
+    def update_month_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymm_string,
+    ) -> None:
+        """
+        feature only available for some regions.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        _LOGGER.debug(f"update_month_trip_info: {yyyymm_string}")
+        vehicle.month_trip_info = None
+
+        if vehicle.data is None or "filled_trips" not in vehicle.data:
+            _LOGGER.debug(f"filled_trips is empty: {vehicle.data}")
+            return  # nothing to fill
+
+        trips = vehicle.data["filled_trips"]
+
+        month_trip_info: MonthTripInfo = None
+        month_trip_info_count = 0
+
+        for trip in trips:
+            date_str = trip.hhmmss
+            yyyymm = date_str[0:4] + date_str[5:7]
+            if yyyymm == yyyymm_string:
+                if month_trip_info_count == 0:
+                    month_trip_info = MonthTripInfo(
+                        yyyymm=yyyymm_string,
+                        summary=TripInfo(
+                            drive_time=trip.drive_time,
+                            idle_time=trip.idle_time,
+                            distance=trip.distance,
+                            avg_speed=trip.avg_speed,
+                            max_speed=trip.max_speed,
+                        ),
+                        day_list=[],
+                    )
+                    month_trip_info_count = 1
+                else:
+                    # increment totals for month (for the few trips available)
+                    month_trip_info_count += 1
+                    summary = month_trip_info.summary
+                    summary.drive_time += trip.drive_time
+                    summary.idle_time += trip.idle_time
+                    summary.distance += trip.distance
+                    summary.avg_speed += trip.avg_speed
+                    summary.max_speed = max(trip.max_speed, summary.max_speed)
+
+                month_trip_info.summary.avg_speed /= month_trip_info_count
+                month_trip_info.summary.avg_speed = round(
+                    month_trip_info.summary.avg_speed, 1
+                )
+
+                # also fill DayTripCount
+                yyyymmdd = yyyymm + date_str[8:10]
+                day_trip_found = False
+                for day in month_trip_info.day_list:
+                    if day.yyyymmdd == yyyymmdd:
+                        day.trip_count += 1
+                        day_trip_found = True
+
+                if not day_trip_found:
+                    month_trip_info.day_list.append(
+                        DayTripCounts(yyyymmdd=yyyymmdd, trip_count=1)
+                    )
+
+        vehicle.month_trip_info = month_trip_info
+
+    def update_day_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymmdd_string,
+    ) -> None:
+        """
+        feature only available for some regions.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
+        _LOGGER.debug(f"update_day_trip_info: {yyyymmdd_string}")
+        vehicle.day_trip_info = None
+
+        if vehicle.data is None or "filled_trips" not in vehicle.data:
+            _LOGGER.debug(f"filled_trips is empty: {vehicle.data}")
+            return  # nothing to fill
+
+        trips = vehicle.data["filled_trips"]
+        _LOGGER.debug(f"filled_trips: {trips}")
+
+        day_trip_info: DayTripInfo = None
+        day_trip_info_count = 0
+
+        for trip in trips:
+            date_str = trip.hhmmss
+            yyyymmdd = date_str[0:4] + date_str[5:7] + date_str[8:10]
+            _LOGGER.debug(f"update_day_trip_info: {yyyymmdd} trip: {trip}")
+            if yyyymmdd == yyyymmdd_string:
+                if day_trip_info_count == 0:
+                    day_trip_info = DayTripInfo(
+                        yyyymmdd=yyyymmdd_string,
+                        summary=TripInfo(
+                            drive_time=trip.drive_time,
+                            idle_time=trip.idle_time,
+                            distance=trip.distance,
+                            avg_speed=trip.avg_speed,
+                            max_speed=trip.max_speed,
+                        ),
+                        trip_list=[],
+                    )
+                    day_trip_info_count = 1
+                else:
+                    # increment totals for month (for the few trips available)
+                    day_trip_info_count += 1
+                    summary = day_trip_info.summary
+                    summary.drive_time += trip.drive_time
+                    summary.idle_time += trip.idle_time
+                    summary.distance += trip.distance
+                    summary.avg_speed += trip.avg_speed
+                    summary.max_speed = max(trip.max_speed, summary.max_speed)
+
+                day_trip_info.summary.avg_speed /= day_trip_info_count
+                day_trip_info.summary.avg_speed = round(
+                    day_trip_info.summary.avg_speed, 1
+                )
+
+                # also fill TripInfo
+                hhmmss = date_str[11:13] + date_str[14:16] + date_str[17:19]
+                day_trip_info.trip_list.append(
+                    TripInfo(
+                        hhmmss=hhmmss,
+                        drive_time=trip.drive_time,
+                        idle_time=trip.idle_time,
+                        distance=trip.distance,
+                        avg_speed=trip.avg_speed,
+                        max_speed=trip.max_speed,
+                    )
+                )
+                _LOGGER.debug(
+                    f"update_day_trip_info: trip_list result: {day_trip_info.trip_list}"
+                )
+
+        vehicle.day_trip_info = day_trip_info
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = {}
