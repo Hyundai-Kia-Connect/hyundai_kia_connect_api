@@ -17,8 +17,8 @@ class TripInfo:
     """Trip Info"""
 
     hhmmss: str = None  # will not be filled by summary
-    drive_time: int = None
-    idle_time: int = None
+    drive_time: int = None  # minutes
+    idle_time: int = None  # minutes
     distance: int = None
     avg_speed: float = None
     max_speed: int = None

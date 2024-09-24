@@ -479,11 +479,12 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         trips = []
         for trip in tripDetails:
             yyyymmdd_hhmmss = trip["startdate"]  # remember full date
-            drive_time = get_child_value(trip["mileagetime"], "value")
+            drive_time = int(get_child_value(trip["mileagetime"], "value"))
+            idle_time = int(get_child_value(trip["duration"], "value")) - drive_time
             processed_trip = TripInfo(
                 hhmmss=yyyymmdd_hhmmss,
-                drive_time=int(drive_time),
-                idle_time=int(get_child_value(trip["duration"], "value") - drive_time),
+                drive_time=int(drive_time / 60),  # convert seconds to minutes
+                idle_time=int(idle_time / 60),  # convert seconds to minutes
                 distance=int(trip["distance"]),
                 avg_speed=get_child_value(trip["avgspeed"], "value"),
                 max_speed=int(get_child_value(trip["maxspeed"], "value")),
