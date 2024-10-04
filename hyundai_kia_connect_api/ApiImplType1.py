@@ -54,12 +54,12 @@ class ApiImplType1(ApiImpl):
                     get_child_value(state, "Date"), dt.timezone.utc
                 )
             elif vehicle.last_updated_at < parse_datetime(
-                    get_child_value(state, "Date"), dt.timezone.utc
-                ):
-                                    vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "Date"), dt.timezone.utc
+            ):
+                vehicle.last_updated_at = parse_datetime(
                     get_child_value(state, "Date"), dt.timezone.utc
                 )
-                
+
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
