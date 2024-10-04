@@ -356,7 +356,10 @@ class Vehicle:
 
     @last_updated_at.setter
     def last_updated_at(self, value):
-        self._last_updated_at = get_safe_local_datetime(value)
+        if not self.last_updated_at:
+            self._last_updated_at = get_safe_local_datetime(value)
+        elif self.last_updated_at < value:
+            self._last_updated_at = get_safe_local_datetime(value)
 
     @property
     def location_latitude(self):
