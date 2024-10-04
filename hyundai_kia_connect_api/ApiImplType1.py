@@ -49,9 +49,17 @@ class ApiImplType1(ApiImpl):
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
             # `Date` field is in UTC time
-            vehicle.last_updated_at = parse_datetime(
+            if vehicle.last_updated_at:
+                vehicle.last_updated_at = parse_datetime(
+                    get_child_value(state, "Date"), dt.timezone.utc
+                )
+            elif vehicle.last_updated_at < parse_datetime(
                 get_child_value(state, "Date"), dt.timezone.utc
-            )
+            ):
+                vehicle.last_updated_at = parse_datetime(
+                    get_child_value(state, "Date"), dt.timezone.utc
+                )
+
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
