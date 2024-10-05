@@ -356,7 +356,17 @@ class Vehicle:
 
     @last_updated_at.setter
     def last_updated_at(self, value):
-        self._last_updated_at = get_safe_local_datetime(value)
+        # workaround for: Timestamp of "last_updated_at" sensor is wrong #931
+        # https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/931#issuecomment-2381569934
+        newest_updated_at = get_safe_local_datetime(value)
+        previous_updated_at = self._last_updated_at
+        if newest_updated_at and previous_updated_at:  # both filled
+            if newest_updated_at < previous_updated_at:
+                utcoffset = newest_updated_at.utcoffset()
+                newest_updated_at_corrected = newest_updated_at + utcoffset
+                if newest_updated_at_corrected >= previous_updated_at:
+                    newest_updated_at = newest_updated_at_corrected
+        self._last_updated_at = newest_updated_at
 
     @property
     def location_latitude(self):
