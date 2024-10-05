@@ -366,6 +366,8 @@ class Vehicle:
                 newest_updated_at_corrected = newest_updated_at + utcoffset
                 if newest_updated_at_corrected >= previous_updated_at:
                     newest_updated_at = newest_updated_at_corrected
+                if newest_updated_at < previous_updated_at:
+                    newest_updated_at = previous_updated_at  # keep old because newer
         self._last_updated_at = newest_updated_at
 
     @property
