@@ -1307,7 +1307,7 @@ class KiaUvoApiEU(ApiImplType1):
             if departure_options.enabled is None:
                 departure_options.enabled = False
             if departure_options.days is None:
-                departure_options.days = []
+                departure_options.days = [0]
             if departure_options.time is None:
                 departure_options.time = dt.time()
 
