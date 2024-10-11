@@ -313,8 +313,9 @@ class Vehicle:
 
     @geocode.setter
     def geocode(self, value):
-        self._geocode_name = value[0]
-        self._geocode_address = value[1]
+        if value:
+            self._geocode_name = value[0]
+            self._geocode_address = value[1]
 
     @property
     def total_driving_range(self):
