@@ -319,6 +319,7 @@ class Vehicle:
         else:
             self._geocode_name = None
             self._geocode_address = None
+
     @property
     def total_driving_range(self):
         return self._total_driving_range
