@@ -248,7 +248,8 @@ class KiaUvoApiCA(ApiImpl):
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
         if (
-            get_child_value(state, "status.airTemp.value") != "OFF"
+            get_child_value(state, "status.airTemp.value") is not None
+            and get_child_value(state, "status.airTemp.value") != "OFF"
             and get_child_value(state, "status.airTemp.value")[-1] == "H"
         ):
             tempIndex = get_hex_temp_into_index(
