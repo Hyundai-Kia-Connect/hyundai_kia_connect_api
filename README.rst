@@ -6,14 +6,14 @@ I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others
 Introduction
 ============
 
-This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/fuatakgun/kia_uvo.  Much of this base code came from reading bluelinky and contributions to the kia_uvo home assistant project.
+This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/Hyundai-Kia-Connect/kia_uvo.  Much of this base code came from reading bluelinky (https://github.com/Hacksore/bluelinky) and contributions to the kia_uvo home assistant project.
 
 Usage
 =====
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
-Python 3.9 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
+Python 3.10 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
     region: int
     brand: int,
@@ -21,7 +21,7 @@ Python 3.9 or newer is required to use this package. Vehicle manager is the key 
     password: str
     pin: str (required for CA, and potentially USA, otherwise pass a blank string)
 
-Key values for the int exist in the constant(https://github.com/fuatakgun/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
+Key values for the int exist in the constant(https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
 
     REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}

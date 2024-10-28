@@ -32,13 +32,13 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/fuatakgun/hyundai_kia_connect_api
+    $ git clone git://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl -OJL https://github.com/fuatakgun/hyundai_kia_connect_api/tarball/master
+    $ curl -OJL https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/fuatakgun/hyundai_kia_connect_api
-.. _tarball: https://github.com/fuatakgun/hyundai_kia_connect_api/tarball/master
+.. _Github repo: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api
+.. _tarball: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/tarball/master
