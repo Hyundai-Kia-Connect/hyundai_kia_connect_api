@@ -124,8 +124,14 @@ class KiaUvoAPIUSA(ApiImpl):
 
         self.BASE_URL: str = "api.owners.kia.com"
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
-        self.session = requests.Session()
-        self.session.mount("https://", KiaSSLAdapter())
+        self._session = None
+
+    @property
+    def session(self):
+        if not self._session:
+            self._session = requests.Session()
+            self._session.mount("https://", KiaSSLAdapter())
+        return self._session
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
@@ -653,8 +659,9 @@ class KiaUvoAPIUSA(ApiImpl):
             },
         }
 
-        # Kia seems to now be checking if you can set the heated/vented seats at the car level
-        # only add to body if the option is not none for any of the seats
+        # Kia seems to now be checking if you can set the heated/vented seats at
+        # the car level only add to body if the option is not none for any of
+        # the seats
         if (
             options.front_left_seat is not None
             or options.front_right_seat is not None
