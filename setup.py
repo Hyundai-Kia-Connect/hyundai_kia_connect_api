@@ -23,13 +23,13 @@ test_requirements = [
 setup(
     author="Fuat Akgun",
     author_email="fuatakgun@gmail.com",
-    python_requires=">=3.6",
+    python_requires=">=3.10",
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
     install_requires=requirements,
