@@ -95,8 +95,14 @@ class KiaUvoApiCA(ApiImpl):
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
         }
-        self.sessions = requests.Session()
-        self.sessions.mount("https://" + self.BASE_URL, cipherAdapter())
+        self._sessions = None
+
+    @property
+    def sessions(self):
+        if not self._sessions:
+            self._sessions = requests.Session()
+            self._sessions.mount("https://" + self.BASE_URL, cipherAdapter())
+        return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
         """
