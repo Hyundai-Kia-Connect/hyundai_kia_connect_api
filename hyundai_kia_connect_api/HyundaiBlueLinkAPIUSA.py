@@ -12,6 +12,8 @@ import certifi
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
+from hyundai_kia_connect_api.exceptions import APIError
+
 from .const import (
     DOMAIN,
     VEHICLE_LOCK_ACTION,
@@ -459,6 +461,31 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         # fill vehicle.daily_stats
         tripStats = []
         tripDetails = get_child_value(state, "evTripDetails.tripdetails") or {}
+
+        # compute more digits for distance mileage using odometer and overrule distance
+        previous_odometer = None
+        for trip in reversed(tripDetails):
+            odometer = get_child_value(trip, "odometer.value")
+            if previous_odometer and odometer:
+                delta_odometer = odometer - previous_odometer
+                if delta_odometer >= 0.0:
+                    trip["distance"] = delta_odometer
+            previous_odometer = odometer
+
+        # overrule odometer with more accuracy from last trip
+        if (
+            previous_odometer
+            and vehicle.odometer
+            and previous_odometer > vehicle.odometer
+        ):
+            _LOGGER.debug(
+                f"Overruling odometer: {previous_odometer:.1f} old: {vehicle.odometer:.1f}"  # noqa
+            )
+            vehicle.odometer = (
+                previous_odometer,
+                DISTANCE_UNITS[3],
+            )
+
         for trip in tripDetails:
             processedTrip = DailyDrivingStats(
                 date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S.%f"),
@@ -485,7 +512,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
                 hhmmss=yyyymmdd_hhmmss,
                 drive_time=int(drive_time / 60),  # convert seconds to minutes
                 idle_time=int(idle_time / 60),  # convert seconds to minutes
-                distance=int(trip["distance"]),
+                distance=float(trip["distance"]),
                 avg_speed=get_child_value(trip["avgspeed"], "value"),
                 max_speed=int(get_child_value(trip["maxspeed"], "value")),
             )
@@ -733,6 +760,8 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "rcs/rdo/on"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
+        else:
+            raise APIError(f"Invalid action value: {action}")
 
         headers = self._get_vehicle_headers(token, vehicle)
         headers["APPCLOUD-VIN"] = vehicle.VIN

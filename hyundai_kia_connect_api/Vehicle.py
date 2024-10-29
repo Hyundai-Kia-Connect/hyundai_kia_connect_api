@@ -19,7 +19,7 @@ class TripInfo:
     hhmmss: str = None  # will not be filled by summary
     drive_time: int = None  # minutes
     idle_time: int = None  # minutes
-    distance: int = None
+    distance: float = None
     avg_speed: float = None
     max_speed: int = None
 
@@ -60,9 +60,7 @@ class DailyDrivingStats:
     onboard_electronics_consumption: int = None
     battery_care_consumption: int = None
     regenerated_energy: int = None
-    # distance is expressed in (I assume) whatever unit the vehicle is
-    # configured in. KMs (rounded) in my case
-    distance: int = None
+    distance: float = None
     distance_unit: str = DISTANCE_UNITS[1]  # set to kms by default
 
 
