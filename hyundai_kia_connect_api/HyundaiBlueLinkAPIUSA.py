@@ -462,7 +462,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         tripStats = []
         tripDetails = get_child_value(state, "evTripDetails.tripdetails") or {}
 
-        # compute more digits for distance milage using odometer and overrule distance
+        # compute more digits for distance mileage using odometer and overrule distance
         previous_odometer = None
         for trip in reversed(tripDetails):
             odometer = get_child_value(trip, "odometer.value")
