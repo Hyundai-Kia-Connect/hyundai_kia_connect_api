@@ -15,7 +15,7 @@ Types of Contributions
 Report Bugs
 ~~~~~~~~~~~
 
-Report bugs at https://github.com/fuatakgun/hyundai_kia_connect_api/issues.
+Report bugs at https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/issues.
 
 If you are reporting a bug, please include:
 
@@ -45,7 +45,7 @@ articles, and such.
 Submit Feedback
 ~~~~~~~~~~~~~~~
 
-The best way to send feedback is to file an issue at https://github.com/fuatakgun/hyundai_kia_connect_api/issues.
+The best way to send feedback is to file an issue at https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/issues.
 
 If you are proposing a feature:
 
