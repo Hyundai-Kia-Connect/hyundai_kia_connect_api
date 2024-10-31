@@ -302,15 +302,16 @@ class KiaUvoApiAU(ApiImplType1):
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
-        vehicle.odometer = (
-            get_child_value(state, "status.odometer.value"),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "status.odometer.unit",
-                )
-            ],
-        )
+        if get_child_value(state, "odometer.value"):
+            vehicle.odometer = (
+                get_child_value(state, "odometer.value"),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "odometer.unit",
+                    )
+                ],
+            )
         vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
         vehicle.engine_is_running = get_child_value(state, "status.engine")
 
