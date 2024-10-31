@@ -302,13 +302,13 @@ class KiaUvoApiAU(ApiImplType1):
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
-        if get_child_value(state, "odometer.value"):
+        if get_child_value(state, "status.odometer.value"):
             vehicle.odometer = (
-                get_child_value(state, "odometer.value"),
+                get_child_value(state, "status.odometer.value"),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "odometer.unit",
+                        "status.odometer.unit",
                     )
                 ],
             )
