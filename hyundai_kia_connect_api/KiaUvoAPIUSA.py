@@ -648,9 +648,9 @@ class KiaUvoAPIUSA(ApiImpl):
                 "airCtrl": options.climate,
                 "defrost": options.defrost,
                 "heatingAccessory": {
-                    "rearWindow": int(options.heating),
-                    "sideMirror": int(options.heating),
-                    "steeringWheel": int(options.heating),
+                    "rearWindow": 1 if options.heating in [3, 4] else 0,
+                    "sideMirror": 1 if options.heating == 4 else 0,
+                    "steeringWheel": 1 if options.heating in [2, 4] else 0,
                 },
                 "ignitionOnDuration": {
                     "unit": 4,
