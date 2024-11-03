@@ -632,6 +632,8 @@ class KiaUvoAPIUSA(ApiImpl):
             options.set_temp = "HIGH"
         if options.climate is None:
             options.climate = True
+        if options.heating is None:
+            options.heating = 0
         if options.defrost is None:
             options.defrost = False
         if options.duration is None:
@@ -646,9 +648,9 @@ class KiaUvoAPIUSA(ApiImpl):
                 "airCtrl": options.climate,
                 "defrost": options.defrost,
                 "heatingAccessory": {
-                    "rearWindow": int(options.heating is not None),
-                    "sideMirror": int(options.heating is not None),
-                    "steeringWheel": int(options.heating is not None),
+                    "rearWindow": 1 if options.heating in [3, 4] else 0,
+                    "sideMirror": 1 if options.heating == 4 else 0,
+                    "steeringWheel": 1 if options.heating in [2, 4] else 0,
                 },
                 "ignitionOnDuration": {
                     "unit": 4,
