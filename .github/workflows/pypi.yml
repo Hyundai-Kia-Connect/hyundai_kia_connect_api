@@ -26,13 +26,13 @@ jobs:
             - name: Build package
               run: python -m build
             - name: Publish package to PyPi Test
-              uses: pypa/gh-action-pypi-publish@f7600683efdcb7656dec5b29656edb7bc586e597
+              uses: pypa/gh-action-pypi-publish@fb13cb306901256ace3dab689990e13a5550ffaa
               with:
                   user: __token__
                   password: ${{ secrets.TEST_PYPI_API_TOKEN }}
                   repository_url: https://test.pypi.org/legacy/
             - name: Publish package to PyPi Live
-              uses: pypa/gh-action-pypi-publish@f7600683efdcb7656dec5b29656edb7bc586e597
+              uses: pypa/gh-action-pypi-publish@fb13cb306901256ace3dab689990e13a5550ffaa
               with:
                   user: __token__
                   password: ${{ secrets.PYPI_API_TOKEN }}
