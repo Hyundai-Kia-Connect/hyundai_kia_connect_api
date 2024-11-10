@@ -164,7 +164,9 @@ class VehicleManager:
         return self.api.start_hazard_lights(self.token, self.get_vehicle(vehicle_id))
 
     def start_hazard_lights_and_horn(self, vehicle_id: str) -> str:
-        return self.api.start_hazard_lights_and_horn(self.token, self.get_vehicle(vehicle_id))
+        return self.api.start_hazard_lights_and_horn(
+            self.token, self.get_vehicle(vehicle_id)
+        )
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
         return self.api.set_charge_limits(
