@@ -1043,8 +1043,8 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(
             url,
             json=payload,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
+            headers=self._get_control_headers(
+                token, vehicle
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
@@ -1060,8 +1060,8 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(
             url,
             json=payload,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
+            headers=self._get_control_headers(
+                token, vehicle
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
