@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import JSONDecodeError
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN, VALET_MODE_ACTION
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -219,4 +219,16 @@ class ApiImpl:
 
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         """Turns on the hazard lights and horn for 30 seconds"""
+        pass
+
+    def valet_mode_action(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action: VALET_MODE_ACTION
+    ) -> str:
+        """
+        feature only available for some regions.
+        Activate or Deactivate valet mode. Returns the tracking ID
+        """
         pass

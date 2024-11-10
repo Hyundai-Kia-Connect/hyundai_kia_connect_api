@@ -98,3 +98,8 @@ class WINDOW_STATE(IntEnum):
     CLOSED = 0
     OPEN = 1
     VENTILATION = 2
+
+
+class VALET_MODE_ACTION(Enum):
+    ACTIVATE = "activate"
+    DEACTIVATE = "deactivate"
