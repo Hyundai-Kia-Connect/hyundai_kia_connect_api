@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import JSONDecodeError
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN, VALET_MODE_ACTION
+from .const import WINDOW_STATE, CHARGE_PORT_ACTION, OrderStatus, DOMAIN, VALET_MODE_ACTION, VEHICLE_LOCK_ACTION
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ class ApiImpl:
                     get_child_value(response, "address"),
                 )
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action: str) -> str:
+    def lock_action(self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
         pass
 
