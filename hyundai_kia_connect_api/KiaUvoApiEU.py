@@ -45,6 +45,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    VALET_MODE_ACTION,
 )
 from .exceptions import (
     AuthenticationError,
@@ -1431,6 +1432,21 @@ class KiaUvoApiEU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/valet"
+
+        payload = {"action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]

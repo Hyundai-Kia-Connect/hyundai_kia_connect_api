@@ -37,6 +37,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
     OrderStatus,
+    VALET_MODE_ACTION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -257,9 +258,19 @@ class VehicleManager:
 
     def schedule_charging_and_climate(
         self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
-    ) -> None:
-        self.api.schedule_charging_and_climate(
+    ) -> str:
+        return self.api.schedule_charging_and_climate(
             self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def start_valet_mode(self, vehicle_id: str) -> str:
+        return self.api.valet_mode_action(
+            self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.ACTIVATE
+        )
+
+    def stop_valet_mode(self, vehicle_id: str) -> str:
+        return self.api.valet_mode_action(
+            self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.DEACTIVATE
         )
 
     @staticmethod
