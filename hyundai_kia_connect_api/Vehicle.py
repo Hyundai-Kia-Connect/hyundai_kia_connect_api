@@ -159,7 +159,9 @@ class Vehicle:
 
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
-    ev_charging_current: typing.Union[int, None] = None  # Europe feature only
+    ev_charging_current: typing.Union[int, None] = (
+        None  # Only supported in some regions
+    )
     ev_v2l_discharge_limit: typing.Union[int, None] = None
 
     # energy consumed and regenerated since the vehicle was paired with the account
