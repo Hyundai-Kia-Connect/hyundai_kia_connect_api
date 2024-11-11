@@ -14,8 +14,8 @@ from .ApiImpl import (
     WindowRequestOptions,
     ScheduleChargingClimateRequestOptions,
 )
-from .HyundaiBlueLinkAPIUSA import HyundaiBlueLinkAPIUSA
-from .KiaUvoAPIUSA import KiaUvoAPIUSA
+from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from .KiaUvoApiUSA import KiaUvoApiUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiCN import KiaUvoApiCN
@@ -284,9 +284,9 @@ class VehicleManager:
         elif REGIONS[region] == REGION_USA and (
             BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
         ):
-            return HyundaiBlueLinkAPIUSA(region, brand, language)
+            return HyundaiBlueLinkApiUSA(region, brand, language)
         elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
-            return KiaUvoAPIUSA(region, brand, language)
+            return KiaUvoApiUSA(region, brand, language)
         elif REGIONS[region] == REGION_CHINA:
             return KiaUvoApiCN(region, brand, language)
         elif REGIONS[region] == REGION_AUSTRALIA:

@@ -62,8 +62,8 @@ class cipherAdapter(HTTPAdapter):
         return super().proxy_manager_for(*args, **kwargs)
 
 
-class HyundaiBlueLinkAPIUSA(ApiImpl):
-    """HyundaiBlueLinkAPIUSA"""
+class HyundaiBlueLinkApiUSA(ApiImpl):
+    """HyundaiBlueLinkApiUSA"""
 
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
