@@ -1035,6 +1035,36 @@ class KiaUvoApiEU(ApiImplType1):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.

@@ -212,3 +212,11 @@ class ApiImpl:
         Schedule charging and climate control. Returns the tracking ID
         """
         pass
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        """Turns on the hazard lights for 30 seconds"""
+        pass
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        """Turns on the hazard lights and horn for 30 seconds"""
+        pass
