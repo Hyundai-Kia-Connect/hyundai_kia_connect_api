@@ -1436,7 +1436,9 @@ class KiaUvoApiEU(ApiImplType1):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
-    def valet_mode_action(self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION) -> str:
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/valet"
 
         payload = {"action": action.value}
