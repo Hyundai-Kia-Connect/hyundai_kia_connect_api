@@ -442,8 +442,8 @@ def main():
         username=args.username,
         password=args.password,
         pin=args.pin,
-        geocode_api_enable=true,
-        geocode_api_use_email=true,
+        geocode_api_enable=True,
+        geocode_api_use_email=True,
     )
     # TODO: Cache token.
     vm.check_and_refresh_token()
