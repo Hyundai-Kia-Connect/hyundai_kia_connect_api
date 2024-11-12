@@ -106,8 +106,8 @@ def request_with_logging(func):
     return request_with_logging_wrapper
 
 
-class KiaUvoAPIUSA(ApiImpl):
-    """KiaUvoAPIUSA"""
+class KiaUvoApiUSA(ApiImpl):
+    """KiaUvoApiUSA"""
 
     def __init__(self, region: int, brand: int, language) -> None:
         self.LANGUAGE: str = language
