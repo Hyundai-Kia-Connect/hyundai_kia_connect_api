@@ -72,6 +72,11 @@ class ENGINE_TYPES(Enum):
     HEV = "HEV"
 
 
+class VEHICLE_ENGINE_CONTROL_ACTION(Enum):
+    START = "start"
+    STOP = "stop"
+
+
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"

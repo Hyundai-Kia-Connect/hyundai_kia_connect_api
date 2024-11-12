@@ -11,6 +11,7 @@ import certifi
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
+from dataclasses import fields
 
 from hyundai_kia_connect_api.exceptions import APIError
 
@@ -21,6 +22,7 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     ENGINE_TYPES,
+    VEHICLE_ENGINE_CONTROL_ACTION,
 )
 from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -781,7 +783,84 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
+    def engine_control_action(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action: VEHICLE_ENGINE_CONTROL_ACTION,
+        options: ClimateRequestOptions,
+    ) -> str:
+        _LOGGER.debug(f"{DOMAIN} - {action.value} engine..")
+
+        match action:
+            case VEHICLE_ENGINE_CONTROL_ACTION.START:
+                self.start_engine(token, vehicle, options)
+            case VEHICLE_ENGINE_CONTROL_ACTION.STOP:
+                self.stop_engine(token, vehicle)
+
+    def _determine_climate_options(
+        self, options: ClimateRequestOptions
+    ) -> ClimateRequestOptions:
+        if not options:
+            options = ClimateRequestOptions()
+        # Iterate over every field
+        for field in fields(options):
+            # Get the value of the field
+            field_value = getattr(options, field.name)
+            # If there isn't a field value set, set it
+            if not field_value:
+                match field.name:
+                    case "climate":
+                        options.climate = True
+                    case "set_temp":
+                        options.set_temp = 70
+                    case "duration":
+                        options.duration = 5
+                    case "heating":
+                        options.heating = 0
+                    case "defrost":
+                        options.defrost = False
+                    case "front_left_seat":
+                        options.front_left_seat = 0
+                    case "front_right_seat":
+                        options.front_right_seat = 0
+                    case "rear_left_seat":
+                        options.rear_left_seat = 0
+                    case "rear_right_seat":
+                        options.rear_right_seat = 0
+        return options
+
+    def _determine_data_payload(
+        self, token: Token, options: ClimateRequestOptions, vehicle: Vehicle
+    ):
+        data = {
+            "airCtrl": int(options.climate),
+            "heating1": int(options.heating),
+            "defrost": options.defrost,
+        }
+        match vehicle.engine_type:
+            case ENGINE_TYPES.EV:
+                data["airTemp"] = {"value": str(options.set_temp), "unit": 1}
+            case _:
+                data["Ims"] = 0
+                data["airTemp"] = {"unit": 1, "value": options.set_temp}
+                data["igniOnDuration"] = options.duration
+                data["seatHeaterVentInfo"] = {
+                    "drvSeatHeatState": options.front_left_seat,
+                    "astSeatHeatState": options.front_right_seat,
+                    "rlSeatHeatState": options.rear_left_seat,
+                    "rrSeatHeatState": options.rear_right_seat,
+                }
+                data["username"] = token.username
+                data["vin"] = vehicle.id
+        return data
+
     def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        self.start_engine(token, vehicle, options)
+
+    def start_engine(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
@@ -793,49 +872,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
-        if options.climate is None:
-            options.climate = True
-        if options.set_temp is None:
-            options.set_temp = 70
-        if options.duration is None:
-            options.duration = 5
-        if options.heating is None:
-            options.heating = 0
-        if options.defrost is None:
-            options.defrost = False
-        if options.front_left_seat is None:
-            options.front_left_seat = 0
-        if options.front_right_seat is None:
-            options.front_right_seat = 0
-        if options.rear_left_seat is None:
-            options.rear_left_seat = 0
-        if options.rear_right_seat is None:
-            options.rear_right_seat = 0
+        determined_climate_options = self._determine_climate_options(options)
+        data = self._determine_data_payload(token, determined_climate_options, vehicle)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
-            data = {
-                "airCtrl": int(options.climate),
-                "airTemp": {"value": str(options.set_temp), "unit": 1},
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-            }
-        else:
-            data = {
-                "Ims": 0,
-                "airCtrl": int(options.climate),
-                "airTemp": {"unit": 1, "value": options.set_temp},
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-                "igniOnDuration": options.duration,
-                "seatHeaterVentInfo": {
-                    "drvSeatHeatState": options.front_left_seat,
-                    "astSeatHeatState": options.front_right_seat,
-                    "rlSeatHeatState": options.rear_left_seat,
-                    "rrSeatHeatState": options.rear_right_seat,
-                },
-                "username": token.username,
-                "vin": vehicle.id,
-            }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
@@ -844,7 +883,7 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+    def stop_engine(self, token: Token, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -861,6 +900,9 @@ class HyundaiBlueLinkAPIUSA(ApiImpl):
             f"{DOMAIN} - Stop engine response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+        self.stop_engine(token, vehicle)
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
