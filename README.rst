@@ -119,4 +119,4 @@ state to a JSON file. Example usage:
     bluelink --region Canada --brand Hyundai --username FOO --password BAR --pin 1234 info --json infos.json
 
 Environment variables BLUELINK_XXX can be used to provide a default value for
-the corresponding --xxx argument. 
+the corresponding --xxx argument.
