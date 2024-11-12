@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Connects to the Bluelink API and query the vehicule."""
+"""Connects to the Bluelink API and query the vehicle."""
 
 import argparse
 import datetime
