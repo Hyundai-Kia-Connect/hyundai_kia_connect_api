@@ -6,9 +6,9 @@ I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others
 Introduction
 ============
 
-This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/Hyundai-Kia-Connect/kia_uvo.  Much of this base code came from reading bluelinky (https://github.com/Hacksore/bluelinky) and contributions to the kia_uvo home assistant project.
+This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/Hyundai-Kia-Connect/kia_uvo.  Much of this base code came from reading `bluelinky <https://github.com/Hacksore/bluelinky>`_ and contributions to the kia_uvo home assistant project.
 
-Usage
+API Usage
 =====
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
@@ -21,7 +21,7 @@ Python 3.10 or newer is required to use this package. Vehicle manager is the key
     password: str
     pin: str (required for CA, and potentially USA, otherwise pass a blank string)
 
-Key values for the int exist in the constant(https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py) file as::
+Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
     REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
@@ -106,3 +106,17 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
                 if vehicle.day_trip_info is not None:
                     for trip in reversed(vehicle.day_trip_info.trip_list):  # show oldest first
                         print(f"{day.yyyymmdd},{trip.hhmmss},{trip.drive_time},{trip.idle_time},{trip.distance},{trip.avg_speed},{trip.max_speed}")
+
+
+CLI Usage
+=====
+
+A tool `bluelink` is provided that enable querying the vehicles and save the
+state to a JSON file. Example usage:
+
+::
+
+    bluelink --region Canada --brand Hyundai --username FOO --password BAR --pin 1234 info --json infos.json
+
+Environment variables BLUELINK_XXX can be used to provide a default value for
+the corresponding --xxx argument. 

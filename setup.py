@@ -41,6 +41,11 @@ setup(
     packages=find_packages(
         include=["hyundai_kia_connect_api", "hyundai_kia_connect_api.*"]
     ),
+    entry_points={
+      'console_scripts': [
+        'bluelink = hyundai_kia_connect_api.bluelink:main'
+      ]
+    },
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api",
