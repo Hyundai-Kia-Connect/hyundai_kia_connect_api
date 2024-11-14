@@ -8,6 +8,12 @@ Introduction
 
 This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/Hyundai-Kia-Connect/kia_uvo.  Much of this base code came from reading bluelinky (https://github.com/Hacksore/bluelinky) and contributions to the kia_uvo home assistant project.
 
+Chat on discord:: |Discord|
+
+.. |Discord| image:: https://img.shields.io/discord/652755205041029120
+   :target: https://discord.gg/HwnG8sY
+   :alt: Discord
+
 Usage
 =====
 
