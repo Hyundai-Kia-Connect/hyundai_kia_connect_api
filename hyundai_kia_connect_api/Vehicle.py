@@ -424,7 +424,7 @@ class Vehicle:
     def air_temperature(self, value):
         self._air_temperature_value = value[0]
         self._air_temperature_unit = value[1]
-        self._air_temperature = value[0]
+        self._air_temperature = value[0] if value[0] != "OFF" else None
 
     @property
     def ev_driving_range(self):
