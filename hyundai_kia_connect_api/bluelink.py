@@ -100,6 +100,7 @@ def print_vehicle(vehicle):
     print("  location_last_updated_at:", vehicle.location_last_updated_at)
     print("EV/PHEV")
     print("  charge_port_door_is_open:", vehicle.ev_charge_port_door_is_open)
+    print("  charging_power:", vehicle.ev_charging_power)
     print("  charge_limits_dc:", vehicle.ev_charge_limits_dc)
     print("  charge_limits_ac:", vehicle.ev_charge_limits_ac)
     print("  charging_current:", vehicle.ev_charging_current)
@@ -278,6 +279,7 @@ def vehicle_to_dict(vehicle):
         },
         "electric": {
             "charge_port_door_is_open": vehicle.ev_charge_port_door_is_open,
+            "charging_power": vehicle.ev_charging_power,
             "charge_limits_dc": vehicle.ev_charge_limits_dc,
             "charge_limits_ac": vehicle.ev_charge_limits_ac,
             "charging_current": vehicle.ev_charging_current,

@@ -386,8 +386,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
         )
-        vehicle.ev_charging_current = get_child_value(
-            state, "vehicleStatus.evStatus.batteryStndChrgPower"
+        vehicle.ev_charging_power = get_child_value(
+            state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
         )
         ChargeDict = get_child_value(
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
