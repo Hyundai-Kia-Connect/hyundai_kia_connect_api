@@ -15,7 +15,7 @@ Chat on discord:: |Discord|
    :alt: Discord
 
 API Usage
-=====
+=========
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
@@ -115,7 +115,7 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
 
 
 CLI Usage
-=====
+=========
 
 A tool `bluelink` is provided that enable querying the vehicles and save the
 state to a JSON file. Example usage:
