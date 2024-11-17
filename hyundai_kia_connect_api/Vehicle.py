@@ -156,7 +156,7 @@ class Vehicle:
     # EV fields (EV/PHEV)
 
     ev_charge_port_door_is_open: typing.Union[bool, None] = None
-    ev_charging_power: typing.Union[float, None] = None # Charging power in kW
+    ev_charging_power: typing.Union[float, None] = None  # Charging power in kW
 
     ev_charge_limits_dc: typing.Union[int, None] = None
     ev_charge_limits_ac: typing.Union[int, None] = None
