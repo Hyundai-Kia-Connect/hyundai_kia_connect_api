@@ -100,7 +100,9 @@ class VehicleManager:
         for vehicle_id in self.vehicles.keys():
             self.check_and_force_update_vehicle(force_refresh_interval, vehicle_id)
 
-    def check_and_force_update_vehicle(self, force_refresh_interval: int, vehicle_id: str) -> None:
+    def check_and_force_update_vehicle(
+        self, force_refresh_interval: int, vehicle_id: str
+    ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
         started_at_utc: dt = dt.datetime.now(pytz.utc)
