@@ -1,6 +1,6 @@
--   Hyundai / Kia Connect version:
--   Python version:
--   Operating System:
+- Hyundai / Kia Connect version:
+- Python version:
+- Operating System:
 
 ### Description
 
