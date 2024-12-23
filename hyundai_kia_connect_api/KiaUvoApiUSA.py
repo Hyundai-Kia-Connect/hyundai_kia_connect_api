@@ -620,6 +620,59 @@ class KiaUvoApiUSA(ApiImpl):
 
         return response.headers["Xid"]
 
+    def _seat_settings(self, level) -> dict:
+        # See const.SEAT_STATUS for the list and descriptions of levels.
+        #
+        # The values were determined empirically, see https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/718
+        if level == 8:    # High heat
+            return {
+                "heatVentType": 1,
+                "heatVentLevel": 4,
+                "heatVentStep": 1,
+            }
+        elif level == 7:  # Medium heat
+            return {
+                "heatVentType": 1,
+                "heatVentLevel": 3,
+                "heatVentStep": 2,
+            }
+        elif level == 6:  # Low heat
+            return {
+                "heatVentType": 1,
+                "heatVentLevel": 2,
+                "heatVentStep": 3,
+            }
+        elif level == 5:  # High cool
+            return {
+                "heatVentType": 2,
+                "heatVentLevel": 4,
+                "heatVentStep": 1,
+            }
+        elif level == 4:  # Medium cool
+            return {
+                "heatVentType": 2,
+                "heatVentLevel": 3,
+                "heatVentStep": 2,
+            }
+        elif level == 3:  # Low cool
+            return {
+                "heatVentType": 2,
+                "heatVentLevel": 2,
+                "heatVentStep": 3,
+            }
+        elif level == 1:  # Generically on, let's assume high heat
+            return {
+                "heatVentType": 1,
+                "heatVentLevel": 4,
+                "heatVentStep": 1,
+            }
+        else:             # Off
+            return {
+                "heatVentType": 0,
+                "heatVentLevel": 1,
+                "heatVentStep": 0,
+            }
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
@@ -668,72 +721,11 @@ class KiaUvoApiUSA(ApiImpl):
             or options.rear_left_seat is not None
             or options.rear_right_seat is not None
         ):
-            if options.front_left_seat is None:
-                options.front_left_seat = 0
-            if options.front_right_seat is None:
-                options.front_right_seat = 0
-            if options.rear_left_seat is None:
-                options.rear_left_seat = 0
-            if options.rear_right_seat is None:
-                options.rear_right_seat = 0
-
-            front_left_heatVentType = 0
-            front_right_heatVentType = 0
-            rear_left_heatVentType = 0
-            rear_right_heatVentType = 0
-            front_left_heatVentLevel = 0
-            front_right_heatVentLevel = 0
-            rear_left_heatVentLevel = 0
-            rear_right_heatVentLevel = 0
-
-            # heated
-            if options.front_left_seat in (6, 7, 8):
-                front_left_heatVentType = 1
-                front_left_heatVentLevel = options.front_left_seat - 4
-            if options.front_right_seat in (6, 7, 8):
-                front_right_heatVentType = 1
-                front_right_heatVentLevel = options.front_right_seat - 4
-            if options.rear_left_seat in (6, 7, 8):
-                rear_left_heatVentType = 1
-                rear_left_heatVentLevel = options.rear_left_seat - 4
-            if options.rear_right_seat in (6, 7, 8):
-                rear_right_heatVentType = 1
-                rear_right_heatVentLevel = options.rear_right_seat - 4
-
-            # ventilated
-            if options.front_left_seat in (3, 4, 5):
-                front_left_heatVentType = 2
-                front_left_heatVentLevel = options.front_left_seat - 1
-            if options.front_right_seat in (3, 4, 5):
-                front_right_heatVentType = 2
-                front_right_heatVentLevel = options.front_right_seat - 1
-            if options.rear_left_seat in (3, 4, 5):
-                rear_left_heatVentType = 2
-                rear_left_heatVentLevel = options.rear_left_seat - 1
-            if options.rear_right_seat in (3, 4, 5):
-                rear_right_heatVentType = 2
-                rear_right_heatVentLevel = options.rear_right_seat - 1
             body["remoteClimate"]["heatVentSeat"] = {
-                "driverSeat": {
-                    "heatVentType": front_left_heatVentType,
-                    "heatVentLevel": front_left_heatVentLevel,
-                    "heatVentStep": 1,
-                },
-                "passengerSeat": {
-                    "heatVentType": front_right_heatVentType,
-                    "heatVentLevel": front_right_heatVentLevel,
-                    "heatVentStep": 1,
-                },
-                "rearLeftSeat": {
-                    "heatVentType": rear_left_heatVentType,
-                    "heatVentLevel": rear_left_heatVentLevel,
-                    "heatVentStep": 1,
-                },
-                "rearRightSeat": {
-                    "heatVentType": rear_right_heatVentType,
-                    "heatVentLevel": rear_right_heatVentLevel,
-                    "heatVentStep": 1,
-                },
+                "driverSeat": self._seat_settings(options.front_left_seat),
+                "passengerSeat": self._seat_settings(options.front_right_seat),
+                "rearLeftSeat": self._seat_settings(options.rear_left_seat),
+                "rearRightSeat": self._seat_settings(options.rear_right_seat),
             }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
         response = self.post_request_with_logging_and_active_session(
