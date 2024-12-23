@@ -624,7 +624,7 @@ class KiaUvoApiUSA(ApiImpl):
         # See const.SEAT_STATUS for the list and descriptions of levels.
         #
         # The values were determined empirically, see https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/718
-        if level == 8:    # High heat
+        if level == 8:  # High heat
             return {
                 "heatVentType": 1,
                 "heatVentLevel": 4,
@@ -666,7 +666,7 @@ class KiaUvoApiUSA(ApiImpl):
                 "heatVentLevel": 4,
                 "heatVentStep": 1,
             }
-        else:             # Off
+        else:  # Off
             return {
                 "heatVentType": 0,
                 "heatVentLevel": 1,
