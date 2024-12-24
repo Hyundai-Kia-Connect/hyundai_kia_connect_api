@@ -701,10 +701,10 @@ class KiaUvoApiUSA(ApiImpl):
                 "airCtrl": options.climate,
                 "defrost": options.defrost,
                 "heatingAccessory": {
-                    "rearWindow": 1 if options.heating in [3, 4] else 0,
-                    "sideMirror": 1 if options.heating == 4 else 0,
-                    "steeringWheel": 1 if options.heating in [2, 4] else 0,
-                    "steeringWheelStep": 2 if options.heating in [2, 4] else 0,
+                    "rearWindow": 1 if options.heating in [1, 2, 4] else 0,
+                    "sideMirror": 1 if options.heating in [1, 4] else 0,
+                    "steeringWheel": 1 if options.heating in [1, 3, 4] else 0,
+                    "steeringWheelStep": 2 if options.heating in [1, 3, 4] else 0,
                 },
                 "ignitionOnDuration": {
                     "unit": 4,
