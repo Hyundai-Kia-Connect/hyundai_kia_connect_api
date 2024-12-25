@@ -73,11 +73,11 @@ class ApiImpl:
 
     def login(self, username: str, password: str) -> Token:
         """Login into cloud endpoints and return Token"""
-        pass
+        raise NotImplementedError("required")
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
-        pass
+        raise NotImplementedError("required")
 
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles.
@@ -86,7 +86,7 @@ class ApiImpl:
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
-        pass
+        raise NotImplementedError("required")
 
     def check_action_status(
         self,
@@ -95,16 +95,21 @@ class ApiImpl:
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
-        pass
+    ) -> OrderStatus | None:
+        """
+        feature only available for some regions.
+        """
+        return None
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Triggers the system to contact the car and get fresh data"""
-        pass
+        raise NotImplementedError("required")
 
+    @staticmethod
     def update_geocoded_location(
-        self, token: Token, vehicle: Vehicle, use_email: bool
+        token: Token, vehicle: Vehicle, use_email: bool
     ) -> None:
+        """Uses OpenStreetMap to initialize vehicle.geocode."""
         if vehicle.location_latitude and vehicle.location_longitude:
             email_parameter = ""
             if use_email is True:
@@ -139,50 +144,59 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         """Starts climate or remote start.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         """Stops climate or remote start.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         """Starts charge. Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         """Stops charge. Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
         """Sets charge limits. Returns the tracking ID"""
-        pass
+        raise NotImplementedError("required")
 
-    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+    def set_charging_current(
+        self, token: Token, vehicle: Vehicle, level: int
+    ) -> str | None:
         """
         feature only available for some regions.
-        Sets charge current level (1=100%, 2=90%, 3=60%). Returns the tracking ID
+        Sets charge current level (1=100%, 2=90%, 3=60%). Returns the tracking
+        ID
         """
-        pass
+        return None
 
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
-    ) -> str:
-        """Opens or closes a particular window. Returns the tracking ID"""
-        pass
+    ) -> str | None:
+        """
+        feature only available for some regions.
+        Opens or closes a particular window. Returns the tracking ID.
+        """
+        return None
 
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
-    ) -> str:
-        """Opens or closes the charging port of the car. Returns the tracking ID"""
-        pass
+    ) -> str | None:
+        """
+        feature only available for some regions.
+        Opens or closes the charging port of the car. Returns the tracking ID
+        """
+        return None
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str
@@ -195,7 +209,7 @@ class ApiImpl:
 
         month_trip_info: MonthTripInfo = None
         """
-        pass
+        return None
 
     def update_day_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
@@ -208,27 +222,35 @@ class ApiImpl:
 
         day_trip_info: DayTripInfo = None
         """
-        pass
+        return None
 
     def schedule_charging_and_climate(
         self,
         token: Token,
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
-    ) -> str:
+    ) -> str | None:
         """
         feature only available for some regions.
         Schedule charging and climate control. Returns the tracking ID
         """
-        pass
+        return None
 
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
-        """Turns on the hazard lights for 30 seconds"""
-        pass
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str | None:
+        """
+        feature only available for some regions.
+        Turns on the hazard lights for 30 seconds
+        """
+        return None
 
-    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
-        """Turns on the hazard lights and horn for 30 seconds"""
-        pass
+    def start_hazard_lights_and_horn(
+        self, token: Token, vehicle: Vehicle
+    ) -> str | None:
+        """
+        feature only available for some regions.
+        Turns on the hazard lights and horn for 30 seconds
+        """
+        return None
 
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
@@ -237,4 +259,4 @@ class ApiImpl:
         feature only available for some regions.
         Activate or Deactivate valet mode. Returns the tracking ID
         """
-        pass
+        return None
