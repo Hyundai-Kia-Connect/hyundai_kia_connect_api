@@ -582,7 +582,7 @@ class KiaUvoApiCA(ApiImpl):
             )
         if vehicle.engine_type == ENGINE_TYPES.EV:
             payload = {
-                "hvacInfo": {
+                "remoteControl": {
                     "airCtrl": int(options.climate),
                     "defrost": options.defrost,
                     "heating1": options.heating,
@@ -590,6 +590,13 @@ class KiaUvoApiCA(ApiImpl):
                         "value": hex_set_temp,
                         "unit": 0,
                         "hvacTempType": 1,
+                    },
+                    "igniOnDuration": options.duration,
+                    "seatHeaterVentCMD": {
+                        "drvSeatOptCmd": options.front_left_seat,
+                        "astSeatOptCmd": options.front_right_seat,
+                        "rlSeatOptCmd": options.rear_left_seat,
+                        "rrSeatOptCmd": options.rear_right_seat,
                     },
                 },
                 "pin": token.pin,
