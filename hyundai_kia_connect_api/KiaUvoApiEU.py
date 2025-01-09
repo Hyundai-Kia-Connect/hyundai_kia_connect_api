@@ -969,8 +969,13 @@ class KiaUvoApiEU(ApiImplType1):
                 "tempCode": hex_set_temp,
                 "unit": "C",
             }
-        else: 
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/temperature"
+        else:
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/temperature"
+            )
 
             # Defaults are located here to be region specific
 
@@ -996,7 +1001,7 @@ class KiaUvoApiEU(ApiImplType1):
                     "rrSeatClimateState": 6,
                     "drvSeatClimateState": 6,
                     "psgSeatClimateState": 6,
-                    "rlSeatClimateState": 6
+                    "rlSeatClimateState": 6,
                 },
                 "sideRearMirrorHeating": 1,
                 "hvacTempType": 1,
@@ -1004,9 +1009,8 @@ class KiaUvoApiEU(ApiImplType1):
                 "command": "start",
                 "windshieldFrontDefogState": True,
                 "ignitionDuration": 5,
-                "strgWhlHeating": 1
-                }
-                            
+                "strgWhlHeating": 1,
+            }
 
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(
