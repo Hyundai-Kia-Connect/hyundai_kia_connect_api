@@ -939,35 +939,75 @@ class KiaUvoApiEU(ApiImplType1):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
 
-        # Defaults are located here to be region specific
+            # Defaults are located here to be region specific
 
-        if options.set_temp is None:
-            options.set_temp = 21
-        if options.duration is None:
-            options.duration = 5
-        if options.defrost is None:
-            options.defrost = False
-        if options.climate is None:
-            options.climate = True
-        if options.heating is None:
-            options.heating = 0
+            if options.set_temp is None:
+                options.set_temp = 21
+            if options.duration is None:
+                options.duration = 5
+            if options.defrost is None:
+                options.defrost = False
+            if options.climate is None:
+                options.climate = True
+            if options.heating is None:
+                options.heating = 0
 
-        hex_set_temp = get_index_into_hex_temp(
-            self.temperature_range.index(options.set_temp)
-        )
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range.index(options.set_temp)
+            )
 
-        payload = {
-            "action": "start",
-            "hvacType": 0,
-            "options": {
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-            },
-            "tempCode": hex_set_temp,
-            "unit": "C",
-        }
+            payload = {
+                "action": "start",
+                "hvacType": 0,
+                "options": {
+                    "defrost": options.defrost,
+                    "heating1": int(options.heating),
+                },
+                "tempCode": hex_set_temp,
+                "unit": "C",
+            }
+        else: 
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/temperature"
+
+            # Defaults are located here to be region specific
+
+            if options.set_temp is None:
+                options.set_temp = 21
+            if options.duration is None:
+                options.duration = 5
+            if options.defrost is None:
+                options.defrost = False
+            if options.climate is None:
+                options.climate = True
+            if options.heating is None:
+                options.heating = 0
+
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range.index(options.set_temp)
+            )
+
+            payload = {
+                "drvSeatLoc": "R",
+                "tempUnit": "C",
+                "seatClimateInfo": {
+                    "rrSeatClimateState": 6,
+                    "drvSeatClimateState": 6,
+                    "psgSeatClimateState": 6,
+                    "rlSeatClimateState": 6
+                },
+                "sideRearMirrorHeating": 1,
+                "hvacTempType": 1,
+                "hvacTemp": "22.0",
+                "command": "start",
+                "windshieldFrontDefogState": True,
+                "ignitionDuration": 5,
+                "strgWhlHeating": 1
+                }
+                            
+
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(
             url,
