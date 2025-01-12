@@ -70,6 +70,7 @@ class KiaUvoApiCA(ApiImpl):
     def __init__(self, region: int, brand: int, language: str) -> None:
         self.vehicle_timezone = self.data_timezone
         self.LANGUAGE: str = language
+        self.brand = brand
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
@@ -582,25 +583,33 @@ class KiaUvoApiCA(ApiImpl):
             )
         if vehicle.engine_type == ENGINE_TYPES.EV:
             payload = {
-                "remoteControl": {
-                    "airCtrl": int(options.climate),
-                    "defrost": options.defrost,
-                    "heating1": options.heating,
-                    "airTemp": {
-                        "value": hex_set_temp,
-                        "unit": 0,
-                        "hvacTempType": 1,
-                    },
-                    "igniOnDuration": options.duration,
-                    "seatHeaterVentCMD": {
-                        "drvSeatOptCmd": options.front_left_seat,
-                        "astSeatOptCmd": options.front_right_seat,
-                        "rlSeatOptCmd": options.rear_left_seat,
-                        "rrSeatOptCmd": options.rear_right_seat,
-                    },
-                },
                 "pin": token.pin,
             }
+            climate_settings = {
+                "airCtrl": int(options.climate),
+                "defrost": options.defrost,
+                "heating1": options.heating,
+                "airTemp": {
+                    "value": hex_set_temp,
+                    "unit": 0,
+                    "hvacTempType": 1,
+                },
+            }
+            if BRANDS[self.brand] == BRAND_KIA:
+                payload["remoteControl"] = climate_settings
+                payload["remoteControl"].update(
+                    {
+                        "igniOnDuration": options.duration,
+                        "seatHeaterVentCMD": {
+                            "drvSeatOptCmd": options.front_left_seat,
+                            "astSeatOptCmd": options.front_right_seat,
+                            "rlSeatOptCmd": options.rear_left_seat,
+                            "rrSeatOptCmd": options.rear_right_seat,
+                        },
+                    }
+                )
+            else:
+                payload["hvacInfo"] = climate_settings
         else:
             payload = {
                 "setting": {
