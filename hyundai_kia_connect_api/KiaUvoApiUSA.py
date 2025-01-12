@@ -691,6 +691,8 @@ class KiaUvoApiUSA(ApiImpl):
             options.defrost = False
         if options.duration is None:
             options.duration = 5
+        if options.steeringWheel is None:
+            options.steeringWheel = 0
 
         body = {
             "remoteClimate": {
@@ -703,8 +705,8 @@ class KiaUvoApiUSA(ApiImpl):
                 "heatingAccessory": {
                     "rearWindow": 1 if options.heating in [1, 2, 4] else 0,
                     "sideMirror": 1 if options.heating in [1, 4] else 0,
-                    "steeringWheel": 1 if options.heating in [1, 3, 4] else 0,
-                    "steeringWheelStep": 2 if options.heating in [1, 3, 4] else 0,
+                    "steeringWheel": 1 if options.steeringWheel in [1, 2] else 0,
+                    "steeringWheelStep": options.steeringWheel,
                 },
                 "ignitionOnDuration": {
                     "unit": 4,
