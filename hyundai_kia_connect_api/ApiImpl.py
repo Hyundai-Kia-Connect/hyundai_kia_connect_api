@@ -34,7 +34,7 @@ class ClimateRequestOptions:
     front_right_seat: int = None
     rear_left_seat: int = None
     rear_right_seat: int = None
-    steeringWheel: int = None
+    steering_wheel: int = None
 
 
 @dataclass
