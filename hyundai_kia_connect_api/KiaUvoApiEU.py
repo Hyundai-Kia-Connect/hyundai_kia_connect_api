@@ -924,11 +924,10 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
  
         response = requests.post(
-                url,
-                json=payload,
-                headers=headers
-            ).json()
-
+            url,
+            json=payload,
+            headers=headers
+        ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
