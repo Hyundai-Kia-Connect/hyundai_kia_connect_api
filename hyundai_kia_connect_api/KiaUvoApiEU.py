@@ -917,17 +917,11 @@ class KiaUvoApiEU(ApiImplType1):
             url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/door"
 
             payload = {"command": action.value}
-            headers = self._get_control_headers(
-                token, vehicle
-            )
+            headers = self._get_control_headers(token, vehicle)
 
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
- 
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers
-        ).json()
+
+        response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
@@ -1029,19 +1023,15 @@ class KiaUvoApiEU(ApiImplType1):
             )
 
         else:
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
-
-            payload = {"command": "start"}
-            headers = self._get_control_headers(
-                token, vehicle
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
             )
 
+            payload = {"command": "start"}
+            headers = self._get_control_headers(token, vehicle)
+
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers
-        ).json()
+        response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
@@ -1057,19 +1047,15 @@ class KiaUvoApiEU(ApiImplType1):
             )
 
         else:
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
-
-            payload = {"command": "stop"}
-            headers = self._get_control_headers(
-                token, vehicle
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
             )
 
+            payload = {"command": "stop"}
+            headers = self._get_control_headers(token, vehicle)
+
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
-        response = requests.post(
-            url,
-            json=payload,
-            headers=headers
-        ).json()
+        response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
