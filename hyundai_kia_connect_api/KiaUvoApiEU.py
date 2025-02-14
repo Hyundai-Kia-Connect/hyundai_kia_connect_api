@@ -27,7 +27,6 @@ from .Vehicle import (
     Vehicle,
     DailyDrivingStats,
     MonthTripInfo,
-    DayTripInfo,
     TripInfo,
     DayTripCounts,
 )
@@ -1180,7 +1179,6 @@ class KiaUvoApiEU(ApiImplType1):
                 result.day_list.append(processed_day)
 
             vehicle.month_trip_info = result
-
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
