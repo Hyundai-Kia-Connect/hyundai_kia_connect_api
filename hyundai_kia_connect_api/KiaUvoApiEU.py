@@ -1179,7 +1179,6 @@ class KiaUvoApiEU(ApiImplType1):
 
             vehicle.month_trip_info = result
 
-
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
