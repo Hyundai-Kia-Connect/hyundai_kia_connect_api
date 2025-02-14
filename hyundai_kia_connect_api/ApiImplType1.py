@@ -18,6 +18,7 @@ from .utils import (
 )
 
 from .exceptions import (
+    DeviceIDError,
     AuthenticationError,
     DuplicateRequestError,
     RequestTimeoutError,
@@ -438,7 +439,7 @@ class ApiImplType1(ApiImpl):
         )
         responseAlltime = responseAlltime.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
-        _check_response_for_errors(responseAlltime)
+        self._check_response_for_errors(responseAlltime)
 
         response30d = requests.post(
             url,
@@ -449,7 +450,7 @@ class ApiImplType1(ApiImpl):
         )
         response30d = response30d.json()
         _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
-        _check_response_for_errors(response30d)
+        self._check_response_for_errors(response30d)
         if get_child_value(responseAlltime, "resMsg.drivingInfo.0"):
             drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
 

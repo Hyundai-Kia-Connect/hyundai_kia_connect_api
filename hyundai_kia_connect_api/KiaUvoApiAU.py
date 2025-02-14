@@ -124,7 +124,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
@@ -179,7 +179,7 @@ class KiaUvoApiAU(ApiImplType1):
         ).json()
 
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
 
         if is_ccs2:
             state = response["resMsg"]["state"]["Vehicle"]

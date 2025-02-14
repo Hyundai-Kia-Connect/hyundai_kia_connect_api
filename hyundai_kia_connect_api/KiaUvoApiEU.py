@@ -238,7 +238,7 @@ class KiaUvoApiEU(ApiImplType1):
             headers=self._get_authenticated_headers(token),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
@@ -295,7 +295,7 @@ class KiaUvoApiEU(ApiImplType1):
         ).json()
 
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
 
         if vehicle.ccu_ccs2_protocol_support == 0:
             self._update_vehicle_properties(
@@ -820,7 +820,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         if vehicle.ccu_ccs2_protocol_support == 0:
             response = response["resMsg"]["vehicleStatusInfo"]
         else:
@@ -838,7 +838,7 @@ class KiaUvoApiEU(ApiImplType1):
                 ),
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
-            _check_response_for_errors(response)
+            self._check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
         except Exception:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
@@ -853,7 +853,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         mapped_response = {}
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
@@ -879,7 +879,7 @@ class KiaUvoApiEU(ApiImplType1):
 
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -894,7 +894,7 @@ class KiaUvoApiEU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -939,7 +939,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -965,7 +965,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -989,7 +989,7 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1013,7 +1013,7 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1028,7 +1028,7 @@ class KiaUvoApiEU(ApiImplType1):
             headers=self._get_control_headers(token, vehicle),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1043,7 +1043,7 @@ class KiaUvoApiEU(ApiImplType1):
             headers=self._get_control_headers(token, vehicle),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1060,7 +1060,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested
         # (EU Ioniq Electric Facelift MY 2019)
@@ -1090,7 +1090,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response
 
     def update_month_trip_info(
@@ -1162,7 +1162,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
@@ -1179,7 +1179,7 @@ class KiaUvoApiEU(ApiImplType1):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def schedule_charging_and_climate(
@@ -1292,7 +1292,7 @@ class KiaUvoApiEU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1307,7 +1307,7 @@ class KiaUvoApiEU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
@@ -1342,7 +1342,7 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
@@ -1601,7 +1601,7 @@ class KiaUvoApiEU(ApiImplType1):
                 ),
             ).json()
             _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
-            _check_response_for_errors(response)
+            self._check_response_for_errors(response)
 
             for action in response["resMsg"]:
                 if action["recordId"] == action_id:
