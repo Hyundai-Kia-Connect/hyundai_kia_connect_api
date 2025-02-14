@@ -3,16 +3,29 @@
 import datetime as dt
 from typing import Optional
 import logging
+import requests
+
 
 from .ApiImpl import (
     ApiImpl,
 )
 from .Token import Token
-from .Vehicle import Vehicle, DailyDrivingStats, DayTripInfo
+from .Vehicle import Vehicle, DailyDrivingStats, DayTripInfo, TripInfo
 
 from .utils import (
     get_child_value,
     parse_datetime,
+)
+
+from .exceptions import (
+    AuthenticationError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    APIError,
+    RateLimitingError,
 )
 
 from .const import (
@@ -49,6 +62,47 @@ class ApiImplType1(ApiImpl):
             "Ccuccs2protocolsupport": str(ccs2_support or 0),
             "User-Agent": USER_AGENT_OK_HTTP,
         }
+        
+    def _check_response_for_errors(response: dict) -> None:
+            """
+            Checks for errors in the API response.
+            If an error is found, an exception is raised.
+            retCode known values:
+            - S: success
+            - F: failure
+            resCode / resMsg known values:
+            - 0000: no error
+            - 4002:  "Invalid request body - invalid deviceId",
+                    relogin will resolve but a bandaid.
+            - 4004: "Duplicate request"
+            - 4081: "Request timeout"
+            - 5031: "Unavailable remote control - Service Temporary Unavailable"
+            - 5091: "Exceeds number of requests"
+            - 5921: "No Data Found v2 - No Data Found v2"
+            - 9999: "Undefined Error - Response timeout"
+            :param response: the API's JSON response
+            """
+
+            error_code_mapping = {
+                "4002": DeviceIDError,
+                "4004": DuplicateRequestError,
+                "4081": RequestTimeoutError,
+                "5031": ServiceTemporaryUnavailable,
+                "5091": RateLimitingError,
+                "5921": NoDataFound,
+                "9999": RequestTimeoutError,
+            }
+
+            if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+                _LOGGER.error(f"Unknown API response format: {response}")
+                raise InvalidAPIResponseError()
+
+            if response["retCode"] == "F":
+                if response["resCode"] in error_code_mapping:
+                    raise error_code_mapping[response["resCode"]](response["resMsg"])
+                raise APIError(
+                    f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
+                )
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
