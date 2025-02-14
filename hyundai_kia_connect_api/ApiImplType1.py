@@ -19,6 +19,7 @@ from .const import (
     DISTANCE_UNITS,
     ENGINE_TYPES,
     SEAT_STATUS,
+    DOMAIN,
     TEMPERATURE_UNITS,
 )
 

@@ -25,7 +25,6 @@ from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
-    DailyDrivingStats,
     MonthTripInfo,
     TripInfo,
     DayTripCounts,
@@ -1180,78 +1179,6 @@ class KiaUvoApiEU(ApiImplType1):
 
             vehicle.month_trip_info = result
 
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
-
-        responseAlltime = requests.post(
-            url,
-            json={"periodTarget": 1},
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        )
-        responseAlltime = responseAlltime.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
-        _check_response_for_errors(responseAlltime)
-
-        response30d = requests.post(
-            url,
-            json={"periodTarget": 0},
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        )
-        response30d = response30d.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
-        _check_response_for_errors(response30d)
-        if get_child_value(responseAlltime, "resMsg.drivingInfo.0"):
-            drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
-
-            drivingInfo["dailyStats"] = []
-            if get_child_value(response30d, "resMsg.drivingInfoDetail.0"):
-                for day in response30d["resMsg"]["drivingInfoDetail"]:
-                    processedDay = DailyDrivingStats(
-                        date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                        total_consumed=get_child_value(day, "totalPwrCsp"),
-                        engine_consumption=get_child_value(day, "motorPwrCsp"),
-                        climate_consumption=get_child_value(day, "climatePwrCsp"),
-                        onboard_electronics_consumption=get_child_value(
-                            day, "eDPwrCsp"
-                        ),
-                        battery_care_consumption=get_child_value(
-                            day, "batteryMgPwrCsp"
-                        ),
-                        regenerated_energy=get_child_value(day, "regenPwr"),
-                        distance=get_child_value(day, "calculativeOdo"),
-                        distance_unit=vehicle.odometer_unit,
-                    )
-                    drivingInfo["dailyStats"].append(processedDay)
-
-            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if (
-                    drivingInfoItem["drivingPeriod"] == 0
-                    and next(
-                        (
-                            v
-                            for k, v in drivingInfoItem.items()
-                            if k.lower() == "calculativeodo"
-                        ),
-                        0,
-                    )
-                    > 0
-                ):
-                    drivingInfo["consumption30d"] = round(
-                        drivingInfoItem["totalPwrCsp"]
-                        / drivingInfoItem["calculativeOdo"]
-                    )
-                    break
-
-            return drivingInfo
-        else:
-            _LOGGER.debug(
-                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
-            )
-            return None
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
