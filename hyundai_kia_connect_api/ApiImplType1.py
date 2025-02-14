@@ -8,7 +8,7 @@ from .ApiImpl import (
     ApiImpl,
 )
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, DailyDrivingStats, DayTripInfo
 
 from .utils import (
     get_child_value,

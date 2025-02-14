@@ -23,9 +23,7 @@ from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
-    DailyDrivingStats,
     MonthTripInfo,
-    DayTripInfo,
     TripInfo,
     DayTripCounts,
 )
