@@ -2,26 +2,43 @@
 
 import datetime as dt
 from typing import Optional
+import logging
+import requests
+
 
 from .ApiImpl import (
     ApiImpl,
 )
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, DailyDrivingStats, DayTripInfo, TripInfo
 
 from .utils import (
     get_child_value,
     parse_datetime,
 )
 
+from .exceptions import (
+    DeviceIDError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    APIError,
+    RateLimitingError,
+)
+
 from .const import (
     DISTANCE_UNITS,
     ENGINE_TYPES,
     SEAT_STATUS,
+    DOMAIN,
     TEMPERATURE_UNITS,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ApiImplType1(ApiImpl):
@@ -45,6 +62,47 @@ class ApiImplType1(ApiImpl):
             "Ccuccs2protocolsupport": str(ccs2_support or 0),
             "User-Agent": USER_AGENT_OK_HTTP,
         }
+
+    def _check_response_for_errors(response: dict) -> None:
+        """
+        Checks for errors in the API response.
+        If an error is found, an exception is raised.
+        retCode known values:
+        - S: success
+        - F: failure
+        resCode / resMsg known values:
+        - 0000: no error
+        - 4002:  "Invalid request body - invalid deviceId",
+                relogin will resolve but a bandaid.
+        - 4004: "Duplicate request"
+        - 4081: "Request timeout"
+        - 5031: "Unavailable remote control - Service Temporary Unavailable"
+        - 5091: "Exceeds number of requests"
+        - 5921: "No Data Found v2 - No Data Found v2"
+        - 9999: "Undefined Error - Response timeout"
+        :param response: the API's JSON response
+        """
+
+        error_code_mapping = {
+            "4002": DeviceIDError,
+            "4004": DuplicateRequestError,
+            "4081": RequestTimeoutError,
+            "5031": ServiceTemporaryUnavailable,
+            "5091": RateLimitingError,
+            "5921": NoDataFound,
+            "9999": RequestTimeoutError,
+        }
+
+        if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+            _LOGGER.error(f"Unknown API response format: {response}")
+            raise InvalidAPIResponseError()
+
+        if response["retCode"] == "F":
+            if response["resCode"] in error_code_mapping:
+                raise error_code_mapping[response["resCode"]](response["resMsg"])
+            raise APIError(
+                f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
+            )
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
@@ -319,3 +377,124 @@ class ApiImplType1(ApiImpl):
             )
 
         vehicle.data = state
+
+    def update_day_trip_info(
+        self,
+        token,
+        vehicle,
+        yyyymmdd_string,
+    ) -> None:
+        """
+        feature only available for some regions.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
+        vehicle.day_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymmdd_string,
+            1,  # day trip info
+        )
+        day_trip_list = json_result["resMsg"]["dayTripList"]
+        if len(day_trip_list) > 0:
+            msg = day_trip_list[0]
+            result = DayTripInfo(
+                yyyymmdd=yyyymmdd_string,
+                trip_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for trip in msg["tripList"]:
+                processed_trip = TripInfo(
+                    hhmmss=trip["tripTime"],
+                    drive_time=trip["tripDrvTime"],
+                    idle_time=trip["tripIdleTime"],
+                    distance=trip["tripDist"],
+                    avg_speed=trip["tripAvgSpeed"],
+                    max_speed=trip["tripMaxSpeed"],
+                )
+                result.trip_list.append(processed_trip)
+
+            vehicle.day_trip_info = result
+
+    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
+
+        responseAlltime = requests.post(
+            url,
+            json={"periodTarget": 1},
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        responseAlltime = responseAlltime.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
+        self._check_response_for_errors(responseAlltime)
+
+        response30d = requests.post(
+            url,
+            json={"periodTarget": 0},
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        response30d = response30d.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+        self._check_response_for_errors(response30d)
+        if get_child_value(responseAlltime, "resMsg.drivingInfo.0"):
+            drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
+
+            drivingInfo["dailyStats"] = []
+            if get_child_value(response30d, "resMsg.drivingInfoDetail.0"):
+                for day in response30d["resMsg"]["drivingInfoDetail"]:
+                    processedDay = DailyDrivingStats(
+                        date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                        total_consumed=get_child_value(day, "totalPwrCsp"),
+                        engine_consumption=get_child_value(day, "motorPwrCsp"),
+                        climate_consumption=get_child_value(day, "climatePwrCsp"),
+                        onboard_electronics_consumption=get_child_value(
+                            day, "eDPwrCsp"
+                        ),
+                        battery_care_consumption=get_child_value(
+                            day, "batteryMgPwrCsp"
+                        ),
+                        regenerated_energy=get_child_value(day, "regenPwr"),
+                        distance=get_child_value(day, "calculativeOdo"),
+                        distance_unit=vehicle.odometer_unit,
+                    )
+                    drivingInfo["dailyStats"].append(processedDay)
+
+            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+                if (
+                    drivingInfoItem["drivingPeriod"] == 0
+                    and next(
+                        (
+                            v
+                            for k, v in drivingInfoItem.items()
+                            if k.lower() == "calculativeodo"
+                        ),
+                        0,
+                    )
+                    > 0
+                ):
+                    drivingInfo["consumption30d"] = round(
+                        drivingInfoItem["totalPwrCsp"]
+                        / drivingInfoItem["calculativeOdo"]
+                    )
+                    break
+
+            return drivingInfo
+        else:
+            _LOGGER.debug(
+                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
+            )
+            return None
