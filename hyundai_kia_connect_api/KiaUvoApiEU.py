@@ -1181,53 +1181,6 @@ class KiaUvoApiEU(ApiImplType1):
 
             vehicle.month_trip_info = result
 
-    def update_day_trip_info(
-        self,
-        token,
-        vehicle,
-        yyyymmdd_string,
-    ) -> None:
-        """
-        feature only available for some regions.
-        Updates the vehicle.day_trip_info information for the specified day.
-
-        Default this information is None:
-
-        day_trip_info: DayTripInfo = None
-        """
-        vehicle.day_trip_info = None
-        json_result = self._get_trip_info(
-            token,
-            vehicle,
-            yyyymmdd_string,
-            1,  # day trip info
-        )
-        day_trip_list = json_result["resMsg"]["dayTripList"]
-        if len(day_trip_list) > 0:
-            msg = day_trip_list[0]
-            result = DayTripInfo(
-                yyyymmdd=yyyymmdd_string,
-                trip_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-            for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
-                )
-                result.trip_list.append(processed_trip)
-
-            vehicle.day_trip_info = result
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
