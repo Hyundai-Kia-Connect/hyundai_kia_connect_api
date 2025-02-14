@@ -23,9 +23,7 @@ from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
-    DailyDrivingStats,
     MonthTripInfo,
-    DayTripInfo,
     TripInfo,
     DayTripCounts,
 )
@@ -891,7 +889,6 @@ class KiaUvoApiAU(ApiImplType1):
                 result.day_list.append(processed_day)
 
             vehicle.month_trip_info = result
-
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
