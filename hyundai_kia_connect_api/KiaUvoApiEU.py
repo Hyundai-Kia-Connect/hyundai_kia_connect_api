@@ -1736,7 +1736,7 @@ class KiaUvoApiEU(ApiImplType1):
         timeout: int = 0,
     ) -> OrderStatus:
         url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
-
+    
         if synchronous:
             if timeout < 1:
                 raise APIError("Timeout must be 1 or higher")
@@ -1784,5 +1784,5 @@ class KiaUvoApiEU(ApiImplType1):
 
             # if iterate the whole notifications list and
             # can't find the action, raise an exception
-            # raise APIError(f"No action found with ID {action_id}")
+            # Old code: raise APIError(f"No action found with ID {action_id}")
             return OrderStatus.UNKNOWN
