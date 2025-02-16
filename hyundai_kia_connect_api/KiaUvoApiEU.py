@@ -1784,4 +1784,5 @@ class KiaUvoApiEU(ApiImplType1):
 
             # if iterate the whole notifications list and
             # can't find the action, raise an exception
-            raise APIError(f"No action found with ID {action_id}")
+            #raise APIError(f"No action found with ID {action_id}")
+            return OrderStatus.UNKNOWN
