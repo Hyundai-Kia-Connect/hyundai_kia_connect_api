@@ -1736,7 +1736,7 @@ class KiaUvoApiEU(ApiImplType1):
         timeout: int = 0,
     ) -> OrderStatus:
         url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
-    
+
         if synchronous:
             if timeout < 1:
                 raise APIError("Timeout must be 1 or higher")
