@@ -1353,9 +1353,15 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
-        url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
-        url = url + "/reservation/chargehvac"
+        
+        if vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
+            url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
+            url = url + "/reservation/chargehvac"
+        else:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id
+            url = url + "/ccs2"
+            url = url + "/reservation/chargehvac"
 
         def set_default_departure_options(
             departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
@@ -1451,11 +1457,18 @@ class KiaUvoApiEU(ApiImplType1):
             },
             "reservFlag": 1 if options.charging_enabled else 0,
         }
-
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
+
+        if vehicle.ccu_ccs2_protocol_support:
+
+            response = requests.post(
+                url, json=payload, headers=self._get_control_headers(token, vehicle)
+            ).json()
+        else: 
+            response = requests.post(
+                url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+            ).json()
+
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
