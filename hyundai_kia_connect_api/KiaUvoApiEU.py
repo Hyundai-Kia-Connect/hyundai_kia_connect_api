@@ -1353,7 +1353,6 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        
         if vehicle.ccu_ccs2_protocol_support:
             url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
             url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
@@ -1460,13 +1459,16 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
 
         if vehicle.ccu_ccs2_protocol_support:
-
             response = requests.post(
                 url, json=payload, headers=self._get_control_headers(token, vehicle)
             ).json()
-        else: 
+        else:
             response = requests.post(
-                url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+                url,
+                json=payload,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
             ).json()
 
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
