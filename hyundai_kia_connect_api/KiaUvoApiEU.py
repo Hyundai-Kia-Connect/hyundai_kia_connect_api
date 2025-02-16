@@ -931,19 +931,28 @@ class KiaUvoApiEU(ApiImplType1):
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
         if vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/portdoor"
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/portdoor"
+            )
 
             payload = {"command": action.value}
             _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
             response = requests.post(
                 url, json=payload, headers=self._get_control_headers(token, vehicle)
             ).json()
-        else:     
+        else:
             url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
             payload = {"action": action.value}
             _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
             response = requests.post(
-                url, json=payload, headers=self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+                url,
+                json=payload,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
