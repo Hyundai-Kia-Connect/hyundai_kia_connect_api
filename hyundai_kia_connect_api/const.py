@@ -92,6 +92,8 @@ class OrderStatus(Enum):
     # no response received from vehicle.
     # no way to know if the order was executed, but most likely not
     TIMEOUT = "TIMEOUT"
+    # Used when we don't know the status of the order
+    UNKNOWN = "UNKNOWN"
 
 
 class WINDOW_STATE(IntEnum):
