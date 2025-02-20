@@ -45,20 +45,6 @@ CIPHERS = "ALL:@SECLEVEL=0"
 _LOGGER = logging.getLogger(__name__)
 
 
-class cipherAdapter(requests.adapters.HTTPAdapter):
-    """
-    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
-    """
-
-    def init_poolmanager(self, connections, maxsize, block=False):
-        context = ssl.create_default_context()
-        context.set_ciphers(CIPHERS)
-        context.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
-        self.poolmanager = urllib3.poolmanager.PoolManager(
-            ssl_version=ssl.PROTOCOL_TLS, ssl_context=context
-        )
-
-
 class KiaUvoApiCA(ApiImpl):
     """KiaUvoApiCA"""
 
@@ -101,7 +87,6 @@ class KiaUvoApiCA(ApiImpl):
     def sessions(self):
         if not self._sessions:
             self._sessions = requests.Session()
-            # self._sessions.mount("https://" + self.BASE_URL)
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
