@@ -130,7 +130,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def login(self, username: str, password: str) -> Token:
         # Sign In with Email and Password and Get Authorization Code
-        url = self.API_URL + "lgn"
+        url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         response = self.sessions.post(url, json=data, headers=headers)
