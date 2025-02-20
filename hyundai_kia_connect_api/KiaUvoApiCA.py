@@ -135,10 +135,10 @@ class KiaUvoApiCA(ApiImpl):
             refresh_token=refresh_token,
             valid_until=valid_until,
         )
-    
+
     def test_token(self, token: Token) -> bool:
         # Use "get number of notifications" as a dummy request to test the token
-        # Use this api because it's likely checked more frequently than other APIs, less 
+        # Use this api because it's likely checked more frequently than other APIs, less
         # chance to get banned. And it's short and simple.
         url = self.API_URL + "ntcmsgcnt"
         headers = self.API_HEADERS
@@ -147,7 +147,10 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
         response = response.json()
         token_errors = ["7403", "7602"]
-        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] in token_errors:
+        if (
+            response["responseHeader"]["responseCode"] == 1
+            and response["error"]["errorCode"] in token_errors
+        ):
             return False
         return True
 
