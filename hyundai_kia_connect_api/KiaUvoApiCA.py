@@ -22,7 +22,6 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
-    LOGIN_TOKEN_LIFETIME,
     OrderStatus,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -36,9 +35,6 @@ from .utils import (
     get_index_into_hex_temp,
     parse_datetime,
 )
-
-
-CIPHERS = "ALL:@SECLEVEL=0"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,17 +60,19 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
-            "content-type": "application/json;charset=UTF-8",
+            "content-type": "application/json",
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",  # noqa
+            "user-agent": "MyHyundai/2.0.25 (iPhone; iOS 18.3.1; Scale/3.00)",  # noqa
             "host": self.BASE_URL,
+            "client_id": "HATAHSPACA0232141ED9722C67715A0B",
+            "client_secret": "CLISCR01AHSPA",
             "origin": "https://" + self.BASE_URL,
             "referer": "https://" + self.BASE_URL + "/login",
-            "from": "CWP",
+            "from": "SPA",
             "language": "0",
-            "offset": "0",
+            "offset": "-5",
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
@@ -121,12 +119,13 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         self._check_response_for_errors(response)
         response = response["result"]["token"]
+        token_expire_in = int(response["expireIn"]) - 60
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
-        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
+        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=token_expire_in)
 
         return Token(
             username=username,
