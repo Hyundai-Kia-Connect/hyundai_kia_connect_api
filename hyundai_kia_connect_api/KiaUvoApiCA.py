@@ -37,8 +37,6 @@ from .utils import (
     parse_datetime,
 )
 
-import ssl
-import urllib3
 
 CIPHERS = "ALL:@SECLEVEL=0"
 
