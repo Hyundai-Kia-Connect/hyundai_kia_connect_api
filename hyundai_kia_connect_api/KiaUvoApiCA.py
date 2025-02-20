@@ -118,7 +118,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         self._check_response_for_errors(response)
         response = response["result"]["token"]
-        token_expire_in = int(response['expireIn']) - 60
+        token_expire_in = int(response["expireIn"]) - 60
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
