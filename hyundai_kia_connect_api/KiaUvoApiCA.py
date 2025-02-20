@@ -6,7 +6,6 @@ import time
 import datetime as dt
 import json
 import logging
-
 import pytz
 import requests
 
@@ -89,7 +88,7 @@ class KiaUvoApiCA(ApiImpl):
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,
             "referer": "https://" + self.BASE_URL + "/login",
-            "from": "SPA",
+            "from": "CWP",
             "language": "0",
             "offset": "0",
             "sec-fetch-dest": "empty",
@@ -102,7 +101,7 @@ class KiaUvoApiCA(ApiImpl):
     def sessions(self):
         if not self._sessions:
             self._sessions = requests.Session()
-            self._sessions.mount("https://" + self.BASE_URL, cipherAdapter())
+            #self._sessions.mount("https://" + self.BASE_URL)
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
@@ -128,16 +127,18 @@ class KiaUvoApiCA(ApiImpl):
             else:
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
+
+
     def login(self, username: str, password: str) -> Token:
         # Sign In with Email and Password and Get Authorization Code
-        url = self.API_URL + "lgn"
+        url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         self._check_response_for_errors(response)
-        response = response["result"]
+        response = response["result"]['token']
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
