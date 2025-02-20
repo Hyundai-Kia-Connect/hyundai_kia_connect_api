@@ -115,6 +115,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
+        headers.pop("accessToken", None)
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
@@ -145,7 +146,8 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
         response = response.json()
-        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] == "7403":
+        token_errors = ["7403", "7602"]
+        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] in token_errors:
             return False
         return True
 
