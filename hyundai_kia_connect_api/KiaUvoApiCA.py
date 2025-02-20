@@ -101,7 +101,7 @@ class KiaUvoApiCA(ApiImpl):
     def sessions(self):
         if not self._sessions:
             self._sessions = requests.Session()
-            #self._sessions.mount("https://" + self.BASE_URL)
+            # self._sessions.mount("https://" + self.BASE_URL)
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
@@ -127,8 +127,6 @@ class KiaUvoApiCA(ApiImpl):
             else:
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
-
-
     def login(self, username: str, password: str) -> Token:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
@@ -138,7 +136,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         self._check_response_for_errors(response)
-        response = response["result"]['token']
+        response = response["result"]["token"]
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
