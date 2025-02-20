@@ -89,6 +89,11 @@ class ApiImpl:
         """Get cached vehicle data and update Vehicle instance with it"""
         pass
 
+    def test_token(self, token: Token) -> bool:
+        """Test if token is valid
+        Use any dummy request to test if token is still valid"""
+        return True
+
     def check_action_status(
         self,
         token: Token,

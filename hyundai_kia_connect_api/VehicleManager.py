@@ -134,7 +134,7 @@ class VehicleManager:
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
-        if self.token.valid_until <= dt.datetime.now(pytz.utc):
+        if self.token.valid_until <= dt.datetime.now(pytz.utc) or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token: Token = self.api.login(self.username, self.password)
             self.token.pin = self.pin
