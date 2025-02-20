@@ -6,7 +6,6 @@ import time
 import datetime as dt
 import json
 import logging
-
 import pytz
 import requests
 
@@ -38,26 +37,10 @@ from .utils import (
     parse_datetime,
 )
 
-import ssl
-import urllib3
 
 CIPHERS = "ALL:@SECLEVEL=0"
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class cipherAdapter(requests.adapters.HTTPAdapter):
-    """
-    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
-    """
-
-    def init_poolmanager(self, connections, maxsize, block=False):
-        context = ssl.create_default_context()
-        context.set_ciphers(CIPHERS)
-        context.options |= getattr(ssl, "OP_LEGACY_SERVER_CONNECT", 0x4)
-        self.poolmanager = urllib3.poolmanager.PoolManager(
-            ssl_version=ssl.PROTOCOL_TLS, ssl_context=context
-        )
 
 
 class KiaUvoApiCA(ApiImpl):
@@ -89,7 +72,7 @@ class KiaUvoApiCA(ApiImpl):
             "host": self.BASE_URL,
             "origin": "https://" + self.BASE_URL,
             "referer": "https://" + self.BASE_URL + "/login",
-            "from": "SPA",
+            "from": "CWP",
             "language": "0",
             "offset": "0",
             "sec-fetch-dest": "empty",
@@ -102,7 +85,6 @@ class KiaUvoApiCA(ApiImpl):
     def sessions(self):
         if not self._sessions:
             self._sessions = requests.Session()
-            self._sessions.mount("https://" + self.BASE_URL, cipherAdapter())
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
@@ -137,7 +119,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         self._check_response_for_errors(response)
-        response = response["result"]
+        response = response["result"]["token"]
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
         _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
