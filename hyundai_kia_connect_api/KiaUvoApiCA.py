@@ -115,6 +115,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
+        headers.pop("accessToken", None)
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
@@ -134,6 +135,24 @@ class KiaUvoApiCA(ApiImpl):
             refresh_token=refresh_token,
             valid_until=valid_until,
         )
+
+    def test_token(self, token: Token) -> bool:
+        # Use "get number of notifications" as a dummy request to test the token
+        # Use this api because it's likely checked more frequently than other APIs, less
+        # chance to get banned. And it's short and simple.
+        url = self.API_URL + "ntcmsgcnt"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        response = self.sessions.post(url, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
+        response = response.json()
+        token_errors = ["7403", "7602"]
+        if (
+            response["responseHeader"]["responseCode"] == 1
+            and response["error"]["errorCode"] in token_errors
+        ):
+            return False
+        return True
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
