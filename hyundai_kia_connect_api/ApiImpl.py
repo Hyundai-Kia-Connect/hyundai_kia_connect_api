@@ -124,10 +124,11 @@ class ApiImpl:
                 + "&format=json&addressdetails=1&zoom=18"
                 + email_parameter
             )
+            headers = {"user-agent": "curl/7.81.0"}
             _LOGGER.debug(
                 f"{DOMAIN} - Running update geocode location with value: {url}"
             )
-            response = requests.get(url)
+            response = requests.get(url, headers=headers)
             _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
             try:
                 response = response.json()
