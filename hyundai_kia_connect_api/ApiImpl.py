@@ -124,7 +124,7 @@ class ApiImpl:
                 + "&format=json&addressdetails=1&zoom=18"
                 + email_parameter
             )
-            headers = {'user-agent': 'curl/7.81.0'}
+            headers = {"user-agent": "curl/7.81.0"}
             _LOGGER.debug(
                 f"{DOMAIN} - Running update geocode location with value: {url}"
             )
