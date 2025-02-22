@@ -172,7 +172,7 @@ class KiaUvoApiCA(ApiImpl):
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
-                model=entry["modelName"],
+                model=entry.get(["modelName"]),
                 year=int(entry["modelYear"]),
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
