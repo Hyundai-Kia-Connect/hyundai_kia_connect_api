@@ -372,7 +372,7 @@ def cmd_info(vm, args):
         print_vehicle(vehicle)
     if args.json:
         data = {id: vehicle_to_dict(v) for id, v in vm.vehicles.items()}
-        json.dump(data, args.json, separators=(",", ":"), cls=DateTimeEncoder)
+        json.dump(data, args.json, separators=(",", ":"), cls=DateTimeEncoder, indent=4)
     return 0
 
 
