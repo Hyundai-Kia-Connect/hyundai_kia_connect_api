@@ -173,7 +173,7 @@ class KiaUvoApiCA(ApiImpl):
                 id=entry["vehicleId"],
                 name=entry["nickName"],
                 model=entry.get("modelName"),
-                year=int(entry.get("modelYear", 1900),
+                year=int(entry.get("modelYear", 1900)),
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
