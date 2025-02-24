@@ -382,7 +382,7 @@ def main():
     default_pin = None
     if os.environ.get("BLUELINK_PIN", ""):
         try:
-            default_pin = int(os.environ["BLUELINK_PIN"])
+            default_pin = str(os.environ["BLUELINK_PIN"])
         except ValueError:
             print("Invalid BLUELINK_PIN environment variable", file=sys.stderr)
             return 1
@@ -414,7 +414,7 @@ def main():
     )
     parser.add_argument(
         "--pin",
-        type=int,
+        type=str,
         default=default_pin,
         help="Bluelink account pin, use env var BLUELINK_PIN",
         required=not default_pin,
