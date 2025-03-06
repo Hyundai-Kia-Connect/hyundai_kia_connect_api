@@ -141,7 +141,7 @@ class KiaUvoApiUSA(ApiImpl):
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
             "apptype": "L",
-            "appversion": "4.10.0",
+            "appversion": "7.12.1",
             "clientid": "MWAMOBILE",
             "from": "SPA",
             "host": self.BASE_URL,
@@ -152,7 +152,7 @@ class KiaUvoApiUSA(ApiImpl):
             "secretkey": "98er-w34rf-ibf3-3f6h",
             "to": "APIGW",
             "tokentype": "G",
-            "user-agent": "okhttp/3.12.1",
+            "user-agent": "okhttp/4.10.0",
         }
         # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
         # May require adjusting locale to en_US
