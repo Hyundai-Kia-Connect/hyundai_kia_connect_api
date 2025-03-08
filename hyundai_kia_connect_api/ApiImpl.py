@@ -139,9 +139,7 @@ class ApiImpl:
                     + email_parameter
                 )
                 headers = {"user-agent": "curl/7.81.0"}
-                _LOGGER.debug(
-                    f"{DOMAIN} - Running update geocode location"
-                )
+                _LOGGER.debug(f"{DOMAIN} - Running update geocode location")
                 response = requests.get(url, headers=headers)
                 _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
                 try:
