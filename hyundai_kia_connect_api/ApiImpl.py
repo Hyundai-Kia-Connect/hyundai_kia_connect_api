@@ -141,7 +141,6 @@ class ApiImpl:
                 headers = {"user-agent": "curl/7.81.0"}
                 _LOGGER.debug(f"{DOMAIN} - Running update geocode location")
                 response = requests.get(url, headers=headers)
-                _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
                 try:
                     response = response.json()
                 except JSONDecodeError:
@@ -150,9 +149,7 @@ class ApiImpl:
                     )
                     vehicle.geocode = None
                 else:
-                    _LOGGER.debug(
-                        f"{DOMAIN} - geocode location json response: {response}"
-                    )
+
                     vehicle.geocode = (
                         get_child_value(response, "display_name"),
                         get_child_value(response, "address"),
