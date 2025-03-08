@@ -149,7 +149,6 @@ class ApiImpl:
                     )
                     vehicle.geocode = None
                 else:
-
                     vehicle.geocode = (
                         get_child_value(response, "display_name"),
                         get_child_value(response, "address"),
