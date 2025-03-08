@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 
 import requests
+from geopy.geocoders import GoogleV3
 from requests.exceptions import JSONDecodeError
 from .Token import Token
 from .Vehicle import Vehicle
@@ -17,7 +18,13 @@ from .const import (
     DOMAIN,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
+    GEO_LOCATION_PROVIDERS,
+    OPENSTREETMAP,
+    GOOGLE
 )
+
+GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+
 from .utils import get_child_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -109,38 +116,45 @@ class ApiImpl:
         pass
 
     def update_geocoded_location(
-        self, token: Token, vehicle: Vehicle, use_email: bool
+        self, token: Token, vehicle: Vehicle, use_email: bool, provider: int = 1, API_KEY: str = None
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
-            email_parameter = ""
-            if use_email is True:
-                email_parameter = "&email=" + token.username
+            if GEO_LOCATION_PROVIDERS[provider] == OPENSTREETMAP:
+                email_parameter = ""
+                if use_email is True:
+                    email_parameter = "&email=" + token.username
 
-            url = (
-                "https://nominatim.openstreetmap.org/reverse?lat="
-                + str(vehicle.location_latitude)
-                + "&lon="
-                + str(vehicle.location_longitude)
-                + "&format=json&addressdetails=1&zoom=18"
-                + email_parameter
-            )
-            headers = {"user-agent": "curl/7.81.0"}
-            _LOGGER.debug(
-                f"{DOMAIN} - Running update geocode location with value: {url}"
-            )
-            response = requests.get(url, headers=headers)
-            _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
-            try:
-                response = response.json()
-            except JSONDecodeError:
-                _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
-                vehicle.geocode = None
-            else:
-                _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
-                vehicle.geocode = (
-                    get_child_value(response, "display_name"),
-                    get_child_value(response, "address"),
+                url = (
+                    "https://nominatim.openstreetmap.org/reverse?lat="
+                    + str(vehicle.location_latitude)
+                    + "&lon="
+                    + str(vehicle.location_longitude)
+                    + "&format=json&addressdetails=1&zoom=18"
+                    + email_parameter
                 )
+                headers = {"user-agent": "curl/7.81.0"}
+                _LOGGER.debug(
+                    f"{DOMAIN} - Running update geocode location with value: {url}"
+                )
+                response = requests.get(url, headers=headers)
+                _LOGGER.debug(f"{DOMAIN} - geocode location raw response: {response}")
+                try:
+                    response = response.json()
+                except JSONDecodeError:
+                    _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
+                    vehicle.geocode = None
+                else:
+                    _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
+                    vehicle.geocode = (
+                        get_child_value(response, "display_name"),
+                        get_child_value(response, "address"),
+                    )
+            elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
+                if API_KEY:
+                    geolocator = GoogleV3(api_key=API_KEY)
+                    locations = geolocator.reverse(vehicle.location_latitude, vehicle.location_longitude)
+                    if locations:
+                        vehicle.geocode = locations[0].address
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
