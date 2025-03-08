@@ -161,7 +161,7 @@ class ApiImpl:
                         vehicle.location_latitude, vehicle.location_longitude
                     )
                     if locations:
-                        vehicle.geocode = locations[0].address
+                        vehicle.geocode = (None, locations[0].address)
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
