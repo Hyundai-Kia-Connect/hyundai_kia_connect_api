@@ -20,7 +20,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     GEO_LOCATION_PROVIDERS,
     OPENSTREETMAP,
-    GOOGLE
+    GOOGLE,
 )
 
 GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -116,7 +116,12 @@ class ApiImpl:
         pass
 
     def update_geocoded_location(
-        self, token: Token, vehicle: Vehicle, use_email: bool, provider: int = 1, API_KEY: str = None
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        use_email: bool,
+        provider: int = 1,
+        API_KEY: str = None,
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
             if GEO_LOCATION_PROVIDERS[provider] == OPENSTREETMAP:
@@ -141,10 +146,14 @@ class ApiImpl:
                 try:
                     response = response.json()
                 except JSONDecodeError:
-                    _LOGGER.debug(f"{DOMAIN} - failed to decode json for geocode location")
+                    _LOGGER.debug(
+                        f"{DOMAIN} - failed to decode json for geocode location"
+                    )
                     vehicle.geocode = None
                 else:
-                    _LOGGER.debug(f"{DOMAIN} - geocode location json response: {response}")
+                    _LOGGER.debug(
+                        f"{DOMAIN} - geocode location json response: {response}"
+                    )
                     vehicle.geocode = (
                         get_child_value(response, "display_name"),
                         get_child_value(response, "address"),
@@ -152,7 +161,9 @@ class ApiImpl:
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
                 if API_KEY:
                     geolocator = GoogleV3(api_key=API_KEY)
-                    locations = geolocator.reverse(vehicle.location_latitude, vehicle.location_longitude)
+                    locations = geolocator.reverse(
+                        vehicle.location_latitude, vehicle.location_longitude
+                    )
                     if locations:
                         vehicle.geocode = locations[0].address
 

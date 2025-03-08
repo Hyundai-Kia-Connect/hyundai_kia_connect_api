@@ -95,7 +95,11 @@ class VehicleManager:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
-                    token=self.token, vehicle=vehicle, use_email=self.geocode_api_use_email, provider=self.geocode_provider, API_KEY=self.geocode_api_key
+                    token=self.token,
+                    vehicle=vehicle,
+                    use_email=self.geocode_api_use_email,
+                    provider=self.geocode_provider,
+                    API_KEY=self.geocode_api_key,
                 )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
