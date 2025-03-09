@@ -240,7 +240,7 @@ class KiaUvoApiAU(ApiImplType1):
                 },                
             )
             
-            if vehicle.odometer == None:
+            if vehicle.odometer is None:
                 # Some cars (e.g. 2024 Niro EV) report as not supporting ccs2 but
                 # only report the odometer value in the ccs2 status response.
                 # So if the odo is None we will try to request the ccs2 status.
@@ -258,7 +258,7 @@ class KiaUvoApiAU(ApiImplType1):
                     
                     state = ccs2Response["resMsg"]["state"]["Vehicle"]
                     odo = get_child_value(state, "Drivetrain.Odometer")
-                    if odo != None:
+                    if odo is not None:
                         vehicle.odometer = (
                             odo,
                             DISTANCE_UNITS[1],
