@@ -26,10 +26,19 @@ Python 3.10 or newer is required to use this package. Vehicle manager is the key
     password: str
     pin: str (required for CA, and potentially USA, otherwise pass a blank string)
 
+    Optional parameters are::
+    geocode_api_enable: bool
+    geocode_api_use_email: bool
+    geocode_provider: int
+    geocode_api_key: str
+    language: str
+
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
     REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
+    GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
+
 
 Once this is done you can now make the following calls against the vehicle manager::
 
