@@ -239,7 +239,7 @@ class KiaUvoApiAU(ApiImplType1):
                     "vehicleLocation": location,
                 },
             )
-            
+
             if not get_child_value(response["resMsg"], "odometer.value"):
                 # Some cars (e.g. 2024 Niro EV) report as not supporting ccs2 but
                 # only report the odometer value in the ccs2 status response.
