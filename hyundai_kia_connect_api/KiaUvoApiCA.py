@@ -589,27 +589,20 @@ class KiaUvoApiCA(ApiImpl):
                 "airCtrl": int(options.climate),
                 "defrost": options.defrost,
                 "heating1": options.heating,
+                "igniOnDuration": options.duration,
                 "airTemp": {
                     "value": hex_set_temp,
                     "unit": 0,
                     "hvacTempType": 1,
                 },
+                "seatHeaterVentCMD": {
+                    "drvSeatOptCmd": options.front_left_seat,
+                    "astSeatOptCmd": options.front_right_seat,
+                    "rlSeatOptCmd": options.rear_left_seat,
+                    "rrSeatOptCmd": options.rear_right_seat,
+                }
             }
-            if BRANDS[self.brand] == BRAND_KIA:
-                payload["remoteControl"] = climate_settings
-                payload["remoteControl"].update(
-                    {
-                        "igniOnDuration": options.duration,
-                        "seatHeaterVentCMD": {
-                            "drvSeatOptCmd": options.front_left_seat,
-                            "astSeatOptCmd": options.front_right_seat,
-                            "rlSeatOptCmd": options.rear_left_seat,
-                            "rrSeatOptCmd": options.rear_right_seat,
-                        },
-                    }
-                )
-            else:
-                payload["hvacInfo"] = climate_settings
+            payload["hvacInfo"] = climate_settings
         else:
             payload = {
                 "setting": {
