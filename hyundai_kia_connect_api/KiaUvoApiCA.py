@@ -600,7 +600,7 @@ class KiaUvoApiCA(ApiImpl):
                     "astSeatOptCmd": options.front_right_seat,
                     "rlSeatOptCmd": options.rear_left_seat,
                     "rrSeatOptCmd": options.rear_right_seat,
-                }
+                },
             }
             payload["hvacInfo"] = climate_settings
         else:
