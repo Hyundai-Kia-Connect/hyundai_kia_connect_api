@@ -596,18 +596,32 @@ class KiaUvoApiCA(ApiImpl):
                 },
             }
             if BRANDS[self.brand] == BRAND_KIA:
-                payload["remoteControl"] = climate_settings
-                payload["remoteControl"].update(
-                    {
-                        "igniOnDuration": options.duration,
-                        "seatHeaterVentCMD": {
-                            "drvSeatOptCmd": options.front_left_seat,
-                            "astSeatOptCmd": options.front_right_seat,
-                            "rlSeatOptCmd": options.rear_left_seat,
-                            "rrSeatOptCmd": options.rear_right_seat,
-                        },
-                    }
-                )
+                if vehicle.name == "EV9":    
+                    payload["remoteControl"] = climate_settings
+                    payload["remoteControl"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )
+                else:
+                    payload["hvacInfo"] = climate_settings
+                    payload["hvacInfo"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )    
             else:
                 payload["hvacInfo"] = climate_settings
         else:
