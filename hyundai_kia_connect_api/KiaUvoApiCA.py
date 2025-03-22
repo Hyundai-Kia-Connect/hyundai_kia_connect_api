@@ -596,7 +596,7 @@ class KiaUvoApiCA(ApiImpl):
                 },
             }
             if BRANDS[self.brand] == BRAND_KIA:
-                if vehicle.name == "EV9":    
+                if vehicle.name == "EV9":
                     payload["remoteControl"] = climate_settings
                     payload["remoteControl"].update(
                         {
@@ -621,7 +621,7 @@ class KiaUvoApiCA(ApiImpl):
                                 "rrSeatOptCmd": options.rear_right_seat,
                             },
                         }
-                    )    
+                    )
             else:
                 payload["hvacInfo"] = climate_settings
         else:
