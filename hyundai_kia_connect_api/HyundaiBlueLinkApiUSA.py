@@ -747,7 +747,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
                 model=entry["modelCode"],
-                registration_date=["enrollmentDate"],
+                registration_date=entry["enrollmentDate"],
                 timezone=self.data_timezone,
             )
             result.append(vehicle)
