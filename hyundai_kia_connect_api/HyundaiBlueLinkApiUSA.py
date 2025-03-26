@@ -103,7 +103,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             "refresh": "false",
             "encryptFlag": "false",
             "brandIndicator": "H",
-            "gen": "2",
             "client_id": "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920",
             "clientSecret": "v558o935-6nne-423i-baa8",
         }
@@ -122,6 +121,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self._get_authenticated_headers(token)
         headers["registrationId"] = vehicle.id
+        headers["gen"] = vehicle.generation
         headers["vin"] = vehicle.VIN
         return headers
 
@@ -749,6 +749,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 model=entry["modelCode"],
                 registration_date=entry["enrollmentDate"],
                 timezone=self.data_timezone,
+                generation=entry.get("vehicleGeneration", 2),
             )
             result.append(vehicle)
 
