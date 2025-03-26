@@ -73,7 +73,10 @@ class Vehicle:
     year: int = None
     VIN: str = None
     key: str = None
+    # EU or Type 1 version:
     ccu_ccs2_protocol_support: int = None
+    # Hyundai USA:
+    generation: int = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
