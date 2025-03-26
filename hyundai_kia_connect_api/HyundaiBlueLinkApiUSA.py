@@ -749,7 +749,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 model=entry["modelCode"],
                 registration_date=["enrollmentDate"],
                 timezone=self.data_timezone,
-                generation=entry.get("vehicleGeneration"),
+                generation=entry.get("vehicleGeneration", 2),
             )
             result.append(vehicle)
 
