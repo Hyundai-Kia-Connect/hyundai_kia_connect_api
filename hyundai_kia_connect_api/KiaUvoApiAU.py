@@ -23,9 +23,7 @@ from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
     Vehicle,
-    DailyDrivingStats,
     MonthTripInfo,
-    DayTripInfo,
     TripInfo,
     DayTripCounts,
 )
@@ -44,13 +42,7 @@ from .const import (
 )
 from .exceptions import (
     AuthenticationError,
-    DuplicateRequestError,
-    RequestTimeoutError,
-    ServiceTemporaryUnavailable,
-    NoDataFound,
-    InvalidAPIResponseError,
     APIError,
-    RateLimitingError,
 )
 from .utils import (
     get_child_value,
@@ -63,44 +55,6 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-
-
-def _check_response_for_errors(response: dict) -> None:
-    """
-    Checks for errors in the API response.
-    If an error is found, an exception is raised.
-    retCode known values:
-    - S: success
-    - F: failure
-    resCode / resMsg known values:
-    - 0000: no error
-    - 4004: "Duplicate request"
-    - 4081: "Request timeout"
-    - 5031: "Unavailable remote control - Service Temporary Unavailable"
-    - 5091: "Exceeds number of requests"
-    - 5921: "No Data Found v2 - No Data Found v2"
-    - 9999: "Undefined Error - Response timeout"
-    :param response: the API's JSON response
-    """
-
-    error_code_mapping = {
-        "4004": DuplicateRequestError,
-        "4081": RequestTimeoutError,
-        "5031": ServiceTemporaryUnavailable,
-        "5091": RateLimitingError,
-        "5921": NoDataFound,
-        "9999": RequestTimeoutError,
-    }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
-        _LOGGER.error(f"Unknown API response format: {response}")
-        raise InvalidAPIResponseError()
-
-    if response["retCode"] == "F":
-        if response["resCode"] in error_code_mapping:
-            raise error_code_mapping[response["resCode"]](response["resMsg"])
-        else:
-            raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
 class KiaUvoApiAU(ApiImplType1):
@@ -170,7 +124,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
@@ -225,7 +179,7 @@ class KiaUvoApiAU(ApiImplType1):
         ).json()
 
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
 
         if is_ccs2:
             state = response["resMsg"]["state"]["Vehicle"]
@@ -665,7 +619,7 @@ class KiaUvoApiAU(ApiImplType1):
                 url, headers=self._get_authenticated_headers(token)
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
-            _check_response_for_errors(response)
+            self._check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
@@ -677,7 +631,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         mapped_response = {}
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
@@ -693,7 +647,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def set_windows_state(
@@ -712,7 +666,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def charge_port_action(
@@ -727,7 +681,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def start_climate(
@@ -767,7 +721,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -780,7 +734,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -792,7 +746,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -804,7 +758,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
@@ -817,7 +771,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, headers=self._get_authenticated_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         # API sometimes returns multiple entries per plug type and they conflict.
         # The car itself says the last entry per plug type is the truth when tested
         # (EU Ioniq Electric Facelift MY 2019)
@@ -845,7 +799,7 @@ class KiaUvoApiAU(ApiImplType1):
         )
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response
 
     def update_month_trip_info(
@@ -892,106 +846,6 @@ class KiaUvoApiAU(ApiImplType1):
 
             vehicle.month_trip_info = result
 
-    def update_day_trip_info(
-        self,
-        token,
-        vehicle,
-        yyyymmdd_string,
-    ) -> None:
-        """
-        feature only available for some regions.
-        Updates the vehicle.day_trip_info information for the specified day.
-
-        Default this information is None:
-
-        day_trip_info: DayTripInfo = None
-        """
-        vehicle.day_trip_info = None
-        json_result = self._get_trip_info(
-            token,
-            vehicle,
-            yyyymmdd_string,
-            1,  # day trip info
-        )
-        day_trip_list = json_result["resMsg"]["dayTripList"]
-        if len(day_trip_list) > 0:
-            msg = day_trip_list[0]
-            result = DayTripInfo(
-                yyyymmdd=yyyymmdd_string,
-                trip_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-            for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
-                )
-                result.trip_list.append(processed_trip)
-            vehicle.day_trip_info = result
-
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
-
-        responseAlltime = requests.post(
-            url,
-            json={"periodTarget": 1},
-            headers=self._get_authenticated_headers(token),
-        )
-        responseAlltime = responseAlltime.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
-        _check_response_for_errors(responseAlltime)
-
-        response30d = requests.post(
-            url,
-            json={"periodTarget": 0},
-            headers=self._get_authenticated_headers(token),
-        )
-        response30d = response30d.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
-        _check_response_for_errors(response30d)
-        if get_child_value(responseAlltime, "resMsg.drivingInfoDetail.0"):
-            drivingInfo = responseAlltime["resMsg"]["drivingInfoDetail"][0]
-
-            drivingInfo["dailyStats"] = []
-            for day in response30d["resMsg"]["drivingInfoDetail"]:
-                processedDay = DailyDrivingStats(
-                    date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                    total_consumed=day["totalPwrCsp"],
-                    engine_consumption=day["motorPwrCsp"],
-                    climate_consumption=day["climatePwrCsp"],
-                    onboard_electronics_consumption=day["eDPwrCsp"],
-                    battery_care_consumption=day["batteryMgPwrCsp"],
-                    regenerated_energy=day["regenPwr"],
-                    distance=day["calculativeOdo"],
-                    distance_unit=vehicle.odometer_unit,
-                )
-                drivingInfo["dailyStats"].append(processedDay)
-
-            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if drivingInfoItem["drivingPeriod"] == 0:
-                    drivingInfo["consumption30d"] = round(
-                        drivingInfoItem["totalPwrCsp"]
-                        / drivingInfoItem["calculativeOdo"]
-                    )
-                    break
-
-            return drivingInfo
-        else:
-            _LOGGER.debug(
-                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
-            )
-            return None
-
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
@@ -1013,7 +867,7 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=body, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         return response["msgId"]
 
     def _get_stamp(self) -> str:
@@ -1059,7 +913,7 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
-        _check_response_for_errors(response)
+        self._check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
@@ -1214,7 +1068,7 @@ class KiaUvoApiAU(ApiImplType1):
                 url, headers=self._get_authenticated_headers(token)
             ).json()
             _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
-            _check_response_for_errors(response)
+            self._check_response_for_errors(response)
 
             for action in response["resMsg"]:
                 if action["recordId"] == action_id:
