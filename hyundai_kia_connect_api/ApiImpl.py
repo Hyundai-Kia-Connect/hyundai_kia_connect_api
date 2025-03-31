@@ -25,9 +25,6 @@ from .const import (
     GOOGLE,
 )
 
-GOOGLE_MAPS_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
-
-
 _LOGGER = logging.getLogger(__name__)
 
 
