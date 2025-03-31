@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 
 import requests
+import geopy
 from geopy.geocoders import GoogleV3
 from requests.exceptions import JSONDecodeError
 from .Token import Token
