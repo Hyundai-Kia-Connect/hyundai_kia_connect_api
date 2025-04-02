@@ -10,3 +10,4 @@ Sphinx==8.2.3
 twine==6.1.0
 watchdog==6.0.0
 wheel==0.45.1
+geopy>=2.2.0

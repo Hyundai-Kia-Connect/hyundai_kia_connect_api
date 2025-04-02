@@ -53,6 +53,8 @@ class VehicleManager:
         pin: str,
         geocode_api_enable: bool = False,
         geocode_api_use_email: bool = False,
+        geocode_provider: int = 1,
+        geocode_api_key: str = None,
         language: str = "en",
     ):
         self.region: int = region
@@ -61,8 +63,10 @@ class VehicleManager:
         self.password: str = password
         self.geocode_api_enable: bool = geocode_api_enable
         self.geocode_api_use_email: bool = geocode_api_use_email
+        self.geocode_provider: int = geocode_provider
         self.pin: str = pin
         self.language: str = language
+        self.geocode_api_key: str = geocode_api_key
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
@@ -91,7 +95,11 @@ class VehicleManager:
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
-                    self.token, vehicle, self.geocode_api_use_email
+                    token=self.token,
+                    vehicle=vehicle,
+                    use_email=self.geocode_api_use_email,
+                    provider=self.geocode_provider,
+                    API_KEY=self.geocode_api_key,
                 )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")

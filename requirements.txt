@@ -3,3 +3,4 @@ curlify>=2.2.1
 python-dateutil
 pytz>=2021.3
 certifi>=2024.6.2
+geopy >= 2.2.0
