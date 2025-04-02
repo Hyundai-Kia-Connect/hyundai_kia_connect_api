@@ -152,12 +152,11 @@ class ApiImpl:
                     )
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
                 if API_KEY:
+                    latlong = (vehicle.location_latitude, vehicle.location_longitude)
                     geolocator = GoogleV3(api_key=API_KEY)
-                    locations = geolocator.reverse(
-                        vehicle.location_latitude, vehicle.location_longitude
-                    )
+                    locations = geolocator.reverse(latlong)
                     if locations:
-                        vehicle.geocode = (None, locations[0].address)
+                        vehicle.geocode = locations
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
