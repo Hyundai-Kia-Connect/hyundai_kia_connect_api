@@ -29,6 +29,7 @@ from .Vehicle import (
     TripInfo,
     DayTripCounts,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -44,13 +45,7 @@ from .const import (
 )
 from .exceptions import (
     AuthenticationError,
-    DuplicateRequestError,
-    RequestTimeoutError,
-    ServiceTemporaryUnavailable,
-    NoDataFound,
-    InvalidAPIResponseError,
     APIError,
-    RateLimitingError,
 )
 from .utils import (
     get_child_value,
@@ -63,44 +58,6 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-
-
-def _check_response_for_errors(response: dict) -> None:
-    """
-    Checks for errors in the API response.
-    If an error is found, an exception is raised.
-    retCode known values:
-    - S: success
-    - F: failure
-    resCode / resMsg known values:
-    - 0000: no error
-    - 4004: "Duplicate request"
-    - 4081: "Request timeout"
-    - 5031: "Unavailable remote control - Service Temporary Unavailable"
-    - 5091: "Exceeds number of requests"
-    - 5921: "No Data Found v2 - No Data Found v2"
-    - 9999: "Undefined Error - Response timeout"
-    :param response: the API's JSON response
-    """
-
-    error_code_mapping = {
-        "4004": DuplicateRequestError,
-        "4081": RequestTimeoutError,
-        "5031": ServiceTemporaryUnavailable,
-        "5091": RateLimitingError,
-        "5921": NoDataFound,
-        "9999": RequestTimeoutError,
-    }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
-        _LOGGER.error(f"Unknown API response format: {response}")
-        raise InvalidAPIResponseError()
-
-    if response["retCode"] == "F":
-        if response["resCode"] in error_code_mapping:
-            raise error_code_mapping[response["resCode"]](response["resMsg"])
-        else:
-            raise APIError(f"Server returned: '{response['resMsg']}'")
 
 
 class KiaUvoApiAU(ApiImplType1):
@@ -780,30 +737,6 @@ class KiaUvoApiAU(ApiImplType1):
             url, json=payload, headers=self._get_control_headers(token)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-
-        payload = {"action": "start", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-
-        payload = {"action": "stop", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
 

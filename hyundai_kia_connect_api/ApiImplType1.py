@@ -1,6 +1,8 @@
 """ApiImplType1.py"""
 
 import datetime as dt
+import requests
+import logging
 from typing import Optional
 
 from .ApiImpl import (
@@ -15,13 +17,69 @@ from .utils import (
 )
 
 from .const import (
+    DOMAIN,
     DISTANCE_UNITS,
     ENGINE_TYPES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
 )
 
+from .exceptions import (
+    APIError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    NoDataFound,
+    InvalidAPIResponseError,
+    RateLimitingError,
+    DeviceIDError,
+)
+
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _check_response_for_errors(response: dict) -> None:
+    """
+    Checks for errors in the API response.
+    If an error is found, an exception is raised.
+    retCode known values:
+    - S: success
+    - F: failure
+    resCode / resMsg known values:
+    - 0000: no error
+    - 4002:  "Invalid request body - invalid deviceId",
+             relogin will resolve but a bandaid.
+    - 4004: "Duplicate request"
+    - 4081: "Request timeout"
+    - 5031: "Unavailable remote control - Service Temporary Unavailable"
+    - 5091: "Exceeds number of requests"
+    - 5921: "No Data Found v2 - No Data Found v2"
+    - 9999: "Undefined Error - Response timeout"
+    :param response: the API's JSON response
+    """
+
+    error_code_mapping = {
+        "4002": DeviceIDError,
+        "4004": DuplicateRequestError,
+        "4081": RequestTimeoutError,
+        "5031": ServiceTemporaryUnavailable,
+        "5091": RateLimitingError,
+        "5921": NoDataFound,
+        "9999": RequestTimeoutError,
+    }
+
+    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+        _LOGGER.error(f"Unknown API response format: {response}")
+        raise InvalidAPIResponseError()
+
+    if response["retCode"] == "F":
+        if response["resCode"] in error_code_mapping:
+            raise error_code_mapping[response["resCode"]](response["resMsg"])
+        raise APIError(
+            f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
+        )
 
 
 class ApiImplType1(ApiImpl):
@@ -319,3 +377,68 @@ class ApiImplType1(ApiImpl):
             )
 
         vehicle.data = state
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
+
+            payload = {"action": "start", "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
+            )
+
+            payload = {"command": "start"}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
+
+            payload = {"action": "stop", "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
+            )
+
+            payload = {"command": "stop"}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        url = (
+            self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
+        )
+
+        body = {"chargingCurrent": level}
+        response = requests.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
