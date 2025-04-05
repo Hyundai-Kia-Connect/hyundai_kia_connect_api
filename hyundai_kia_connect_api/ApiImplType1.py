@@ -2,6 +2,7 @@
 
 import datetime as dt
 import requests
+import logging
 from typing import Optional
 
 from .ApiImpl import (
