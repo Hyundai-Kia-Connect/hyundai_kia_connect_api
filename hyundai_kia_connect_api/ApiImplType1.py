@@ -40,7 +40,6 @@ USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 _LOGGER = logging.getLogger(__name__)
 
 
-
 def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
