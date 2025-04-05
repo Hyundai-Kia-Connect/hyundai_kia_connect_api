@@ -24,6 +24,7 @@ from .const import (
 )
 
 from .exceptions import (
+    APIError,
     DuplicateRequestError,
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
