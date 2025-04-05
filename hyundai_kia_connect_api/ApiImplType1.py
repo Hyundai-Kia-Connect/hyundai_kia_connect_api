@@ -104,6 +104,16 @@ class ApiImplType1(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
+        control_token, _ = self._get_control_token(token)
+        authenticated_headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        return authenticated_headers | {
+            "Authorization": control_token,
+            "AuthorizationCCSP": control_token,
+        }
+
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Date"):
             vehicle.last_updated_at = parse_datetime(

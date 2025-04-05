@@ -82,14 +82,6 @@ class KiaUvoApiAU(ApiImplType1):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
 
-    def _get_control_headers(self, token: Token) -> dict:
-        control_token, _ = self._get_control_token(token)
-        authenticated_headers = self._get_authenticated_headers(token)
-        return authenticated_headers | {
-            "Authorization": control_token,
-            "AuthorizationCCSP": control_token,
-        }
-
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
@@ -647,7 +639,7 @@ class KiaUvoApiAU(ApiImplType1):
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
@@ -666,7 +658,7 @@ class KiaUvoApiAU(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
@@ -681,7 +673,7 @@ class KiaUvoApiAU(ApiImplType1):
         payload = {"action": action.value, "deviceId": token.device_id}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
@@ -721,7 +713,7 @@ class KiaUvoApiAU(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -734,7 +726,7 @@ class KiaUvoApiAU(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
         response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -943,7 +935,7 @@ class KiaUvoApiAU(ApiImplType1):
             ]
         }
         response = requests.post(
-            url, json=body, headers=self._get_control_headers(token)
+            url, json=body, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
