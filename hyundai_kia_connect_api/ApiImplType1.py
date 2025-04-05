@@ -25,6 +25,7 @@ from .const import (
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
+
 def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
