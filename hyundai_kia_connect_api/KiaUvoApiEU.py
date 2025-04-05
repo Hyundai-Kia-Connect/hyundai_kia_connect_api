@@ -21,6 +21,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
 )
 from .ApiImplType1 import ApiImplType1
+from .ApiImplType1 import _check_response_for_errors
 
 from .Token import Token
 from .Vehicle import (
@@ -88,48 +89,6 @@ SUPPORTED_LANGUAGES_LIST = [
     "fi",  # Finnish
     "pt",  # Portuguese
 ]
-
-
-def _check_response_for_errors(response: dict) -> None:
-    """
-    Checks for errors in the API response.
-    If an error is found, an exception is raised.
-    retCode known values:
-    - S: success
-    - F: failure
-    resCode / resMsg known values:
-    - 0000: no error
-    - 4002:  "Invalid request body - invalid deviceId",
-             relogin will resolve but a bandaid.
-    - 4004: "Duplicate request"
-    - 4081: "Request timeout"
-    - 5031: "Unavailable remote control - Service Temporary Unavailable"
-    - 5091: "Exceeds number of requests"
-    - 5921: "No Data Found v2 - No Data Found v2"
-    - 9999: "Undefined Error - Response timeout"
-    :param response: the API's JSON response
-    """
-
-    error_code_mapping = {
-        "4002": DeviceIDError,
-        "4004": DuplicateRequestError,
-        "4081": RequestTimeoutError,
-        "5031": ServiceTemporaryUnavailable,
-        "5091": RateLimitingError,
-        "5921": NoDataFound,
-        "9999": RequestTimeoutError,
-    }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
-        _LOGGER.error(f"Unknown API response format: {response}")
-        raise InvalidAPIResponseError()
-
-    if response["retCode"] == "F":
-        if response["resCode"] in error_code_mapping:
-            raise error_code_mapping[response["resCode"]](response["resMsg"])
-        raise APIError(
-            f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
-        )
 
 
 class KiaUvoApiEU(ApiImplType1):

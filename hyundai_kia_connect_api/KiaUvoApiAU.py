@@ -29,6 +29,7 @@ from .Vehicle import (
     TripInfo,
     DayTripCounts,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
