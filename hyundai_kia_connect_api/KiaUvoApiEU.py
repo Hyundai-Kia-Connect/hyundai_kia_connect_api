@@ -1234,7 +1234,6 @@ class KiaUvoApiEU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-
     def schedule_charging_and_climate(
         self,
         token: Token,
