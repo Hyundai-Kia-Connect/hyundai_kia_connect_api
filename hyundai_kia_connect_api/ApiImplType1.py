@@ -1,6 +1,8 @@
 """ApiImplType1.py"""
 
 import datetime as dt
+import logging
+import requests
 from typing import Optional
 
 from .ApiImpl import (
@@ -15,6 +17,7 @@ from .utils import (
 )
 
 from .const import (
+    DOMAIN,
     DISTANCE_UNITS,
     ENGINE_TYPES,
     SEAT_STATUS,
