@@ -103,7 +103,7 @@ class ApiImplType1(ApiImpl):
             "Ccuccs2protocolsupport": str(ccs2_support or 0),
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-    
+
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
         control_token, _ = self._get_control_token(token)
         authenticated_headers = self._get_authenticated_headers(
