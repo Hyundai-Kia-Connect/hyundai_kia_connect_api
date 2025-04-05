@@ -783,30 +783,6 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-
-        payload = {"action": "start", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-
-        payload = {"action": "stop", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
