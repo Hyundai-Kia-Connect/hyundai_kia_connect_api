@@ -1,7 +1,6 @@
 """ApiImplType1.py"""
 
 import datetime as dt
-import logging
 import requests
 from typing import Optional
 
