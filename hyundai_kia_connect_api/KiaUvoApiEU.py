@@ -866,7 +866,6 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def charge_port_action(
@@ -881,7 +880,6 @@ class KiaUvoApiEU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def start_climate(
@@ -1335,7 +1333,6 @@ class KiaUvoApiEU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def valet_mode_action(
