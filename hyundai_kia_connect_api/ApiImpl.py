@@ -1,9 +1,6 @@
 """ApiImpl.py"""
 
 # pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
-from .utils import get_child_value
-
-
 import datetime as dt
 import logging
 from dataclasses import dataclass
@@ -11,6 +8,8 @@ from dataclasses import dataclass
 import requests
 from geopy.geocoders import GoogleV3
 from requests.exceptions import JSONDecodeError
+
+from .utils import get_child_value
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -73,6 +72,8 @@ class ScheduleChargingClimateRequestOptions:
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
+    previous_latitude: float = None
+    previous_longitude: float = None
 
     def __init__(self) -> None:
         """Initialize."""
@@ -122,7 +123,13 @@ class ApiImpl:
         API_KEY: str = None,
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
-            if GEO_LOCATION_PROVIDERS[provider] == OPENSTREETMAP:
+            if (
+                vehicle.geocode
+                and vehicle.location_latitude == self.previous_latitude
+                and vehicle.location_longitude == self.previous_longitude
+            ):  # previous coordinates are the same, so keep last valid vehicle.geocode
+                _LOGGER.debug(f"{DOMAIN} - Keeping last geocode location")
+            elif GEO_LOCATION_PROVIDERS[provider] == OPENSTREETMAP:
                 email_parameter = ""
                 if use_email is True:
                     email_parameter = "&email=" + token.username
@@ -136,27 +143,34 @@ class ApiImpl:
                     + email_parameter
                 )
                 headers = {"user-agent": "curl/7.81.0"}
-                _LOGGER.debug(f"{DOMAIN} - Running update geocode location")
                 response = requests.get(url, headers=headers)
                 try:
                     response = response.json()
                 except JSONDecodeError:
-                    _LOGGER.debug(
-                        f"{DOMAIN} - failed to decode json for geocode location"
-                    )
+                    _LOGGER.warning(f"{DOMAIN} - failed geocode openstreetmap")
                     vehicle.geocode = None
                 else:
                     vehicle.geocode = (
                         get_child_value(response, "display_name"),
                         get_child_value(response, "address"),
                     )
+                    self.previous_latitude = vehicle.location_latitude
+                    self.previous_longitude = vehicle.location_longitude
+                    _LOGGER.debug(f"{DOMAIN} - geocode openstreetmap")
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
                 if API_KEY:
                     latlong = (vehicle.location_latitude, vehicle.location_longitude)
-                    geolocator = GoogleV3(api_key=API_KEY)
-                    locations = geolocator.reverse(latlong)
-                    if locations:
-                        vehicle.geocode = locations
+                    try:
+                        geolocator = GoogleV3(api_key=API_KEY)
+                        locations = geolocator.reverse(latlong)
+                        if locations:
+                            vehicle.geocode = locations
+                            self.previous_latitude = vehicle.location_latitude
+                            self.previous_longitude = vehicle.location_longitude
+                            _LOGGER.debug(f"{DOMAIN} - geocode google")
+                    except Exception as ex:  # pylint: disable=broad-except
+                        _LOGGER.warning(f"{DOMAIN} - failed geocode Google: {ex}")
+                        vehicle.geocode = None
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
