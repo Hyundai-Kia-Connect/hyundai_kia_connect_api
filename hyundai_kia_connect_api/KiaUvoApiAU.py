@@ -631,19 +631,6 @@ class KiaUvoApiAU(ApiImplType1):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/door"
-
-        payload = {"action": action.value, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
 
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
