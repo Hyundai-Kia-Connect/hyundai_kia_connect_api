@@ -452,3 +452,31 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
+
+        body = {
+            "targetSOClist": [
+                {
+                    "plugType": 0,
+                    "targetSOClevel": dc,
+                },
+                {
+                    "plugType": 1,
+                    "targetSOClevel": ac,
+                },
+            ]
+        }
+        response = requests.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]

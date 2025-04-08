@@ -917,30 +917,6 @@ class KiaUvoApiAU(ApiImplType1):
             )
             return None
 
-    def set_charge_limits(
-        self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
-
-        body = {
-            "targetSOClist": [
-                {
-                    "plugType": 0,
-                    "targetSOClevel": dc,
-                },
-                {
-                    "plugType": 1,
-                    "targetSOClevel": ac,
-                },
-            ]
-        }
-        response = requests.post(
-            url, json=body, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
     def _get_stamp(self) -> str:
         if BRANDS[self.brand] == BRAND_KIA:
             cfb = base64.b64decode(
