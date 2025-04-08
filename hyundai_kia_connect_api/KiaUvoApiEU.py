@@ -1196,7 +1196,6 @@ class KiaUvoApiEU(ApiImplType1):
             )
             return None
 
-
     def schedule_charging_and_climate(
         self,
         token: Token,

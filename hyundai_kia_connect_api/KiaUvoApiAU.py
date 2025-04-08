@@ -917,7 +917,6 @@ class KiaUvoApiAU(ApiImplType1):
             )
             return None
 
-
     def _get_stamp(self) -> str:
         if BRANDS[self.brand] == BRAND_KIA:
             cfb = base64.b64decode(
