@@ -288,10 +288,8 @@ class VehicleManager:
         return self.api.valet_mode_action(
             self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.DEACTIVATE
         )
-    
-    def set_vehicle_to_load_discharge_limit(
-        self, vehicle_id: str, limit: int
-    ) -> str:
+
+    def set_vehicle_to_load_discharge_limit(self, vehicle_id: str, limit: int) -> str:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )

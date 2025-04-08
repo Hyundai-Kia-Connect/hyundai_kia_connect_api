@@ -481,8 +481,9 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         return response["msgId"]
 
-
-    def set_vehicle_to_load_discharge_limit(self, token: Token, vehicle: Vehicle, limit: int) -> str:
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
         url = (
             self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/dischargelimit"
         )
