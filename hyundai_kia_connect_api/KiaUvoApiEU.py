@@ -45,7 +45,6 @@ from .const import (
     OrderStatus,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION,
     VALET_MODE_ACTION,
 )
 from .exceptions import (
@@ -843,7 +842,6 @@ class KiaUvoApiEU(ApiImplType1):
         mapped_response = {}
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
-
 
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION

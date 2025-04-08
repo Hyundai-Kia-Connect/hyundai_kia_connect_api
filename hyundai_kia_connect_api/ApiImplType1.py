@@ -22,7 +22,7 @@ from .const import (
     ENGINE_TYPES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION
+    VEHICLE_LOCK_ACTION,
 )
 
 from .exceptions import (

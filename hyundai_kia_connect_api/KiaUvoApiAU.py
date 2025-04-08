@@ -38,7 +38,6 @@ from .const import (
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     SEAT_STATUS,
-    VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
     ENGINE_TYPES,
     OrderStatus,
@@ -630,7 +629,6 @@ class KiaUvoApiAU(ApiImplType1):
         mapped_response = {}
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
-
 
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
