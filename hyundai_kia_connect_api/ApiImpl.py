@@ -156,13 +156,10 @@ class ApiImpl:
                     )
                     self.previous_latitude = vehicle.location_latitude
                     self.previous_longitude = vehicle.location_longitude
-                    _LOGGER.debug(
-                        f"{DOMAIN} - geocode openstreetmap ({vehicle.location_latitude},{vehicle.location_longitude}) {vehicle.geocode}"  # noqa
-                    )
+                    _LOGGER.debug(f"{DOMAIN} - geocode openstreetmap")
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
                 if API_KEY:
                     latlong = (vehicle.location_latitude, vehicle.location_longitude)
-                    _LOGGER.debug(f"{DOMAIN} - Running update geocode google")
                     try:
                         geolocator = GoogleV3(api_key=API_KEY)
                         locations = geolocator.reverse(latlong)
@@ -170,9 +167,7 @@ class ApiImpl:
                             vehicle.geocode = locations
                             self.previous_latitude = vehicle.location_latitude
                             self.previous_longitude = vehicle.location_longitude
-                        _LOGGER.debug(
-                            f"{DOMAIN} - geocode google ({vehicle.location_latitude},{vehicle.location_longitude}) {vehicle.geocode}"  # noqa
-                        )
+                            _LOGGER.debug(f"{DOMAIN} - geocode google")
                     except Exception as ex:  # pylint: disable=broad-except
                         _LOGGER.warning(f"{DOMAIN} - failed geocode Google: {ex}")
                         vehicle.geocode = None
