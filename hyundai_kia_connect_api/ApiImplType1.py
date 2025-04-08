@@ -22,6 +22,7 @@ from .const import (
     ENGINE_TYPES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
 )
 
 from .exceptions import (
@@ -498,4 +499,28 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
         _check_response_for_errors(response)
+        
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
+
+            payload = {"action": action.value, "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/door"
+
+            payload = {"command": action.value}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
+
+        response = requests.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
