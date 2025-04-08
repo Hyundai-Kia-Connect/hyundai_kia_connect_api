@@ -480,3 +480,21 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
+
+
+    def set_vehicle_to_load_discharge_limit(self, token: Token, vehicle: Vehicle, limit: int) -> str:
+        url = (
+            self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/dischargelimit"
+        )
+
+        body = {"dischargingLimit": int(limit)}
+        response = requests.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]

@@ -275,3 +275,10 @@ class ApiImpl:
         Activate or Deactivate valet mode. Returns the tracking ID
         """
         pass
+
+    def set_vehicle_to_load_discharge_limit(self, token: Token, vehicle: Vehicle, limit: int) -> str:
+        """
+        feature only available for some regions.
+        Set the vehicle to load limit. Returns the tracking ID
+        """
+        pass
