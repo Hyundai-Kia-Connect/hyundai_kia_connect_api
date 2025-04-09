@@ -500,9 +500,9 @@ class ApiImplType1(ApiImpl):
             ),
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
-        token.device_id = self._get_device_id(self._get_stamp())
         _check_response_for_errors(response)
-
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
