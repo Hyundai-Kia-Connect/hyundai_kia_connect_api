@@ -37,7 +37,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     LOGIN_TOKEN_LIFETIME,
-    OrderStatus,
+    ORDER_STATUS,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -1143,7 +1143,7 @@ class KiaUvoApiCN(ApiImplType1):
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
 
         if synchronous:
@@ -1156,7 +1156,7 @@ class KiaUvoApiCN(ApiImplType1):
                 state = self.check_action_status(
                     token, vehicle, action_id, synchronous=False
                 )
-                if state == OrderStatus.PENDING:
+                if state == ORDER_STATUS.PENDING:
                     # state pending: recheck regularly
                     # (until we get a final state or exceed the timeout)
                     sleep(5)
@@ -1165,7 +1165,7 @@ class KiaUvoApiCN(ApiImplType1):
                     return state
 
             # if we exit the loop after the set timeout, return a Timeout state
-            return OrderStatus.TIMEOUT
+            return ORDER_STATUS.TIMEOUT
 
         else:
             response = requests.get(
@@ -1177,16 +1177,16 @@ class KiaUvoApiCN(ApiImplType1):
             for action in response["resMsg"]:
                 if action["recordId"] == action_id:
                     if action["result"] == "success":
-                        return OrderStatus.SUCCESS
+                        return ORDER_STATUS.SUCCESS
                     elif action["result"] == "fail":
-                        return OrderStatus.FAILED
+                        return ORDER_STATUS.FAILED
                     elif action["result"] == "non-response":
-                        return OrderStatus.TIMEOUT
+                        return ORDER_STATUS.TIMEOUT
                     elif action["result"] is None:
                         _LOGGER.debug(
                             "Action status not set yet by server - try again in a few seconds"  # noqa
                         )
-                        return OrderStatus.PENDING
+                        return ORDER_STATUS.PENDING
 
             # if iterate the whole notifications list and
             # can't find the action, raise an exception

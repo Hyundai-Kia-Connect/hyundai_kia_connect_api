@@ -40,7 +40,6 @@ from .const import (
     SEAT_STATUS,
     CHARGE_PORT_ACTION,
     ENGINE_TYPES,
-    OrderStatus,
 )
 from .exceptions import (
     AuthenticationError,
@@ -1063,59 +1062,3 @@ class KiaUvoApiAU(ApiImplType1):
             dt.datetime.now().timestamp() + response["expiresTime"]
         )
         return control_token, control_token_expire_at
-
-    def check_action_status(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        action_id: str,
-        synchronous: bool = False,
-        timeout: int = 0,
-    ) -> OrderStatus:
-        url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
-
-        if synchronous:
-            if timeout < 1:
-                raise APIError("Timeout must be 1 or higher")
-
-            end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
-            while end_time > dt.datetime.now():
-                # recursive call with Synchronous set to False
-                state = self.check_action_status(
-                    token, vehicle, action_id, synchronous=False
-                )
-                if state == OrderStatus.PENDING:
-                    # state pending: recheck regularly
-                    # (until we get a final state or exceed the timeout)
-                    sleep(5)
-                else:
-                    # any other state is final
-                    return state
-
-            # if we exit the loop after the set timeout, return a Timeout state
-            return OrderStatus.TIMEOUT
-
-        else:
-            response = requests.get(
-                url, headers=self._get_authenticated_headers(token)
-            ).json()
-            _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
-            _check_response_for_errors(response)
-
-            for action in response["resMsg"]:
-                if action["recordId"] == action_id:
-                    if action["result"] == "success":
-                        return OrderStatus.SUCCESS
-                    elif action["result"] == "fail":
-                        return OrderStatus.FAILED
-                    elif action["result"] == "non-response":
-                        return OrderStatus.TIMEOUT
-                    elif action["result"] is None:
-                        _LOGGER.debug(
-                            "Action status not set yet by server - try again in a few seconds"  # noqa
-                        )
-                        return OrderStatus.PENDING
-
-            # if iterate the whole notifications list and
-            # can't find the action, raise an exception
-            raise APIError(f"No action found with ID {action_id}")

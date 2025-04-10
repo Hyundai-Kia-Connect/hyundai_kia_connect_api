@@ -25,7 +25,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     LOGIN_TOKEN_LIFETIME,
-    OrderStatus,
+    ORDER_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
@@ -595,7 +595,7 @@ class KiaUvoApiUSA(ApiImpl):
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
         response = self.post_request_with_logging_and_active_session(
