@@ -8,7 +8,6 @@ import math
 import logging
 import random
 import uuid
-from time import sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytz
@@ -43,7 +42,6 @@ from .const import (
 )
 from .exceptions import (
     AuthenticationError,
-    APIError,
 )
 from .utils import (
     get_child_value,
