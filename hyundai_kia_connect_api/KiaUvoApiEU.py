@@ -1166,7 +1166,6 @@ class KiaUvoApiEU(ApiImplType1):
             )
             return None
 
-
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:

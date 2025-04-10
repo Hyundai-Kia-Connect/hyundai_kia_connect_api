@@ -8,10 +8,7 @@ from typing import Optional
 from time import sleep
 
 
-from .ApiImpl import (
-    ApiImpl,
-    ScheduleChargingClimateRequestOptions
-)
+from .ApiImpl import ApiImpl, ScheduleChargingClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -593,7 +590,6 @@ class ApiImplType1(ApiImpl):
             # can't find the action, raise an exception
             # Old code: raise APIError(f"No action found with ID {action_id}")
             return ORDER_STATUS.UNKNOWN
-
 
     def schedule_charging_and_climate(
         self,
