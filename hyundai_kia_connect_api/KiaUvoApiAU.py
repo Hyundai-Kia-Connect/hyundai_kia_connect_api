@@ -701,7 +701,6 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
