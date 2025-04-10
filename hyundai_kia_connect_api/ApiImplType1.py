@@ -5,6 +5,9 @@ import requests
 import logging
 from typing import Optional
 
+from time import sleep
+
+
 from .ApiImpl import (
     ApiImpl,
 )
@@ -23,6 +26,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    ORDER_STATUS
 )
 
 from .exceptions import (
@@ -528,3 +532,64 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
+
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
+
+        if synchronous:
+            if timeout < 1:
+                raise APIError("Timeout must be 1 or higher")
+
+            end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
+            while end_time > dt.datetime.now():
+                # recursive call with Synchronous set to False
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
+                if state == ORDER_STATUS.PENDING:
+                    # state pending: recheck regularly
+                    # (until we get a final state or exceed the timeout)
+                    sleep(5)
+                else:
+                    # any other state is final
+                    return state
+
+            # if we exit the loop after the set timeout, return a Timeout state
+            return ORDER_STATUS.TIMEOUT
+
+        else:
+            response = requests.get(
+                url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
+            _check_response_for_errors(response)
+
+            for action in response["resMsg"]:
+                if action["recordId"] == action_id:
+                    if action["result"] == "success":
+                        return ORDER_STATUS.SUCCESS
+                    elif action["result"] == "fail":
+                        return ORDER_STATUS.FAILED
+                    elif action["result"] == "non-response":
+                        return ORDER_STATUS.TIMEOUT
+                    elif action["result"] is None:
+                        _LOGGER.info(
+                            "Action status not set yet by server - try again in a few seconds"  # noqa
+                        )
+                        return ORDER_STATUS.PENDING
+
+            # if iterate the whole notifications list and
+            # can't find the action, raise an exception
+            # Old code: raise APIError(f"No action found with ID {action_id}")
+            return ORDER_STATUS.UNKNOWN

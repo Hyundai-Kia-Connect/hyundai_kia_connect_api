@@ -86,7 +86,7 @@ class CHARGE_PORT_ACTION(Enum):
     OPEN = "open"
 
 
-class OrderStatus(Enum):
+class ORDER_STATUS(Enum):
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"
     # order executed by vehicle and response returned
