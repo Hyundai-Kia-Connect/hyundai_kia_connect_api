@@ -765,10 +765,10 @@ class ApiImplType1(ApiImpl):
                     "drvSeatClimateState": options.front_left_seat,
                     "psgSeatClimateState": options.front_right_seat,
                     "rrSeatClimateState": options.rear_right_seat,
-                    "rlSeatClimateState": options.rear_left_seat
+                    "rlSeatClimateState": options.rear_left_seat,
                 },
-            "tempUnit": "C",
-            "windshieldFrontDefogState": options.defrost,
+                "tempUnit": "C",
+                "windshieldFrontDefogState": options.defrost,
             }
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
             response = requests.post(

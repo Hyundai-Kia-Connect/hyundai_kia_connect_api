@@ -15,7 +15,6 @@ import requests
 from dateutil import tz
 
 from .ApiImpl import (
-    ClimateRequestOptions,
     WindowRequestOptions,
 )
 from .ApiImplType1 import ApiImplType1
@@ -45,7 +44,6 @@ from .exceptions import (
 )
 from .utils import (
     get_child_value,
-    get_index_into_hex_temp,
     get_hex_temp_into_index,
     parse_datetime,
 )
@@ -660,8 +658,6 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
-
-
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
