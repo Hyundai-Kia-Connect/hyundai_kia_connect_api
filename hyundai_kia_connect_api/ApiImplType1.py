@@ -26,7 +26,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
-    ORDER_STATUS
+    ORDER_STATUS,
 )
 
 from .exceptions import (
@@ -532,7 +532,6 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
-
 
     def check_action_status(
         self,
