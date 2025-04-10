@@ -679,7 +679,7 @@ class KiaUvoApiCA(ApiImpl):
         timeout: int = 0,
     ) -> ORDER_STATUS:
         if timeout < 0:
-            return OrderStatus.TIMEOUT
+            return ORDER_STATUS.TIMEOUT
         start_time = dt.datetime.now()
 
         url = self.API_URL + "rmtsts"
