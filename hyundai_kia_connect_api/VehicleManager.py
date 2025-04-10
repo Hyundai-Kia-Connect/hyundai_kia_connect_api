@@ -36,7 +36,7 @@ from .const import (
     REGIONS,
     VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
-    OrderStatus,
+    ORDER_STATUS,
     VALET_MODE_ACTION,
 )
 
@@ -206,7 +206,7 @@ class VehicleManager:
         action_id: str,
         synchronous: bool = False,
         timeout: int = 120,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         """
         Check for the status of a sent action/command.
 

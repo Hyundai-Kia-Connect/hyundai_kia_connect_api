@@ -22,7 +22,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
-    OrderStatus,
+    ORDER_STATUS,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -677,9 +677,9 @@ class KiaUvoApiCA(ApiImpl):
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         if timeout < 0:
-            return OrderStatus.TIMEOUT
+            return ORDER_STATUS.TIMEOUT
         start_time = dt.datetime.now()
 
         url = self.API_URL + "rmtsts"
@@ -700,12 +700,12 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Last action_status: {action_status}")
 
         if response["responseHeader"]["responseCode"] == 1:
-            return OrderStatus.FAILED
+            return ORDER_STATUS.FAILED
         elif response["result"]["transaction"]["apiResult"] == "C":
-            return OrderStatus.SUCCESS
+            return ORDER_STATUS.SUCCESS
         elif response["result"]["transaction"]["apiResult"] == "P":
             if not synchronous:
-                return OrderStatus.PENDING
+                return ORDER_STATUS.PENDING
             else:
                 timedelta = dt.datetime.now() - start_time
                 time_left = timeout - timedelta.seconds - 10
@@ -714,7 +714,7 @@ class KiaUvoApiCA(ApiImpl):
                     token, vehicle, action_id, synchronous, time_left
                 )
 
-        return OrderStatus.FAILED
+        return ORDER_STATUS.FAILED
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstrt"

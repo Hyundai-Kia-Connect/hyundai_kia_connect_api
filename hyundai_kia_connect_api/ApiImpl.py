@@ -15,7 +15,7 @@ from .Vehicle import Vehicle
 from .const import (
     WINDOW_STATE,
     CHARGE_PORT_ACTION,
-    OrderStatus,
+    ORDER_STATUS,
     DOMAIN,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
@@ -107,7 +107,7 @@ class ApiImpl:
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         pass
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
