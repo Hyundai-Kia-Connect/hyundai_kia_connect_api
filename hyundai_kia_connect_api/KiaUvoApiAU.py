@@ -701,18 +701,6 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
-        payload = {
-            "action": "stop",
-        }
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
