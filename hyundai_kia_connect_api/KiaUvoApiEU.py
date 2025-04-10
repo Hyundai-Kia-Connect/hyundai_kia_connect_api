@@ -47,7 +47,6 @@ from .const import (
 )
 from .exceptions import (
     AuthenticationError,
-    APIError,
 )
 from .utils import (
     get_child_value,
