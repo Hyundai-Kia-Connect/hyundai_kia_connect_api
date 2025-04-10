@@ -8,15 +8,15 @@ from typing import Optional
 from time import sleep
 
 
-from .ApiImpl import ApiImpl, ScheduleChargingClimateRequestOptions, ClimateRequestOptions
+from .ApiImpl import (
+    ApiImpl,
+    ScheduleChargingClimateRequestOptions,
+    ClimateRequestOptions,
+)
 from .Token import Token
 from .Vehicle import Vehicle
 
-from .utils import (
-    get_child_value,
-    parse_datetime,
-    get_index_into_hex_temp
-)
+from .utils import get_child_value, parse_datetime, get_index_into_hex_temp
 
 from .const import (
     DOMAIN,
@@ -803,10 +803,14 @@ class ApiImplType1(ApiImpl):
                 ),
             ).json()
         else:
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/temperature"
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/temperature"
+            )
             payload = {
                 "command": "stop",
-                
             }
             _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
             response = requests.post(

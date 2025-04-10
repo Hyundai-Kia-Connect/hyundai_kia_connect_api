@@ -851,7 +851,6 @@ class KiaUvoApiEU(ApiImplType1):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
-
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
 
