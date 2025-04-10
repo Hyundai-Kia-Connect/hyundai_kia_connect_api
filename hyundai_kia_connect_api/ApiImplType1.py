@@ -746,6 +746,36 @@ class ApiImplType1(ApiImpl):
                     token, vehicle.ccu_ccs2_protocol_support
                 ),
             ).json()
+        else:
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/temperature"
+            )
+            payload = {
+                "command": "start",
+                "ignitionDuration:": options.duration,
+                "strgWhlHeating": options.steering_wheel,
+                "hvacTempType": 1,
+                "hvacTemp": options.set_temp,
+                "sideRearMirrorHeating": 1,
+                "drvSeatLoc": "R",
+                "seatClimateInfo": {
+                    "drvSeatClimateState": options.front_left_seat,
+                    "psgSeatClimateState": options.front_right_seat,
+                    "rrSeatClimateState": options.rear_right_seat,
+                    "rlSeatClimateState": options.rear_left_seat
+                },
+            "tempUnit": "C",
+            "windshieldFrontDefogState": options.defrost,
+            }
+            _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
+            response = requests.post(
+                url,
+                json=payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
