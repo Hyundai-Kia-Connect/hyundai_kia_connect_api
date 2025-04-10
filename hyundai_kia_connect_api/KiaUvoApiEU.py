@@ -17,7 +17,6 @@ from dateutil import tz
 
 from .ApiImpl import (
     ClimateRequestOptions,
-    ScheduleChargingClimateRequestOptions,
 )
 from .ApiImplType1 import ApiImplType1
 from .ApiImplType1 import _check_response_for_errors
@@ -1166,120 +1165,6 @@ class KiaUvoApiEU(ApiImplType1):
                 f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
             )
             return None
-
-    def schedule_charging_and_climate(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        options: ScheduleChargingClimateRequestOptions,
-    ) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
-        url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
-        url = url + "/reservation/chargehvac"
-
-        def set_default_departure_options(
-            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
-        ) -> None:
-            if departure_options.enabled is None:
-                departure_options.enabled = False
-            if departure_options.days is None:
-                departure_options.days = [0]
-            if departure_options.time is None:
-                departure_options.time = dt.time()
-
-        if options.first_departure is None:
-            options.first_departure = (
-                ScheduleChargingClimateRequestOptions.DepartureOptions()
-            )
-        if options.second_departure is None:
-            options.second_departure = (
-                ScheduleChargingClimateRequestOptions.DepartureOptions()
-            )
-
-        set_default_departure_options(options.first_departure)
-        set_default_departure_options(options.second_departure)
-        departures = [options.first_departure, options.second_departure]
-
-        if options.charging_enabled is None:
-            options.charging_enabled = False
-        if options.off_peak_start_time is None:
-            options.off_peak_start_time = dt.time()
-        if options.off_peak_end_time is None:
-            options.off_peak_end_time = options.off_peak_start_time
-        if options.off_peak_charge_only_enabled is None:
-            options.off_peak_charge_only_enabled = False
-        if options.climate_enabled is None:
-            options.climate_enabled = False
-        if options.temperature is None:
-            options.temperature = 21.0
-        if options.temperature_unit is None:
-            options.temperature_unit = 0
-        if options.defrost is None:
-            options.defrost = False
-
-        temperature: float = options.temperature
-        if options.temperature_unit == 0:
-            # Round to nearest 0.5
-            temperature = round(temperature * 2.0) / 2.0
-            # Cap at 27, floor at 17
-            if temperature > 27.0:
-                temperature = 27.0
-            elif temperature < 17.0:
-                temperature = 17.0
-
-        payload = {
-            "reservChargeInfo" + str(i + 1): {
-                "reservChargeSet": departures[i].enabled,
-                "reservInfo": {
-                    "day": departures[i].days,
-                    "time": {
-                        "time": departures[i].time.strftime("%I%M"),
-                        "timeSection": 1 if departures[i].time >= dt.time(12, 0) else 0,
-                    },
-                },
-                "reservFatcSet": {
-                    "airCtrl": 1 if options.climate_enabled else 0,
-                    "airTemp": {
-                        "value": f"{temperature:.1f}",
-                        "hvacTempType": 1,
-                        "unit": options.temperature_unit,
-                    },
-                    "heating1": 0,
-                    "defrost": options.defrost,
-                },
-            }
-            for i in range(2)
-        }
-
-        payload = payload | {
-            "offPeakPowerInfo": {
-                "offPeakPowerTime1": {
-                    "endtime": {
-                        "timeSection": (
-                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
-                        ),
-                        "time": options.off_peak_end_time.strftime("%I%M"),
-                    },
-                    "starttime": {
-                        "timeSection": (
-                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
-                        ),
-                        "time": options.off_peak_start_time.strftime("%I%M"),
-                    },
-                },
-                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
-            },
-            "reservFlag": 1 if options.charging_enabled else 0,
-        }
-
-        _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
-        _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
-        return response["msgId"]
 
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
