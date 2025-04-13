@@ -475,6 +475,7 @@ class ApiImplType1(ApiImpl):
                 },
             ]
         }
+        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Body: {body}")
         response = requests.post(
             url,
             json=body,
