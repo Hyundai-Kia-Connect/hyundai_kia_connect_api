@@ -5,3 +5,4 @@
 # For IDE created directories, we recommended to use global git ignores. See
 # https://git-scm.com/docs/gitignore or
 # https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files#configuring-ignored-files-for-all-repositories-on-your-computer
+__pycache__/
