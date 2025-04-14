@@ -474,11 +474,11 @@ class ApiImplType1(ApiImpl):
             "targetSOClist": [
                 {
                     "plugType": 0,
-                    "targetSOClevel": dc,
+                    "targetSOClevel": int(dc),
                 },
                 {
                     "plugType": 1,
-                    "targetSOClevel": ac,
+                    "targetSOClevel": int(ac),
                 },
             ]
         }
