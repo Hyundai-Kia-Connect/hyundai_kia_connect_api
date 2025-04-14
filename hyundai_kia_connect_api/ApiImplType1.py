@@ -122,7 +122,7 @@ class ApiImplType1(ApiImpl):
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "Offset"):
-            offset = get_child_value(state, "Offset")
+            offset = float(get_child_value(state, "Offset"))
             hours = int(offset)
             minutes = int((offset - hours) * 60)
             vehicle.timezone = timezone(timedelta(hours=hours, minutes=minutes))
