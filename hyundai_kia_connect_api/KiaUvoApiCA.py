@@ -122,8 +122,6 @@ class KiaUvoApiCA(ApiImpl):
         token_expire_in = int(response["expireIn"]) - 60
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
-        _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
-        _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=token_expire_in)
 
