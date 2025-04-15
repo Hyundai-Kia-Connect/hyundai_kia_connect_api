@@ -123,6 +123,10 @@ class Vehicle:
 
     # Door Status
     is_locked: bool = None
+    front_left_door_is_locked: bool = None
+    front_right_door_is_locked: bool = None
+    back_left_door_is_locked: bool = None
+    back_right_door_is_locked: bool = None
     front_left_door_is_open: bool = None
     front_right_door_is_open: bool = None
     back_left_door_is_open: bool = None
