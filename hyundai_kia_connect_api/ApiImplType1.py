@@ -187,8 +187,6 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
         ]
 
-        # TODO: status.doorLock
-
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
         )
@@ -202,12 +200,24 @@ class ApiImplType1(ApiImpl):
             state, "Cabin.Door.Row2.Right.Open"
         )
 
-        # TODO: should the windows and trunc also be checked?
+        vehicle.front_left_door_is_locked = get_child_value(
+            state, "Cabin.Door.Row1.Driver.Open"
+        )
+        vehicle.front_right_door_is_locked = get_child_value(
+            state, "Cabin.Door.Row1.Passenger.Lock"
+        )
+        vehicle.back_left_door_is_locked = get_child_value(
+            state, "Cabin.Door.Row2.Left.Lock"
+        )
+        vehicle.back_right_door_is_locked = get_child_value(
+            state, "Cabin.Door.Row2.Right.Lock"
+        )
+
         vehicle.is_locked = not (
-            vehicle.front_left_door_is_open
-            or vehicle.front_right_door_is_open
-            or vehicle.back_left_door_is_open
-            or vehicle.back_right_door_is_open
+            vehicle.front_left_door_is_locked
+            or vehicle.front_right_door_is_locked
+            or vehicle.back_left_door_is_locked
+            or vehicle.back_right_door_is_locked
         )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
