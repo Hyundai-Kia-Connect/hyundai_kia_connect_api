@@ -200,17 +200,25 @@ class ApiImplType1(ApiImpl):
             state, "Cabin.Door.Row2.Right.Open"
         )
 
-        vehicle.front_left_door_is_locked = get_child_value(
-            state, "Cabin.Door.Row1.Driver.Open"
+        vehicle.front_left_door_is_locked = (
+            bool(get_child_value(state, "Cabin.Door.Row1.Driver.Open"))
+            if get_child_value(state, "Cabin.Door.Row1.Driver.Open") is not None
+            else None
         )
-        vehicle.front_right_door_is_locked = get_child_value(
-            state, "Cabin.Door.Row1.Passenger.Lock"
+        vehicle.front_right_door_is_locked = (
+            bool(get_child_value(state, "Cabin.Door.Row1.Passenger.Lock"))
+            if get_child_value(state, "Cabin.Door.Row1.Passenger.Lock") is not None
+            else None
         )
-        vehicle.back_left_door_is_locked = get_child_value(
-            state, "Cabin.Door.Row2.Left.Lock"
+        vehicle.back_left_door_is_locked = (
+            bool(get_child_value(state, "Cabin.Door.Row2.Left.Lock"))
+            if get_child_value(state, "Cabin.Door.Row2.Left.Lock") is not None
+            else None
         )
-        vehicle.back_right_door_is_locked = get_child_value(
-            state, "Cabin.Door.Row2.Right.Lock"
+        vehicle.back_right_door_is_locked = (
+            bool(get_child_value(state, "Cabin.Door.Row2.Right.Lock"))
+            if get_child_value(state, "Cabin.Door.Row2.Right.Lock") is not None
+            else None
         )
 
         vehicle.is_locked = (
