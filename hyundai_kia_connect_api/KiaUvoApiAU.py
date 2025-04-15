@@ -952,15 +952,12 @@ class KiaUvoApiAU(ApiImplType1):
             + "%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data: {headers}{data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
         authorization_code = response["refresh_token"]
-        _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         return token_type, access_token, authorization_code
 
     def _get_refresh_token(self, authorization_code, stamp):
@@ -977,10 +974,8 @@ class KiaUvoApiAU(ApiImplType1):
         }
 
         data = "grant_type=refresh_token&refresh_token=" + authorization_code
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data: {data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Response: {response}")
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token

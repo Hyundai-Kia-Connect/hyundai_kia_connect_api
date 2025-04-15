@@ -65,9 +65,6 @@ def request_with_active_session(func):
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
             new_token = self.login(token.username, token.password)
-            _LOGGER.debug(
-                f"{DOMAIN} - Old token:{token.access_token}, new token:{new_token.access_token}"  # noqa
-            )
             token.access_token = new_token.access_token
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)

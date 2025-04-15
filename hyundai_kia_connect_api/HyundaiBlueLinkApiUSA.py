@@ -136,8 +136,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
-        _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
-        _LOGGER.debug(f"{DOMAIN} - Refresh Token Value {refresh_token}")
 
         valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
 
