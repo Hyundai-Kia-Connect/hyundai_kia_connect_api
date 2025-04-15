@@ -213,11 +213,11 @@ class ApiImplType1(ApiImpl):
             state, "Cabin.Door.Row2.Right.Lock"
         )
 
-        vehicle.is_locked = not (
+        vehicle.is_locked = (
             vehicle.front_left_door_is_locked
-            or vehicle.front_right_door_is_locked
-            or vehicle.back_left_door_is_locked
-            or vehicle.back_right_door_is_locked
+            and vehicle.front_right_door_is_locked
+            and vehicle.back_left_door_is_locked
+            and vehicle.back_right_door_is_locked
         )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
