@@ -167,7 +167,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if refresh:
             headers["REFRESH"] = "true"
 
-        _LOGGER.debug(f"{DOMAIN} - using API headers: {headers}")
 
         response = self.sessions.get(url, headers=headers)
         response = response.json()
@@ -194,8 +193,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["userId"] = headers["username"]
         # This header is sent by the MyHyundai app, but doesn't seem to do anything
         # headers["offset"] = "-5"
-
-        _LOGGER.debug(f"{DOMAIN} - using API headers: {headers}")
 
         response = self.sessions.get(url, headers=headers)
         response = response.json()
