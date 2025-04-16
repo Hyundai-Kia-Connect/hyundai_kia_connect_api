@@ -201,8 +201,8 @@ class ApiImplType1(ApiImpl):
         )
 
         vehicle.front_left_door_is_locked = (
-            bool(get_child_value(state, "Cabin.Door.Row1.Driver.Open"))
-            if get_child_value(state, "Cabin.Door.Row1.Driver.Open") is not None
+            bool(get_child_value(state, "Cabin.Door.Row1.Driver.Lock"))
+            if get_child_value(state, "Cabin.Door.Row1.Driver.Lock") is not None
             else None
         )
         vehicle.front_right_door_is_locked = (
