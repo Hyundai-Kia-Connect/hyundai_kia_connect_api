@@ -167,7 +167,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if refresh:
             headers["REFRESH"] = "true"
 
-
         response = self.sessions.get(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_vehicle_status response {response}")
