@@ -928,7 +928,6 @@ class KiaUvoApiAU(ApiImplType1):
         response = requests.post(
             url, json=data, headers=headers, cookies=cookies
         ).json()
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
