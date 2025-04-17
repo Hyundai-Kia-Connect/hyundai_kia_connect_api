@@ -335,7 +335,7 @@ class ApiImplType1(ApiImpl):
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
         )
         vehicle.ev_v2l_discharge_limit = get_child_value(
-            state, "Green.BatteryManagement.VehicleToLoad.DischargeLimitation.SoC"
+            state, "Green.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
