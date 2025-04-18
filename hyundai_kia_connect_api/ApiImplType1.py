@@ -15,7 +15,7 @@ from .ApiImpl import (
     ApiImpl,
     ScheduleChargingClimateRequestOptions,
     ClimateRequestOptions,
-    WindowRequestOptions
+    WindowRequestOptions,
 )
 from .Token import Token
 from .Vehicle import Vehicle
