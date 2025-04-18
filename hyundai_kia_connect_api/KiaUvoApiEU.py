@@ -756,6 +756,28 @@ class KiaUvoApiEU(ApiImplType1):
             response = response["resMsg"]["state"]["Vehicle"]
         return response
 
+    def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
+        _LOGGER.error(f"Getting maintenance alert from {url}")
+        response = requests.get(
+            url, headers=self._get_authenticated_headers(token)
+        ).json()
+        _LOGGER.error(response)
+        _check_response_for_errors(response)
+        return response["resMsg"]
+
+    def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "odometer"):
+            vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
+
+    def _update_vehicle_location(self, vehicle: Vehicle, state: dict) -> None:
+        if get_child_value(state, "coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "coord.lat"),
+                get_child_value(state, "coord.lon"),
+                self.get_last_updated_at(get_child_value(state, "time")),
+            )
+
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
