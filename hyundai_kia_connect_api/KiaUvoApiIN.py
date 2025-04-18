@@ -13,7 +13,6 @@ from urllib.parse import parse_qs, urlparse
 from typing import Optional
 import pytz
 import requests
-from bs4 import BeautifulSoup
 from dateutil import tz
 
 
@@ -38,7 +37,6 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
-    LOGIN_TOKEN_LIFETIME,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -108,7 +106,7 @@ class KiaUvoApiIN(ApiImplType1):
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = ( "Basic ZTViM2Y2ZDAtN2Y4My00M2M5LWFmZjMtYTI1NGRiN2FmMzY4OjVKRk9DcjZDMjRPZk96bERxWnA3RXdxcmtMMFd3MDRVYXhjRGlFNlVkM3FJNVNFNA==" ) # noqa
+            self.BASIC_AUTHORIZATION: str = "Basic ZTViM2Y2ZDAtN2Y4My00M2M5LWFmZjMtYTI1NGRiN2FmMzY4OjVKRk9DcjZDMjRPZk96bERxWnA3RXdxcmtMMFd3MDRVYXhjRGlFNlVkM3FJNVNFNA=="  # noqa
             self.LOGIN_FORM_HOST = "prd.in-ccapi.hyundai.connected-car.io"
             self.PUSH_TYPE = "GCM"
             self.GCM_SENDER_ID = 974204007939
@@ -130,7 +128,10 @@ class KiaUvoApiIN(ApiImplType1):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-    def _get_authenticated_headers(self, token: Token, ccs2_support: Optional[int] = None) -> dict:
+
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: Optional[int] = None
+    ) -> dict:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -140,7 +141,7 @@ class KiaUvoApiIN(ApiImplType1):
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
-        } 
+        }
 
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
@@ -221,7 +222,6 @@ class KiaUvoApiIN(ApiImplType1):
         return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-
         state = self._get_cached_vehicle_state(token, vehicle)
 
         self._update_vehicle_properties(vehicle, state)
@@ -237,7 +237,7 @@ class KiaUvoApiIN(ApiImplType1):
     def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "odometer"):
             vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
-            
+
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
         _LOGGER.error(f"Getting maintenance alert from {url}")
@@ -254,7 +254,8 @@ class KiaUvoApiIN(ApiImplType1):
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),
                 self.get_last_updated_at(get_child_value(state, "time")),
-            )       
+            )
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
         state["vehicleLocation"] = self._get_location(token, vehicle)
@@ -756,7 +757,7 @@ class KiaUvoApiIN(ApiImplType1):
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
         _LOGGER.error(f"Getting location from {url}")
-        
+
         try:
             response = requests.get(
                 url,
@@ -784,7 +785,7 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
-        
+
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         response = requests.get(
@@ -1125,7 +1126,6 @@ class KiaUvoApiIN(ApiImplType1):
         return session.cookies.get_dict()
         # return session
 
-
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
@@ -1139,7 +1139,7 @@ class KiaUvoApiIN(ApiImplType1):
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
-    
+
     def _get_access_token(self, stamp, authorization_code):
         # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
@@ -1188,7 +1188,7 @@ class KiaUvoApiIN(ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
-    
+
     def _get_refresh_token(self, stamp, authorization_code):
         # Get Refresh Token #
         url = self.USER_API_URL + "oauth2/token"
