@@ -81,7 +81,7 @@ class KiaUvoApiAU(ApiImplType1):
             )
         elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "84ab606a7-cea4-48a0-a216-ed9c14a4a38c"
+            self.CCSP_SERVICE_ID: str = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
             self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="  # noqa
             self.cfb = base64.b64decode(
