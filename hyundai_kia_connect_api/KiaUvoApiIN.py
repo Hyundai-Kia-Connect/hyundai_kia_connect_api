@@ -283,452 +283,101 @@ class KiaUvoApiIN(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "vehicleStatus.time"):
-            vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "vehicleStatus.time"), self.data_timezone
+        if get_child_value(state, "time"):
+            vehicle.last_updated_at = self.get_last_updated_at(
+                get_child_value(state, "time")
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
-        if get_child_value(state, "odometer.value"):
-            vehicle.odometer = (
-                get_child_value(state, "odometer.value"),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "odometer.unit",
-                    )
-                ],
-            )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
-        )
-        vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
+
+        vehicle.engine_is_running = get_child_value(state, "engine")
 
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
-        if get_child_value(state, "vehicleStatus.airTemp.value"):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "vehicleStatus.airTemp.value")
-            )
+        if get_child_value(state, "airTemp.value"):
+            tempIndex = get_hex_temp_into_index(get_child_value(state, "airTemp.value"))
 
             vehicle.air_temperature = (
                 self.temperature_range[tempIndex],
                 TEMPERATURE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.airTemp.unit",
+                        "airTemp.unit",
                     )
                 ],
             )
-        vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
-        steer_wheel_heat = get_child_value(state, "vehicleStatus.steerWheelHeat")
+        vehicle.defrost_is_on = get_child_value(state, "defrost")
+        steer_wheel_heat = get_child_value(state, "steerWheelHeat")
         if steer_wheel_heat in [0, 2]:
             vehicle.steering_wheel_heater_is_on = False
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
 
-        vehicle.back_window_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideBackWindowHeat"
-        )
-        vehicle.side_mirror_heater_is_on = get_child_value(
-            state, "vehicleStatus.sideMirrorHeat"
-        )
+        vehicle.back_window_heater_is_on = get_child_value(state, "sideBackWindowHeat")
         vehicle.front_left_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.flSeatHeatState")
+            get_child_value(state, "seatHeaterVentState.astSeatHeatState")
         ]
         vehicle.front_right_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.frSeatHeatState")
+            get_child_value(state, "seatHeaterVentState.drvSeatHeatState")
         ]
         vehicle.rear_left_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState")
+            get_child_value(state, "seatHeaterVentState.rlSeatHeatState")
         ]
         vehicle.rear_right_seat_status = SEAT_STATUS[
-            get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
+            get_child_value(state, "seatHeaterVentState.rrSeatHeatState")
         ]
         vehicle.is_locked = get_child_value(state, "doorLock")
-        vehicle.front_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontLeft"
-        )
-        vehicle.front_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.frontRight"
-        )
-        vehicle.back_left_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backLeft"
-        )
-        vehicle.back_right_door_is_open = get_child_value(
-            state, "vehicleStatus.doorOpen.backRight"
-        )
-        vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
+        vehicle.front_left_door_is_open = get_child_value(state, "doorOpen.frontLeft")
+        vehicle.front_right_door_is_open = get_child_value(state, "doorOpen.frontRight")
+        vehicle.back_left_door_is_open = get_child_value(state, "doorOpen.backLeft")
+        vehicle.back_right_door_is_open = get_child_value(state, "doorOpen.backRight")
+        vehicle.hood_is_open = get_child_value(state, "hoodOpen")
         vehicle.front_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontLeft"
+            state, "windowOpen.frontLeft"
         )
         vehicle.front_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontRight"
+            state, "windowOpen.frontRight"
         )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backLeft"
-        )
+        vehicle.back_left_window_is_open = get_child_value(state, "windowOpen.backLeft")
         vehicle.back_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backRight"
+            state, "windowOpen.backRight"
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampRL")
+            get_child_value(state, "tirePressureLamp.tirePressureLampRL")
         )
         vehicle.tire_pressure_front_left_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampFL")
+            get_child_value(state, "tirePressureLamp.tirePressureLampFL")
         )
         vehicle.tire_pressure_front_right_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampFR")
+            get_child_value(state, "tirePressureLamp.tirePressureLampFR")
         )
         vehicle.tire_pressure_rear_right_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampRR")
+            get_child_value(state, "tirePressureLamp.tirePressureLampRR")
         )
         vehicle.tire_pressure_all_warning_is_on = bool(
-            get_child_value(state, "vehicleStatus.tirePressureLamp.tirePressureLampAll")
+            get_child_value(state, "tirePressureLamp.tirePressureLampAll")
         )
-        vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
-        vehicle.ev_battery_percentage = get_child_value(
-            state, "vehicleStatus.evStatus.batteryStatus"
-        )
-        vehicle.ev_battery_is_charging = get_child_value(
-            state, "vehicleStatus.evStatus.batteryCharge"
-        )
-
-        vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "vehicleStatus.evStatus.batteryPlugin"
-        )
-
-        ev_charge_port_door_is_open = get_child_value(
-            state, "vehicleStatus.evStatus.chargePortDoorOpenStatus"
-        )
-
-        if ev_charge_port_door_is_open == 1:
-            vehicle.ev_charge_port_door_is_open = True
-        elif ev_charge_port_door_is_open == 2:
-            vehicle.ev_charge_port_door_is_open = False
-
-        vehicle.ev_charging_power = get_child_value(
-            state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
-        )
-
-        if (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
-            )
-            is not None
-        ):
-            vehicle.total_driving_range = (
-                round(
-                    float(
-                        get_child_value(
-                            state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
-                        )
-                    ),
-                    1,
-                ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
-                    )
-                ],
-            )
-        if (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-            )
-            is not None
-        ):
-            vehicle.ev_driving_range = (
-                round(
-                    float(
-                        get_child_value(
-                            state,
-                            "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
-                        )
-                    ),
-                    1,
-                ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
-                    )
-                ],
-            )
-        vehicle.ev_estimated_current_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
-            "m",
-        )
-        vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
-            "m",
-        )
-        vehicle.ev_estimated_portable_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
-            "m",
-        )
-        vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
-            "m",
-        )
-
-        target_soc_list = get_child_value(
-            state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
-        )
-        try:
-            vehicle.ev_charge_limits_ac = [
-                x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 1
-            ][-1]
-            vehicle.ev_charge_limits_dc = [
-                x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
-            ][-1]
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
-        if (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-            )
-            is not None
+        vehicle.trunk_is_open = get_child_value(state, "trunkOpen")
+        if get_child_value(
+            state,
+            "dte.value",
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "dte.value",
                 ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
-                    )
-                ],
-            )
-        elif get_child_value(
-            state,
-            "vehicleStatus.dte.value",
-        ):
-            vehicle.fuel_driving_range = (
-                get_child_value(
-                    state,
-                    "vehicleStatus.dte.value",
-                ),
-                DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
+                DISTANCE_UNITS[get_child_value(state, "dte.unit")],
             )
 
-        vehicle.ev_target_range_charge_AC = (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",  # noqa
-            ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
-                )
-            ],
-        )
-        vehicle.ev_target_range_charge_DC = (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",  # noqa
-            ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
-                )
-            ],
-        )
-        vehicle.ev_first_departure_enabled = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",  # noqa
-        )
-        vehicle.ev_second_departure_enabled = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",  # noqa
-        )
-        vehicle.ev_first_departure_days = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",  # noqa
-        )
-        vehicle.ev_second_departure_days = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",  # noqa
-        )
-
-        vehicle.ev_first_departure_time = self._get_time_from_string(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",  # noqa
-            ),
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
-            ),
-        )
-
-        vehicle.ev_second_departure_time = self._get_time_from_string(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",  # noqa
-            ),
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
-            ),
-        )
-
-        vehicle.ev_first_departure_climate_enabled = bool(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airCtrl",  # noqa
-            )
-        )
-
-        vehicle.ev_second_departure_climate_enabled = bool(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airCtrl",  # noqa
-            )
-        )
-
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
-        ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
-                )
-            )
-
-            vehicle.ev_first_departure_climate_temperature = (
-                self.temperature_range[temp_index],
-                TEMPERATURE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.unit",  # noqa
-                    )
-                ],
-            )
-
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
-        ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",  # noqa
-                )
-            )
-
-            vehicle.ev_second_departure_climate_temperature = (
-                self.temperature_range[temp_index],
-                TEMPERATURE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.unit",  # noqa
-                    )
-                ],
-            )
-
-        vehicle.ev_first_departure_climate_defrost = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.defrost",  # noqa
-        )
-
-        vehicle.ev_second_departure_climate_defrost = get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.defrost",  # noqa
-        )
-
-        vehicle.ev_off_peak_start_time = self._get_time_from_string(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",  # noqa
-            ),
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",  # noqa
-            ),
-        )
-
-        vehicle.ev_off_peak_end_time = self._get_time_from_string(
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",  # noqa
-            ),
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",  # noqa
-            ),
-        )
-
-        if get_child_value(
-            state,
-            "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
-        ):
-            if (
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
-                )
-                == 1
-            ):
-                vehicle.ev_off_peak_charge_only_enabled = True
-            elif (
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
-                )
-                == 2
-            ):
-                vehicle.ev_off_peak_charge_only_enabled = False
-
-        if (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservFlag",  # noqa
-            )
-            == 1
-        ):
-            vehicle.ev_schedule_charge_enabled = True
-        elif (
-            get_child_value(
-                state,
-                "vehicleStatus.evStatus.reservChargeInfos.reservFlag",  # noqa
-            )
-            == 0
-        ):
-            vehicle.ev_schedule_charge_enabled = False
-
-        vehicle.washer_fluid_warning_is_on = get_child_value(
-            state, "vehicleStatus.washerFluidStatus"
-        )
-        vehicle.brake_fluid_warning_is_on = get_child_value(
-            state, "vehicleStatus.breakOilStatus"
-        )
-        vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-        vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
-        vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
+        vehicle.brake_fluid_warning_is_on = get_child_value(state, "breakOilStatus")
+        vehicle.fuel_level = get_child_value(state, "fuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
+        vehicle.air_control_is_on = get_child_value(state, "airCtrlOn")
         vehicle.smart_key_battery_warning_is_on = get_child_value(
-            state, "vehicleStatus.smartKeyBatteryWarning"
+            state, "smartKeyBatteryWarning"
         )
 
-        if get_child_value(state, "vehicleLocation.coord.lat"):
-            vehicle.location = (
-                get_child_value(state, "vehicleLocation.coord.lat"),
-                get_child_value(state, "vehicleLocation.coord.lon"),
-                parse_datetime(
-                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
-                ),
-            )
         vehicle.data = state
 
     def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
