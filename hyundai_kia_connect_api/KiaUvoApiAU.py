@@ -32,7 +32,10 @@ from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
+    REGIONS,
     DOMAIN,
+    REGION_AUSTRALIA,
+    REGION_NZ,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
     SEAT_STATUS,
@@ -59,17 +62,33 @@ class KiaUvoApiAU(ApiImplType1):
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+
         self.brand = brand
-        if BRANDS[brand] == BRAND_KIA:
+        if BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_AUSTRALIA:
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
             self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
             self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="  # noqa
+            self.cfb = base64.b64decode(
+                "IDbMgWBXgic4MAyMgf5PFFRAdGX5O3IyC3uvN3scCs0gDpTFDuyvBorlAH9JMM2/wMc="
+            )
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
             self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
             self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="  # noqa
+            self.cfb = base64.b64decode(
+                "V60WkEmyRQaAfrBF1623/7QL62MjLVbCHdItGzQ1g5T/hkmKmMVTaMHv4cKGzgD3gL8="
+            )
+        elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
+            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID: str = "84ab606a7-cea4-48a0-a216-ed9c14a4a38c"
+            self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
+            self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="  # noqa
+            self.cfb = base64.b64decode(
+                "IDbMgWBXgic4MAyMgf5PFGsDas7YzQmN/lcPSkArm/KVUTutuiJAZ+4ZFoVxsHFNNy4="
+            )
+
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
@@ -845,18 +864,8 @@ class KiaUvoApiAU(ApiImplType1):
             return None
 
     def _get_stamp(self) -> str:
-        if BRANDS[self.brand] == BRAND_KIA:
-            cfb = base64.b64decode(
-                "IDbMgWBXgic4MAyMgf5PFFRAdGX5O3IyC3uvN3scCs0gDpTFDuyvBorlAH9JMM2/wMc="
-            )
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            cfb = base64.b64decode(
-                "V60WkEmyRQaAfrBF1623/7QL62MjLVbCHdItGzQ1g5T/hkmKmMVTaMHv4cKGzgD3gL8="
-            )
-        else:
-            raise ValueError("Invalid brand")
         raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
-        result = bytes(b1 ^ b2 for b1, b2 in zip(cfb, raw_data))
+        result = bytes(b1 ^ b2 for b1, b2 in zip(self.cfb, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp):
