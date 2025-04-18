@@ -1116,12 +1116,7 @@ class KiaUvoApiEU(ApiImplType1):
         return session.cookies.get_dict()
         # return session
 
-    def _set_session_language(self, cookies) -> None:
-        # Set Language for Session #
-        url = self.USER_API_URL + "language"
-        headers = {"Content-type": "application/json"}
-        payload = {"lang": self.LANGUAGE}
-        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
+
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies

@@ -916,3 +916,10 @@ class ApiImplType1(ApiImpl):
             dt.datetime.now().timestamp() + response["expiresTime"]
         )
         return control_token, control_token_expire_at
+    
+    def _set_session_language(self, cookies) -> None:
+        # Set Language for Session #
+        url = self.USER_API_URL + "language"
+        headers = {"Content-type": "application/json"}
+        payload = {"lang": self.LANGUAGE}
+        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)

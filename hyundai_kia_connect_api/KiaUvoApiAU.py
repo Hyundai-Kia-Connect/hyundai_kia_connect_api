@@ -819,7 +819,6 @@ class KiaUvoApiAU(ApiImplType1):
             10**80
         )
         registration_id = my_hex[:64]
-        # provider_device_id = "59af09e554a9442ab8589c9500d04d2e"
         url = self.SPA_API_URL + "notifications/register"
         payload = {
             # "providerDeviceId": provider_device_id,
@@ -865,14 +864,7 @@ class KiaUvoApiAU(ApiImplType1):
         _ = session.get(url)
         _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
-        # return session
 
-    def _set_session_language(self, cookies) -> None:
-        # Set Language for Session #
-        url = self.USER_API_URL
-        headers = {"Content-type": "application/json"}
-        payload = {"lang": "en"}
-        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
