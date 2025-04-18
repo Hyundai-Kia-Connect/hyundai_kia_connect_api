@@ -48,7 +48,6 @@ from .exceptions import (
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
-    parse_datetime,
 )
 
 _LOGGER = logging.getLogger(__name__)
