@@ -896,6 +896,55 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
+    
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+    
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/windowcurtain"
+
+        payload = {
+            "backLeft": options.back_left,
+            "backRight": options.back_right,
+            "frontLeft": options.front_left,
+            "frontRight": options.front_right,
+        }
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
         url = self.USER_API_URL + "pin?token="
