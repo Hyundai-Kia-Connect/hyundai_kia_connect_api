@@ -3,6 +3,7 @@
 import datetime as dt
 import requests
 import logging
+import math
 from typing import Optional
 from datetime import timedelta, timezone
 
@@ -14,6 +15,7 @@ from .ApiImpl import (
     ApiImpl,
     ScheduleChargingClimateRequestOptions,
     ClimateRequestOptions,
+    WindowRequestOptions
 )
 from .Token import Token
 from .Vehicle import Vehicle
