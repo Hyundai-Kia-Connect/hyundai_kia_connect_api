@@ -127,7 +127,7 @@ class ApiImplType1(ApiImpl):
             )
             result.append(vehicle)
         return result
-    
+
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
             lastTwo = int(value[-2:])
@@ -896,7 +896,7 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
-    
+
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
 
@@ -926,7 +926,7 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
-    
+
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
     ) -> str:
@@ -965,7 +965,7 @@ class ApiImplType1(ApiImpl):
             dt.datetime.now().timestamp() + response["expiresTime"]
         )
         return control_token, control_token_expire_at
-    
+
     def _set_session_language(self, cookies) -> None:
         # Set Language for Session #
         url = self.USER_API_URL + "language"

@@ -4,7 +4,6 @@
 
 import base64
 import datetime as dt
-import math
 import logging
 import random
 import uuid
@@ -14,9 +13,6 @@ import pytz
 import requests
 from dateutil import tz
 
-from .ApiImpl import (
-    WindowRequestOptions,
-)
 from .ApiImplType1 import ApiImplType1
 from .Token import Token
 from .Vehicle import (
@@ -580,7 +576,6 @@ class KiaUvoApiAU(ApiImplType1):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
-
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
@@ -846,7 +841,6 @@ class KiaUvoApiAU(ApiImplType1):
         _ = session.get(url)
         _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
-
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies

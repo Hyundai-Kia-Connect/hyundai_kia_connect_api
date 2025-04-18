@@ -7,7 +7,6 @@ import random
 import datetime as dt
 import logging
 import uuid
-import math
 from urllib.parse import parse_qs, urlparse
 
 import pytz
@@ -208,7 +207,6 @@ class KiaUvoApiEU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
         )
-
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -804,7 +802,6 @@ class KiaUvoApiEU(ApiImplType1):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
-
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
@@ -1087,8 +1084,6 @@ class KiaUvoApiEU(ApiImplType1):
         return session.cookies.get_dict()
         # return session
 
-
-
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
@@ -1250,5 +1245,3 @@ class KiaUvoApiEU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-
-
