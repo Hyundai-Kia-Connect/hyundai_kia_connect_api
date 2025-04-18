@@ -317,6 +317,8 @@ class VehicleManager:
             if BRANDS[brand] == BRAND_KIA:
                 return KiaUvoApiAU(region, brand, language)
             else:
-                raise APIError(f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}")
+                raise APIError(
+                    f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
+                )
         else:
             raise APIError(f"Unknown region {region}")

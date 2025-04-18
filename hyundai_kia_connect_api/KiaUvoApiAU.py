@@ -62,7 +62,6 @@ class KiaUvoApiAU(ApiImplType1):
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_AUSTRALIA:
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
@@ -88,7 +87,6 @@ class KiaUvoApiAU(ApiImplType1):
             self.cfb = base64.b64decode(
                 "IDbMgWBXgic4MAyMgf5PFGsDas7YzQmN/lcPSkArm/KVUTutuiJAZ+4ZFoVxsHFNNy4="
             )
-
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
