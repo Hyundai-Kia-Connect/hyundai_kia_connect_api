@@ -44,8 +44,5 @@ jobs:
                   KIA_CA_CDNNINJA_PIN: ${{ secrets.KIA_CA_CDNNINJA_PIN }}
                   KIA_EU_FUATAKGUN_USERNAME: ${{ secrets.KIA_EU_FUATAKGUN_USERNAME }}
                   KIA_EU_FUATAKGUN_PASSWORD: ${{ secrets.KIA_EU_FUATAKGUN_PASSWORD }}
-                  KIA_IN_NISHANT_USERNAME: ${{ secrets.NISHANT_USERNAME }}
-                  KIA_IN_NISHANT_PASSWORD: ${{ secrets.NISHANT_PASSWORD }}
-                  KIA_IN_NISHANT_PIN: ${{ secrets.NISHANT_PIN }}
               run: |
                   pytest
