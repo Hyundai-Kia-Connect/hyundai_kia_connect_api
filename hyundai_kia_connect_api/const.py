@@ -32,7 +32,6 @@ REGIONS = {
     5: REGION_AUSTRALIA,
     6: REGION_INDIA,
     7: REGION_NZ,
-
 }
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
