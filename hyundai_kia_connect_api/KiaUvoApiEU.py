@@ -7,7 +7,6 @@ import random
 import datetime as dt
 import logging
 import uuid
-import math
 from urllib.parse import parse_qs, urlparse
 
 import pytz
@@ -208,54 +207,6 @@ class KiaUvoApiEU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
         )
-
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL + "vehicles"
-        response = requests.get(
-            url,
-            headers=self._get_authenticated_headers(token),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=entry_engine_type,
-                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
-            )
-            result.append(vehicle)
-        return result
-
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
-            lastTwo = int(value[-2:])
-            if lastTwo > 60:
-                value = int(value) + 40
-            if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
-            else:
-                d = dt.datetime.strptime(str(value), "%I%M")
-                if timesection > 0:
-                    d += dt.timedelta(hours=12)
-                value = d.time()
-        return value
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -851,36 +802,6 @@ class KiaUvoApiEU(ApiImplType1):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
-
-        payload = {"command": "on"}
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
-        response = requests.post(
-            url,
-            json=payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
-        _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
-        return response["msgId"]
-
-    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
-
-        payload = {"command": "on"}
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
-        response = requests.post(
-            url,
-            json=payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
-        _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
-        return response["msgId"]
-
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
@@ -1163,13 +1084,6 @@ class KiaUvoApiEU(ApiImplType1):
         return session.cookies.get_dict()
         # return session
 
-    def _set_session_language(self, cookies) -> None:
-        # Set Language for Session #
-        url = self.USER_API_URL + "language"
-        headers = {"Content-type": "application/json"}
-        payload = {"lang": self.LANGUAGE}
-        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
-
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
@@ -1331,24 +1245,3 @@ class KiaUvoApiEU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-
-    def _get_control_token(self, token: Token) -> Token:
-        url = self.USER_API_URL + "pin?token="
-        headers = {
-            "Authorization": token.access_token,
-            "Content-type": "application/json",
-            "Host": self.BASE_URL,
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = {"deviceId": token.device_id, "pin": token.pin}
-        _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
-        response = requests.put(url, json=data, headers=headers)
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
-        control_token = "Bearer " + response["controlToken"]
-        control_token_expire_at = math.floor(
-            dt.datetime.now().timestamp() + response["expiresTime"]
-        )
-        return control_token, control_token_expire_at
