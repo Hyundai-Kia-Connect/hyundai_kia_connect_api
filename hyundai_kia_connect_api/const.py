@@ -21,6 +21,8 @@ REGION_CANADA = "Canada"
 REGION_USA = "USA"
 REGION_CHINA = "China"
 REGION_AUSTRALIA = "Australia"
+REGION_NZ = "New Zealand"
+
 REGION_INDIA = "India"
 REGIONS = {
     1: REGION_EUROPE,
@@ -29,6 +31,7 @@ REGIONS = {
     4: REGION_CHINA,
     5: REGION_AUSTRALIA,
     6: REGION_INDIA,
+    7: REGION_NZ,
 }
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)

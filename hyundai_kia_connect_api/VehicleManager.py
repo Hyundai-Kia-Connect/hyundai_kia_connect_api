@@ -34,6 +34,7 @@ from .const import (
     REGION_EUROPE,
     REGION_USA,
     REGION_CHINA,
+    REGION_NZ,
     REGION_INDIA,
     REGIONS,
     VEHICLE_LOCK_ACTION,
@@ -314,6 +315,13 @@ class VehicleManager:
             return KiaUvoApiCN(region, brand, language)
         elif REGIONS[region] == REGION_AUSTRALIA:
             return KiaUvoApiAU(region, brand, language)
+        elif REGIONS[region] == REGION_NZ:
+            if BRANDS[brand] == BRAND_KIA:
+                return KiaUvoApiAU(region, brand, language)
+            else:
+                raise APIError(
+                    f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
+                )
         elif REGIONS[region] == REGION_INDIA:
             return KiaUvoApiIN(brand)
         else:
