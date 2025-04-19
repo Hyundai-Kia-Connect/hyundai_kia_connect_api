@@ -84,20 +84,7 @@ class KiaUvoApiIN(ApiImplType1):
         super().__init__()
         self.brand = brand
 
-        if BRANDS[self.brand] == BRAND_KIA:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
-            self.PORT: int = 8080
-            self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB: str = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
-            )
-            self.LOGIN_FORM_HOST = "eu-account.kia.com"
-            self.PUSH_TYPE = "APNS"
-        elif BRANDS[brand] == BRAND_HYUNDAI:
+        if BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.in-ccapi.hyundai.connected-car.io"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "e5b3f6d0-7f83-43c9-aff3-a254db7af368"
@@ -109,17 +96,8 @@ class KiaUvoApiIN(ApiImplType1):
             self.LOGIN_FORM_HOST = "prd.in-ccapi.hyundai.connected-car.io"
             self.PUSH_TYPE = "GCM"
             self.GCM_SENDER_ID = 974204007939
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
-            self.PORT: int = 443
-            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
-            self.CFB: str = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
-            )
-            self.BASIC_AUTHORIZATION: str = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="  # noqa
-            self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
-            self.PUSH_TYPE = "GCM"
+        elif BRANDS[brand] == BRAND_KIA:
+            raise NotImplemented()
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
