@@ -29,7 +29,6 @@ from .Vehicle import (
     DayTripCounts,
 )
 from .const import (
-    BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
@@ -97,7 +96,7 @@ class KiaUvoApiIN(ApiImplType1):
             self.PUSH_TYPE = "GCM"
             self.GCM_SENDER_ID = 974204007939
         elif BRANDS[brand] == BRAND_KIA:
-            raise NotImplemented()
+            raise NotImplementedError()
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
