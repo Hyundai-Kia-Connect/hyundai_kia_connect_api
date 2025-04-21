@@ -166,7 +166,6 @@ class ApiImplType1(ApiImpl):
 
         return headers
 
-
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
         control_token, _ = self._get_control_token(token)
         authenticated_headers = self._get_authenticated_headers(
