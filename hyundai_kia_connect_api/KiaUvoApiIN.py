@@ -10,7 +10,6 @@ import uuid
 import re
 import math
 from urllib.parse import parse_qs, urlparse
-from typing import Optional
 import pytz
 import requests
 from dateutil import tz
@@ -108,20 +107,6 @@ class KiaUvoApiIN(ApiImplType1):
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
 
-    def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None
-    ) -> dict:
-        return {
-            "Authorization": token.access_token,
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "ccsp-device-id": token.device_id,
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
     def login(self, username: str, password: str) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
@@ -153,38 +138,6 @@ class KiaUvoApiIN(ApiImplType1):
         )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL + "vehicles"
-        response = requests.get(
-            url,
-            headers=self._get_authenticated_headers(token),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=entry_engine_type,
-                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
-            )
-            result.append(vehicle)
-        return result
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
@@ -441,59 +394,6 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
-        return response["msgId"]
-
-    def start_climate(
-        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
-
-        # Defaults are located here to be region specific
-
-        if options.set_temp is None:
-            options.set_temp = 21
-        if options.duration is None:
-            options.duration = 5
-        if options.defrost is None:
-            options.defrost = False
-        if options.climate is None:
-            options.climate = True
-        if options.heating is None:
-            options.heating = 0
-
-        hex_set_temp = get_index_into_hex_temp(
-            self.temperature_range.index(options.set_temp)
-        )
-
-        payload = {
-            "action": "start",
-            "hvacType": 1,
-            "options": {
-                "defrost": options.defrost,
-                "heating1": int(options.heating),
-            },
-            "tempCode": hex_set_temp,
-            "unit": "C",
-        }
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
-        payload = {
-            "action": "stop",
-        }
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-        response = requests.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
         return response["msgId"]
 
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
