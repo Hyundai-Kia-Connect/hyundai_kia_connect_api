@@ -30,6 +30,8 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
     ORDER_STATUS,
+    REGIONS,
+    REGION_INDIA,
 )
 
 from .exceptions import (
@@ -147,7 +149,7 @@ class ApiImplType1(ApiImpl):
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: Optional[int] = None
     ) -> dict:
-        return {
+        headers = {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
@@ -157,6 +159,13 @@ class ApiImplType1(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
+
+        if REGIONS[region] != REGION_INDIA:
+            headers["Stamp"] = self._get_stamp()
+            headers["Ccuccs2protocolsupport"] = str(ccs2_support or 0)
+
+        return headers
+
 
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
         control_token, _ = self._get_control_token(token)
