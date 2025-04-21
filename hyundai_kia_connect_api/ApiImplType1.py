@@ -147,7 +147,10 @@ class ApiImplType1(ApiImpl):
         return value
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None, region: Optional[int] = None
+        self,
+        token: Token,
+        ccs2_support: Optional[int] = None,
+        region: Optional[int] = None,
     ) -> dict:
         headers = {
             "Authorization": token.access_token,
