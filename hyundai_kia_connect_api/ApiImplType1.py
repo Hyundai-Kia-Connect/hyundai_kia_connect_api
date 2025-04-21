@@ -783,7 +783,7 @@ class ApiImplType1(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
 
         # Defaults are located here to be region specific
 
@@ -804,7 +804,7 @@ class ApiImplType1(ApiImpl):
 
             payload = {
                 "action": "start",
-                "hvacType": 0,
+                "hvacType": 1,
                 "options": {
                     "defrost": options.defrost,
                     "heating1": int(options.heating),
@@ -857,7 +857,7 @@ class ApiImplType1(ApiImpl):
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
             payload = {
                 "action": "stop",
                 "hvacType": 0,
