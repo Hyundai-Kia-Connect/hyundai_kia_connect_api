@@ -30,8 +30,6 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
     ORDER_STATUS,
-    REGIONS,
-    REGION_INDIA,
 )
 
 from .exceptions import (
@@ -147,27 +145,20 @@ class ApiImplType1(ApiImpl):
         return value
 
     def _get_authenticated_headers(
-        self,
-        token: Token,
-        ccs2_support: Optional[int] = None,
-        region: Optional[int] = None,
+        self, token: Token, ccs2_support: Optional[int] = None
     ) -> dict:
-        headers = {
+        return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
+            "Stamp": self._get_stamp(),
             "ccsp-device-id": token.device_id,
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": str(ccs2_support or 0),
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-
-        if REGIONS[region] != REGION_INDIA:
-            headers["Stamp"] = self._get_stamp()
-            headers["Ccuccs2protocolsupport"] = str(ccs2_support or 0)
-
-        return headers
 
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
         control_token, _ = self._get_control_token(token)
@@ -794,7 +785,7 @@ class ApiImplType1(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
 
         # Defaults are located here to be region specific
 
@@ -815,7 +806,7 @@ class ApiImplType1(ApiImpl):
 
             payload = {
                 "action": "start",
-                "hvacType": 1,
+                "hvacType": 0,
                 "options": {
                     "defrost": options.defrost,
                     "heating1": int(options.heating),
@@ -868,7 +859,7 @@ class ApiImplType1(ApiImpl):
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
             payload = {
                 "action": "stop",
                 "hvacType": 0,
