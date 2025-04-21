@@ -137,8 +137,6 @@ class KiaUvoApiIN(ApiImplType1):
             valid_until=valid_until,
         )
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
             lastTwo = int(value[-2:])
