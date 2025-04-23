@@ -14,7 +14,9 @@ from typing import Optional
 import pytz
 import requests
 from dateutil import tz
-
+from .ApiImpl import (
+    ClimateRequestOptions,
+)
 
 from .ApiImplType1 import ApiImplType1
 from .ApiImplType1 import _check_response_for_errors
@@ -46,6 +48,7 @@ from .exceptions import (
 )
 from .utils import (
     get_child_value,
+    get_index_into_hex_temp,
     get_hex_temp_into_index,
 )
 
@@ -438,6 +441,59 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
+
+        # Defaults are located here to be region specific
+
+        if options.set_temp is None:
+            options.set_temp = 21
+        if options.duration is None:
+            options.duration = 5
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
+
+        hex_set_temp = get_index_into_hex_temp(
+            self.temperature_range.index(options.set_temp)
+        )
+
+        payload = {
+            "action": "start",
+            "hvacType": 1,
+            "options": {
+                "defrost": options.defrost,
+                "heating1": int(options.heating),
+            },
+            "tempCode": hex_set_temp,
+            "unit": "C",
+        }
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_authenticated_headers(token)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
+        payload = {
+            "action": "stop",
+        }
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
+        _check_response_for_errors(response)
         return response["msgId"]
 
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
