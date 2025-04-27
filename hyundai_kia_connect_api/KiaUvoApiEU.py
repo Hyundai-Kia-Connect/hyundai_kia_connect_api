@@ -792,7 +792,6 @@ class KiaUvoApiEU(ApiImplType1):
     ) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
 
-
         payload = {"action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
         response = requests.post(
