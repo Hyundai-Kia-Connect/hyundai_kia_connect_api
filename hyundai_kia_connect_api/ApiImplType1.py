@@ -41,6 +41,7 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
+    PINMissingError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -954,6 +955,8 @@ class ApiImplType1(ApiImpl):
         return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
+        if token.pin is None:
+            raise PINMissingError("PIN is not set, action will fail.")
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
