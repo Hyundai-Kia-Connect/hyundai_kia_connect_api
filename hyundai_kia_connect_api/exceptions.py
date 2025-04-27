@@ -10,6 +10,13 @@ class HyundaiKiaException(Exception):
 
     pass
 
+class PINMissingError(HyundaiKiaException):
+    """
+    Raised upon receipt of an authentication error.
+    """
+
+    pass
+
 
 class AuthenticationError(HyundaiKiaException):
     """
