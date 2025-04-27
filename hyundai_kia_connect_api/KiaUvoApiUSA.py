@@ -401,6 +401,26 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.backRight"
         )
+        if not vehicle.front_left_window_is_open:
+            vehicle.front_left_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFL",
+            )
+        if not vehicle.front_right_window_is_open:
+            vehicle.front_right_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFR",
+            )
+        if not vehicle.back_left_window_is_open:
+            vehicle.back_left_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRL",
+            )
+        if not vehicle.back_right_window_is_open:
+            vehicle.back_right_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRR",
+            )
         vehicle.ev_battery_percentage = get_child_value(
             state,
             "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryStatus",
