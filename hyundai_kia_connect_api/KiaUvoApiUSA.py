@@ -401,22 +401,22 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.backRight"
         )
-        if not vehicle.front_left_window_is_open:
+        if vehicle.front_left_window_is_open is None:
             vehicle.front_left_window_is_open = get_child_value(
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFL",
             )
-        if not vehicle.front_right_window_is_open:
+        if vehicle.front_right_window_is_open is None:
             vehicle.front_right_window_is_open = get_child_value(
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFR",
             )
-        if not vehicle.back_left_window_is_open:
+        if vehicle.back_left_window_is_open is None:
             vehicle.back_left_window_is_open = get_child_value(
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRL",
             )
-        if not vehicle.back_right_window_is_open:
+        if vehicle.back_right_window_is_open is None:
             vehicle.back_right_window_is_open = get_child_value(
                 state,
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRR",
