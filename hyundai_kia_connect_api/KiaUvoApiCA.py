@@ -13,7 +13,7 @@ from dateutil.tz import tzoffset
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, DailyDrivingStats
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -202,6 +202,7 @@ class KiaUvoApiCA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
+            self._update_vehicle_properties_trip_details(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -240,6 +241,7 @@ class KiaUvoApiCA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
+            self._update_vehicle_properties_trip_details(token, vehicle)
 
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
@@ -439,6 +441,31 @@ class KiaUvoApiCA(ApiImpl):
                 parse_datetime(get_child_value(state, "time"), self.data_timezone),
             )
         vehicle.data["vehicleLocation"] = state
+
+    def _update_vehicle_properties_trip_details(self, token: Token, vehicle: Vehicle):
+        url = self.API_URL + "alerts/maintenance/evTripDetails"
+        headers = self.API_HEADERS
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+
+        response = self.sessions.post(url, headers=headers)
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received get_ev_details response {response}")
+        tripStats = []
+        for trip in response["result"]["tripdetails"]:
+            processedTrip = DailyDrivingStats(
+                date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S"),
+                total_consumed=get_child_value(trip, "totalused"),
+                engine_consumption=get_child_value(trip, "drivetrain"),
+                climate_consumption=get_child_value(trip, "climate"),
+                onboard_electronics_consumption=get_child_value(trip, "accessories"),
+                battery_care_consumption=get_child_value(trip, "batterycare"),
+                regenerated_energy=get_child_value(trip, "regen"),
+                distance=get_child_value(trip, "distance"),
+                distance_unit=vehicle.odometer_unit,
+            )
+            tripStats.append(processedTrip)
+        vehicle.daily_stats = tripStats
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
