@@ -443,6 +443,11 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Electronics.FOB.LowBattery")
         )
 
+        if vehicle._ev_estimated_current_charge_duration == 0:
+            vehicle.ev_battery_is_charging = False
+        elif vehicle._ev_estimated_current_charge_duration > 0:
+            vehicle.ev_battery_is_charging = True
+
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
                 2000, 1, 1, tzinfo=self.data_timezone
