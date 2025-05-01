@@ -443,11 +443,11 @@ class ApiImplType1(ApiImpl):
         vehicle.smart_key_battery_warning_is_on = bool(
             get_child_value(state, "Electronics.FOB.LowBattery")
         )
-
-        if vehicle._ev_estimated_current_charge_duration == 0:
-            vehicle.ev_battery_is_charging = False
-        elif vehicle._ev_estimated_current_charge_duration > 0:
-            vehicle.ev_battery_is_charging = True
+        if vehicle._ev_estimated_current_charge_duration is None:
+            if vehicle._ev_estimated_current_charge_duration == 0:
+                vehicle.ev_battery_is_charging = False
+            elif vehicle._ev_estimated_current_charge_duration > 0:
+                vehicle.ev_battery_is_charging = True
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
             location_last_updated_at = dt.datetime(
