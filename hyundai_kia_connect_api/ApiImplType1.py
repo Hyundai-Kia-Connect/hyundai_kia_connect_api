@@ -292,6 +292,9 @@ class ApiImplType1(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "Cabin.Window.Row2.Right.Open"
         )
+        vehicle.sunroof_is_open = get_child_value(
+            state, "Body.Sunroof.Glass.Open"
+        )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
         )
