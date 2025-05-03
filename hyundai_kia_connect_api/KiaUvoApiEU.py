@@ -211,6 +211,8 @@ class KiaUvoApiEU(ApiImplType1):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
+        _LOGGER.debug(f"{DOMAIN} - CCU CCS Support: {vehicle.ccu_ccs2_protocol_support}")
+
         if is_ccs2:
             url += "/ccs2/carstatus/latest"
         else:
