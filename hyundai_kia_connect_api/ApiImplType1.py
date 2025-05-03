@@ -952,6 +952,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
