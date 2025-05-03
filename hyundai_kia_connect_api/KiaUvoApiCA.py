@@ -451,16 +451,22 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         if response.ok:
             response = response.json()
-            _LOGGER.debug(f"{DOMAIN} - Received _update_vehicle_properties_trip_details response {response}")
+            _LOGGER.debug(
+                f"{DOMAIN} - Received _update_vehicle_properties_trip_details response {response}"
+            )
             if "result" in response and "tripdetails" in response["result"]:
                 trip_stats = []
                 for trip in response["result"]["tripdetails"]:
                     processed_trip = DailyDrivingStats(
-                        date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S"),
+                        date=dt.datetime.strptime(
+                            trip["startdate"], "%Y-%m-%d %H:%M:%S"
+                        ),
                         total_consumed=get_child_value(trip, "totalused"),
                         engine_consumption=get_child_value(trip, "drivetrain"),
                         climate_consumption=get_child_value(trip, "climate"),
-                        onboard_electronics_consumption=get_child_value(trip, "accessories"),
+                        onboard_electronics_consumption=get_child_value(
+                            trip, "accessories"
+                        ),
                         battery_care_consumption=get_child_value(trip, "batterycare"),
                         regenerated_energy=get_child_value(trip, "regen"),
                         distance=get_child_value(trip, "distance"),
@@ -469,9 +475,13 @@ class KiaUvoApiCA(ApiImpl):
                     trip_stats.append(processed_trip)
                 vehicle.daily_stats = trip_stats
             else:
-                _LOGGER.debug(f"{DOMAIN} - Error with _update_vehicle_properties_trip_details response. Unknown format: {response}")
+                _LOGGER.debug(
+                    f"{DOMAIN} - Error with _update_vehicle_properties_trip_details response. Unknown format: {response}"
+                )
         else:
-            _LOGGER.debug(f"{DOMAIN} - Error with _update_vehicle_properties_trip_details response: {response.text}")
+            _LOGGER.debug(
+                f"{DOMAIN} - Error with _update_vehicle_properties_trip_details response: {response.text}"
+            )
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
