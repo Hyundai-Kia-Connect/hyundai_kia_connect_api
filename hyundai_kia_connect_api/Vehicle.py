@@ -139,6 +139,7 @@ class Vehicle:
     front_right_window_is_open: bool = None
     back_left_window_is_open: bool = None
     back_right_window_is_open: bool = None
+    sunroof_is_open: bool = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
