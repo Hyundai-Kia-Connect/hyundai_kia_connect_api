@@ -65,12 +65,9 @@ class KiaUvoApiCA(ApiImpl):
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "okhttp/4.12.0",
             "host": self.BASE_URL,
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
-            "origin": "https://" + self.BASE_URL,
-            "referer": "https://" + self.BASE_URL + "/login",
             "from": "SPA",
             "language": "0",
             "offset": "-5",
@@ -83,7 +80,7 @@ class KiaUvoApiCA(ApiImpl):
     @property
     def sessions(self):
         if not self._sessions:
-            self._sessions = cloudscraper.Session()
+            self._sessions = cloudscraper.create_scraper()
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
