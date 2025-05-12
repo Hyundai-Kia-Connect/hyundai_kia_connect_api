@@ -62,8 +62,8 @@ class KiaUvoApiCA(ApiImpl):
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
             "content-type": "application/json",
-            "accept": "application/json, text/plain, */*",
-            "accept-encoding": "gzip, deflate, br",
+            "accept": "application/json",
+            "accept-encoding": "gzip",
             "accept-language": "en-US,en;q=0.9",
             "host": self.BASE_URL,
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
@@ -80,7 +80,9 @@ class KiaUvoApiCA(ApiImpl):
     @property
     def sessions(self):
         if not self._sessions:
-            self._sessions = cloudscraper.create_scraper()
+            self._sessions = cloudscraper.create_scraper(
+                browser={"custom": "okhttp/4.12.0"}
+            )
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
