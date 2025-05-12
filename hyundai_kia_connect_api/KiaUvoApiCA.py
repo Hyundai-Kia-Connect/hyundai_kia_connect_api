@@ -81,9 +81,7 @@ class KiaUvoApiCA(ApiImpl):
     def sessions(self):
         if not self._sessions:
             self._sessions = cloudscraper.create_scraper(
-                browser={
-                    'custom': 'okhttp/4.12.0'
-                }
+                browser={"custom": "okhttp/4.12.0"}
             )
         return self._sessions
 
