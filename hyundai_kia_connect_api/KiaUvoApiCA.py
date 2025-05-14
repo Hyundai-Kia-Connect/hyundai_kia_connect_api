@@ -363,43 +363,45 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "status.windowOpen.backRight"
         )
-        vehicle.ev_battery_percentage = get_child_value(
-            state, "status.evStatus.batteryStatus"
-        )
-        vehicle.ev_battery_is_charging = get_child_value(
-            state, "status.evStatus.batteryCharge"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "status.evStatus.batteryPlugin"
-        )
-        vehicle.ev_driving_range = (
-            get_child_value(
-                state,
-                "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-            ),
-            DISTANCE_UNITS[
+        if vehicle.engine_type != ENGINE_TYPES.ICE:
+
+            vehicle.ev_battery_percentage = get_child_value(
+                state, "status.evStatus.batteryStatus"
+            )
+            vehicle.ev_battery_is_charging = get_child_value(
+                state, "status.evStatus.batteryCharge"
+            )
+            vehicle.ev_battery_is_plugged_in = get_child_value(
+                state, "status.evStatus.batteryPlugin"
+            )
+            vehicle.ev_driving_range = (
                 get_child_value(
                     state,
-                    "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
-                )
-            ],
-        )
-        vehicle.ev_estimated_current_charge_duration = (
-            get_child_value(state, "status.evStatus.remainTime2.atc.value"),
-            "m",
-        )
-        vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "status.evStatus.remainTime2.etc1.value"),
-            "m",
-        )
-        vehicle.ev_estimated_portable_charge_duration = (
-            get_child_value(state, "status.evStatus.remainTime2.etc2.value"),
-            "m",
-        )
-        vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
-            "m",
-        )
+                    "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                    )
+                ],
+            )
+            vehicle.ev_estimated_current_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.atc.value"),
+                "m",
+            )
+            vehicle.ev_estimated_fast_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc1.value"),
+                "m",
+            )
+            vehicle.ev_estimated_portable_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc2.value"),
+                "m",
+            )
+            vehicle.ev_estimated_station_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
+                "m",
+            )
         vehicle.fuel_driving_range = (
             get_child_value(
                 state,
