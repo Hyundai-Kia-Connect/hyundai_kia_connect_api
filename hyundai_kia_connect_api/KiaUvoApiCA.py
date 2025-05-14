@@ -364,7 +364,6 @@ class KiaUvoApiCA(ApiImpl):
             state, "status.windowOpen.backRight"
         )
         if vehicle.engine_type != ENGINE_TYPES.ICE:
-
             vehicle.ev_battery_percentage = get_child_value(
                 state, "status.evStatus.batteryStatus"
             )
