@@ -37,7 +37,7 @@ from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
     DOMAIN,
-    ENGINE_TYPES,
+    EngineType,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -164,15 +164,15 @@ class KiaUvoApiIN(ApiImplType1):
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
             if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = EngineType.ICE
             elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = EngineType.EV
             elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
+                entry_engine_type = EngineType.HEV
             elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -242,8 +242,8 @@ class KiaUvoApiIN(ApiImplType1):
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
-            vehicle.engine_type == ENGINE_TYPES.EV
-            or vehicle.engine_type == ENGINE_TYPES.PHEV
+            vehicle.engine_type == EngineType.EV
+            or vehicle.engine_type == EngineType.PHEV
         ):
             try:
                 state = self._get_driving_info(token, vehicle)

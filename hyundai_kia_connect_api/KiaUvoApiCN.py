@@ -35,7 +35,7 @@ from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
     DOMAIN,
-    ENGINE_TYPES,
+    EngineType,
     LOGIN_TOKEN_LIFETIME,
     ORDER_STATUS,
     SEAT_STATUS,
@@ -196,13 +196,13 @@ class KiaUvoApiCN(ApiImplType1):
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
             if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = EngineType.ICE
             elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = EngineType.EV
             elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
+                entry_engine_type = EngineType.HEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -234,7 +234,7 @@ class KiaUvoApiCN(ApiImplType1):
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
@@ -258,7 +258,7 @@ class KiaUvoApiCN(ApiImplType1):
         self._update_vehicle_properties(vehicle, state)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:

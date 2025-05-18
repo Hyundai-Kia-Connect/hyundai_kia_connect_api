@@ -20,7 +20,7 @@ from .const import (
     SEAT_STATUS,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
-    ENGINE_TYPES,
+    EngineType,
 )
 from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -184,7 +184,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         return status
 
     def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict:
-        if vehicle.engine_type != ENGINE_TYPES.EV:
+        if vehicle.engine_type != EngineType.EV:
             return {}
 
         url = self.API_URL + "ts/alerts/maintenance/evTripDetails"
@@ -732,9 +732,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             entry = entry["vehicleDetails"]
             entry_engine_type = None
             if entry["evStatus"] == "N":
-                entry_engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = EngineType.ICE
             elif entry["evStatus"] == "E":
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = EngineType.EV
             vehicle: Vehicle = Vehicle(
                 id=entry["regid"],
                 name=entry["nickName"],
@@ -781,7 +781,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             url = self.API_URL + "evc/fatc/start"
         else:
             url = self.API_URL + "rcs/rsc/start"
@@ -808,7 +808,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             data = {
                 "airCtrl": int(options.climate),
                 "igniOnDuration": options.duration,
@@ -850,7 +850,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             url = self.API_URL + "evc/fatc/stop"
         else:
             url = self.API_URL + "rcs/rsc/stop"
@@ -866,7 +866,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> None:
-        if vehicle.engine_type != ENGINE_TYPES.EV:
+        if vehicle.engine_type != EngineType.EV:
             return {}
 
         _LOGGER.debug(f"{DOMAIN} - Start charging..")
@@ -882,7 +882,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start charge response: {response.text}")
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
-        if vehicle.engine_type != ENGINE_TYPES.EV:
+        if vehicle.engine_type != EngineType.EV:
             return {}
 
         _LOGGER.debug(f"{DOMAIN} - Stop charging..")
@@ -900,7 +900,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
-        if vehicle.engine_type != ENGINE_TYPES.EV:
+        if vehicle.engine_type != EngineType.EV:
             return {}
 
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")

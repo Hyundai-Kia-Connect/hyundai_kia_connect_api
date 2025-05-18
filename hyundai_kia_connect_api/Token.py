@@ -1,15 +1,9 @@
-"""Token.py"""
-
-# pylint:disable=invalid-name
-
 import datetime as dt
 from dataclasses import dataclass
 
 
 @dataclass
 class Token:
-    """Token"""
-
     username: str = None
     password: str = None
     access_token: str = None

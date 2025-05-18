@@ -90,7 +90,7 @@ HEAT_STATUS = {
 }
 
 
-class ENGINE_TYPES(Enum):
+class EngineType(Enum):
     ICE = "ICE"
     EV = "EV"
     PHEV = "PHEV"

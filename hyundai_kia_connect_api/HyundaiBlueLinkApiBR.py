@@ -27,7 +27,7 @@ from .const import (
     SEAT_STATUS,
     DISTANCE_UNITS,
     TEMPERATURE_UNITS,
-    ENGINE_TYPES,
+    EngineType,
     Brand,
     Region,
 )
@@ -811,17 +811,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         result = []
 
         for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
+            entry_engine_type = self._get_vehicle_engine_type(entry["type"])
+
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -835,6 +826,21 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             result.append(vehicle)
 
         return result
+
+    def _get_vehicle_engine_type(self, vehicle_type: str) -> EngineType:
+        match vehicle_type:
+            case "GN":
+                return EngineType.ICE
+            case "EV":
+                return EngineType.EV
+            case "PHEV":
+                return EngineType.PHEV
+            case "HV":
+                return EngineType.HEV
+            case "PE":
+                return EngineType.PHEV
+            case _:
+                raise APIError(f"Invalid vehicle type: {vehicle_type}")
 
     # def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
     #     _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")

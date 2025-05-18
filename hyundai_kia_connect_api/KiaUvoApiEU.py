@@ -35,7 +35,7 @@ from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
     DOMAIN,
-    ENGINE_TYPES,
+    EngineType,
     LOGIN_TOKEN_LIFETIME,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -239,8 +239,8 @@ class KiaUvoApiEU(ApiImplType1):
             self._update_vehicle_properties_ccs2(vehicle, state)
 
         if (
-            vehicle.engine_type == ENGINE_TYPES.EV
-            or vehicle.engine_type == ENGINE_TYPES.PHEV
+            vehicle.engine_type == EngineType.EV
+            or vehicle.engine_type == EngineType.PHEV
         ):
             try:
                 state = self._get_driving_info(token, vehicle)
@@ -266,8 +266,8 @@ class KiaUvoApiEU(ApiImplType1):
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
-            vehicle.engine_type == ENGINE_TYPES.EV
-            or vehicle.engine_type == ENGINE_TYPES.PHEV
+            vehicle.engine_type == EngineType.EV
+            or vehicle.engine_type == EngineType.PHEV
         ):
             try:
                 state = self._get_driving_info(token, vehicle)
