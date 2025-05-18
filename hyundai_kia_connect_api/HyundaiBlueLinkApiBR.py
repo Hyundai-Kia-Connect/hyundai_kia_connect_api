@@ -3,8 +3,6 @@
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
 import base64
-import logging
-import time
 import datetime as dt
 import pytz
 import requests
@@ -21,31 +19,17 @@ from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DOMAIN,
-    REGION_BRAZIL,
-    REGIONS,
-    VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
     EngineType,
-    Brand,
-    Region,
 )
-from .utils import get_child_value, get_float, parse_datetime
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .utils import get_child_value, get_float
+from .ApiImpl import ApiImpl
 from .Token import Token
 from .Vehicle import (
-    DailyDrivingStats,
-    DayTripCounts,
-    DayTripInfo,
-    MonthTripInfo,
-    TripInfo,
     Vehicle,
 )
 
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
-BASIC_AUTHORIZATION_HEADER = "Basic MDNmN2RmOWItNzYyNi00ODUzLWI3YmQtYWQxZThkNzIyYmQ1OnlRejJiYzZDbjhPb3ZWT1I3UkRXd3hUcVZ3V0czeUtCWUZEZzBIc09Yc3l4eVBsSA=="
 
 logger = get_logger(f"{DOMAIN}/BR")
 
@@ -80,34 +64,33 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         if BRANDS[brand] != BRAND_HYUNDAI:
             raise APIError(f"Unknown brand {BRANDS[brand]} for region {region}.")
 
-        self.LANGUAGE: str = language
-        self.BASE_URL: str = "br-ccapi.hyundai.com.br"
-        self.API_URL: str = "https://" + self.BASE_URL + "/api/v1/"
-        self.CCSP_DEVICE_ID = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
-        self.CCSP_SERVICE_ID = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
-        self.CCSP_APPLICATION_ID = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
+        self.language: str = language
+        self.base_url: str = "br-ccapi.hyundai.com.br"
+        self.api_url: str = "https://" + self.base_url + "/api/v1/"
+        self.ccsp_device_id = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
+        self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
+        self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
+        self.basic_authorization_header = f"Basic {base64.b64encode(f'{self.ccsp_service_id}:{self.ccsp_application_id}'.encode()).decode()}"
         self.temperature_range = range(62, 82)
-        origin: str = "https://" + self.BASE_URL
-
-        self.API_HEADERS = {
+        self.api_headers = {
             "Connection": "Keep-Alive",
             "Content-Type": "application/json; charset=UTF-8",
             "Accept": "application/json, text/plain, */*",
             "Accept-Encoding": "br;q=1.0, gzip;q=0.9, deflare;q=0.8",
             "Accept-Language": "en-BR;q=1.0",
             "User-Agent": "BR_BlueLink/1.0.14 (com.hyundai.bluelink.br; build:10132; iOS 18.4.0) Alamofire/5.9.1",
-            "Host": self.BASE_URL,
+            "Host": self.base_url,
             "offset": "-3",
             "ccuCCS2ProtocolSupport": "0",
         }
         self.sessions = requests.Session()
-        self.sessions.mount(origin, cipherAdapter())
-        logger.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
+        self.sessions.mount(f"https://{self.base_url}", cipherAdapter())
+        logger.debug(f"{DOMAIN} - initial API headers: {self.api_headers}")
 
     def _get_authenticated_headers(self, token: Token) -> dict:
-        headers = dict(self.API_HEADERS)
-        headers["ccsp-device-id"] = self.CCSP_DEVICE_ID
-        headers["ccsp-application-id"] = self.CCSP_APPLICATION_ID
+        headers = dict(self.api_headers)
+        headers["ccsp-device-id"] = self.ccsp_device_id
+        headers["ccsp-application-id"] = self.ccsp_application_id
         headers["Authorization"] = f"Bearer {token.access_token}"
         return headers
 
@@ -172,7 +155,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                 "Accept": "*/*",
                 "Connection": "keep-alive",
                 "Content-Type": "text/plain;charset=UTF-8",
-                "Host": self.API_HEADERS["Host"],
+                "Host": self.api_headers["Host"],
                 "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
                 "Origin": "https://br-ccapi.hyundai.com.br",
                 "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS",
@@ -191,15 +174,15 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         """
         url = self._build_api_url("/user/oauth2/token")
         body = {
-            "client_id": self.CCSP_SERVICE_ID,
+            "client_id": self.ccsp_service_id,
             "grant_type": "authorization_code",
             "code": authorization_code,
-            "redirect_uri": urljoin(self.API_URL, "/user/oauth2/redirect"),
+            "redirect_uri": urljoin(self.api_url, "/user/oauth2/redirect"),
         }
         headers = {
             "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-            "User-Agent": self.API_HEADERS["User-Agent"],
-            "Authorization": BASIC_AUTHORIZATION_HEADER,
+            "User-Agent": self.api_headers["User-Agent"],
+            "Authorization": self.basic_authorization_header,
         }
         response = requests.post(url, data=body, headers=headers)
         response.raise_for_status()
@@ -208,17 +191,17 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         return response
 
     def _build_api_url(self, path: str) -> str:
-        return self.API_URL + path.removeprefix("/")
+        return self.api_url + path.removeprefix("/")
 
     def _get_cookies(self) -> dict:
         """Request cookies from the API, which will be used for authentication."""
         params = {
             "response_type": "code",
-            "client_id": self.CCSP_SERVICE_ID,
-            "redirect_uri": urljoin(self.API_URL, "/user/oauth2/redirect"),
+            "client_id": self.ccsp_service_id,
+            "redirect_uri": urljoin(self.api_url, "/user/oauth2/redirect"),
         }
         # Build the URL with encoded parameters
-        url = self.API_URL + "/user/oauth2/authorize?" + urlencode(params)
+        url = self.api_url + "/user/oauth2/authorize?" + urlencode(params)
 
         logger.debug(f"Requesting cookies from {url}")
         session = requests.Session()
