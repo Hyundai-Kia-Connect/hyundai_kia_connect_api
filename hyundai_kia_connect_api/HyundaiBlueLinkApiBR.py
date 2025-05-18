@@ -228,21 +228,20 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         logger.debug(f"Got cookies from response: {cookies}")
         return cookies
 
-    # def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
-    #     url = self.API_URL + "enrollment/details/" + token.username
-    #     headers = self._get_authenticated_headers(token)
-    #     response = self.sessions.get(url, headers=headers)
-    #     _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-    #     response = response.json()
-    #     for entry in response["enrolledVehicleDetails"]:
-    #         entry = entry["vehicleDetails"]
-    #         if entry["regid"] == vehicle.id:
-    #             return entry
+    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+        """
+        Query a single vehicle's profile.
+        """
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/profile")
+        headers = self._get_authenticated_headers(token)
+        response = self.sessions.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()["resMsg"]
+        return data
 
     # def _get_vehicle_status(
     #     self, token: Token, vehicle: Vehicle, refresh: bool
     # ) -> dict:
-    #     # Vehicle Status Call
     #     url = self.API_URL + "rcs/rvs/vehicleStatus"
     #     headers = self._get_vehicle_headers(token, vehicle)
     #     if refresh:
@@ -250,7 +249,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
     #     response = self.sessions.get(url, headers=headers)
     #     response = response.json()
-    #     _LOGGER.debug(f"{DOMAIN} - get_vehicle_status response {response}")
+    #     logger.debug(f"{DOMAIN} - get_vehicle_status response {response}")
 
     #     status = dict(response["vehicleStatus"])
 
@@ -753,36 +752,36 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
     #     vehicle.day_trip_info = day_trip_info
 
-    # def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-    #     state = {}
-    #     state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
-    #     state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
-    #     state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        state = {}
+        state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
+        # state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
+        # state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
 
-    #     if state["vehicleStatus"] is not None:
-    #         vehicle_location_result = None
-    #         if vehicle.odometer:
-    #             if vehicle.odometer < get_float(
-    #                 get_child_value(state["vehicleDetails"], "odometer")
-    #             ):
-    #                 vehicle_location_result = self._get_vehicle_location(token, vehicle)
-    #             else:
-    #                 cached_location = state["vehicleStatus"]["vehicleLocation"]
-    #                 _LOGGER.debug(
-    #                     f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback {cached_location}"  # noqa
-    #                 )
-    #         else:
-    #             vehicle_location_result = self._get_vehicle_location(token, vehicle)
+        if state["vehicleStatus"] is not None:
+            vehicle_location_result = None
+            if vehicle.odometer:
+                if vehicle.odometer < get_float(
+                    get_child_value(state["vehicleDetails"], "odometer")
+                ):
+                    vehicle_location_result = self._get_vehicle_location(token, vehicle)
+                else:
+                    cached_location = state["vehicleStatus"]["vehicleLocation"]
+                    logger.debug(
+                        f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback {cached_location}"  # noqa
+                    )
+            else:
+                vehicle_location_result = self._get_vehicle_location(token, vehicle)
 
-    #         if vehicle_location_result is not None:
-    #             state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
-    #         else:
-    #             cached_location = state["vehicleStatus"]["vehicleLocation"]
-    #             _LOGGER.debug(
-    #                 f"{DOMAIN} - update_vehicle_with_cached_state Location fallback {cached_location}"  # noqa
-    #             )
+            if vehicle_location_result is not None:
+                state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
+            else:
+                cached_location = state["vehicleStatus"]["vehicleLocation"]
+                logger.debug(
+                    f"{DOMAIN} - update_vehicle_with_cached_state Location fallback {cached_location}"  # noqa
+                )
 
-    #     self._update_vehicle_properties(vehicle, state)
+        self._update_vehicle_properties(vehicle, state)
 
     # def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
     #     state = {}
