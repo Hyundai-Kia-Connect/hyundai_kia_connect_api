@@ -34,19 +34,13 @@ def manager():
 @pytest.mark.br
 class TestBrazilHyundaiAPI:
     @classmethod
-    def setup_class(self, manager):
+    def setup_class(self):
         if not username or not password or not pin:
             raise ValueError(
                 "BLUELINK_BR_USERNAME, BLUELINK_BR_PASSWORD, and BLUELINK_BR_PIN must be set to run this test file."
             )
 
-        self.manager = manager
-
-    def test_login_hyundai(self):
-        self.manager.check_and_refresh_token()
-        self.manager.update_all_vehicles_with_cached_state()
-        assert len(self.manager.vehicles.keys()) > 0
-
-    def test_vehicle_status(self):
-        self.manager.vehicles
-        breakpoint()
+    def test_login_hyundai(self, manager):
+        manager.check_and_refresh_token()
+        manager.update_all_vehicles_with_cached_state()
+        assert len(manager.vehicles.keys()) > 0
