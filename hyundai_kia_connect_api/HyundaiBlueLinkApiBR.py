@@ -132,7 +132,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             valid_until=expires_at,
             username=username,
             password=password,
-            pin=None,
+            pin=None,  # will be set later
         )
 
     def _get_authorization_code(
@@ -149,6 +149,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             url,
             json=data,
             cookies=cookies,
+            # TODO: we might not need all these headers
             headers={
                 "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
                 "Accept-Encoding": "gzip, deflate, br",

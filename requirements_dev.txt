@@ -14,3 +14,4 @@ geopy>=2.2.0
 cloudscraper>=1.2.60
 python-dotenv==1.1.0
 ruff==0.11.10
+ipython==9.2.0

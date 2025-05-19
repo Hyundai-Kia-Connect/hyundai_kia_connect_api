@@ -20,24 +20,33 @@ password = os.getenv("BLUELINK_BR_PASSWORD")
 pin = os.getenv("BLUELINK_BR_PIN")
 
 
+@pytest.fixture
+def manager():
+    return VehicleManager(
+        region=Region.BRAZIL,
+        brand=Brand.HYUNDAI,
+        username=username,
+        password=password,
+        pin=pin,
+    )
+
+
 @pytest.mark.br
 class TestBrazilHyundaiAPI:
     @classmethod
-    def setup_class(self):
+    def setup_class(self, manager):
         if not username or not password or not pin:
             raise ValueError(
                 "BLUELINK_BR_USERNAME, BLUELINK_BR_PASSWORD, and BLUELINK_BR_PIN must be set to run this test file."
             )
 
-    def test_login_hyundai(self):
-        vm = VehicleManager(
-            region=Region.BRAZIL,
-            brand=Brand.HYUNDAI,
-            username=username,
-            password=password,
-            pin=pin,
-        )
+        self.manager = manager
 
-        vm.check_and_refresh_token()
-        vm.update_all_vehicles_with_cached_state()
-        assert len(vm.vehicles.keys()) > 0
+    def test_login_hyundai(self):
+        self.manager.check_and_refresh_token()
+        self.manager.update_all_vehicles_with_cached_state()
+        assert len(self.manager.vehicles.keys()) > 0
+
+    def test_vehicle_status(self):
+        self.manager.vehicles
+        breakpoint()
