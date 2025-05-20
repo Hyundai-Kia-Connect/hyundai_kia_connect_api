@@ -3,3 +3,7 @@ python = "3.12"
 
 [env]
 _.python.venv = { path = ".venv", create = true }
+
+[tasks.tests]
+run = "python -m runtests"
+description = "Run unit tests with pytest"
