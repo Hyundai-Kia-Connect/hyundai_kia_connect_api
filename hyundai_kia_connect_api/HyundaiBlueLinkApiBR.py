@@ -3,6 +3,7 @@
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
 import base64
+from dataclasses import dataclass
 import datetime as dt
 import pytz
 import requests
@@ -256,79 +257,43 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         logger.debug("Car status response: %s", response)
         return response["resMsg"]
 
-    #     if vehicle.engine_type != ENGINE_TYPES.EV:
-    #         return {}
+    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle):
+        """
+        Get the EV trip details for the vehicle.
+        """
+        if vehicle.engine_type != EngineType.EV:
+            return {}
+        
+        # NOTE: I (@vanessa) don't have a vehicle with an EV engine to test this
+        return NotImplementedError
 
-    #     url = self.API_URL + "ts/alerts/maintenance/evTripDetails"
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     headers["userId"] = headers["username"]
-    #     # This header is sent by the MyHyundai app, but doesn't seem to do anything
-    #     # headers["offset"] = "-5"
-
-    #     response = self.sessions.get(url, headers=headers)
-    #     response = response.json()
-    #     _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
-
-    #     return response
-
-    # def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
-    #     """
-    #     Get the location of the vehicle
-    #     This logic only checks odometer move in the update.
-    #     This call doesn't protect from overlimit as per:
-    #     Only update the location if the odometer moved AND if the last location
-    #     update was over an hour ago.
-    #     Note that the "last updated" time is initially set to three hours ago.
-    #     This will help to prevent too many calls to the API
-    #     """
-    #     url = self.API_URL + "rcs/rfc/findMyCar"
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     try:
-    #         response = self.sessions.get(url, headers=headers)
-    #         response_json = response.json()
-    #         logger.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
-    #         if response_json.get("coord") is not None:
-    #             return response_json
-    #         else:
-    #             if (
-    #                 response_json.get("errorCode", 0) == 502
-    #                 and response_json.get("errorSubCode", "") == "HT_534"
-    #             ):
-    #                 logger.warn(
-    #                     f"{DOMAIN} - get vehicle location rate limit exceeded."
-    #                 )
-    #             else:
-    #                 logger.warn(
-    #                     f"{DOMAIN} - Unable to get vehicle location: {response_json}"
-    #                 )
-
-    #     except Exception as e:
-    #         logger.warning(
-    #             f"{DOMAIN} - Get vehicle location failed: {e}", exc_info=True
-    #         )
-
-    #     logger.debug(f"{DOMAIN} - Get Vehicle Location result is None")
-    #     return None
+    def _get_driving_info(self, token: Token, vehicle: Vehicle):
+        """
+        Get the driving info for the vehicle.
+        """
+        if vehicle.engine_type != EngineType.EV:
+            return {}
+        return NotImplementedError
 
     def _update_vehicle_properties(
-        self, vehicle: Vehicle, vehicle_details: dict, vehicle_state: dict
+        self, vehicle: Vehicle, state: "CachedVehicleState"
     ):
         vehicle.last_updated_at = parse_datetime(
-            get_child_value(vehicle_state, "time"), self.data_timezone
+            state.current_state.get("time"), self.data_timezone
         )
 
-        if drive_range := vehicle_state.get("dte"):
+        if drive_range := state.current_state.get("dte"):
             vehicle.fuel_driving_range = (
                 drive_range["value"],
                 DISTANCE_UNITS[drive_range["unit"]],
             )
 
-        vehicle.engine_is_running = vehicle_state.get("engine")
-        vehicle.washer_fluid_warning_is_on = vehicle_state.get("washerFluidStatus")
-        vehicle.fuel_level = vehicle_state.get("fuelLevel")
-        vehicle.fuel_level_is_low = vehicle_state.get("lowFuelLight")
-        vehicle.defrost_is_on = vehicle_state.get("defrost")
-        vehicle.steering_wheel_heater_is_on = vehicle_state.get("steerWheelHeat")
+        vehicle.engine_is_running = state.current_state.get("engine")
+        vehicle.washer_fluid_warning_is_on = state.current_state.get("washerFluidStatus")
+        vehicle.fuel_level = state.current_state.get("fuelLevel")
+        vehicle.fuel_level_is_low = state.current_state.get("lowFuelLight")
+        vehicle.defrost_is_on = state.current_state.get("defrost")
+        vehicle.steering_wheel_heater_is_on = state.current_state.get("steerWheelHeat")
         return vehicle
 
     #     vehicle.total_driving_range = (
@@ -762,11 +727,11 @@ class HyundaiBlueLinkApiBR(ApiImpl):
     #     vehicle.day_trip_info = day_trip_info
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        state = {}
-        vehicle_details = self._get_vehicle_details(token, vehicle)
-        vehicle_state = self._get_cached_vehicle_state(token, vehicle, False)
+        state = CachedVehicleState()
+        state.details = self._get_vehicle_details(token, vehicle)
+        state.current_state = self._get_cached_vehicle_state(token, vehicle, False)
 
-        if vehicle_state:
+        if state.current_state:
             vehicle_location_result = None
 
             if vehicle.odometer:
@@ -783,35 +748,37 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                 vehicle_location_result = self._get_vehicle_location(token, vehicle)
 
             if vehicle_location_result is not None:
-                state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
+                state.location = vehicle_location_result
             else:
-                cached_location = state["vehicleStatus"]["vehicleLocation"]
+                cached_location = state.location
                 logger.debug(
                     f"{DOMAIN} - update_vehicle_with_cached_state Location fallback {cached_location}"  # noqa
                 )
 
-        self._update_vehicle_properties(vehicle, vehicle_details, vehicle_state)
+        self._update_vehicle_properties(vehicle, state)
     
     def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/location/park")
+        headers = self._get_authenticated_headers(token)
+
+        try:
+            response = self.sessions.get(url, headers=headers)
+            response.raise_for_status()
+            logger.debug("Get vehicle location response: %s", response.text)
+            response = response.json()
+            return response["resMsg"]
+        except Exception as e:
+            logger.exception("Get vehicle location failed: %s", e)
+            return None
+        
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """
+        Force a refresh of the vehicle state.
+
+        This means that the vehicle state will wake up the vehicle to get the latest state.
+        This might take longer to complete and slightly consume the vehicle's battery.
+        """
         raise NotImplementedError
-    
-    # def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-    #     state = {}
-    #     state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
-    #     state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, True)
-    #     state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
-
-    #     if state["vehicleStatus"] is not None:
-    #         vehicle_location_result = self._get_vehicle_location(token, vehicle)
-    #         if vehicle_location_result is not None:
-    #             state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
-    #         else:
-    #             cached_location = state["vehicleStatus"]["vehicleLocation"]
-    #             _LOGGER.debug(
-    #                 f"{DOMAIN} - force_refresh_vehicle_state Location fallback {cached_location}"  # noqa
-    #             )
-
-    #     self._update_vehicle_properties(vehicle, state)
 
     def get_vehicles(self, token: Token):
         url = self._build_api_url("/spa/vehicles")
@@ -1031,3 +998,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
     #         f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
     #     )
     #     _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
+
+@dataclass
+class CachedVehicleState:
+    location: dict
+    details: dict
+    current_state: dict
