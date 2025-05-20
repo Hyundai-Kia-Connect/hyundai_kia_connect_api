@@ -15,6 +15,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
+from hyundai_kia_connect_api.lib.date import date_string_to_datetime, date_to_year_month
 from hyundai_kia_connect_api.lib.logging import get_logger
 
 from .const import (
@@ -380,7 +381,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
         data = {
             "tripPeriodType": TripPeriodType.MONTH,
-            "setTripMonth": str(dt.date.today().strftime("%Y%m")),
+            "setTripMonth": date_to_year_month(dt.date.today()),
         }
         response = self.session.post(
             url, json=data, headers=self._get_authenticated_headers(token)
@@ -395,7 +396,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         for day in data["tripDayList"]:
             items.append(
                 TripListItem(
-                    date=dt.datetime.strptime(day["tripDayInMonth"], "%Y%m%d"),
+                    date=date_string_to_datetime(day["tripDayInMonth"]),
                     count=day["tripCntDay"],
                 )
             )

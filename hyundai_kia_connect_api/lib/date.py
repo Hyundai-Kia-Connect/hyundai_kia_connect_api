@@ -1,8 +1,15 @@
-from datetime import date, datetime
+from datetime import datetime, date
 
 
-def parse_date_from_string(date_string: str) -> date:
+def date_string_to_datetime(date_string: str) -> datetime:
     try:
-        return date.fromisoformat(date_string)
+        return datetime.fromisoformat(date_string)
     except ValueError:
-        return datetime.strptime(date_string, "%Y%m").date()
+        try:
+            return datetime.strptime(date_string, "%Y%m")
+        except ValueError:
+            return datetime.strptime(date_string, "%Y%m%d%H%M%S")
+
+
+def date_to_year_month(d: date):
+    return d.strftime("%Y%m")
