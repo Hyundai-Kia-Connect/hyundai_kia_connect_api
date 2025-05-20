@@ -12,6 +12,9 @@ BR API:
     ☐ start_hazard_lights
     ☐ start_hazard_lights_and_horn
     ☐ get/update maintenance alert
+    ☐ check if response format matches expected
+    ☐ check with HA connection
+    ☐ add tests with mock
 
 Questions:
     ☐ Why is update_month_trip_info useful?
