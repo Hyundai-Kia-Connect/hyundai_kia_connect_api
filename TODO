@@ -3,14 +3,15 @@
 BR API:
     ✔ Authentication @done(25-05-20 11:59)
     ✔ Get vehicle details @done(25-05-20 11:59)
-    ☐ Force refresh data?
+    ✔ Force refresh data? @done(25-05-20 13:03)
     ✔ Get vehicle location @done(25-05-20 11:59)
     ☐ Get trip info (month/day?)
-    ☐ Odometer?
-    ☐ Lock/unlock
-    ☐ Start/stop climate
+    ☐ odometer?
+    ☐ lock/unlock
+    ☐ start/stop climate
     ☐ start_hazard_lights
     ☐ start_hazard_lights_and_horn
+    ☐ get/update maintenance alert
 
 Questions:
     ☐ Why is update_month_trip_info useful?

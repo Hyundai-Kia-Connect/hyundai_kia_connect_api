@@ -74,9 +74,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self.ccsp_device_id = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
         self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
         self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
+        # NOTE: this is a base64 encoded string with the service_id and some unknown string (service_id:{unknown})
         self.basic_authorization_header = "Basic MDNmN2RmOWItNzYyNi00ODUzLWI3YmQtYWQxZThkNzIyYmQ1OnlRejJiYzZDbjhPb3ZWT1I3UkRXd3hUcVZ3V0czeUtCWUZEZzBIc09Yc3l4eVBsSA=="
         self.api_headers = {
-            "Connection": "Keep-Alive",
             "Content-Type": "application/json; charset=UTF-8",
             "Accept": "application/json, text/plain, */*",
             "Accept-Encoding": "br;q=1.0, gzip;q=0.9, deflare;q=0.8",
@@ -86,8 +86,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             "offset": "-3",
             "ccuCCS2ProtocolSupport": "0",
         }
-        self.sessions = requests.Session()
-        self.sessions.mount(f"https://{self.base_url}", cipherAdapter())
+        self.session = requests.Session()
+        self.session.mount(f"https://{self.base_url}", cipherAdapter())
         logger.debug("Initial API headers: %s", self.api_headers)
 
         self.temperature_range = range(62, 82)
@@ -150,7 +150,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url("/user/signin")
         data = {"email": username, "password": password}
 
-        response = self.sessions.post(
+        response = self.session.post(
             url,
             json=data,
             cookies=cookies,
@@ -230,7 +230,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         """
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/profile")
         headers = self._get_authenticated_headers(token)
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()["resMsg"]
         return data
@@ -253,7 +253,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             headers["REFRESH"] = "true"
 
         logger.debug("Getting car status from %s", url)
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         response = response.json()
         logger.debug("Car status response: %s", response)
         return response["resMsg"]
@@ -382,7 +382,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             "tripPeriodType": TripPeriodType.MONTH,
             "setTripMonth": str(dt.date.today().strftime("%Y%m")),
         }
-        response = self.sessions.post(
+        response = self.session.post(
             url, json=data, headers=self._get_authenticated_headers(token)
         )
         try:
@@ -418,7 +418,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
 
         try:
-            response = self.sessions.get(url, headers=headers)
+            response = self.session.get(url, headers=headers)
             response.raise_for_status()
             logger.debug("Get vehicle location response: %s", response.text)
             response = response.json()
@@ -454,7 +454,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
     def get_vehicles(self, token: Token):
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         logger.debug("Get Vehicles Response %s", response.text)
         response = response.json()
         result = []
