@@ -3,8 +3,9 @@
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime as dt
+from enum import IntEnum
 import pytz
 import requests
 import certifi
@@ -24,7 +25,7 @@ from .const import (
     SEAT_STATUS,
     EngineType,
 )
-from .utils import get_child_value, get_float, parse_datetime
+from .utils import get_child_value, parse_datetime
 from .ApiImpl import ApiImpl
 from .Token import Token
 from .Vehicle import (
@@ -234,8 +235,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         data = response.json()["resMsg"]
         return data
 
-    def _get_cached_vehicle_state(
-        self, token: Token, vehicle: Vehicle, refresh: bool
+    def _request_vehicle_state(
+        self, token: Token, vehicle: Vehicle, force_refresh: bool
     ) -> dict:
         """
         Checks for "cached" vehicle state (i.e., state from the API server, without
@@ -244,11 +245,11 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}")
         if not vehicle.ccu_ccs2_protocol_support:
             url = url + "/status/latest"
-        else:
+        else:  # untested
             url = url + "/ccs2/carstatus/latest"
 
         headers = self._get_authenticated_headers(token)
-        if refresh:
+        if force_refresh:
             headers["REFRESH"] = "true"
 
         logger.debug("Getting car status from %s", url)
@@ -263,7 +264,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         """
         if vehicle.engine_type != EngineType.EV:
             return {}
-        
+
         # NOTE: I (@vanessa) don't have a vehicle with an EV engine to test this
         return NotImplementedError
 
@@ -275,9 +276,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             return {}
         return NotImplementedError
 
-    def _update_vehicle_properties(
-        self, vehicle: Vehicle, state: "CachedVehicleState"
-    ):
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: "CachedVehicleState"):
         vehicle.last_updated_at = parse_datetime(
             state.current_state.get("time"), self.data_timezone
         )
@@ -289,475 +288,132 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             )
 
         vehicle.engine_is_running = state.current_state.get("engine")
-        vehicle.washer_fluid_warning_is_on = state.current_state.get("washerFluidStatus")
+        vehicle.washer_fluid_warning_is_on = state.current_state.get(
+            "washerFluidStatus"
+        )
         vehicle.fuel_level = state.current_state.get("fuelLevel")
         vehicle.fuel_level_is_low = state.current_state.get("lowFuelLight")
         vehicle.defrost_is_on = state.current_state.get("defrost")
         vehicle.steering_wheel_heater_is_on = state.current_state.get("steerWheelHeat")
+        vehicle.front_left_seat_status = SEAT_STATUS[
+            get_child_value(state, "seatHeaterVentState.flSeatHeatState")
+        ]
+        vehicle.front_right_seat_status = SEAT_STATUS[
+            get_child_value(state.current_state, "seatHeaterVentState.frSeatHeatState")
+        ]
+        vehicle.rear_left_seat_status = SEAT_STATUS[
+            get_child_value(state.current_state, "seatHeaterVentState.rlSeatHeatState")
+        ]
+        vehicle.rear_right_seat_status = SEAT_STATUS[
+            get_child_value(state.current_state, "seatHeaterVentState.rrSeatHeatState")
+        ]
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(
+                state.current_state, "tirePressureLamp.tirePressureWarningLampRearLeft"
+            )
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(
+                state.current_state, "tirePressureLamp.tirePressureWarningLampFrontLeft"
+            )
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(
+                state.current_state,
+                "tirePressureLamp.tirePressureWarningLampFrontRight",
+            )
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(
+                state.current_state,
+                "tirePressureLamp.tirePressureWarningLampRearRight",
+            )
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(
+                state.current_state, "tirePressureLamp.tirePressureWarningLampAll"
+            )
+        )
+        vehicle.front_left_window_is_open = get_child_value(
+            state.current_state, "windowOpen.frontLeft"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state.current_state, "windowOpen.frontRight"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state.current_state, "windowOpen.backLeft"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state.current_state, "windowOpen.backRight"
+        )
+        vehicle.is_locked = get_child_value(state.current_state, "doorLock")
+        vehicle.front_left_door_is_open = get_child_value(
+            state.current_state, "doorOpen.frontLeft"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state.current_state, "doorOpen.frontRight"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state.current_state, "doorOpen.backLeft"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state.current_state, "doorOpen.backRight"
+        )
+        vehicle.hood_is_open = get_child_value(state.current_state, "hoodOpen")
+        vehicle.trunk_is_open = get_child_value(state.current_state, "trunkOpen")
         return vehicle
 
-    #     vehicle.total_driving_range = (
-    #         get_child_value(
-    #             state,
-    #             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
-    #         ),
-    #         DISTANCE_UNITS[
-    #             get_child_value(
-    #                 state,
-    #                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
-    #             )
-    #         ],
-    #     )
-    #     if get_child_value(
-    #         state,
-    #         "vehicleStatus.dte.value",
-    #     ):
-    #         vehicle.fuel_driving_range = (
-    #             get_child_value(
-    #                 state,
-    #                 "vehicleStatus.dte.value",
-    #             ),
-    #             DISTANCE_UNITS[
-    #                 get_child_value(
-    #                     state,
-    #                     "vehicleStatus.dte.unit",
-    #                 )
-    #             ],
-    #         )
-    #     vehicle.odometer = (
-    #         get_child_value(state, "vehicleDetails.odometer"),
-    #         DISTANCE_UNITS[3],
-    #     )
-    #     vehicle.car_battery_percentage = get_child_value(
-    #         state, "vehicleStatus.battery.batSoc"
-    #     )
-    #     vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
-    #     vehicle.washer_fluid_warning_is_on = get_child_value(
-    #         state, "vehicleStatus.washerFluidStatus"
-    #     )
-    #     vehicle.brake_fluid_warning_is_on = get_child_value(
-    #         state, "vehicleStatus.breakOilStatus"
-    #     )
-    #     vehicle.smart_key_battery_warning_is_on = get_child_value(
-    #         state, "vehicleStatus.smartKeyBatteryWarning"
-    #     )
+    def _get_trip_info(self, token: Token, vehicle: Vehicle):
+        """
+        Res:
+        {
+            tripPeriodType: 0,
+            monthTripDayCnt: 25,
+            tripDrvTime: 804,
+            tripIdleTime: 214,
+            tripDist: 263,
+            tripAvgSpeed: 29.9,
+            tripMaxSpeed: 103,
+            tripDaylist: {tripDayInMonth: "20250401", tripCntDay: 4}[]
+        }
+        """
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
+        data = {
+            "tripPeriodType": TripPeriodType.MONTH,
+            "setTripMonth": str(dt.date.today().strftime("%Y%m")),
+        }
+        response = self.sessions.post(
+            url, json=data, headers=self._get_authenticated_headers(token)
+        )
+        try:
+            response.raise_for_status()
+            data = response.json()["resMsg"]
+        except Exception:
+            logger.exception("_get_trip_info request failed")
 
-    #     air_temp = get_child_value(state, "vehicleStatus.airTemp.value")
+        items = []
+        for day in data["tripDayList"]:
+            items.append(
+                TripListItem(
+                    date=dt.datetime.strptime(day["tripDayInMonth"], "%Y%m%d"),
+                    count=day["tripCntDay"],
+                )
+            )
 
-    #     if air_temp == "LO":
-    #         air_temp = self.temperature_range[0]
-    #     if air_temp == "HI":
-    #         air_temp = self.temperature_range[-1]
-    #     if air_temp:
-    #         vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
-    #     vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
-    #     vehicle.steering_wheel_heater_is_on = get_child_value(
-    #         state, "vehicleStatus.steerWheelHeat"
-    #     )
-    #     vehicle.back_window_heater_is_on = get_child_value(
-    #         state, "vehicleStatus.sideBackWindowHeat"
-    #     )
-    #     vehicle.side_mirror_heater_is_on = get_child_value(
-    #         state, "vehicleStatus.sideMirrorHeat"
-    #     )
-    #     vehicle.front_left_seat_status = SEAT_STATUS[
-    #         get_child_value(state, "vehicleStatus.seatHeaterVentState.flSeatHeatState")
-    #     ]
-    #     vehicle.front_right_seat_status = SEAT_STATUS[
-    #         get_child_value(state, "vehicleStatus.seatHeaterVentState.frSeatHeatState")
-    #     ]
-    #     vehicle.rear_left_seat_status = SEAT_STATUS[
-    #         get_child_value(state, "vehicleStatus.seatHeaterVentState.rlSeatHeatState")
-    #     ]
-    #     vehicle.rear_right_seat_status = SEAT_STATUS[
-    #         get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
-    #     ]
-    #     vehicle.tire_pressure_rear_left_warning_is_on = bool(
-    #         get_child_value(
-    #             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearLeft"
-    #         )
-    #     )
-    #     vehicle.tire_pressure_front_left_warning_is_on = bool(
-    #         get_child_value(
-    #             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontLeft"
-    #         )
-    #     )
-    #     vehicle.tire_pressure_front_right_warning_is_on = bool(
-    #         get_child_value(
-    #             state,
-    #             "vehicleStatus.tirePressureLamp.tirePressureWarningLampFrontRight",
-    #         )
-    #     )
-    #     vehicle.tire_pressure_rear_right_warning_is_on = bool(
-    #         get_child_value(
-    #             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampRearRight"
-    #         )
-    #     )
-    #     vehicle.tire_pressure_all_warning_is_on = bool(
-    #         get_child_value(
-    #             state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
-    #         )
-    #     )
-    #     vehicle.front_left_window_is_open = get_child_value(
-    #         state, "vehicleStatus.windowOpen.frontLeft"
-    #     )
-    #     vehicle.front_right_window_is_open = get_child_value(
-    #         state, "vehicleStatus.windowOpen.frontRight"
-    #     )
-    #     vehicle.back_left_window_is_open = get_child_value(
-    #         state, "vehicleStatus.windowOpen.backLeft"
-    #     )
-    #     vehicle.back_right_window_is_open = get_child_value(
-    #         state, "vehicleStatus.windowOpen.backRight"
-    #     )
-    #     vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
-    #     vehicle.front_left_door_is_open = get_child_value(
-    #         state, "vehicleStatus.doorOpen.frontLeft"
-    #     )
-    #     vehicle.front_right_door_is_open = get_child_value(
-    #         state, "vehicleStatus.doorOpen.frontRight"
-    #     )
-    #     vehicle.back_left_door_is_open = get_child_value(
-    #         state, "vehicleStatus.doorOpen.backLeft"
-    #     )
-    #     vehicle.back_right_door_is_open = get_child_value(
-    #         state, "vehicleStatus.doorOpen.backRight"
-    #     )
-    #     vehicle.hood_is_open = get_child_value(state, "vehicleStatus.hoodOpen")
-    #     vehicle.trunk_is_open = get_child_value(state, "vehicleStatus.trunkOpen")
-    #     vehicle.ev_battery_percentage = get_child_value(
-    #         state, "vehicleStatus.evStatus.batteryStatus"
-    #     )
-    #     vehicle.ev_battery_is_charging = get_child_value(
-    #         state, "vehicleStatus.evStatus.batteryCharge"
-    #     )
-    #     vehicle.ev_battery_is_plugged_in = get_child_value(
-    #         state, "vehicleStatus.evStatus.batteryPlugin"
-    #     )
-    #     vehicle.ev_charging_power = get_child_value(
-    #         state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
-    #     )
-    #     ChargeDict = get_child_value(
-    #         state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
-    #     )
-    #     try:
-    #         vehicle.ev_charge_limits_ac = [
-    #             x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
-    #         ][-1]
-    #         vehicle.ev_charge_limits_dc = [
-    #             x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
-    #         ][-1]
-    #     except Exception:
-    #         _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
-
-    #     vehicle.ev_driving_range = (
-    #         get_child_value(
-    #             state,
-    #             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
-    #         ),
-    #         DISTANCE_UNITS[
-    #             get_child_value(
-    #                 state,
-    #                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
-    #             )
-    #         ],
-    #     )
-    #     vehicle.ev_estimated_current_charge_duration = (
-    #         get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
-    #         "m",
-    #     )
-    #     vehicle.ev_estimated_fast_charge_duration = (
-    #         get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc1.value"),
-    #         "m",
-    #     )
-    #     vehicle.ev_estimated_portable_charge_duration = (
-    #         get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc2.value"),
-    #         "m",
-    #     )
-    #     vehicle.ev_estimated_station_charge_duration = (
-    #         get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
-    #         "m",
-    #     )
-    #     if get_child_value(
-    #         state,
-    #         "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
-    #     ):
-    #         vehicle.fuel_driving_range = (
-    #             get_child_value(
-    #                 state,
-    #                 "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
-    #             ),
-    #             DISTANCE_UNITS[
-    #                 get_child_value(
-    #                     state,
-    #                     "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
-    #                 )
-    #             ],
-    #         )
-    #     vehicle.fuel_level_is_low = get_child_value(state, "vehicleStatus.lowFuelLight")
-
-    #     vehicle.fuel_level = get_child_value(state, "vehicleStatus.fuelLevel")
-
-    #     if get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"):
-    #         vehicle.location = (
-    #             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lat"),
-    #             get_child_value(state, "vehicleStatus.vehicleLocation.coord.lon"),
-    #             parse_datetime(
-    #                 get_child_value(state, "vehicleStatus.vehicleLocation.time"),
-    #                 self.data_timezone,
-    #             ),
-    #         )
-    #     vehicle.air_control_is_on = get_child_value(state, "vehicleStatus.airCtrlOn")
-
-    #     # fill vehicle.daily_stats
-    #     tripStats = []
-    #     tripDetails = get_child_value(state, "evTripDetails.tripdetails") or {}
-
-    #     # compute more digits for distance mileage using odometer and overrule distance
-    #     previous_odometer = None
-    #     for trip in reversed(tripDetails):
-    #         odometer = get_child_value(trip, "odometer.value")
-    #         if previous_odometer and odometer:
-    #             delta_odometer = odometer - previous_odometer
-    #             if delta_odometer >= 0.0:
-    #                 trip["distance"] = delta_odometer
-    #         previous_odometer = odometer
-
-    #     # overrule odometer with more accuracy from last trip
-    #     if (
-    #         previous_odometer
-    #         and vehicle.odometer
-    #         and previous_odometer > vehicle.odometer
-    #     ):
-    #         _LOGGER.debug(
-    #             f"Overruling odometer: {previous_odometer:.1f} old: {vehicle.odometer:.1f}"  # noqa
-    #         )
-    #         vehicle.odometer = (
-    #             previous_odometer,
-    #             DISTANCE_UNITS[3],
-    #         )
-
-    #     for trip in tripDetails:
-    #         processedTrip = DailyDrivingStats(
-    #             date=dt.datetime.strptime(trip["startdate"], "%Y-%m-%d %H:%M:%S.%f"),
-    #             total_consumed=get_child_value(trip, "totalused"),
-    #             engine_consumption=get_child_value(trip, "drivetrain"),
-    #             climate_consumption=get_child_value(trip, "climate"),
-    #             onboard_electronics_consumption=get_child_value(trip, "accessories"),
-    #             battery_care_consumption=get_child_value(trip, "batterycare"),
-    #             regenerated_energy=get_child_value(trip, "regen"),
-    #             distance=get_child_value(trip, "distance"),
-    #             distance_unit=vehicle.odometer_unit,
-    #         )
-    #         tripStats.append(processedTrip)
-
-    #     vehicle.daily_stats = tripStats
-
-    #     # remember trips, store state
-    #     trips = []
-    #     for trip in tripDetails:
-    #         yyyymmdd_hhmmss = trip["startdate"]  # remember full date
-    #         drive_time = int(get_child_value(trip["mileagetime"], "value"))
-    #         idle_time = int(get_child_value(trip["duration"], "value")) - drive_time
-    #         processed_trip = TripInfo(
-    #             hhmmss=yyyymmdd_hhmmss,
-    #             drive_time=int(drive_time / 60),  # convert seconds to minutes
-    #             idle_time=int(idle_time / 60),  # convert seconds to minutes
-    #             distance=float(trip["distance"]),
-    #             avg_speed=get_child_value(trip["avgspeed"], "value"),
-    #             max_speed=int(get_child_value(trip["maxspeed"], "value")),
-    #         )
-    #         trips.append(processed_trip)
-
-    #     _LOGGER.debug(f"_update_vehicle_properties filled_trips: {trips}")
-    #     if len(trips) > 0:
-    #         state["filled_trips"] = trips
-
-    #     vehicle.data = state
-
-    # def update_month_trip_info(
-    #     self,
-    #     token,
-    #     vehicle,
-    #     yyyymm_string,
-    # ) -> None:
-    #     """
-    #     feature only available for some regions.
-    #     Updates the vehicle.month_trip_info for the specified month.
-
-    #     Default this information is None:
-
-    #     month_trip_info: MonthTripInfo = None
-    #     """
-    #     _LOGGER.debug(f"update_month_trip_info: {yyyymm_string}")
-    #     vehicle.month_trip_info = None
-
-    #     if vehicle.data is None or "filled_trips" not in vehicle.data:
-    #         _LOGGER.debug(f"filled_trips is empty: {vehicle.data}")
-    #         return  # nothing to fill
-
-    #     trips = vehicle.data["filled_trips"]
-
-    #     month_trip_info: MonthTripInfo = None
-    #     month_trip_info_count = 0
-
-    #     for trip in trips:
-    #         date_str = trip.hhmmss
-    #         yyyymm = date_str[0:4] + date_str[5:7]
-    #         if yyyymm == yyyymm_string:
-    #             if month_trip_info_count == 0:
-    #                 month_trip_info = MonthTripInfo(
-    #                     yyyymm=yyyymm_string,
-    #                     summary=TripInfo(
-    #                         drive_time=trip.drive_time,
-    #                         idle_time=trip.idle_time,
-    #                         distance=trip.distance,
-    #                         avg_speed=trip.avg_speed,
-    #                         max_speed=trip.max_speed,
-    #                     ),
-    #                     day_list=[],
-    #                 )
-    #                 month_trip_info_count = 1
-    #             else:
-    #                 # increment totals for month (for the few trips available)
-    #                 month_trip_info_count += 1
-    #                 summary = month_trip_info.summary
-    #                 summary.drive_time += trip.drive_time
-    #                 summary.idle_time += trip.idle_time
-    #                 summary.distance += trip.distance
-    #                 summary.avg_speed += trip.avg_speed
-    #                 summary.max_speed = max(trip.max_speed, summary.max_speed)
-
-    #             month_trip_info.summary.avg_speed /= month_trip_info_count
-    #             month_trip_info.summary.avg_speed = round(
-    #                 month_trip_info.summary.avg_speed, 1
-    #             )
-
-    #             # also fill DayTripCount
-    #             yyyymmdd = yyyymm + date_str[8:10]
-    #             day_trip_found = False
-    #             for day in month_trip_info.day_list:
-    #                 if day.yyyymmdd == yyyymmdd:
-    #                     day.trip_count += 1
-    #                     day_trip_found = True
-
-    #             if not day_trip_found:
-    #                 month_trip_info.day_list.append(
-    #                     DayTripCounts(yyyymmdd=yyyymmdd, trip_count=1)
-    #                 )
-
-    #     vehicle.month_trip_info = month_trip_info
-
-    # def update_day_trip_info(
-    #     self,
-    #     token,
-    #     vehicle,
-    #     yyyymmdd_string,
-    # ) -> None:
-    #     """
-    #     feature only available for some regions.
-    #     Updates the vehicle.day_trip_info information for the specified day.
-
-    #     Default this information is None:
-
-    #     day_trip_info: DayTripInfo = None
-    #     """
-    #     _LOGGER.debug(f"update_day_trip_info: {yyyymmdd_string}")
-    #     vehicle.day_trip_info = None
-
-    #     if vehicle.data is None or "filled_trips" not in vehicle.data:
-    #         _LOGGER.debug(f"filled_trips is empty: {vehicle.data}")
-    #         return  # nothing to fill
-
-    #     trips = vehicle.data["filled_trips"]
-    #     _LOGGER.debug(f"filled_trips: {trips}")
-
-    #     day_trip_info: DayTripInfo = None
-    #     day_trip_info_count = 0
-
-    #     for trip in trips:
-    #         date_str = trip.hhmmss
-    #         yyyymmdd = date_str[0:4] + date_str[5:7] + date_str[8:10]
-    #         _LOGGER.debug(f"update_day_trip_info: {yyyymmdd} trip: {trip}")
-    #         if yyyymmdd == yyyymmdd_string:
-    #             if day_trip_info_count == 0:
-    #                 day_trip_info = DayTripInfo(
-    #                     yyyymmdd=yyyymmdd_string,
-    #                     summary=TripInfo(
-    #                         drive_time=trip.drive_time,
-    #                         idle_time=trip.idle_time,
-    #                         distance=trip.distance,
-    #                         avg_speed=trip.avg_speed,
-    #                         max_speed=trip.max_speed,
-    #                     ),
-    #                     trip_list=[],
-    #                 )
-    #                 day_trip_info_count = 1
-    #             else:
-    #                 # increment totals for month (for the few trips available)
-    #                 day_trip_info_count += 1
-    #                 summary = day_trip_info.summary
-    #                 summary.drive_time += trip.drive_time
-    #                 summary.idle_time += trip.idle_time
-    #                 summary.distance += trip.distance
-    #                 summary.avg_speed += trip.avg_speed
-    #                 summary.max_speed = max(trip.max_speed, summary.max_speed)
-
-    #             day_trip_info.summary.avg_speed /= day_trip_info_count
-    #             day_trip_info.summary.avg_speed = round(
-    #                 day_trip_info.summary.avg_speed, 1
-    #             )
-
-    #             # also fill TripInfo
-    #             hhmmss = date_str[11:13] + date_str[14:16] + date_str[17:19]
-    #             day_trip_info.trip_list.append(
-    #                 TripInfo(
-    #                     hhmmss=hhmmss,
-    #                     drive_time=trip.drive_time,
-    #                     idle_time=trip.idle_time,
-    #                     distance=trip.distance,
-    #                     avg_speed=trip.avg_speed,
-    #                     max_speed=trip.max_speed,
-    #                 )
-    #             )
-    #             _LOGGER.debug(
-    #                 f"update_day_trip_info: trip_list result: {day_trip_info.trip_list}"
-    #             )
-
-    #     vehicle.day_trip_info = day_trip_info
+        return items
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = CachedVehicleState()
         state.details = self._get_vehicle_details(token, vehicle)
-        state.current_state = self._get_cached_vehicle_state(token, vehicle, False)
-
-        if state.current_state:
-            vehicle_location_result = None
-
-            if vehicle.odometer:
-                if vehicle.odometer < get_float(
-                    get_child_value(state["vehicleDetails"], "odometer")
-                ):
-                    vehicle_location_result = self._get_vehicle_location(token, vehicle)
-                else:
-                    cached_location = state["vehicleStatus"]["vehicleLocation"]
-                    logger.debug(
-                        f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback {cached_location}"  # noqa
-                    )
-            else:
-                vehicle_location_result = self._get_vehicle_location(token, vehicle)
-
-            if vehicle_location_result is not None:
-                state.location = vehicle_location_result
-            else:
-                cached_location = state.location
-                logger.debug(
-                    f"{DOMAIN} - update_vehicle_with_cached_state Location fallback {cached_location}"  # noqa
-                )
-
+        state.current_state = self._request_vehicle_state(token, vehicle, False)
+        state.location = self._get_vehicle_location(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-    
+        self._update_vehicle_location(vehicle, state.location)
+
     def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
+        """
+        Query the vehicle location.
+        """
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/location/park")
         headers = self._get_authenticated_headers(token)
 
@@ -770,7 +426,17 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         except Exception as e:
             logger.exception("Get vehicle location failed: %s", e)
             return None
-        
+
+    def _update_vehicle_location(self, vehicle: Vehicle, location: dict):
+        coord = location.get("coord", {})
+        lat = coord.get("lat")
+        long = coord.get("lng")
+
+        time = location.get("time")
+
+        if lat and long:
+            vehicle.location = (lat, long, time)
+
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """
         Force a refresh of the vehicle state.
@@ -778,13 +444,18 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         This means that the vehicle state will wake up the vehicle to get the latest state.
         This might take longer to complete and slightly consume the vehicle's battery.
         """
-        raise NotImplementedError
+        state = CachedVehicleState(
+            current_state=self._request_vehicle_state(token, vehicle, True),
+            location=self._get_vehicle_location(token, vehicle),
+        )
+        self._update_vehicle_properties(vehicle, state)
+        # TODO: parse driving info?
 
     def get_vehicles(self, token: Token):
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
         response = self.sessions.get(url, headers=headers)
-        logger.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
+        logger.debug("Get Vehicles Response %s", response.text)
         response = response.json()
         result = []
 
@@ -820,187 +491,20 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             case _:
                 raise APIError(f"Invalid vehicle type: {vehicle_type}")
 
-    # def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
-    #     _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
-
-    #     if action == VEHICLE_LOCK_ACTION.LOCK:
-    #         url = self.API_URL + "rcs/rdo/off"
-    #         _LOGGER.debug(f"{DOMAIN} - Calling Lock")
-    #     elif action == VEHICLE_LOCK_ACTION.UNLOCK:
-    #         url = self.API_URL + "rcs/rdo/on"
-    #         _LOGGER.debug(f"{DOMAIN} - Calling unlock")
-    #     else:
-    #         raise APIError(f"Invalid action value: {action}")
-
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     headers["APPCLOUD-VIN"] = vehicle.VIN
-
-    #     data = {"userName": token.username, "vin": vehicle.VIN}
-    #     response = self.sessions.post(url, headers=headers, json=data)
-    #     # response_headers = response.headers
-    #     # response = response.json()
-    #     # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])  # noqa
-
-    #     # _LOGGER.debug(f"{DOMAIN} - Received lock_action response {action_status}")
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Received lock_action response status code: {response.status_code}"  # noqa
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
-
-    # def start_climate(
-    #     self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    # ) -> str:
-    #     _LOGGER.debug(f"{DOMAIN} - Start engine..")
-    #     if vehicle.engine_type == ENGINE_TYPES.EV:
-    #         url = self.API_URL + "evc/fatc/start"
-    #     else:
-    #         url = self.API_URL + "rcs/rsc/start"
-
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
-
-    #     if options.climate is None:
-    #         options.climate = True
-    #     if options.set_temp is None:
-    #         options.set_temp = 70
-    #     if options.duration is None:
-    #         options.duration = 5
-    #     if options.heating is None:
-    #         options.heating = 0
-    #     if options.defrost is None:
-    #         options.defrost = False
-    #     if options.front_left_seat is None:
-    #         options.front_left_seat = 0
-    #     if options.front_right_seat is None:
-    #         options.front_right_seat = 0
-    #     if options.rear_left_seat is None:
-    #         options.rear_left_seat = 0
-    #     if options.rear_right_seat is None:
-    #         options.rear_right_seat = 0
-
-    #     if vehicle.engine_type == ENGINE_TYPES.EV:
-    #         data = {
-    #             "airCtrl": int(options.climate),
-    #             "igniOnDuration": options.duration,
-    #             "airTemp": {"value": str(options.set_temp), "unit": 1},
-    #             "defrost": options.defrost,
-    #             "heating1": int(options.heating),
-    #             "seatHeaterVentInfo": {
-    #                 "drvSeatHeatState": options.front_left_seat,
-    #                 "astSeatHeatState": options.front_right_seat,
-    #                 "rlSeatHeatState": options.rear_left_seat,
-    #                 "rrSeatHeatState": options.rear_right_seat,
-    #             },
-    #         }
-    #     else:
-    #         data = {
-    #             "Ims": 0,
-    #             "airCtrl": int(options.climate),
-    #             "airTemp": {"unit": 1, "value": options.set_temp},
-    #             "defrost": options.defrost,
-    #             "heating1": int(options.heating),
-    #             "igniOnDuration": options.duration,
-    #             "seatHeaterVentInfo": {
-    #                 "drvSeatHeatState": options.front_left_seat,
-    #                 "astSeatHeatState": options.front_right_seat,
-    #                 "rlSeatHeatState": options.rear_left_seat,
-    #                 "rrSeatHeatState": options.rear_right_seat,
-    #             },
-    #             "username": token.username,
-    #             "vin": vehicle.id,
-    #         }
-    #     _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
-
-    #     response = self.sessions.post(url, json=data, headers=headers)
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Start engine response status code: {response.status_code}"
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
-
-    # def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
-    #     _LOGGER.debug(f"{DOMAIN} - Stop engine..")
-
-    #     if vehicle.engine_type == ENGINE_TYPES.EV:
-    #         url = self.API_URL + "evc/fatc/stop"
-    #     else:
-    #         url = self.API_URL + "rcs/rsc/stop"
-
-    #     headers = self._get_vehicle_headers(token, vehicle)
-
-    #     _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
-
-    #     response = self.sessions.post(url, headers=headers)
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Stop engine response status code: {response.status_code}"
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
-
-    # def start_charge(self, token: Token, vehicle: Vehicle) -> None:
-    #     if vehicle.engine_type != ENGINE_TYPES.EV:
-    #         return {}
-
-    #     _LOGGER.debug(f"{DOMAIN} - Start charging..")
-
-    #     url = self.API_URL + "evc/charge/start"
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
-
-    #     response = self.sessions.post(url, headers=headers)
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Start charge response status code: {response.status_code}"
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Start charge response: {response.text}")
-
-    # def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
-    #     if vehicle.engine_type != ENGINE_TYPES.EV:
-    #         return {}
-
-    #     _LOGGER.debug(f"{DOMAIN} - Stop charging..")
-
-    #     url = self.API_URL + "evc/charge/stop"
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
-
-    #     response = self.sessions.post(url, headers=headers)
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Stop charge response status code: {response.status_code}"
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
-
-    # def set_charge_limits(
-    #     self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    # ) -> str:
-    #     if vehicle.engine_type != ENGINE_TYPES.EV:
-    #         return {}
-
-    #     _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
-    #     url = self.API_URL + "evc/charge/targetsoc/set"
-    #     headers = self._get_vehicle_headers(token, vehicle)
-    #     _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {headers}")
-
-    #     data = {
-    #         "targetSOClist": [
-    #             {
-    #                 "plugType": 0,
-    #                 "targetSOClevel": int(dc),
-    #             },
-    #             {
-    #                 "plugType": 1,
-    #                 "targetSOClevel": int(ac),
-    #             },
-    #         ]
-    #     }
-
-    #     _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
-
-    #     response = self.sessions.post(url, json=data, headers=headers)
-    #     _LOGGER.debug(
-    #         f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
-    #     )
-    #     _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
 
 @dataclass
 class CachedVehicleState:
-    location: dict
-    details: dict
-    current_state: dict
+    location: dict = field(default_factory=dict)
+    details: dict = field(default_factory=dict)
+    current_state: dict = field(default_factory=dict)
+
+
+@dataclass
+class TripListItem:
+    date: dt.date
+    count: int
+
+
+class TripPeriodType(IntEnum):
+    MONTH = 0
+    DAY = 1
