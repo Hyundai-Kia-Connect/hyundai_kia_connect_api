@@ -2,6 +2,14 @@ from datetime import datetime, date
 
 
 def date_string_to_datetime(date_string: str) -> datetime:
+    """
+    Tries to convert a date string to a datetime object.
+
+    It goes in the following order:
+        - ISO format
+        - YYYYMM
+        - YYYYMMDDHHMMSS
+    """
     try:
         return datetime.fromisoformat(date_string)
     except ValueError:

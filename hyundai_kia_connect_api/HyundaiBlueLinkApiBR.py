@@ -3,13 +3,19 @@
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
 import base64
-from dataclasses import dataclass, field
 import datetime as dt
-from enum import IntEnum
 import pytz
 import requests
 import certifi
 from urllib.parse import urlencode, urljoin, urlparse
+
+from hyundai_kia_connect_api.models import (
+    CachedVehicleState,
+    TripInfo,
+    TripDayListItem,
+    VehicleLocation,
+    TripPeriodType,
+)
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
@@ -266,18 +272,19 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         if vehicle.engine_type != EngineType.EV:
             return {}
 
-        # NOTE: I (@vanessa) don't have a vehicle with an EV engine to test this
+        # NOTE: I don't have a vehicle with an EV engine to test this
         return NotImplementedError
 
-    def _get_driving_info(self, token: Token, vehicle: Vehicle):
+    def _get_ev_driving_info(self, token: Token, vehicle: Vehicle):
         """
         Get the driving info for the vehicle.
         """
         if vehicle.engine_type != EngineType.EV:
             return {}
+        # TODO: I don't have a vehicle with an EV engine to test this
         return NotImplementedError
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: "CachedVehicleState"):
+    def _update_vehicle_properties(self, vehicle: Vehicle, state: CachedVehicleState):
         vehicle.last_updated_at = parse_datetime(
             state.current_state.get("time"), self.data_timezone
         )
@@ -364,20 +371,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         vehicle.trunk_is_open = get_child_value(state.current_state, "trunkOpen")
         return vehicle
 
-    def _get_trip_info(self, token: Token, vehicle: Vehicle):
-        """
-        Res:
-        {
-            tripPeriodType: 0,
-            monthTripDayCnt: 25,
-            tripDrvTime: 804,
-            tripIdleTime: 214,
-            tripDist: 263,
-            tripAvgSpeed: 29.9,
-            tripMaxSpeed: 103,
-            tripDaylist: {tripDayInMonth: "20250401", tripCntDay: 4}[]
-        }
-        """
+    def _get_trip_info(self, token: Token, vehicle: Vehicle) -> TripInfo:
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
         data = {
             "tripPeriodType": TripPeriodType.MONTH,
@@ -392,16 +386,25 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         except Exception:
             logger.exception("_get_trip_info request failed")
 
-        items = []
+        trip_day_list = []
         for day in data["tripDayList"]:
-            items.append(
-                TripListItem(
+            trip_day_list.append(
+                TripDayListItem(
                     date=date_string_to_datetime(day["tripDayInMonth"]),
                     count=day["tripCntDay"],
                 )
             )
 
-        return items
+        return TripInfo(
+            trip_day_list=trip_day_list,
+            trip_period_type=TripPeriodType(data["tripPeriodType"]),
+            month_trip_day_cnt=data["monthTripDayCnt"],
+            trip_drv_time=data["tripDrvTime"],
+            trip_idle_time=data["tripIdleTime"],
+            trip_dist=data["tripDist"],
+            trip_avg_speed=data["tripAvgSpeed"],
+            trip_max_speed=data["tripMaxSpeed"],
+        )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = CachedVehicleState()
@@ -411,9 +414,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
         self._update_vehicle_location(vehicle, state.location)
 
-    def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
+    def _get_vehicle_location(self, token: Token, vehicle: Vehicle) -> VehicleLocation:
         """
-        Query the vehicle location.
+        Query the API for the vehicle location.
         """
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/location/park")
         headers = self._get_authenticated_headers(token)
@@ -423,20 +426,17 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             response.raise_for_status()
             logger.debug("Get vehicle location response: %s", response.text)
             response = response.json()
-            return response["resMsg"]
+            return VehicleLocation(
+                lat=response["resMsg"]["coord"]["lat"],
+                long=response["resMsg"]["coord"]["lng"],
+                time=date_string_to_datetime(response["resMsg"]["time"]),
+            )
         except Exception as e:
             logger.exception("Get vehicle location failed: %s", e)
             return None
 
-    def _update_vehicle_location(self, vehicle: Vehicle, location: dict):
-        coord = location.get("coord", {})
-        lat = coord.get("lat")
-        long = coord.get("lng")
-
-        time = location.get("time")
-
-        if lat and long:
-            vehicle.location = (lat, long, time)
+    def _update_vehicle_location(self, vehicle: Vehicle, location: VehicleLocation):
+        vehicle.location = (location.lat, location.long, location.time)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """
@@ -450,7 +450,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             location=self._get_vehicle_location(token, vehicle),
         )
         self._update_vehicle_properties(vehicle, state)
-        # TODO: parse driving info?
+        # TODO: parse driving info? from _get_trip_info
 
     def get_vehicles(self, token: Token):
         url = self._build_api_url("/spa/vehicles")
@@ -491,21 +491,3 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                 return EngineType.PHEV
             case _:
                 raise APIError(f"Invalid vehicle type: {vehicle_type}")
-
-
-@dataclass
-class CachedVehicleState:
-    location: dict = field(default_factory=dict)
-    details: dict = field(default_factory=dict)
-    current_state: dict = field(default_factory=dict)
-
-
-@dataclass
-class TripListItem:
-    date: dt.date
-    count: int
-
-
-class TripPeriodType(IntEnum):
-    MONTH = 0
-    DAY = 1

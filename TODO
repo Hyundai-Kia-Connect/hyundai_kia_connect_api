@@ -16,5 +16,9 @@ BR API:
     ☐ check with HA connection
     ☐ add tests with mock
 
+Docs:
+    ☐ mise?
+    ☐ runtests
+
 Questions:
     ☐ Why is update_month_trip_info useful?
