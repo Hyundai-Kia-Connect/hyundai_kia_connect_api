@@ -5,6 +5,7 @@ import logging
 import datetime
 import typing
 from dataclasses import dataclass, field
+from enum import IntEnum
 
 from .utils import get_float, get_safe_local_datetime
 from .const import DISTANCE_UNITS
@@ -16,12 +17,18 @@ _LOGGER = logging.getLogger(__name__)
 class TripInfo:
     """Trip Info"""
 
+    # Trip fields
     hhmmss: str = None  # will not be filled by summary
     drive_time: int = None  # minutes
     idle_time: int = None  # minutes
     distance: float = None
     avg_speed: float = None
     max_speed: int = None
+
+    # API response fields (only used in API implementations)
+    trip_day_list: list["TripDayListItem"] = None
+    trip_period_type: "TripPeriodType" = None
+    month_trip_day_cnt: int = None
 
 
 @dataclass
@@ -62,6 +69,39 @@ class DailyDrivingStats:
     regenerated_energy: int = None
     distance: float = None
     distance_unit: str = DISTANCE_UNITS[1]  # set to kms by default
+
+
+@dataclass
+class CachedVehicleState:
+    """Cache of vehicle state information"""
+
+    location: "VehicleLocation" | None = None
+    details: dict = field(default_factory=dict)
+    current_state: dict = field(default_factory=dict)
+
+
+@dataclass
+class VehicleLocation:
+    """Vehicle location information"""
+
+    lat: float = None
+    long: float = None
+    time: datetime.datetime = None
+
+
+class TripPeriodType(IntEnum):
+    """Trip period type enum"""
+
+    MONTH = 0
+    DAY = 1
+
+
+@dataclass
+class TripDayListItem:
+    """Trip day list item for API responses"""
+
+    date: datetime.datetime
+    count: int
 
 
 @dataclass

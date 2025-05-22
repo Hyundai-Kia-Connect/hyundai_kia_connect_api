@@ -1,27 +1,32 @@
 """HyundaiBlueLinkAPIUSA.py"""
 
-# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
-
-import base64
-import datetime as dt
+from datetime import date, datetime, timedelta
 import pytz
 import requests
 import certifi
 from urllib.parse import urlencode, urljoin, urlparse
 
-from hyundai_kia_connect_api.models import (
+from .Vehicle import (
+    Vehicle,
     CachedVehicleState,
     TripInfo,
     TripDayListItem,
     VehicleLocation,
     TripPeriodType,
+    MonthTripInfo,
+    DayTripCounts,
+    DayTripInfo,
 )
 
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
-from hyundai_kia_connect_api.lib.date import date_string_to_datetime, date_to_year_month
+from hyundai_kia_connect_api.lib.date import (
+    date_string_to_datetime,
+    date_to_year_month,
+    date_to_year_month_day,
+)
 from hyundai_kia_connect_api.lib.logging import get_logger
 
 from .const import (
@@ -69,7 +74,7 @@ class cipherAdapter(HTTPAdapter):
 
 class HyundaiBlueLinkApiBR(ApiImpl):
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
+    last_loc_timestamp = datetime.now(pytz.utc) - timedelta(hours=3)
 
     def __init__(self, region: int, brand: int, language: str | None = "en-US"):
         if BRANDS[brand] != BRAND_HYUNDAI:
@@ -134,9 +139,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         auth_response = self._get_auth_response(authorization_code)
         expires_in_seconds = auth_response["expires_in"]
-        expires_at = dt.datetime.now(pytz.utc) + dt.timedelta(
-            seconds=expires_in_seconds
-        )
+        expires_at = datetime.now(pytz.utc) + timedelta(seconds=expires_in_seconds)
 
         return Token(
             access_token=auth_response["access_token"],
@@ -371,12 +374,23 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         vehicle.trunk_is_open = get_child_value(state.current_state, "trunkOpen")
         return vehicle
 
-    def _get_trip_info(self, token: Token, vehicle: Vehicle) -> TripInfo:
+    def _get_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str = None,
+        trip_period_type: int = TripPeriodType.MONTH,
+    ) -> TripInfo:
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
-        data = {
-            "tripPeriodType": TripPeriodType.MONTH,
-            "setTripMonth": date_to_year_month(dt.date.today()),
-        }
+
+        # Use provided date or default to current month
+        if date_string is None:
+            date_string = date_to_year_month(date.today())
+
+        if trip_period_type == TripPeriodType.MONTH:
+            data = {"tripPeriodType": trip_period_type, "setTripMonth": date_string}
+        else:
+            data = {"tripPeriodType": trip_period_type, "setTripDay": date_string}
         response = self.session.post(
             url, json=data, headers=self._get_authenticated_headers(token)
         )
@@ -395,15 +409,17 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                 )
             )
 
+        # Map API response field names to TripInfo field names
         return TripInfo(
             trip_day_list=trip_day_list,
             trip_period_type=TripPeriodType(data["tripPeriodType"]),
             month_trip_day_cnt=data["monthTripDayCnt"],
-            trip_drv_time=data["tripDrvTime"],
-            trip_idle_time=data["tripIdleTime"],
-            trip_dist=data["tripDist"],
-            trip_avg_speed=data["tripAvgSpeed"],
-            trip_max_speed=data["tripMaxSpeed"],
+            # Map API field names to TripInfo field names
+            drive_time=data["tripDrvTime"],
+            idle_time=data["tripIdleTime"],
+            distance=data["tripDist"],
+            avg_speed=data["tripAvgSpeed"],
+            max_speed=data["tripMaxSpeed"],
         )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -450,19 +466,17 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             location=self._get_vehicle_location(token, vehicle),
         )
         self._update_vehicle_properties(vehicle, state)
-        # TODO: parse driving info? from _get_trip_info
 
     def get_vehicles(self, token: Token):
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers)
-        logger.debug("Get Vehicles Response %s", response.text)
         response = response.json()
-        result = []
+        logger.debug("Response from vehicles endpoint: %s", response)
 
+        result = []
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = self._get_vehicle_engine_type(entry["type"])
-
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -476,6 +490,90 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             result.append(vehicle)
 
         return result
+
+    def update_month_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        month_date: date,
+    ) -> None:
+        """
+        Updates the vehicle.month_trip_info for the specified month.
+
+        This feature provides monthly driving statistics.
+        """
+        vehicle.month_trip_info = None
+
+        yyyymm_string = date_to_year_month(month_date)
+
+        trip_info = self._get_trip_info(
+            token,
+            vehicle,
+            date_string=yyyymm_string,
+            trip_period_type=TripPeriodType.MONTH,
+        )
+
+        if trip_info.month_trip_day_cnt > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
+                summary=TripInfo(
+                    drive_time=trip_info.drive_time,
+                    idle_time=trip_info.idle_time,
+                    distance=trip_info.distance,
+                    avg_speed=trip_info.avg_speed,
+                    max_speed=trip_info.max_speed,
+                ),
+            )
+
+            for day in trip_info.trip_day_list:
+                processed_day = DayTripCounts(
+                    yyyymmdd=date_to_year_month_day(day.date.date()),
+                    trip_count=day.count,
+                )
+                result.day_list.append(processed_day)
+
+            vehicle.month_trip_info = result
+
+    def update_day_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        day_date: date,
+    ) -> None:
+        """
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        This feature provides detailed trip information for a specific day.
+        """
+        vehicle.day_trip_info = None
+
+        yyyymmdd_string = date_to_year_month_day(day_date)
+
+        try:
+            trip_info = self._get_trip_info(
+                token,
+                vehicle,
+                date_string=yyyymmdd_string,
+                trip_period_type=TripPeriodType.DAY,
+            )
+
+            if hasattr(trip_info, "trip_day_list") and trip_info.trip_day_list:
+                result = DayTripInfo(
+                    yyyymmdd=yyyymmdd_string,
+                    trip_list=[],
+                    summary=TripInfo(
+                        drive_time=trip_info.drive_time,
+                        idle_time=trip_info.idle_time,
+                        distance=trip_info.distance,
+                        avg_speed=trip_info.avg_speed,
+                        max_speed=trip_info.max_speed,
+                    ),
+                )
+
+                vehicle.day_trip_info = result
+        except Exception as e:
+            logger.exception("Failed to get day trip info: %s", e)
 
     def _get_vehicle_engine_type(self, vehicle_type: str) -> EngineType:
         match vehicle_type:
