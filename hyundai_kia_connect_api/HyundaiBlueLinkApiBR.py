@@ -128,15 +128,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         Because of that, we do 2 API requests and do not use the default headers.
         """
         cookies = self._get_cookies()
-        authorization_code = None
-
-        try:
-            authorization_code = self._get_authorization_code(
-                cookies, username, password
-            )
-        except Exception as e:
-            raise AuthenticationError(f"First step of login failed: {e}")
-
+        authorization_code = self._get_authorization_code(cookies, username, password)
         auth_response = self._get_auth_response(authorization_code)
         expires_in_seconds = auth_response["expires_in"]
         expires_at = datetime.now(pytz.utc) + timedelta(seconds=expires_in_seconds)
@@ -160,29 +152,33 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url("/user/signin")
         data = {"email": username, "password": password}
 
-        response = self.session.post(
-            url,
-            json=data,
-            cookies=cookies,
-            # TODO: we might not need all these headers
-            headers={
-                "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Accept": "*/*",
-                "Connection": "keep-alive",
-                "Content-Type": "text/plain;charset=UTF-8",
-                "Host": self.api_headers["Host"],
-                "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-                "Origin": "https://br-ccapi.hyundai.com.br",
-                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS",
-            },
-        )
-        response.raise_for_status()
-        response = response.json()
-        logger.debug(f"Got redirect URL: {response['redirectUrl']}")
-        parsed_redirect_url = urlparse(response["redirectUrl"])
-        authorization_code = parsed_redirect_url.query.split("=")[1]
-        return authorization_code
+        try:
+            response = self.session.post(
+                url,
+                json=data,
+                cookies=cookies,
+                # TODO: we might not need all these headers
+                headers={
+                    "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
+                    "Accept-Encoding": "gzip, deflate, br",
+                    "Accept": "*/*",
+                    "Connection": "keep-alive",
+                    "Content-Type": "text/plain;charset=UTF-8",
+                    "Host": self.api_headers["Host"],
+                    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+                    "Origin": "https://br-ccapi.hyundai.com.br",
+                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS",
+                },
+            )
+            response.raise_for_status()
+            response = response.json()
+            logger.debug("Got redirect URL: %s", response["redirectUrl"])
+            parsed_redirect_url = urlparse(response["redirectUrl"])
+            authorization_code = parsed_redirect_url.query.split("=")[1]
+            return authorization_code
+        except Exception:
+            logger.exception("Error getting authorization code: %s", response.text)
+            raise AuthenticationError("Error getting authorization code")
 
     def _get_auth_response(self, authorization_code: str) -> dict:
         """
@@ -223,16 +219,19 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             "client_id": self.ccsp_service_id,
             "redirect_uri": urljoin(self.api_url, "/user/oauth2/redirect"),
         }
-        # Build the URL with encoded parameters
-        url = self.api_url + "/user/oauth2/authorize?" + urlencode(params)
 
-        logger.debug(f"Requesting cookies from {url}")
-        session = requests.Session()
-        response = session.get(url)
-        response.raise_for_status()
-        cookies = session.cookies.get_dict()
-        logger.debug(f"Got cookies from response: {cookies}")
-        return cookies
+        url = f"{self.api_url}/user/oauth2/authorize?{urlencode(params)}"
+
+        try:
+            logger.debug("Requesting cookies from %s", url)
+            response = requests.get(url)
+            response.raise_for_status()
+            cookies = response.cookies.get_dict()
+            logger.debug("Got cookies from response: %s", cookies)
+            return cookies
+        except Exception:
+            logger.exception("Error getting cookies: %s", response.text)
+            raise AuthenticationError("Error getting cookies")
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         """
@@ -255,7 +254,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}")
         if not vehicle.ccu_ccs2_protocol_support:
             url = url + "/status/latest"
-        else:  # untested
+        else:  # NOTE: ccs2 is untested
             url = url + "/ccs2/carstatus/latest"
 
         headers = self._get_authenticated_headers(token)
