@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 import pytz
 import requests
 import certifi
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import urljoin, urlparse
 
 from .Vehicle import (
     Vehicle,
