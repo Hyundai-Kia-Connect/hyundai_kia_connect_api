@@ -3,7 +3,14 @@
 import pytest
 import sys
 
-DEFAULT_OPTS = ["-vv"]
+# Below are some sensible defaults for running tests which
+# should improve overall developer experience.
+DEFAULT_OPTS = [
+    # Increase verbosity (so pytest-clarity kicks in)
+    "-vv",
+    # --last-failed: Run only the tests that failed in the last run
+    "--lf",
+]
 
 # Add the project root to the Python path
 # so absolute imports work
