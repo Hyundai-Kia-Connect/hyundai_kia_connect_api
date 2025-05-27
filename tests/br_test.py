@@ -10,7 +10,7 @@ BLUELINK_BR_PIN=your_pin
 pytest will automatically load the .env file.
 
 Then, run the tests with:
-pytest -m br
+mise run tests -m br
 """
 
 from hyundai_kia_connect_api import VehicleManager
