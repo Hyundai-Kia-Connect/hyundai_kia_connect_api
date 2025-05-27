@@ -24,4 +24,5 @@ ruff==0.11.10
 pytest==8.3.5
 pytest-mock==3.14.1
 pytest-clarity==1.0.1
-pytest-socket==0.7.0
+responses==0.25.7
+pytest-responses==0.5.1

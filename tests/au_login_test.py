@@ -3,6 +3,7 @@ import pytest
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
 
+@pytest.mark.withoutresponses
 def test_AU_login():
     username = os.getenv("KIA_AU_USERNAME")
     password = os.getenv("KIA_AU_PASSWORD")

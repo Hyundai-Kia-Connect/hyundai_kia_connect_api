@@ -6,6 +6,7 @@ These tests do NOT perform network requests.
 
 import datetime
 import pytest
+import responses
 import pytz
 
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
@@ -23,7 +24,27 @@ from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 @pytest.fixture
 def api():
     """Create an instance of the Brazilian API implementation."""
-    return HyundaiBlueLinkApiBR(region=Region.BRAZIL, brand=Brand.HYUNDAI)
+    api = HyundaiBlueLinkApiBR(region=Region.BRAZIL, brand=Brand.HYUNDAI)
+    responses.add(
+        responses.POST,
+        api._build_api_url("/user/signin"),
+        json={"redirectUrl": "https://example.com/?code=mock_authorization_code"},
+    )
+    responses.add(
+        responses.GET,
+        api._build_api_url("/user/oauth2/authorize"),
+        adding_headers={"Set-Cookie": "cookie1=value2"},
+    )
+    responses.add(
+        responses.POST,
+        api._build_api_url("/user/oauth2/token"),
+        json={
+            "access_token": "mock_access_token",
+            "refresh_token": "mock_refresh_token",
+            "expires_in": 3600,
+        },
+    )
+    return api
 
 
 @pytest.fixture
@@ -69,36 +90,8 @@ class TestHyundaiBlueLinkApiBR:
         with pytest.raises(APIError):
             HyundaiBlueLinkApiBR(region=Region.BRAZIL, brand=Brand.KIA)  # not supported
 
-    def test_login(self, api, mocker):
+    def test_login(self, api: HyundaiBlueLinkApiBR):
         """Test the login flow."""
-        # Mock the get cookies request
-        mock_cookie_response = mocker.MagicMock()
-        mock_cookie_response.raise_for_status.return_value = None
-        mock_cookie_response.cookies.get_dict.return_value = {"cookie1": "value1"}
-
-        # Mock the authorization code request
-        mock_auth_code_response = mocker.MagicMock()
-        mock_auth_code_response.raise_for_status.return_value = None
-        mock_auth_code_response.json.return_value = {
-            "redirectUrl": "https://example.com/?code=mock_authorization_code"
-        }
-
-        # Mock the token request
-        mock_token_response = mocker.MagicMock()
-        mock_token_response.raise_for_status.return_value = None
-        mock_token_response.json.return_value = {
-            "access_token": "mock_access_token",
-            "refresh_token": "mock_refresh_token",
-            "expires_in": 3600,
-        }
-
-        # Apply the mocks
-        mocker.patch("requests.get", return_value=mock_cookie_response)
-        mocker.patch.object(
-            api.session,
-            "post",
-            side_effect=[mock_auth_code_response, mock_token_response],
-        )
 
         # Call the login method
         token = api.login("test@example.com", "password")

@@ -30,7 +30,7 @@ pin = os.getenv("BLUELINK_BR_PIN")
 
 
 @pytest.mark.br
-@pytest.mark.enable_socket
+@pytest.mark.withoutresponses
 class TestBrazilHyundaiAPI:
     @classmethod
     def setup_class(self):

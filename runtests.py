@@ -10,6 +10,8 @@ DEFAULT_OPTS = [
     "-vv",
     # --last-failed: Run only the tests that failed in the last run
     "--lf",
+    # Capture stdout and stderr
+    "-s",
 ]
 
 # Add the project root to the Python path

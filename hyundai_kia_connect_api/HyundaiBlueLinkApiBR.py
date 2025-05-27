@@ -21,7 +21,7 @@ from .Vehicle import (
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
+from hyundai_kia_connect_api.exceptions import APIError
 from hyundai_kia_connect_api.lib.date import (
     date_string_to_datetime,
     date_to_year_month,
@@ -149,33 +149,29 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url("/user/signin")
         data = {"email": username, "password": password}
 
-        try:
-            response = self.session.post(
-                url,
-                json=data,
-                cookies=cookies,
-                # TODO: we might not need all these headers
-                headers={
-                    "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
-                    "Accept-Encoding": "gzip, deflate, br",
-                    "Accept": "*/*",
-                    "Connection": "keep-alive",
-                    "Content-Type": "text/plain;charset=UTF-8",
-                    "Host": self.api_headers["Host"],
-                    "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
-                    "Origin": "https://br-ccapi.hyundai.com.br",
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS",
-                },
-            )
-            response.raise_for_status()
-            response = response.json()
-            logger.debug("Got redirect URL: %s", response["redirectUrl"])
-            parsed_redirect_url = urlparse(response["redirectUrl"])
-            authorization_code = parsed_redirect_url.query.split("=")[1]
-            return authorization_code
-        except Exception:
-            logger.exception("Error getting authorization code: %s", response.text)
-            raise AuthenticationError("Error getting authorization code")
+        response = self.session.post(
+            url,
+            json=data,
+            cookies=cookies,
+            # TODO: we might not need all these headers
+            headers={
+                "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept": "*/*",
+                "Connection": "keep-alive",
+                "Content-Type": "text/plain;charset=UTF-8",
+                "Host": self.api_headers["Host"],
+                "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
+                "Origin": "https://br-ccapi.hyundai.com.br",
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS",
+            },
+        )
+        response.raise_for_status()
+        response = response.json()
+        logger.debug("Got redirect URL: %s", response["redirectUrl"])
+        parsed_redirect_url = urlparse(response["redirectUrl"])
+        authorization_code = parsed_redirect_url.query.split("=")[1]
+        return authorization_code
 
     def _get_auth_response(self, authorization_code: str) -> dict:
         """
@@ -195,15 +191,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         }
 
         response = requests.post(url, data=body, headers=headers)
-
-        try:
-            response.raise_for_status()
-            response = response.json()
-            logger.debug("Got response from API: %s", response)
-        except Exception:
-            logger.exception("Error getting auth response: %s", response.text)
-            raise AuthenticationError("Error getting auth response")
-
+        response.raise_for_status()
+        response = response.json()
+        logger.debug("Got response from API: %s", response)
         return response
 
     def _build_api_url(self, path: str) -> str:
@@ -214,20 +204,16 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         params = {
             "response_type": "code",
             "client_id": self.ccsp_service_id,
-            "redirect_uri": urljoin(self.api_url, "/user/oauth2/redirect"),
+            "redirect_uri": self._build_api_url("/user/oauth2/redirect"),
         }
 
-        url = f"{self.api_url}/user/oauth2/authorize?{urlencode(params)}"
-
-        try:
-            logger.debug("Requesting cookies from %s", url)
-            response = requests.get(url)
-            response.raise_for_status()
-            cookies = response.cookies.get_dict()
-            logger.debug("Got cookies from response: %s", cookies)
-            return cookies
-        except Exception:
-            raise AuthenticationError("Error getting cookies")
+        url = self._build_api_url("/user/oauth2/authorize")
+        logger.debug("Requesting cookies from %s with params %s", url, params)
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        cookies = response.cookies.get_dict()
+        logger.debug("Got cookies from response: %s", cookies)
+        return cookies
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         """
