@@ -8,7 +8,6 @@ import datetime
 import pytest
 import responses
 import pytz
-from responses import matchers
 
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.Token import Token
@@ -16,7 +15,6 @@ from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleLocation
 from hyundai_kia_connect_api.const import (
     Brand,
     EngineType,
-    DISTANCE_UNITS,
     Region,
 )
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
@@ -277,17 +275,19 @@ class TestHyundaiBlueLinkApiBR:
         assert vehicle.location[0] == -46.6333  # longitude
         assert vehicle.location[1] == -23.5505  # latitude
 
-    def test_get_vehicle_location(self, api, token, vehicle, mocker):
+    def test_get_vehicle_location(self, api, token, vehicle):
         """Test retrieving the vehicle location."""
         # Mock the API response
-        mock_response = mocker.MagicMock()
-        mock_response.json.return_value = {
-            "resMsg": {
-                "coord": {"lat": -23.5505, "lng": -46.6333},
-                "time": "2023-06-01T12:00:00Z",
-            }
-        }
-        mocker.patch.object(api.session, "get", return_value=mock_response)
+        responses.add(
+            responses.GET,
+            api._build_api_url(f"/spa/vehicles/{vehicle.id}/location/park"),
+            json={
+                "resMsg": {
+                    "coord": {"lat": -23.5505, "lng": -46.6333},
+                    "time": "2023-06-01T12:00:00Z",
+                }
+            },
+        )
 
         # Call the _get_vehicle_location method
         location = api._get_vehicle_location(token, vehicle)
@@ -298,7 +298,7 @@ class TestHyundaiBlueLinkApiBR:
         assert location.long == -46.6333
         assert isinstance(location.time, datetime.datetime)
 
-    def test_force_refresh_vehicle_state(self, api, token, vehicle, mocker):
+    def test_force_refresh_vehicle_state(self, api, token, vehicle):
         """Test forcing a refresh of the vehicle state."""
         status_req = responses.add(
             responses.GET,
@@ -328,26 +328,28 @@ class TestHyundaiBlueLinkApiBR:
         # Verify the REFRESH header was used
         assert status_req.calls[0].request.headers["REFRESH"] == "true"
 
-    def test_update_month_trip_info(self, api, token, vehicle, mocker):
+    def test_update_month_trip_info(self, api, token, vehicle):
         """Test updating the monthly trip information."""
         # Mock the API response
-        mock_response = mocker.MagicMock()
-        mock_response.json.return_value = {
-            "resMsg": {
-                "tripPeriodType": 1,  # Month
-                "monthTripDayCnt": 20,
-                "tripDrvTime": 1500,  # 25 hours
-                "tripIdleTime": 300,  # 5 hours
-                "tripDist": 1200,  # 1200 km
-                "tripAvgSpeed": 80,  # 80 km/h
-                "tripMaxSpeed": 120,  # 120 km/h
-                "tripDayList": [
-                    {"tripDayInMonth": "2023-06-01", "tripCntDay": 2},
-                    {"tripDayInMonth": "2023-06-02", "tripCntDay": 3},
-                ],
-            }
-        }
-        mocker.patch.object(api.session, "post", return_value=mock_response)
+        responses.add(
+            responses.POST,
+            api._build_api_url(f"/spa/vehicles/{vehicle.id}/trip/month"),
+            json={
+                "resMsg": {
+                    "tripPeriodType": 1,  # Month
+                    "monthTripDayCnt": 20,
+                    "tripDrvTime": 1500,  # 25 hours
+                    "tripIdleTime": 300,  # 5 hours
+                    "tripDist": 1200,  # 1200 km
+                    "tripAvgSpeed": 80,  # 80 km/h
+                    "tripMaxSpeed": 120,  # 120 km/h
+                    "tripDayList": [
+                        {"tripDayInMonth": "2023-06-01", "tripCntDay": 2},
+                        {"tripDayInMonth": "2023-06-02", "tripCntDay": 3},
+                    ],
+                }
+            },
+        )
 
         # Call the update_month_trip_info method
         api.update_month_trip_info(token, vehicle, datetime.date(2023, 6, 1))
@@ -366,7 +368,7 @@ class TestHyundaiBlueLinkApiBR:
         assert vehicle.month_trip_info.summary.avg_speed == 80
         assert vehicle.month_trip_info.summary.max_speed == 120
 
-    def test_update_day_trip_info(self, api, token, vehicle, mocker):
+    def test_update_day_trip_info(self, api, token, vehicle):
         """Test updating the daily trip information."""
         # Mock the API response
         responses.add(
