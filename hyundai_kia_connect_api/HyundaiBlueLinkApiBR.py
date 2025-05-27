@@ -40,9 +40,6 @@ from .const import (
 from .utils import get_child_value, parse_datetime
 from .ApiImpl import ApiImpl
 from .Token import Token
-from .Vehicle import (
-    Vehicle,
-)
 
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
