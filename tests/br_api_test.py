@@ -1,4 +1,8 @@
-"""Tests for the Brazilian implementation of the Hyundai BlueLink API."""
+"""
+Tests for the Brazilian implementation of the Hyundai BlueLink API.
+
+These tests do NOT perform network requests.
+"""
 
 import datetime
 import pytest
