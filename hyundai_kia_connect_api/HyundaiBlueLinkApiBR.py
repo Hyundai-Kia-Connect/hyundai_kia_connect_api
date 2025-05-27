@@ -227,7 +227,6 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             logger.debug("Got cookies from response: %s", cookies)
             return cookies
         except Exception:
-            logger.exception("Error getting cookies: %s", response.text)
             raise AuthenticationError("Error getting cookies")
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):

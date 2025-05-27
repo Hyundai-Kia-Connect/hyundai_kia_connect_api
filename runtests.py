@@ -11,4 +11,4 @@ sys.path.append(".")
 
 print("Running pytest with default options:", DEFAULT_OPTS)
 
-pytest.main(args=DEFAULT_OPTS)
+pytest.main(args=DEFAULT_OPTS + sys.argv[1:])
