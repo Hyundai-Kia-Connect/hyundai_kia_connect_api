@@ -9,6 +9,7 @@ DEFAULT_OPTS = ["-vv"]
 # so absolute imports work
 sys.path.append(".")
 
-print("Running pytest with default options:", DEFAULT_OPTS)
+args = DEFAULT_OPTS + sys.argv[1:]
+print("Running pytest with the following args:", args)
 
-pytest.main(args=DEFAULT_OPTS + sys.argv[1:])
+pytest.main(args=args)
