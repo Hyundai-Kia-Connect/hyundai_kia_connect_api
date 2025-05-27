@@ -75,7 +75,7 @@ class DailyDrivingStats:
 class CachedVehicleState:
     """Cache of vehicle state information"""
 
-    location: "VehicleLocation" | None = None
+    location: "VehicleLocation | None" = None
     details: dict = field(default_factory=dict)
     current_state: dict = field(default_factory=dict)
 

@@ -1,3 +1,18 @@
+"""
+These tests perform network requests to the Hyundai BlueLink API.
+
+To test it, create a .env file with the following variables:
+
+BLUELINK_BR_USERNAME=your_username
+BLUELINK_BR_PASSWORD=your_password
+BLUELINK_BR_PIN=your_pin
+
+pytest will automatically load the .env file.
+
+Then, run the tests with:
+pytest -m br
+"""
+
 from hyundai_kia_connect_api import VehicleManager
 import os
 import pytest
@@ -8,16 +23,6 @@ from hyundai_kia_connect_api.const import Brand, Region
 if TYPE_CHECKING:
     from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 
-# To test this, create a .env file with the following variables:
-#
-# BLUELINK_BR_USERNAME=your_username
-# BLUELINK_BR_PASSWORD=your_password
-# BLUELINK_BR_PIN=your_pin
-#
-# pytest will automatically load the .env file.
-#
-# Then, run the tests with:
-# pytest -m br
 
 username = os.getenv("BLUELINK_BR_USERNAME")
 password = os.getenv("BLUELINK_BR_PASSWORD")

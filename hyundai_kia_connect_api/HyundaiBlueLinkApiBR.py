@@ -377,8 +377,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self,
         token: Token,
         vehicle: Vehicle,
-        date_string: str = None,
-        trip_period_type: int = TripPeriodType.MONTH,
+        date_string: str | None = None,
+        trip_period_type: TripPeriodType = TripPeriodType.MONTH,
     ) -> TripInfo:
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
 
