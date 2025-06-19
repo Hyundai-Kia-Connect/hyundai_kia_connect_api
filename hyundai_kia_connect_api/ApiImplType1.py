@@ -25,7 +25,7 @@ from .utils import get_child_value, parse_datetime, get_index_into_hex_temp
 from .const import (
     DOMAIN,
     DISTANCE_UNITS,
-    ENGINE_TYPES,
+    EngineType,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -109,15 +109,15 @@ class ApiImplType1(ApiImpl):
         for entry in response["resMsg"]["vehicles"]:
             entry_engine_type = None
             if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = EngineType.ICE
             elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = EngineType.EV
             elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
+                entry_engine_type = EngineType.HEV
             elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -353,7 +353,7 @@ class ApiImplType1(ApiImpl):
             ],
         )
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             # ev_driving_range is the same as total_driving_range for pure EV
             vehicle.ev_driving_range = (
                 vehicle.total_driving_range,

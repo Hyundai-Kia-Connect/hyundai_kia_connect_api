@@ -1,0 +1,24 @@
+# Used with Todo+ extension for VS Code
+
+BR API:
+    ✔ Authentication @done(25-05-20 11:59)
+    ✔ Get vehicle details @done(25-05-20 11:59)
+    ✔ Force refresh data? @done(25-05-20 13:03)
+    ✔ Get vehicle location @done(25-05-20 11:59)
+    ☐ Get trip info (month/day?)
+    ☐ odometer?
+    ☐ lock/unlock
+    ☐ start/stop climate
+    ☐ start_hazard_lights
+    ☐ start_hazard_lights_and_horn
+    ☐ get/update maintenance alert
+    ☐ check if response format matches expected
+    ☐ check with HA connection
+    ☐ add tests with mock
+
+Docs:
+    ☐ mise?
+    ☐ runtests
+
+Questions:
+    ☐ Why is update_month_trip_info useful?

@@ -7,6 +7,8 @@ import logging
 
 import pytz
 
+from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+
 from .exceptions import APIError
 from .ApiImpl import (
     ApiImpl,
@@ -30,6 +32,7 @@ from .const import (
     BRANDS,
     DOMAIN,
     REGION_AUSTRALIA,
+    REGION_BRAZIL,
     REGION_CANADA,
     REGION_EUROPE,
     REGION_USA,
@@ -301,28 +304,33 @@ class VehicleManager:
     def get_implementation_by_region_brand(
         region: int, brand: int, language: str
     ) -> ApiImpl:
-        if REGIONS[region] == REGION_CANADA:
+        current_region = REGIONS[region]
+        current_brand = BRANDS[brand]
+
+        if current_region == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
-        elif REGIONS[region] == REGION_EUROPE:
+        elif current_region == REGION_EUROPE:
             return KiaUvoApiEU(region, brand, language)
-        elif REGIONS[region] == REGION_USA and (
-            BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
+        elif current_region == REGION_USA and (
+            current_brand == BRAND_HYUNDAI or current_brand == BRAND_GENESIS
         ):
             return HyundaiBlueLinkApiUSA(region, brand, language)
-        elif REGIONS[region] == REGION_USA and BRANDS[brand] == BRAND_KIA:
+        elif current_region == REGION_USA and current_brand == BRAND_KIA:
             return KiaUvoApiUSA(region, brand, language)
-        elif REGIONS[region] == REGION_CHINA:
+        elif current_region == REGION_CHINA:
             return KiaUvoApiCN(region, brand, language)
-        elif REGIONS[region] == REGION_AUSTRALIA:
+        elif current_region == REGION_AUSTRALIA:
             return KiaUvoApiAU(region, brand, language)
-        elif REGIONS[region] == REGION_NZ:
-            if BRANDS[brand] == BRAND_KIA:
+        elif current_region == REGION_NZ:
+            if current_brand == BRAND_KIA:
                 return KiaUvoApiAU(region, brand, language)
             else:
                 raise APIError(
-                    f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
+                    f"Unknown brand {current_brand} for region {current_region}"
                 )
-        elif REGIONS[region] == REGION_INDIA:
+        elif current_region == REGION_INDIA:
             return KiaUvoApiIN(brand)
+        elif current_region == REGION_BRAZIL:
+            return HyundaiBlueLinkApiBR(region, brand, language)
         else:
             raise APIError(f"Unknown region {region}")

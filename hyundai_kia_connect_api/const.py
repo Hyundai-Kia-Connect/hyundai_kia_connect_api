@@ -1,7 +1,3 @@
-"""const.py"""
-
-# pylint:disable=invalid-name,missing-class-docstring
-
 import datetime
 from enum import Enum, IntEnum
 
@@ -22,8 +18,9 @@ REGION_USA = "USA"
 REGION_CHINA = "China"
 REGION_AUSTRALIA = "Australia"
 REGION_NZ = "New Zealand"
-
 REGION_INDIA = "India"
+REGION_BRAZIL = "Brazil"
+
 REGIONS = {
     1: REGION_EUROPE,
     2: REGION_CANADA,
@@ -32,7 +29,26 @@ REGIONS = {
     5: REGION_AUSTRALIA,
     6: REGION_INDIA,
     7: REGION_NZ,
+    8: REGION_BRAZIL,
 }
+
+
+class Region(IntEnum):
+    EUROPE = 1
+    CANADA = 2
+    USA = 3
+    CHINA = 4
+    AUSTRALIA = 5
+    INDIA = 6
+    NZ = 7
+    BRAZIL = 8
+
+
+class Brand(IntEnum):
+    KIA = 1
+    HYUNDAI = 2
+    GENESIS = 3
+
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
 
@@ -74,7 +90,7 @@ HEAT_STATUS = {
 }
 
 
-class ENGINE_TYPES(Enum):
+class EngineType(Enum):
     ICE = "ICE"
     EV = "EV"
     PHEV = "PHEV"

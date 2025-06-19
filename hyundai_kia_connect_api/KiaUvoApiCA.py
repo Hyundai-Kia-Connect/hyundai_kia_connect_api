@@ -22,7 +22,7 @@ from .const import (
     BRANDS,
     DISTANCE_UNITS,
     DOMAIN,
-    ENGINE_TYPES,
+    EngineType,
     ORDER_STATUS,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -162,11 +162,11 @@ class KiaUvoApiCA(ApiImpl):
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
             if entry["fuelKindCode"] == "G":
-                entry_engine_type = ENGINE_TYPES.ICE
+                entry_engine_type = EngineType.ICE
             elif entry["fuelKindCode"] == "E":
-                entry_engine_type = ENGINE_TYPES.EV
+                entry_engine_type = EngineType.EV
             elif entry["fuelKindCode"] == "P":
-                entry_engine_type = ENGINE_TYPES.PHEV
+                entry_engine_type = EngineType.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
@@ -199,7 +199,7 @@ class KiaUvoApiCA(ApiImpl):
         # Update service after the fact so we still have the old odometer
         # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
@@ -238,7 +238,7 @@ class KiaUvoApiCA(ApiImpl):
         # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
 
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
@@ -363,7 +363,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "status.windowOpen.backRight"
         )
-        if vehicle.engine_type != ENGINE_TYPES.ICE:
+        if vehicle.engine_type != EngineType.ICE:
             vehicle.ev_battery_percentage = get_child_value(
                 state, "status.evStatus.batteryStatus"
             )
@@ -587,7 +587,7 @@ class KiaUvoApiCA(ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             url = self.API_URL + "evc/rfon"
         else:
             url = self.API_URL + "rmtstrt"
@@ -623,7 +623,7 @@ class KiaUvoApiCA(ApiImpl):
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_old.index(options.set_temp)
             )
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             payload = {
                 "pin": token.pin,
             }
@@ -694,7 +694,7 @@ class KiaUvoApiCA(ApiImpl):
         return response_headers["transactionId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        if vehicle.engine_type == ENGINE_TYPES.EV:
+        if vehicle.engine_type == EngineType.EV:
             url = self.API_URL + "evc/rfoff"
         else:
             url = self.API_URL + "rmtstp"

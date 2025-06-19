@@ -36,7 +36,7 @@ from .const import (
     TEMPERATURE_UNITS,
     SEAT_STATUS,
     CHARGE_PORT_ACTION,
-    ENGINE_TYPES,
+    EngineType,
 )
 from .exceptions import (
     AuthenticationError,
@@ -152,8 +152,8 @@ class KiaUvoApiAU(ApiImplType1):
             )
 
         if (
-            vehicle.engine_type == ENGINE_TYPES.EV
-            or vehicle.engine_type == ENGINE_TYPES.PHEV
+            vehicle.engine_type == EngineType.EV
+            or vehicle.engine_type == EngineType.PHEV
         ):
             try:
                 state = self._get_driving_info(token, vehicle)
@@ -185,8 +185,8 @@ class KiaUvoApiAU(ApiImplType1):
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
-            vehicle.engine_type == ENGINE_TYPES.EV
-            or vehicle.engine_type == ENGINE_TYPES.PHEV
+            vehicle.engine_type == EngineType.EV
+            or vehicle.engine_type == EngineType.PHEV
         ):
             try:
                 state = self._get_driving_info(token, vehicle)
