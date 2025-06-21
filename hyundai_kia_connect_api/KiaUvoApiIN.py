@@ -109,7 +109,9 @@ class KiaUvoApiIN(ApiImplType1):
             self.BASIC_AUTHORIZATION: str = "Basic ZDBmZTQ4NTUtNzUyNy00YmUwLWFiNmUtYTQ4MTIxNmM3MDVkOlNIb1R0WHB5ZmJZbVAzWGpOQTZCcnRsRGdseXBQV2o5MjBQdEtCSlBmbGVIRVlwVQ=="  # noqa
             self.LOGIN_FORM_HOST = "prd.in-ccapi.kia.connected-car.io"
             self.PUSH_TYPE = "APNS"
-            self.GCM_SENDER_ID = "7c02b67078de725f04de392067781f395d83093590dcabebb14b8381ccdc7f8a"
+            self.GCM_SENDER_ID = (
+                "7c02b67078de725f04de392067781f395d83093590dcabebb14b8381ccdc7f8a"
+            )
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
@@ -791,9 +793,7 @@ class KiaUvoApiIN(ApiImplType1):
         }
 
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
-        print(
-            f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}"
-        )
+        print(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
         _check_response_for_errors(response)
