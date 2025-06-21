@@ -793,7 +793,6 @@ class KiaUvoApiIN(ApiImplType1):
         }
 
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
-        print(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
         _check_response_for_errors(response)
