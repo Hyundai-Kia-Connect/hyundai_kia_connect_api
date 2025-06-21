@@ -97,7 +97,6 @@ class KiaUvoApiIN(ApiImplType1):
             self.BASIC_AUTHORIZATION: str = "Basic ZTViM2Y2ZDAtN2Y4My00M2M5LWFmZjMtYTI1NGRiN2FmMzY4OjVKRk9DcjZDMjRPZk96bERxWnA3RXdxcmtMMFd3MDRVYXhjRGlFNlVkM3FJNVNFNA=="  # noqa
             self.LOGIN_FORM_HOST = "prd.in-ccapi.hyundai.connected-car.io"
             self.PUSH_TYPE = "GCM"
-            self.GCM_SENDER_ID = 974204007939
         elif BRANDS[brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.in-ccapi.kia.connected-car.io"
             self.PORT: int = 8080
@@ -109,10 +108,8 @@ class KiaUvoApiIN(ApiImplType1):
             self.BASIC_AUTHORIZATION: str = "Basic ZDBmZTQ4NTUtNzUyNy00YmUwLWFiNmUtYTQ4MTIxNmM3MDVkOlNIb1R0WHB5ZmJZbVAzWGpOQTZCcnRsRGdseXBQV2o5MjBQdEtCSlBmbGVIRVlwVQ=="  # noqa
             self.LOGIN_FORM_HOST = "prd.in-ccapi.kia.connected-car.io"
             self.PUSH_TYPE = "APNS"
-            self.GCM_SENDER_ID = (
-                "7c02b67078de725f04de392067781f395d83093590dcabebb14b8381ccdc7f8a"
-            )
-
+        
+        self.GCM_SENDER_ID = 974204007939
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
