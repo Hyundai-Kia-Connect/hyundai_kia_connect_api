@@ -56,17 +56,33 @@ def parse_datetime(value, timezone) -> datetime.datetime:
     if value is None:
         return datetime.datetime(2000, 1, 1, tzinfo=timezone)
 
-    value = value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
-    m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-    return datetime.datetime(
-        year=int(m.group(1)),
-        month=int(m.group(2)),
-        day=int(m.group(3)),
-        hour=int(m.group(4)),
-        minute=int(m.group(5)),
-        second=int(m.group(6)),
-        tzinfo=timezone,
-    )
+    # Try parsing the new format: Tue, 24 Jun 2025 16:18:10 GMT
+    try:
+        dt_object = datetime.datetime.strptime(value, "%a, %d %b %Y %H:%M:%S GMT")
+
+        if timezone:
+            # First, make it aware of UTC since 'GMT' implies UTC
+            utc_dt = dt_object.replace(tzinfo=datetime.timezone.utc)
+            # Then convert to the target timezone
+            return utc_dt.astimezone(timezone)
+        else:
+            return dt_object
+    except ValueError:
+        # If the new format parsing fails, try the old format
+        value = value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+        if m:
+            return datetime.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=timezone,
+            )
+        else:
+            raise ValueError(f"Unable to parse datetime value: {value}")
 
 
 def get_safe_local_datetime(date: datetime) -> datetime:
