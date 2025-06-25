@@ -69,7 +69,9 @@ def parse_datetime(value, timezone) -> datetime.datetime:
             return dt_object
     except ValueError:
         # If the new format parsing fails, try the old format
-        value = value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
+        value = (
+            value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
+        )
         m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
         if m:
             return datetime.datetime(
