@@ -138,7 +138,7 @@ class KiaUvoApiUSA(ApiImpl):
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
             "apptype": "L",
-            "appversion": "7.12.1",
+            "appversion": "7.15.2",
             "clientid": "MWAMOBILE",
             "from": "SPA",
             "host": self.BASE_URL,
