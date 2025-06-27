@@ -811,17 +811,19 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             data = {
                 "airCtrl": int(options.climate),
-                "igniOnDuration": options.duration,
                 "airTemp": {"value": str(options.set_temp), "unit": 1},
                 "defrost": options.defrost,
                 "heating1": int(options.heating),
-                "seatHeaterVentInfo": {
+            }
+            # Older vehicles do not support seat heater vent info or duration
+            if vehicle.generation == 3:
+                data["igniOnDuration"] = options.duration
+                data["seatHeaterVentInfo"] = {
                     "drvSeatHeatState": options.front_left_seat,
                     "astSeatHeatState": options.front_right_seat,
                     "rlSeatHeatState": options.rear_left_seat,
                     "rrSeatHeatState": options.rear_right_seat,
-                },
-            }
+                }
         else:
             data = {
                 "Ims": 0,
