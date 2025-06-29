@@ -4,4 +4,5 @@ python-dateutil
 pytz>=2021.3
 certifi>=2024.6.2
 geopy >= 2.2.0
+git+https://github.com/VeNoMouS/cloudscraper.git@3.0.0#egg=cloudscraper
 cloudscraper>=1.2.60
