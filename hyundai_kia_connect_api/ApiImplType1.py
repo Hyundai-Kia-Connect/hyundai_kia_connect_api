@@ -842,7 +842,7 @@ class ApiImplType1(ApiImpl):
             )
             payload = {
                 "command": "start",
-                "ignitionDuration:": options.duration,
+                "ignitionDuration": options.duration,
                 "strgWhlHeating": options.steering_wheel,
                 "hvacTempType": 1,
                 "hvacTemp": options.set_temp,
