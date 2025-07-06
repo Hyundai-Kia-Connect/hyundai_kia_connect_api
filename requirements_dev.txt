@@ -12,4 +12,4 @@ watchdog==6.0.0
 wheel==0.45.1
 geopy>=2.2.0
 git+https://github.com/VeNoMouS/cloudscraper.git
-cloudscraper>=1.2.60
+cloudscraper>=3.0.0
