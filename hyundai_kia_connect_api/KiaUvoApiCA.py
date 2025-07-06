@@ -80,9 +80,7 @@ class KiaUvoApiCA(ApiImpl):
     @property
     def sessions(self):
         if not self._sessions:
-            self._sessions = cloudscraper.create_scraper(
-                browser={"custom": "okhttp/4.12.0"}
-            )
+            self._sessions = cloudscraper.create_scraper()
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
