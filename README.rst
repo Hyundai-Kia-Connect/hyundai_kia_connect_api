@@ -1,7 +1,7 @@
 Code Maintainers Wanted
 =======================
 
-I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others who are interested in jumping in are welcome to join the project!   Even just pull requests are appreciated! 
+I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others who are interested in jumping in are welcome to join the project! Even just pull requests are appreciated! 
 
 Introduction 
 ============
