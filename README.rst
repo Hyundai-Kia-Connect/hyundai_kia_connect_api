@@ -3,7 +3,7 @@ Code Maintainers Wanted
 
 I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others who are interested in jumping in are welcome to join the project!   Even just pull requests are appreciated! 
 
-Introduction
+Introduction 
 ============
 
 This is a Kia UVO, Hyundai Bluelink, Genesis Connect(Canada Only) written in python.  It is primary consumed by home assistant.  If you are looking for a home assistant Kia / Hyundai implementation please look here: https://github.com/Hyundai-Kia-Connect/kia_uvo.  Much of this base code came from reading `bluelinky <https://github.com/Hacksore/bluelinky>`_ and contributions to the kia_uvo home assistant project.
