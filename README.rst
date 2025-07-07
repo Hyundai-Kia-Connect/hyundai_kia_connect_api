@@ -122,7 +122,6 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
                     for trip in reversed(vehicle.day_trip_info.trip_list):  # show oldest first
                         print(f"{day.yyyymmdd},{trip.hhmmss},{trip.drive_time},{trip.idle_time},{trip.distance},{trip.avg_speed},{trip.max_speed}")
 
-
 CLI Usage
 =========
 
