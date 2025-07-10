@@ -404,16 +404,20 @@ class KiaUvoApiCA(ApiImpl):
                 state,
                 "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
             ),
-            DISTANCE_UNITS[get_child_value(state, "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit")],
+            DISTANCE_UNITS[
+                get_child_value(
+                    state, "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit"
+                )
+            ],
         )
         if vehicle.fuel_driving_range is None:
             vehicle.fuel_driving_range = (
-            get_child_value(
-                state,
-                "status.dte.value",
-            ),
-            DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
-        )
+                get_child_value(
+                    state,
+                    "status.dte.value",
+                ),
+                DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
+            )
 
         vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
         vehicle.fuel_level = get_child_value(state, "status.fuelLevel")
