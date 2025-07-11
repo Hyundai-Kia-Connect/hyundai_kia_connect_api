@@ -34,6 +34,7 @@ from .const import (
 
 from .exceptions import (
     APIError,
+    AuthenticationError,
     DuplicateRequestError,
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
@@ -79,16 +80,28 @@ def _check_response_for_errors(response: dict) -> None:
         "9999": RequestTimeoutError,
     }
 
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
+    error_message_to_exception_mapping = {
+        "Key not authorized: Token is expired": AuthenticationError
+    }
+
+    if not any(x in response for x in ["retCode", "resCode", "resMsg", "error"]):
         _LOGGER.error(f"Unknown API response format: {response}")
         raise InvalidAPIResponseError()
 
-    if response["retCode"] == "F":
+    if "retCode" in response and response["retCode"] == "F":
         if response["resCode"] in error_code_mapping:
             raise error_code_mapping[response["resCode"]](response["resMsg"])
         raise APIError(
             f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
         )
+    elif "error" in response:
+        error_reason = response["error"]
+        if error_reason in error_message_to_exception_mapping:
+            _LOGGER.error(f"API error: {error_reason}")
+            raise error_message_to_exception_mapping[error_reason](error_reason)
+        else:
+            _LOGGER.error(f"Unknown error in API response: {error_reason}")
+            raise APIError(f"Unknown error in API response: {error_reason}")
 
 
 class ApiImplType1(ApiImpl):

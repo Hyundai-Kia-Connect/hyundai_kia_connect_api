@@ -36,7 +36,6 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
-    LOGIN_TOKEN_LIFETIME,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
@@ -193,11 +192,12 @@ class KiaUvoApiEU(ApiImplType1):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code = self._get_access_token(
+        _, access_token, authorization_code, expires_in = self._get_access_token(
             stamp, authorization_code
         )
+        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+
         _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -1226,7 +1226,8 @@ class KiaUvoApiEU(ApiImplType1):
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
         authorization_code = response["refresh_token"]
-        return token_type, access_token, authorization_code
+        expires_in = response["expires_in"]
+        return token_type, access_token, authorization_code, expires_in
 
     def _get_refresh_token(self, stamp, authorization_code):
         # Get Refresh Token #
