@@ -78,7 +78,7 @@ Ready to contribute? Here's how to set up `hyundai_kia_connect_api` for local de
 
 5. When you're done making changes, check that your changes pass flake8. Most
    tests require environment variables to supply the username and password and
-   they will run as part of the PR pre-requisites:
+   they will run as part of the PR pre-requisites::
 
     $ flake8 hyundai_kia_connect_api tests
     $ python setup.py test or pytest

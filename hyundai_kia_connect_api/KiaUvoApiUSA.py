@@ -19,9 +19,11 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImplType1 import _check_response_for_errors
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
+    CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
     DOMAIN,
     LOGIN_TOKEN_LIFETIME,
@@ -592,6 +594,22 @@ class KiaUvoApiUSA(ApiImpl):
 
     def get_location(self, token: Token, vehicle_id: str) -> None:
         pass
+
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/portdoor"
+
+        payload = {"action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rems/rvs"
