@@ -15,6 +15,7 @@ from urllib3.util.ssl_ import create_urllib3_context
 from hyundai_kia_connect_api.exceptions import APIError
 
 from .const import (
+    CHARGE_PORT_ACTION,
     DOMAIN,
     VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
@@ -930,3 +931,19 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
         )
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
+
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
+        url = "???" + "vehicles/" + vehicle.id + "/control/portdoor"
+
+        payload = {"action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+
+        _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
+        #  _check_response_for_errors(response)
+        #  token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
