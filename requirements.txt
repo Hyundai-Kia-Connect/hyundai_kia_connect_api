@@ -4,4 +4,4 @@ python-dateutil
 pytz>=2021.3
 certifi>=2024.6.2
 geopy >= 2.2.0
-cloudscraper >= 1.2.60
+cloudscraper25 >= 2.7.0
