@@ -7,7 +7,7 @@ import datetime as dt
 import json
 import logging
 import pytz
-import cloudscraper
+import cloudscraper25
 
 
 from dateutil.tz import tzoffset
