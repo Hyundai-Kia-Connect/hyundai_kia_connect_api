@@ -7,7 +7,7 @@ import datetime as dt
 import json
 import logging
 import pytz
-import cloudscraper
+import cloudscraper25
 
 
 from dateutil.tz import tzoffset
@@ -80,7 +80,7 @@ class KiaUvoApiCA(ApiImpl):
     @property
     def sessions(self):
         if not self._sessions:
-            self._sessions = cloudscraper.create_scraper()
+            self._sessions = cloudscraper25.create_scraper()
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
