@@ -1096,18 +1096,18 @@ class KiaUvoApiEU(ApiImplType1):
         url = self.LOGIN_FORM_URL
         headers = {"Content-type": "application/json"}
         data = {"email": username, "password": password}
-        response = requests.get(
-            url, headers=headers, cookies=cookies
-        )
+        response = requests.get(url, headers=headers, cookies=cookies)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
 
         url_redirect = response.url
-        connector_session_key = re.search(r'connector_session_key%3D([0-9a-fA-F-]{36})', url_redirect).group(1)
+        connector_session_key = re.search(
+            r"connector_session_key%3D([0-9a-fA-F-]{36})", url_redirect
+        ).group(1)
         url = "https://idpconnect-eu.kia.com/auth/account/signin"
         headers = {
             "content-type": "application/x-www-form-urlencoded",
-            "origin": "https://idpconnect-eu.kia.com"
-            }
+            "origin": "https://idpconnect-eu.kia.com",
+        }
         data = {
             "client_id": self.CCSP_SERVICE_ID,
             "encryptedPassword": "false",
@@ -1118,12 +1118,14 @@ class KiaUvoApiEU(ApiImplType1):
             "username": username,
             "remember_me": "false",
             "connector_session_key": connector_session_key,
-            "_csrf": ""
-            }
+            "_csrf": "",
+        }
 
         response = requests.post(url, headers=headers, data=data, allow_redirects=False)
         location = response.headers["Location"]
-        code_location = re.search(r'code=([0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36})', location).group(1)
+        code_location = re.search(
+            r"code=([0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36})", location
+        ).group(1)
 
         return code_location
 
@@ -1232,8 +1234,8 @@ class KiaUvoApiEU(ApiImplType1):
             "code": authorization_code,
             "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
             "client_id": self.CCSP_SERVICE_ID,
-            "client_secret": "secret"
-            }
+            "client_secret": "secret",
+        }
 
         response = requests.post(url, data=data, allow_redirects=False)
         response = response.json()
