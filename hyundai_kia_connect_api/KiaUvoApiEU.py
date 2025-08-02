@@ -149,7 +149,6 @@ class KiaUvoApiEU(ApiImplType1):
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             auth_client_id = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.LOGIN_FORM_URL: str = (
-
                 self.LOGIN_FORM_HOST
                 + "/auth/api/v2/user/oauth2/authorize?response_type=code&client_id="
                 + auth_client_id
