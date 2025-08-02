@@ -1112,7 +1112,9 @@ class KiaUvoApiEU(ApiImplType1):
             "encryptedPassword": "false",
             "orgHmgSid": "",
             "password": password,
-            "redirect_uri": "https://" + self.BASE_DOMAIN + ":8080/api/v1/user/oauth2/redirect",
+            "redirect_uri": "https://"
+            + self.BASE_DOMAIN
+            + ":8080/api/v1/user/oauth2/redirect",
             "state": "ccsp",
             "username": username,
             "remember_me": "false",
@@ -1231,7 +1233,9 @@ class KiaUvoApiEU(ApiImplType1):
         data = {
             "grant_type": "authorization_code",
             "code": authorization_code,
-            "redirect_uri": "https://" + self.BASE_DOMAIN + ":8080/api/v1/user/oauth2/redirect",
+            "redirect_uri": "https://"
+            + self.BASE_DOMAIN
+            + ":8080/api/v1/user/oauth2/redirect",
             "client_id": self.CCSP_SERVICE_ID,
             "client_secret": "secret",
         }
