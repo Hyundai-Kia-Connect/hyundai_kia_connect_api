@@ -148,7 +148,7 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=ccsp"
             )
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
+            auth_client_id = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.LOGIN_FORM_URL: str = (
                 "https://"
                 + self.LOGIN_FORM_HOST
@@ -1093,33 +1093,54 @@ class KiaUvoApiEU(ApiImplType1):
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
-        url = self.LOGIN_FORM_URL
-        headers = {"Content-type": "application/json"}
-        data = {"email": username, "password": password}
-        response = requests.get(url, headers=headers, cookies=cookies)
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
+        if BRANDS[self.brand] == BRAND_KIA:
+            url = self.LOGIN_FORM_URL
+            headers = {"Content-type": "application/json"}
+            data = {"email": username, "password": password}
+            response = requests.get(url, headers=headers, cookies=cookies)
+            _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
 
-        url_redirect = response.url
-        connector_session_key = re.search(
-            r"connector_session_key%3D([0-9a-fA-F-]{36})", url_redirect
-        ).group(1)
-        url = "https://idpconnect-eu.kia.com/auth/account/signin"
-        headers = {
-            "content-type": "application/x-www-form-urlencoded",
-            "origin": "https://idpconnect-eu.kia.com",
-        }
+            url_redirect = response.url
+            connector_session_key = re.search(
+                r"connector_session_key%3D([0-9a-fA-F-]{36})", url_redirect
+            ).group(1)
+            url = "https://idpconnect-eu.kia.com/auth/account/signin"
+            headers = {
+                "content-type": "application/x-www-form-urlencoded",
+                "origin": "https://idpconnect-eu.kia.com",
+            }
+            redirect_uri = "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect" 
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
+            url = self.LOGIN_FORM_URL + "&response_type=code"
+            headers = {"Content-type": "application/json"}
+            data = {"email": username, "password": password}
+            response = requests.get(
+                url
+            )
+            _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
+            
+            url_redirect = response.url
+            connector_session_key = re.search(r'connector_session_key%3D([0-9a-fA-F-]{36})', url_redirect).group(1)
+            url = "https://idpconnect-eu.hyundai.com/auth/account/signin"
+            headers = {
+                "content-type": "application/x-www-form-urlencoded",
+                "origin": "https://idpconnect-eu.hyundai.com"
+            }
+            redirect_uri = "https://prd.eu-ccapi.hyundai.com:8080/api/v1/user/oauth2/redirect"
+        else:
+            pass
         data = {
             "client_id": self.CCSP_SERVICE_ID,
             "encryptedPassword": "false",
             "orgHmgSid": "",
             "password": password,
-            "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
+            "redirect_uri": redirect_uri,
             "state": "ccsp",
             "username": username,
             "remember_me": "false",
             "connector_session_key": connector_session_key,
-            "_csrf": "",
-        }
+            "_csrf": ""
+            }
 
         response = requests.post(url, headers=headers, data=data, allow_redirects=False)
         location = response.headers["Location"]
@@ -1228,14 +1249,28 @@ class KiaUvoApiEU(ApiImplType1):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        url = "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/token"
-        data = {
-            "grant_type": "authorization_code",
-            "code": authorization_code,
-            "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
-            "client_id": self.CCSP_SERVICE_ID,
-            "client_secret": "secret",
-        }
+        # Get Access Token #
+        
+        if BRANDS[self.brand] == BRAND_KIA:
+            url = "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/token"
+            data = {
+                "grant_type": "authorization_code",
+                "code": authorization_code,
+                "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
+                "client_id": self.CCSP_SERVICE_ID,
+                "client_secret": "secret",
+            }
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
+            url = "https://idpconnect-eu.hyundai.com/auth/api/v2/user/oauth2/token"
+            data = {
+                "grant_type": "authorization_code",
+                "code": authorization_code,
+                "redirect_uri": "https://prd.eu-ccapi.hyundai.com:8080/api/v1/user/oauth2/redirect",
+                "client_id": self.CCSP_SERVICE_ID,
+                "client_secret": "secret"
+            }
+        else:
+            pass # to implement later
 
         response = requests.post(url, data=data, allow_redirects=False)
         response = response.json()
