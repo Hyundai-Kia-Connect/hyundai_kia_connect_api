@@ -92,6 +92,7 @@ class KiaUvoApiEU(ApiImplType1):
 
         if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
+            self.BASE_IDP_DOMAIN: str = "https://prd.eu-idpconnect.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
@@ -105,6 +106,7 @@ class KiaUvoApiEU(ApiImplType1):
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
+            self.BASE_IDP_DOMAIN: str = "https://prd.eu-idpconnect.hyundai.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
@@ -148,7 +150,7 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=ccsp"
             )
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
+            auth_client_id = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.LOGIN_FORM_URL: str = (
                 "https://"
                 + self.LOGIN_FORM_HOST
@@ -1103,17 +1105,17 @@ class KiaUvoApiEU(ApiImplType1):
         connector_session_key = re.search(
             r"connector_session_key%3D([0-9a-fA-F-]{36})", url_redirect
         ).group(1)
-        url = "https://idpconnect-eu.kia.com/auth/account/signin"
+        url = self.BASE_IDP_DOMAIN + "/auth/account/signin"
         headers = {
             "content-type": "application/x-www-form-urlencoded",
-            "origin": "https://idpconnect-eu.kia.com",
+            "origin": self.BASE_IDP_DOMAIN,
         }
         data = {
             "client_id": self.CCSP_SERVICE_ID,
             "encryptedPassword": "false",
             "orgHmgSid": "",
             "password": password,
-            "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
+            "redirect_uri": self.BASE_DOMAIN + ":8080/api/v1/user/oauth2/redirect",
             "state": "ccsp",
             "username": username,
             "remember_me": "false",
@@ -1228,11 +1230,11 @@ class KiaUvoApiEU(ApiImplType1):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        url = "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/token"
+        url = self.BASE_IDP_DOMAIN + "/auth/api/v2/user/oauth2/token"
         data = {
             "grant_type": "authorization_code",
             "code": authorization_code,
-            "redirect_uri": "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect",
+            "redirect_uri": self.BASE_DOMAIN +":8080/api/v1/user/oauth2/redirect",
             "client_id": self.CCSP_SERVICE_ID,
             "client_secret": "secret",
         }
