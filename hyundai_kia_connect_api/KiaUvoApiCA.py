@@ -63,7 +63,7 @@ class RetrySession(requests.Session):
                 _LOGGER.debug(
                     f"{DOMAIN} - {method} Attempt {attempt + 1}: Connection error ({e}), retrying..."
                 )
-
+                last_exception=e
                 time.sleep(current_delay)
                 current_delay *= self.backoff
                 attempt += 1
