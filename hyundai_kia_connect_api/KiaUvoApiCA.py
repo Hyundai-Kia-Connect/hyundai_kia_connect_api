@@ -59,14 +59,15 @@ class RetrySession(requests.Session):
                 response = super().request(method, url, **kwargs)
 
                 return response
-            except requests.exceptions.RequestException as e:
-                _LOGGER.debug(
-                    f"{DOMAIN} - {method} Attempt {attempt + 1}: Connection error ({e}), retrying..."
-                )
-                last_exception = e
+            except requests.exceptions.ConnectionError as e:
+                _LOGGER.debug(f"{DOMAIN} - Attempt {attempt + 1}: Connection error ({e}), retrying...")
+                last_exception=e
                 time.sleep(current_delay)
                 current_delay *= self.backoff
                 attempt += 1
+            except requests.exceptions.RequestException as e:
+                _LOGGER.debug(f"{DOMAIN} - {method} Other exception not connection reset {attempt + 1}: Connection error ({e})")
+                raise e
 
         raise last_exception
 
