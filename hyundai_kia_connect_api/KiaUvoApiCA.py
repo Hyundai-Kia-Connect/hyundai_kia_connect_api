@@ -9,7 +9,6 @@ import logging
 import pytz
 import requests
 
-
 from dateutil.tz import tzoffset
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
@@ -38,6 +37,43 @@ from .utils import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class RetrySession(requests.Session):
+    def __init__(self, max_retries=3, delay=2, backoff=2):
+        super().__init__()
+        self.max_retries = max_retries
+        self.delay = delay
+        self.backoff = backoff
+
+    def post(self, url, **kwargs):
+        return self._request_with_retry("POST", url, **kwargs)
+
+    def _request_with_retry(self, method, url, **kwargs):
+        attempt = 0
+        current_delay = self.delay
+
+        while attempt < self.max_retries:
+            try:
+                _LOGGER.debug(f"{DOMAIN} - Try to request {attempt + 1}")
+                response = super().request(method, url, **kwargs)
+
+                return response
+            except requests.exceptions.ConnectionError as e:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Attempt {attempt + 1}: Connection error ({e}), retrying..."
+                )
+                last_exception = e
+                time.sleep(current_delay)
+                current_delay *= self.backoff
+                attempt += 1
+            except requests.exceptions.RequestException as e:
+                _LOGGER.debug(
+                    f"{DOMAIN} - {method} Other exception not connection reset {attempt + 1}: Connection error ({e})"
+                )
+                raise e
+
+        raise last_exception
 
 
 class KiaUvoApiCA(ApiImpl):
@@ -81,7 +117,7 @@ class KiaUvoApiCA(ApiImpl):
     @property
     def sessions(self):
         if not self._sessions:
-            self._sessions = requests.session()
+            self._sessions = RetrySession(max_retries=4, delay=2, backoff=2)
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
