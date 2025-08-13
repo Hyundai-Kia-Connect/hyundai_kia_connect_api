@@ -65,7 +65,7 @@ class KiaUvoApiAU(ApiImplType1):
             self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="  # noqa
             self.cfb = base64.b64decode(
-                "IDbMgWBXgic4MAyMgf5PFFRAdGX5O3IyC3uvN3scCs0gDpTFDuyvBorlAH9JMM2/wMc="
+                "SGGCDRvrzmRa2WTNFQPUaNfSFdtPklZ48xUuVckigYasxmeOQqVgCAC++YNrI1vVabI="
             )
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
@@ -73,7 +73,7 @@ class KiaUvoApiAU(ApiImplType1):
             self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="  # noqa
             self.cfb = base64.b64decode(
-                "V60WkEmyRQaAfrBF1623/7QL62MjLVbCHdItGzQ1g5T/hkmKmMVTaMHv4cKGzgD3gL8="
+                "nGDHng3k4Cg9gWV+C+A6Yk/ecDopUNTkGmDpr2qVKAQXx9bvY2/YLoHPfObliK32mZQ="
             )
         elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
             self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
@@ -81,7 +81,7 @@ class KiaUvoApiAU(ApiImplType1):
             self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
             self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="  # noqa
             self.cfb = base64.b64decode(
-                "IDbMgWBXgic4MAyMgf5PFGsDas7YzQmN/lcPSkArm/KVUTutuiJAZ+4ZFoVxsHFNNy4="
+                "SGGCDRvrzmRa2WTNFQPUaC1OsnAhQgPgcQETEfbY8abEjR/ICXK0p+Rayw5tHCGyiUA="
             )
 
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
