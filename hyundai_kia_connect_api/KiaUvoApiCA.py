@@ -7,7 +7,7 @@ import datetime as dt
 import json
 import logging
 import pytz
-import requests
+import cloudscraper
 
 from dateutil.tz import tzoffset
 
@@ -39,7 +39,7 @@ from .utils import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class RetrySession(requests.Session):
+class RetrySession(cloudscraper.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
         self.max_retries = max_retries
@@ -59,7 +59,7 @@ class RetrySession(requests.Session):
                 response = super().request(method, url, **kwargs)
 
                 return response
-            except requests.exceptions.ConnectionError as e:
+            except cloudscraper.exceptions.ConnectionError as e:
                 _LOGGER.debug(
                     f"{DOMAIN} - Attempt {attempt + 1}: Connection error ({e}), retrying..."
                 )
@@ -67,7 +67,7 @@ class RetrySession(requests.Session):
                 time.sleep(current_delay)
                 current_delay *= self.backoff
                 attempt += 1
-            except requests.exceptions.RequestException as e:
+            except cloudscraper.exceptions.RequestException as e:
                 _LOGGER.debug(
                     f"{DOMAIN} - {method} Other exception not connection reset {attempt + 1}: Connection error ({e})"
                 )
