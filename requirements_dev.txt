@@ -11,4 +11,4 @@ twine==6.1.0
 watchdog==6.0.0
 wheel==0.45.1
 geopy>=2.2.0
-cloudscraper>=1.2.60
+cloudscraper @ git+https://github.com/VeNoMouS/cloudscraper.git@master
