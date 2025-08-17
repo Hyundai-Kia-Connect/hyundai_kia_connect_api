@@ -577,7 +577,7 @@ class KiaUvoApiAU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
