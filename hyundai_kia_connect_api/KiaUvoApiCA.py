@@ -40,11 +40,10 @@ from .utils import (
 # Try to fix hyundai/cloudflare
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
-import urllib3
 import certifi
 
 # Firefox Fingerprint
-firefox=[
+firefox = [
     "TLS_AES_128_GCM_SHA256",
     "TLS_CHACHA20_POLY1305_SHA256",
     "TLS_AES_256_GCM_SHA384",
@@ -62,17 +61,19 @@ firefox=[
     "DHE-RSA-AES256-SHA",
     "AES128-SHA",
     "AES256-SHA",
-    "DES-CBC3-SHA"
+    "DES-CBC3-SHA",
 ]
 
 _LOGGER = logging.getLogger(__name__)
+
 
 # Use the custom cipher order
 class CustomCipherAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         context = create_urllib3_context(ciphers=":".join(firefox))
-        kwargs['ssl_context'] = context
-        return super(CustomCipherAdapter, self).init_poolmanager(*args, **kwargs)
+        kwargs["ssl_context"] = context
+        return super().init_poolmanager(*args, **kwargs)
+
 
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
