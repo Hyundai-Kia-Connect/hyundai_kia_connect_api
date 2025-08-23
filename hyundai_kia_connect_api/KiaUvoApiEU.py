@@ -40,6 +40,8 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
+    REGIONS,
+    REGION_EUROPE
 )
 from .exceptions import (
     AuthenticationError,
@@ -90,7 +92,21 @@ class KiaUvoApiEU(ApiImplType1):
         self.LANGUAGE: str = language
         self.brand: int = brand
 
-        if BRANDS[self.brand] == BRAND_KIA:
+        if BRANDS[self.brand] == BRAND_KIA and REGIONS[region] == REGION_EUROPE:
+            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
+            self.PORT: int = 8080
+            self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
+            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+            self.CFB: str = base64.b64decode(
+                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+            )
+            self.BASIC_AUTHORIZATION: str = (
+                "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
+            )
+            self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
+            self.PUSH_TYPE = "APNS"
+            self.REGION = "EUROPE"
+        elif BRANDS[self.brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
@@ -1103,6 +1119,73 @@ class KiaUvoApiEU(ApiImplType1):
             parsed_url = urlparse(response["redirectUrl"])
             authorization_code = "".join(parse_qs(parsed_url.query)["code"])
             return authorization_code
+        elif BRANDS[self.brand] == BRAND_KIA and self.REGION == "EUROPE":
+            session = requests.session()
+            session.headers.update({
+              "User-Agent": USER_AGENT_MOZILLA
+            })
+            url = (
+              self.LOGIN_FORM_HOST
+              + "/auth/account/signin"
+            )
+            headers = { "content-type": "application/x-www-form-urlencoded" }
+            data = {
+                "client_id": "peukiaidm-online-sales",
+                "encryptedPassword": "false",
+                "username": username,
+                "password": password,
+                "redirect_uri": "https://www.kia.com/api/bin/oneid/login",
+                "state": "aHR0cHM6Ly93d3cua2lhLmNvbTo0NDMvZGUvP3ZlZD0yYWhVS0V3akI2ZFc3dDQtUEF4WFBSZkVESGNDQ0J4UVFnVTk2QkFnY0VBZyZfdG09MTc1NTg1NTY2ODE2Mg==_default",
+                "remember_me": "false"
+                }
+            response = session.post(url, headers=headers, data=data, cookies=cookies)
+
+            device_id = self._get_device_id(self._get_stamp())
+
+            # Authorize
+            url = (
+                self.LOGIN_FORM_HOST
+                + "/auth/api/v2/user/oauth2/authorize?response_type=code&client_id="
+                + self.CCSP_SERVICE_ID
+                + "&redirect_uri=https://"
+                + self.BASE_URL
+                + "/api/v1/user/oauth2/redirect&state=ccsp&lang=en"
+                )
+            headers = {
+                "ccsp-application-id": self.APP_ID,
+                "ccsp-service-id": self.CCSP_SERVICE_ID,
+                "ccsp-device-id": device_id
+                }
+            response = session.get(url, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+
+            # Authorize2
+            response = session.get(url_location, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+            connector_session_key = re.search(r'connector_session_key%3D([0-9a-fA-F-]{36})', url_location).group(1)
+
+            # Authorize3
+            response = session.get(url_location, headers=headers, allow_redirects=False)
+
+            # Authorize Code
+            url = (
+                self.LOGIN_FORM_HOST
+                + "/auth/api/v2/user/oauth2/authorize?client_id="
+                + self.CCSP_SERVICE_ID
+                + "&redirect_uri=https://"
+                + self.BASE_URL
+                + "/api/v1/user/oauth2/redirect&response_type=code&scope=&state=ccsp&connector_client_id=hmgid1.0-"
+                + self.CCSP_SERVICE_ID
+                + "&ui_locales=de&connector_scope=&connector_session_key="
+                + connector_session_key
+                )
+            response = session.get(url, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+            parsed_redirect = urlparse(url_location)
+            code = parse_qs(parsed_redirect.query).get('code')[0]
+
+            return code
+
         else:
             url = self.LOGIN_FORM_URL
             headers = {"Content-type": "application/json"}
