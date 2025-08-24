@@ -40,8 +40,6 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
-    REGIONS,
-    REGION_EUROPE,
 )
 from .exceptions import (
     AuthenticationError,
@@ -92,21 +90,7 @@ class KiaUvoApiEU(ApiImplType1):
         self.LANGUAGE: str = language
         self.brand: int = brand
 
-        if BRANDS[self.brand] == BRAND_KIA and REGIONS[region] == REGION_EUROPE:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
-            self.PORT: int = 8080
-            self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB: str = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
-            )
-            self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
-            self.PUSH_TYPE = "APNS"
-            self.REGION = "EUROPE"
-        elif BRANDS[self.brand] == BRAND_KIA:
+        if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
@@ -1119,7 +1103,7 @@ class KiaUvoApiEU(ApiImplType1):
             parsed_url = urlparse(response["redirectUrl"])
             authorization_code = "".join(parse_qs(parsed_url.query)["code"])
             return authorization_code
-        elif BRANDS[self.brand] == BRAND_KIA and self.REGION == "EUROPE":
+        elif BRANDS[self.brand] == BRAND_KIA:
             session = requests.session()
             session.headers.update({"User-Agent": USER_AGENT_MOZILLA})
             url = self.LOGIN_FORM_HOST + "/auth/account/signin"
