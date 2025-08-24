@@ -1103,6 +1103,73 @@ class KiaUvoApiEU(ApiImplType1):
             parsed_url = urlparse(response["redirectUrl"])
             authorization_code = "".join(parse_qs(parsed_url.query)["code"])
             return authorization_code
+        elif BRANDS[self.brand] == BRAND_KIA:
+            session = requests.session()
+            session.headers.update({"User-Agent": USER_AGENT_MOZILLA})
+            url = self.LOGIN_FORM_HOST + "/auth/account/signin"
+            headers = {"content-type": "application/x-www-form-urlencoded"}
+            data = {
+                "client_id": "peukiaidm-online-sales",
+                "encryptedPassword": "false",
+                "username": username,
+                "password": password,
+                "redirect_uri": "https://www.kia.com/api/bin/oneid/login",
+                "state": "aHR0cHM6Ly93d3cua2lhLmNvbTo0NDMvZGUvP3ZlZD0yYWhVS0V3akI2ZFc3dDQtUEF4WFBSZkVESGNDQ0J4UVFnVTk2QkFnY0VBZyZfdG09MTc1NTg1NTY2ODE2Mg==_default",
+                "remember_me": "false",
+            }
+            response = session.post(url, headers=headers, data=data, cookies=cookies)
+
+            device_id = self._get_device_id(self._get_stamp())
+
+            # Authorize
+            url = (
+                self.LOGIN_FORM_HOST
+                + "/auth/api/v2/user/oauth2/authorize?response_type=code&client_id="
+                + self.CCSP_SERVICE_ID
+                + "&redirect_uri=https://"
+                + self.BASE_URL
+                + "/api/v1/user/oauth2/redirect&state=ccsp&lang=en"
+            )
+            headers = {
+                "ccsp-application-id": self.APP_ID,
+                "ccsp-service-id": self.CCSP_SERVICE_ID,
+                "ccsp-device-id": device_id,
+            }
+            response = session.get(url, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+
+            # Authorize2: Get connector_session_key
+            response = session.get(url_location, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+            parsed_redirect = urlparse(url_location)
+            next_uri = parse_qs(parsed_redirect.query).get("next_uri")[0]
+            parsed_next_uri = urlparse(next_uri)
+            connector_session_key = parse_qs(parsed_next_uri.query).get(
+                "connector_session_key"
+            )[0]
+
+            # Authorize3
+            response = session.get(url_location, headers=headers, allow_redirects=False)
+
+            # Authorize: Get Code
+            url = (
+                self.LOGIN_FORM_HOST
+                + "/auth/api/v2/user/oauth2/authorize?client_id="
+                + self.CCSP_SERVICE_ID
+                + "&redirect_uri=https://"
+                + self.BASE_URL
+                + "/api/v1/user/oauth2/redirect&response_type=code&scope=&state=ccsp&connector_client_id=hmgid1.0-"
+                + self.CCSP_SERVICE_ID
+                + "&ui_locales=de&connector_scope=&connector_session_key="
+                + connector_session_key
+            )
+            response = session.get(url, headers=headers, allow_redirects=False)
+            url_location = response.headers["location"]
+            parsed_redirect = urlparse(url_location)
+            code = parse_qs(parsed_redirect.query).get("code")[0]
+
+            return code
+
         else:
             url = self.LOGIN_FORM_URL
             headers = {"Content-type": "application/json"}
@@ -1138,11 +1205,9 @@ class KiaUvoApiEU(ApiImplType1):
                 url, headers=headers, data=data, allow_redirects=False
             )
             location = response.headers["Location"]
-            code_location = re.search(
-                r"code=([0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36})", location
-            ).group(1)
+            code = parse_qs(urlparse(location).query).get("code")[0]
 
-            return code_location
+            return code
 
     def _get_authorization_code_with_form(self, username, password, cookies) -> str:
         url = self.USER_API_URL + "integrationinfo"
