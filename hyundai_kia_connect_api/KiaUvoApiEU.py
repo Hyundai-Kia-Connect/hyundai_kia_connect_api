@@ -1159,15 +1159,18 @@ class KiaUvoApiEU(ApiImplType1):
             response = session.get(url, headers=headers, allow_redirects=False)
             url_location = response.headers["location"]
 
-            # Authorize2
+            # Authorize2: Get connector_session_key
             response = session.get(url_location, headers=headers, allow_redirects=False)
             url_location = response.headers["location"]
-            connector_session_key = re.search(r'connector_session_key%3D([0-9a-fA-F-]{36})', url_location).group(1)
+            parsed_redirect = urlparse(url_location)
+            next_uri = parse_qs(parsed_redirect.query).get("next_uri")[0]
+            parsed_next_uri = urlparse(next_uri)
+            connector_session_key = parse_qs(parsed_next_uri.query).get("connector_session_key")[0]
 
             # Authorize3
             response = session.get(url_location, headers=headers, allow_redirects=False)
 
-            # Authorize Code
+            # Authorize: Get Code
             url = (
                 self.LOGIN_FORM_HOST
                 + "/auth/api/v2/user/oauth2/authorize?client_id="
@@ -1221,11 +1224,9 @@ class KiaUvoApiEU(ApiImplType1):
                 url, headers=headers, data=data, allow_redirects=False
             )
             location = response.headers["Location"]
-            code_location = re.search(
-                r"code=([0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36}\.[0-9a-fA-F-]{36})", location
-            ).group(1)
+            code = parse_qs(urlparse(location).query).get("code")[0]
 
-            return code_location
+            return code
 
     def _get_authorization_code_with_form(self, username, password, cookies) -> str:
         url = self.USER_API_URL + "integrationinfo"
