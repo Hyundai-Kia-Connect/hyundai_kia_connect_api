@@ -41,7 +41,7 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
     REGIONS,
-    REGION_EUROPE
+    REGION_EUROPE,
 )
 from .exceptions import (
     AuthenticationError,
@@ -1121,14 +1121,9 @@ class KiaUvoApiEU(ApiImplType1):
             return authorization_code
         elif BRANDS[self.brand] == BRAND_KIA and self.REGION == "EUROPE":
             session = requests.session()
-            session.headers.update({
-              "User-Agent": USER_AGENT_MOZILLA
-            })
-            url = (
-              self.LOGIN_FORM_HOST
-              + "/auth/account/signin"
-            )
-            headers = { "content-type": "application/x-www-form-urlencoded" }
+            session.headers.update({"User-Agent": USER_AGENT_MOZILLA})
+            url = self.LOGIN_FORM_HOST + "/auth/account/signin"
+            headers = {"content-type": "application/x-www-form-urlencoded"}
             data = {
                 "client_id": "peukiaidm-online-sales",
                 "encryptedPassword": "false",
@@ -1136,8 +1131,8 @@ class KiaUvoApiEU(ApiImplType1):
                 "password": password,
                 "redirect_uri": "https://www.kia.com/api/bin/oneid/login",
                 "state": "aHR0cHM6Ly93d3cua2lhLmNvbTo0NDMvZGUvP3ZlZD0yYWhVS0V3akI2ZFc3dDQtUEF4WFBSZkVESGNDQ0J4UVFnVTk2QkFnY0VBZyZfdG09MTc1NTg1NTY2ODE2Mg==_default",
-                "remember_me": "false"
-                }
+                "remember_me": "false",
+            }
             response = session.post(url, headers=headers, data=data, cookies=cookies)
 
             device_id = self._get_device_id(self._get_stamp())
@@ -1150,12 +1145,12 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&redirect_uri=https://"
                 + self.BASE_URL
                 + "/api/v1/user/oauth2/redirect&state=ccsp&lang=en"
-                )
+            )
             headers = {
                 "ccsp-application-id": self.APP_ID,
                 "ccsp-service-id": self.CCSP_SERVICE_ID,
-                "ccsp-device-id": device_id
-                }
+                "ccsp-device-id": device_id,
+            }
             response = session.get(url, headers=headers, allow_redirects=False)
             url_location = response.headers["location"]
 
@@ -1165,7 +1160,9 @@ class KiaUvoApiEU(ApiImplType1):
             parsed_redirect = urlparse(url_location)
             next_uri = parse_qs(parsed_redirect.query).get("next_uri")[0]
             parsed_next_uri = urlparse(next_uri)
-            connector_session_key = parse_qs(parsed_next_uri.query).get("connector_session_key")[0]
+            connector_session_key = parse_qs(parsed_next_uri.query).get(
+                "connector_session_key"
+            )[0]
 
             # Authorize3
             response = session.get(url_location, headers=headers, allow_redirects=False)
@@ -1181,11 +1178,11 @@ class KiaUvoApiEU(ApiImplType1):
                 + self.CCSP_SERVICE_ID
                 + "&ui_locales=de&connector_scope=&connector_session_key="
                 + connector_session_key
-                )
+            )
             response = session.get(url, headers=headers, allow_redirects=False)
             url_location = response.headers["location"]
             parsed_redirect = urlparse(url_location)
-            code = parse_qs(parsed_redirect.query).get('code')[0]
+            code = parse_qs(parsed_redirect.query).get("code")[0]
 
             return code
 
