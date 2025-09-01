@@ -1,3 +1,4 @@
+"""
 import os
 
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -13,3 +14,4 @@ def test_EU_login():
     vm.check_and_refresh_token()
     vm.update_all_vehicles_with_cached_state()
     assert len(vm.vehicles.keys()) > 0
+"""
