@@ -178,35 +178,53 @@ class KiaUvoApiEU(ApiImplType1):
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
-        authorization_code = None
-        try:
-            authorization_code = self._get_authorization_code_with_redirect_url(
-                username, password, cookies
+        if BRANDS[self.brand] == BRAND_KIA:
+            refresh_token = password
+
+            _, access_token, authorization_code, expires_in = self._get_access_token(
+                stamp, refresh_token
             )
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
-            authorization_code = self._get_authorization_code_with_form(
-                username, password, cookies
+            valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+
+            return Token(
+                username=username,
+                password=password,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                device_id=device_id,
+                valid_until=valid_until,
             )
 
-        if authorization_code is None:
-            raise AuthenticationError("Login Failed")
-
-        _, access_token, authorization_code, expires_in = self._get_access_token(
-            stamp, authorization_code
-        )
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
-
-        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-
-        return Token(
-            username=username,
-            password=password,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            device_id=device_id,
-            valid_until=valid_until,
-        )
+        else:
+            authorization_code = None
+            try:
+                authorization_code = self._get_authorization_code_with_redirect_url(
+                    username, password, cookies
+                )
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
+                authorization_code = self._get_authorization_code_with_form(
+                    username, password, cookies
+                )
+    
+            if authorization_code is None:
+                raise AuthenticationError("Login Failed")
+    
+            _, access_token, authorization_code, expires_in = self._get_access_token(
+                stamp, authorization_code
+            )
+            valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+    
+            _, refresh_token = self._get_refresh_token(stamp, authorization_code)
+    
+            return Token(
+                username=username,
+                password=password,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                device_id=device_id,
+                valid_until=valid_until,
+            )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -1309,7 +1327,6 @@ class KiaUvoApiEU(ApiImplType1):
 
     def _get_access_token(self, stamp, authorization_code):
         if BRANDS[self.brand] == BRAND_HYUNDAI:
-            # Get Access Token #
             url = self.USER_API_URL + "oauth2/token"
             headers = {
                 "Authorization": self.BASIC_AUTHORIZATION,
@@ -1331,11 +1348,8 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
             data = {
-                "grant_type": "authorization_code",
-                "code": authorization_code,
-                "redirect_uri": "https://"
-                + self.BASE_DOMAIN
-                + ":8080/api/v1/user/oauth2/redirect",
+                "grant_type": "refresh_token",
+                "refresh_token": authorization_code,
                 "client_id": self.CCSP_SERVICE_ID,
                 "client_secret": "secret",
             }
