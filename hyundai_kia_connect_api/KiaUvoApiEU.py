@@ -202,21 +202,23 @@ class KiaUvoApiEU(ApiImplType1):
                     username, password, cookies
                 )
             except Exception:
-                _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
+                _LOGGER.debug(
+                    f"{DOMAIN} - get_authorization_code_with_redirect_url failed"
+                )
                 authorization_code = self._get_authorization_code_with_form(
                     username, password, cookies
                 )
-    
+
             if authorization_code is None:
                 raise AuthenticationError("Login Failed")
-    
+
             _, access_token, authorization_code, expires_in = self._get_access_token(
                 stamp, authorization_code
             )
             valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
-    
+
             _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-    
+
             return Token(
                 username=username,
                 password=password,
