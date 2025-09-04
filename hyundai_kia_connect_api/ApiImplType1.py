@@ -144,19 +144,48 @@ class ApiImplType1(ApiImpl):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
-            lastTwo = int(value[-2:])
-            if lastTwo > 60:
-                value = int(value) + 40
-            if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
-            else:
-                d = dt.datetime.strptime(str(value), "%I%M")
-                if timesection > 0:
-                    d += dt.timedelta(hours=12)
-                value = d.time()
-        return value
+    def _get_time_from_string(self, value, timesection) -> Optional[dt.time]:
+        """Parse time from telematics fields.
+        Accepts:
+          - 24h HHMM like '0000', '1345'
+          - 12h I%M (e.g., '0930') with timesection (0=AM, 1=PM or truthy for PM)
+        Returns a dt.time or None if unparsable.
+        """
+        try:
+            s = str(value).strip() if value is not None else ""
+            if not s:
+                return None
+
+            # 24-hour HHMM (e.g., '0000', '1345')
+            if len(s) == 4 and s.isdigit():
+                hh = int(s[:2])
+                mm = int(s[2:])
+                if 0 <= hh <= 23 and 0 <= mm <= 59:
+                    return dt.time(hour=hh, minute=mm)
+                # fall through to 12h attempt if out of range
+
+            # 12-hour format using timesection for AM/PM
+            d = dt.datetime.strptime(s, "%I%M")
+            hh = d.hour
+            mm = d.minute
+            # timesection > 0 means PM in current codebase conventions
+            if timesection:
+                # normalize common representations (1/"PM"/"pm" etc.)
+                if isinstance(timesection, str):
+                    ts = timesection.strip().upper()
+                    is_pm = ts in ("P", "PM", "1", "TRUE", "YES")
+                else:
+                    is_pm = bool(timesection)
+                if is_pm and hh < 12:
+                    hh += 12
+                if not is_pm and hh == 12:
+                    hh = 0
+            return dt.time(hour=hh, minute=mm)
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - _get_time_from_string: could not parse value={value!r} timesection={timesection!r}; returning None"
+            )
+            return None
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: Optional[int] = None
