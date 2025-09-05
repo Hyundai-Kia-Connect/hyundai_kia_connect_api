@@ -149,7 +149,9 @@ class ApiImplType1(ApiImpl):
             lastTwo = int(value[-2:])
             if lastTwo > 60:
                 value = int(value) + 40
-            if int(value) > 1260:
+            if int(value) == 0:
+                value = dt.time(0, 0)
+            elif int(value) > 1260:
                 value = dt.datetime.strptime(str(value), "%H%M").time()
             else:
                 d = dt.datetime.strptime(str(value), "%I%M")
