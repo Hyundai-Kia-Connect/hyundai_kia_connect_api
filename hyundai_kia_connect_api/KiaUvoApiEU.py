@@ -54,6 +54,7 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
+USER_AGENT_GENESIS: str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS"  # noqa
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
 
 SUPPORTED_LANGUAGES_LIST = [
@@ -179,15 +180,28 @@ class KiaUvoApiEU(ApiImplType1):
         cookies = self._get_cookies()
         self._set_session_language(cookies)
         authorization_code = None
-        try:
-            authorization_code = self._get_authorization_code_with_redirect_url(
-                username, password, cookies
-            )
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
-            authorization_code = self._get_authorization_code_with_form(
-                username, password, cookies
-            )
+        # For Genesis brand, use the new authorization flow
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            try:
+                authorization_code = self._get_authorization_code_genesis(
+                    username, password
+                )
+            except Exception as e:
+                _LOGGER.error(f"{DOMAIN} - Genesis authentication failed: {e}")
+                raise AuthenticationError("Genesis Login Failed") from e
+        else:
+            # For other brands, try the redirect URL method first, then fallback to form method
+            try:
+                authorization_code = self._get_authorization_code_with_redirect_url(
+                    username, password, cookies
+                )
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - get_authorization_code_with_redirect_url failed"
+                )
+                authorization_code = self._get_authorization_code_with_form(
+                    username, password, cookies
+                )
 
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
@@ -207,6 +221,178 @@ class KiaUvoApiEU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
         )
+
+    def _get_authorization_code_genesis(self, username: str, password: str) -> str:
+        """
+        Authentication flow for Genesis brand.
+        """
+        _LOGGER.debug(f"{DOMAIN} - Using Genesis authentication flow")
+
+        # Create a session for handling cookies
+        session = requests.Session()
+        session.headers.update(
+            {
+                "User-Agent": USER_AGENT_GENESIS,
+                "Accept-Language": f"{self.LANGUAGE}-{self.LANGUAGE.upper()},{self.LANGUAGE};q=0.9",
+            }
+        )
+
+        # Step 1: Get initial cookie
+        url = f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/authorize?response_type=code&client_id={self.CCSP_SERVICE_ID}&redirect_uri=https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2&lang={self.LANGUAGE}&scope=url.newapp"
+        response = session.get(url, allow_redirects=False)
+        _LOGGER.debug(
+            f"{DOMAIN} - Initial OAuth2 request status: {response.status_code}"
+        )
+        _LOGGER.debug(f"{DOMAIN} - Initial OAuth2 URL: {url}")
+
+        if response.status_code != 302:
+            _LOGGER.error(
+                f"{DOMAIN} - Initial OAuth2 request failed with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to get initial OAuth2 redirect")
+
+        # Step 2: Follow redirect to authorize page
+        location_url = response.headers["Location"]
+        _LOGGER.debug(f"{DOMAIN} - Redirect location: {location_url}")
+        response = session.get(location_url)
+        _LOGGER.debug(
+            f"{DOMAIN} - Authorize page request status: {response.status_code}"
+        )
+
+        if response.status_code != 200:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to load authorize page with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to load authorize page")
+
+        # Step 3: Get session
+        url = f"https://{self.BASE_DOMAIN}/api/v1/user/session"
+        response = session.get(url)
+        _LOGGER.debug(f"{DOMAIN} - Session request status: {response.status_code}")
+
+        if response.status_code != 204:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to establish session with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to establish session")
+
+        # Step 4: Set language
+        url = f"https://{self.BASE_DOMAIN}/api/v1/user/language"
+        headers = {"Content-Type": "text/plain;charset=UTF-8"}
+        response = session.post(url, headers=headers, json={"lang": self.LANGUAGE})
+        _LOGGER.debug(f"{DOMAIN} - Set language request status: {response.status_code}")
+
+        if response.status_code != 204:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to set language with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to set language")
+
+        # Step 5: Get integration info
+        url = f"https://{self.BASE_DOMAIN}/api/v1/user/integrationinfo"
+        response = session.get(url)
+        _LOGGER.debug(
+            f"{DOMAIN} - Integration info request status: {response.status_code}"
+        )
+
+        if response.status_code != 200:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to get integration info with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to get integration info")
+
+        integration_info = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Integration info: {integration_info}")
+        service_id = integration_info.get("serviceId")
+        user_id = integration_info.get("userId")
+
+        if not service_id or not user_id:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to extract service or user ID from integration info"
+            )
+            raise AuthenticationError("Failed to extract service or user ID")
+
+        # Step 6: Perform login
+        url = f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/protocol/openid-connect/auth?client_id=ga-gcs&scope=openid%20profile%20email%20phone&response_type=code&redirect_uri=https://{self.BASE_DOMAIN}/api/v1/user/integration/redirect/login&ui_locales={self.LANGUAGE}&state={service_id}:{user_id}"
+        _LOGGER.debug(f"{DOMAIN} - Login form URL: {url}")
+        response = session.get(url)
+        _LOGGER.debug(f"{DOMAIN} - Login page request status: {response.status_code}")
+
+        if response.status_code != 200:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to load login page with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to load login page")
+
+        # Extract login action URL from response
+        match = re.search(r'"loginAction":\s*"(https://.*?)"', response.text)
+        if not match:
+            _LOGGER.error(f"{DOMAIN} - Could not find loginAction URL in response")
+            _LOGGER.debug(f"{DOMAIN} - Response content: {response.text[:500]}...")
+            raise AuthenticationError("Could not find loginAction URL")
+
+        login_action_url = match.group(1)
+        _LOGGER.debug(f"{DOMAIN} - Login action URL: {login_action_url}")
+
+        # Submit login credentials
+        payload = {"username": username, "password": password}
+        response = session.post(login_action_url, data=payload, allow_redirects=False)
+        _LOGGER.debug(f"{DOMAIN} - Login submission status: {response.status_code}")
+
+        if response.status_code != 302:
+            _LOGGER.error(
+                f"{DOMAIN} - Login submission failed with status: {response.status_code}"
+            )
+            _LOGGER.debug(
+                f"{DOMAIN} - Login response content: {response.text[:500]}..."
+            )
+            raise AuthenticationError("Login submission failed")
+
+        # Step 7: Follow redirects
+        redirect_url = response.headers["Location"]
+        _LOGGER.debug(f"{DOMAIN} - Redirect URL after login: {redirect_url}")
+        response = session.get(redirect_url, allow_redirects=True)
+        _LOGGER.debug(f"{DOMAIN} - Final redirect status: {response.status_code}")
+
+        if response.status_code != 200:
+            _LOGGER.error(
+                f"{DOMAIN} - Failed to follow login redirects with status: {response.status_code}"
+            )
+            raise AuthenticationError("Failed to follow login redirects")
+
+        # Step 8: Perform silent signin
+        url = f"https://{self.BASE_DOMAIN}/api/v1/user/silentsignin"
+        headers = {"Content-Type": "text/plain;charset=UTF-8"}
+        response = session.post(url, headers=headers, json={"intUserId": ""})
+        _LOGGER.debug(f"{DOMAIN} - Silent signin status: {response.status_code}")
+
+        if response.status_code != 200:
+            _LOGGER.error(
+                f"{DOMAIN} - Silent signin failed with status: {response.status_code}"
+            )
+            raise AuthenticationError("Silent signin failed")
+
+        redirect_url_with_code = response.json().get("redirectUrl")
+        if not redirect_url_with_code:
+            _LOGGER.error(f"{DOMAIN} - No redirect URL in silent signin response")
+            raise AuthenticationError("No redirect URL in silent signin response")
+
+        _LOGGER.debug(f"{DOMAIN} - Redirect URL with code: {redirect_url_with_code}")
+
+        # Extract authorization code from redirect URL
+        match = re.search(r"code=([^&]*)", redirect_url_with_code)
+        if not match:
+            _LOGGER.error(
+                f"{DOMAIN} - Could not extract authorization code from redirect URL"
+            )
+            raise AuthenticationError(
+                "Could not extract authorization code from redirect URL"
+            )
+
+        authorization_code = match.group(1)
+        _LOGGER.debug(f"{DOMAIN} - Genesis authorization code obtained successfully")
+
+        return authorization_code
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -1328,6 +1514,21 @@ class KiaUvoApiEU(ApiImplType1):
                 + authorization_code
             )
             response = requests.post(url, data=data, headers=headers)
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            # Genesis specific access token flow
+            url = self.USER_API_URL + "oauth2/token"
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                "Authorization": self.BASIC_AUTHORIZATION,
+                "User-Agent": USER_AGENT_GENESIS,
+            }
+            data = {
+                "client_id": self.CCSP_SERVICE_ID,
+                "code": authorization_code,
+                "grant_type": "authorization_code",
+                "redirect_uri": f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2",
+            }
+            response = requests.post(url, data=data, headers=headers)
         else:
             url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
             data = {
@@ -1351,24 +1552,63 @@ class KiaUvoApiEU(ApiImplType1):
         return token_type, access_token, authorization_code, expires_in
 
     def _get_refresh_token(self, stamp, authorization_code):
-        # Get Refresh Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": stamp,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            # Genesis specific refresh token flow
+            url = self.USER_API_URL + "oauth2/token"
 
-        data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
-            + authorization_code
-        )
-        response = requests.post(url, data=data, headers=headers)
-        response = response.json()
-        token_type = response["token_type"]
-        refresh_token = token_type + " " + response["access_token"]
-        return token_type, refresh_token
+            payload = {
+                "client_id": self.CCSP_SERVICE_ID,
+                "refresh_token": authorization_code,
+                "grant_type": "refresh_token",
+                "redirect_uri": f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2",
+            }
+
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                "Authorization": self.BASIC_AUTHORIZATION,
+                "User-Agent": USER_AGENT_GENESIS,
+            }
+
+            _LOGGER.debug(
+                f"{DOMAIN} - Genesis Get Refresh Token Request: URL={url}, Headers={headers}, Payload={payload}"
+            )
+
+            response = requests.post(url, headers=headers, data=payload)
+            response_json = response.json()
+            _LOGGER.debug(
+                f"{DOMAIN} - Genesis Get Refresh Token Response: {response_json}"
+            )
+
+            if "access_token" not in response_json:
+                _LOGGER.error(
+                    f"{DOMAIN} - Genesis refresh token request failed: {response_json}"
+                )
+                raise AuthenticationError("Failed to get Genesis refresh token")
+
+            token_type = response_json.get("token_type", "Bearer")
+            refresh_token = f"{token_type} {response_json['access_token']}"
+
+            _LOGGER.debug(f"{DOMAIN} - Genesis Refresh Token obtained successfully")
+            return token_type, refresh_token
+        else:
+            # Get Refresh Token #
+            url = self.USER_API_URL + "oauth2/token"
+            headers = {
+                "Authorization": self.BASIC_AUTHORIZATION,
+                "Stamp": stamp,
+                "Content-type": "application/x-www-form-urlencoded",
+                "Host": self.BASE_URL,
+                "Connection": "close",
+                "Accept-Encoding": "gzip, deflate",
+                "User-Agent": USER_AGENT_OK_HTTP,
+            }
+
+            data = (
+                "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
+                + authorization_code
+            )
+            response = requests.post(url, data=data, headers=headers)
+            response = response.json()
+            token_type = response["token_type"]
+            refresh_token = token_type + " " + response["access_token"]
+            return token_type, refresh_token
