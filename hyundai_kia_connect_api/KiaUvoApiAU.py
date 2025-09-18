@@ -151,6 +151,46 @@ class KiaUvoApiAU(ApiImplType1):
                 },
             )
 
+            if not get_child_value(response["resMsg"], "odometer.value"):
+                # Some cars (e.g. 2024 Niro EV) report as not supporting ccs2 but
+                # only report the odometer value in the ccs2 status response.
+                # So if the odo is None we will try to request the ccs2 status.
+                try:
+                    url = (
+                        self.SPA_API_URL
+                        + "vehicles/"
+                        + vehicle.id
+                        + "/ccs2/carstatus/latest"
+                    )
+                    ccs2Response = requests.get(
+                        url,
+                        headers=self._get_authenticated_headers(
+                            token, vehicle.ccu_ccs2_protocol_support
+                        ),
+                    ).json()
+
+                    _LOGGER.debug(
+                        f"{DOMAIN} - get_cached_vehicle_status ccs2 response: {ccs2Response}"
+                    )
+                    _check_response_for_errors(ccs2Response)
+
+                    state = ccs2Response["resMsg"]["state"]["Vehicle"]
+                    odo = get_child_value(state, "Drivetrain.Odometer")
+                    if odo is not None:
+                        vehicle.odometer = (
+                            odo,
+                            DISTANCE_UNITS[1],
+                        )
+                except Exception as e:
+                    _LOGGER.exception(
+                        """Failed to parse CCS2 driving info. Possible reasons:
+                                        - incompatible vehicle (ICE)
+                                        - new API format
+                                        - API outage
+                                """,
+                        exc_info=e,
+                    )
+
         if (
             vehicle.engine_type == ENGINE_TYPES.EV
             or vehicle.engine_type == ENGINE_TYPES.PHEV
