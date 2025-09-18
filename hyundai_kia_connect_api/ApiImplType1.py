@@ -71,6 +71,7 @@ def _check_response_for_errors(response: dict) -> None:
     """
 
     error_code_mapping = {
+        "7501": AuthenticationError,
         "4002": DeviceIDError,
         "4004": DuplicateRequestError,
         "4081": RequestTimeoutError,
@@ -102,6 +103,10 @@ def _check_response_for_errors(response: dict) -> None:
         else:
             _LOGGER.error(f"Unknown error in API response: {error_reason}")
             raise APIError(f"Unknown error in API response: {error_reason}")
+    elif "retCode" in response and "retMsg" in response:
+        retMSG = response["retMsg"]
+        if retMSG == "Received unexpected statusCode":
+            raise AuthenticationError(retMSG)
 
 
 class ApiImplType1(ApiImpl):
