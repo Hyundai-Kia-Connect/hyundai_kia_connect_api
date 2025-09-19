@@ -330,6 +330,10 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+        if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower"):
+            vehicle.ev_charging_power = get_child_value(
+                state, "Green.Electric.SmartGrid.RealTimePower"
+            )
         vehicle.ev_battery_remain = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Value"
         )
