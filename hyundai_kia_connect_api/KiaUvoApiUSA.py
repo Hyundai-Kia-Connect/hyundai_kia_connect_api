@@ -384,6 +384,9 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.hood_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.hood"
         )
+        vehicle.sunroof_is_open = get_child_value(
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.sunroofOpen"
+        )
 
         vehicle.trunk_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.trunk"
@@ -432,6 +435,10 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state,
             "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPlugin",
+        )
+        vehicle.ev_charging_power = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.realTimePower",
         )
         ChargeDict = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC"
