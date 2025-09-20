@@ -85,7 +85,9 @@ def _check_response_for_errors(response: dict) -> None:
         "Key not authorized: Token is expired": AuthenticationError
     }
 
-    if not any(x in response for x in ["retCode", "resCode", "resMsg", "error"]):
+    if not any(
+        x in response for x in ["retCode", "resCode", "resMsg", "error", "access_token"]
+    ):
         _LOGGER.error(f"Unknown API response format: {response}")
         raise InvalidAPIResponseError()
 
