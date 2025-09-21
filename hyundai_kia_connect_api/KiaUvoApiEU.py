@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 
 from .ApiImplType1 import ApiImplType1
@@ -75,7 +75,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 
 class KiaUvoApiEU(ApiImplType1):
-    data_timezone = tz.gettz("Europe/Berlin")
+    data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:

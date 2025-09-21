@@ -11,7 +11,7 @@ from time import sleep
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 from .ApiImpl import (
     ClimateRequestOptions,
@@ -104,7 +104,7 @@ def _check_response_for_errors(response: dict) -> None:
 
 
 class KiaUvoApiCN(ApiImplType1):
-    data_timezone = tz.gettz("Asia/Shanghai")
+    data_timezone = ZoneInfo("Asia/Shanghai")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:

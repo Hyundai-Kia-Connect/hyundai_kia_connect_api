@@ -10,7 +10,7 @@ import uuid
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 from .ApiImplType1 import ApiImplType1
 from .Token import Token
@@ -53,7 +53,7 @@ USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build
 
 
 class KiaUvoApiAU(ApiImplType1):
-    data_timezone = tz.gettz("Australia/Sydney")
+    data_timezone = ZoneInfo("Australia/Sydney")
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
