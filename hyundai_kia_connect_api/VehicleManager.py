@@ -5,8 +5,6 @@
 import datetime as dt
 import logging
 
-import pytz
-
 from .exceptions import APIError
 from .ApiImpl import (
     ApiImpl,
@@ -116,7 +114,7 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt = dt.datetime.now(pytz.utc)
+        started_at_utc: dt = dt.datetime.now(dt.timezone.utc)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
             _LOGGER.debug(
@@ -146,7 +144,7 @@ class VehicleManager:
         if self.token is None:
             self.initialize()
         if (
-            self.token.valid_until <= dt.datetime.now(pytz.utc)
+            self.token.valid_until <= dt.datetime.now(dt.timezone.utc)
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")

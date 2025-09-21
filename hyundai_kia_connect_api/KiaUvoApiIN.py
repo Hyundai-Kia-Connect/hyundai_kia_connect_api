@@ -11,7 +11,6 @@ import re
 import math
 from urllib.parse import parse_qs, urlparse
 from typing import Optional
-import pytz
 import requests
 from dateutil import tz
 from .ApiImpl import (
@@ -150,7 +149,7 @@ class KiaUvoApiIN(ApiImplType1):
             stamp, authorization_code
         )
         _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
 
         return Token(
             username=username,

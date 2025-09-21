@@ -9,7 +9,6 @@ import random
 import uuid
 from urllib.parse import parse_qs, urlparse
 
-import pytz
 import requests
 from dateutil import tz
 
@@ -109,7 +108,7 @@ class KiaUvoApiAU(ApiImplType1):
             authorization_code, stamp
         )
         _, refresh_token = self._get_refresh_token(authorization_code, stamp)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
 
         return Token(
             username=username,

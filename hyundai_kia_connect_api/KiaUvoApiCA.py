@@ -6,7 +6,6 @@ import time
 import datetime as dt
 import json
 import logging
-import pytz
 import requests
 
 from dateutil.tz import tzoffset
@@ -198,7 +197,9 @@ class KiaUvoApiCA(ApiImpl):
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
 
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=token_expire_in)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=token_expire_in
+        )
 
         return Token(
             username=username,
@@ -287,7 +288,7 @@ class KiaUvoApiCA(ApiImpl):
         last_updated_at = parse_datetime(
             get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
-        now_utc: dt = dt.datetime.now(pytz.utc)
+        now_utc: dt = dt.datetime.now(dt.timezone.utc)
         offset = round((last_updated_at - now_utc).total_seconds() / 3600)
         _LOGGER.debug(f"{DOMAIN} - Offset between vehicle and UTC: {offset} hours")
         if offset != 0:

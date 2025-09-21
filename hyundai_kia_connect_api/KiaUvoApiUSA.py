@@ -12,7 +12,6 @@ import typing
 from datetime import datetime
 
 import certifi
-import pytz
 import requests
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
@@ -153,7 +152,7 @@ class KiaUvoApiUSA(ApiImpl):
         }
         # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
         # May require adjusting locale to en_US
-        date = datetime.now(tz=pytz.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        date = datetime.now(tz=dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
         return headers
@@ -199,7 +198,7 @@ class KiaUvoApiUSA(ApiImpl):
                 f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"  # noqa
             )
         _LOGGER.debug(f"got session id {session_id}")
-        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
+        valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
             password=password,
