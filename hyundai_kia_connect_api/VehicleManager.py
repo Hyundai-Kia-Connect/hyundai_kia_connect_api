@@ -114,7 +114,7 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt = dt.datetime.now(dt.timezone.utc)
+        started_at_utc: dt.datetime = dt.datetime.now(dt.timezone.utc)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
             _LOGGER.debug(
