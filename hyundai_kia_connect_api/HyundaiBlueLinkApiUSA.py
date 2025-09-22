@@ -5,7 +5,6 @@
 import logging
 import time
 import datetime as dt
-import pytz
 import requests
 import certifi
 
@@ -66,7 +65,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     """HyundaiBlueLinkApiUSA"""
 
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = dt.datetime.now(pytz.utc) - dt.timedelta(hours=3)
+    last_loc_timestamp = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
@@ -137,7 +136,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
 
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=expires_in
+        )
 
         return Token(
             username=username,

@@ -92,3 +92,21 @@ def get_safe_local_datetime(date: datetime) -> datetime:
     if date is not None and hasattr(date, "tzinfo") and date.tzinfo is not None:
         date = date.astimezone()
     return date
+
+
+def detect_timezone_for_date(
+    date: datetime.datetime,
+    ref_date: datetime.datetime,
+    timezones: list[datetime.timezone],
+) -> datetime.timezone | None:
+    """
+    Guess an appropriate timezone given a date with an unknown timezone and a
+    nearby reference time in any valid timezone.
+    """
+    for tz in timezones:
+        delta = (ref_date - date.replace(tzinfo=tz)).total_seconds()
+        # Timezones differing by half an hour exist, 20 minutes should hopefully
+        # be enough to cover clock skew and API processing times.
+        if abs(delta) < 20 * 60:
+            return tz
+    return None

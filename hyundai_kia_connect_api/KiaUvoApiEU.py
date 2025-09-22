@@ -10,10 +10,9 @@ import uuid
 import re
 from urllib.parse import parse_qs, urlparse
 
-import pytz
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 
 from .ApiImplType1 import ApiImplType1
@@ -76,7 +75,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 
 class KiaUvoApiEU(ApiImplType1):
-    data_timezone = tz.gettz("Europe/Berlin")
+    data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -184,7 +183,9 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, authorization_code, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-            valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=expires_in
+            )
 
             return Token(
                 username=username,
@@ -215,7 +216,9 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, authorization_code, expires_in = self._get_access_token(
                 stamp, authorization_code
             )
-            valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
+            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=expires_in
+            )
 
             _, refresh_token = self._get_refresh_token(stamp, authorization_code)
 

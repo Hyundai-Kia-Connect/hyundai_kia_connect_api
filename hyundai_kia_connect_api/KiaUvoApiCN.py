@@ -10,9 +10,8 @@ from typing import Optional
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 
-import pytz
 import requests
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 from .ApiImpl import (
     ClimateRequestOptions,
@@ -105,7 +104,7 @@ def _check_response_for_errors(response: dict) -> None:
 
 
 class KiaUvoApiCN(ApiImplType1):
-    data_timezone = tz.gettz("Asia/Shanghai")
+    data_timezone = ZoneInfo("Asia/Shanghai")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -174,7 +173,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         _, access_token, authorization_code = self._get_access_token(authorization_code)
         _, refresh_token = self._get_refresh_token(authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
+        valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
