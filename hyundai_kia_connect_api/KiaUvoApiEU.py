@@ -433,12 +433,11 @@ class KiaUvoApiEU(ApiImplType1):
         elif ev_charge_port_door_is_open == 2:
             vehicle.ev_charge_port_door_is_open = False
 
-        if get_child_value(
+        battery_stnd_chrg_power = get_child_value(
             state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
-        ):
-            vehicle.ev_charging_power = get_child_value(
-                state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
-            )
+        )
+        if battery_stnd_chrg_power is not None:
+            vehicle.ev_charging_power = battery_stnd_chrg_power
 
         if (
             get_child_value(
