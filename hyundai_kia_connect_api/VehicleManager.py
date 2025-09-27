@@ -145,7 +145,8 @@ class VehicleManager:
         if self.token is None:
             self.initialize()
         if (
-            self.token.valid_until - timedelta(seconds=10) <= dt.datetime.now(dt.timezone.utc)
+            self.token.valid_until - timedelta(seconds=10)
+            <= dt.datetime.now(dt.timezone.utc)
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
