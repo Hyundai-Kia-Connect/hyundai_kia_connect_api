@@ -3,6 +3,7 @@
 # pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
 
 import datetime as dt
+from datetime import timedelta
 import logging
 
 from .exceptions import APIError
@@ -144,7 +145,8 @@ class VehicleManager:
         if self.token is None:
             self.initialize()
         if (
-            self.token.valid_until <= dt.datetime.now(dt.timezone.utc)
+            self.token.valid_until - timedelta(seconds=10)
+            <= dt.datetime.now(dt.timezone.utc)
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
