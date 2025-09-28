@@ -293,7 +293,7 @@ class KiaUvoApiCA(ApiImpl):
         last_updated_at = parse_datetime(
             get_child_value(state, "status.lastStatusDate"), dt.timezone.utc
         )
-        ref_date = dt.datetime.now()
+        ref_date = dt.datetime.now(tz=dt.timezone.utc)
         tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
         if tz:
             _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
