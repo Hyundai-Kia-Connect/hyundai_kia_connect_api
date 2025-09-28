@@ -120,7 +120,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self._get_authenticated_headers(token)
         headers["registrationId"] = vehicle.id
-        headers["gen"] = vehicle.generation
+        headers["gen"] = str(vehicle.generation)
         headers["vin"] = vehicle.VIN
         return headers
 
