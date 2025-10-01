@@ -6,8 +6,12 @@ import logging
 from dataclasses import dataclass
 
 import requests
-from geopy.geocoders import GoogleV3
 from requests.exceptions import JSONDecodeError
+
+try:
+    from geopy.geocoders import GoogleV3
+except ImportError:
+    GoogleV3 = None
 
 from .utils import get_child_value
 from .Token import Token
@@ -158,7 +162,13 @@ class ApiImpl:
                     self.previous_longitude = vehicle.location_longitude
                     _LOGGER.debug(f"{DOMAIN} - geocode openstreetmap")
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
-                if API_KEY:
+                if not API_KEY:
+                    _LOGGER.warning(f"{DOMAIN} - missing API KEY for geocode Google")
+                    vehicle.geocode = None
+                elif GoogleV3 is None:
+                    _LOGGER.warning(f"{DOMAIN} - geopy is required for geocode Google")
+                    vehicle.geocode = None
+                else:
                     latlong = (vehicle.location_latitude, vehicle.location_longitude)
                     try:
                         geolocator = GoogleV3(api_key=API_KEY)
