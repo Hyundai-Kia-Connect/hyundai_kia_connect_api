@@ -3,19 +3,15 @@
 # pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
 
 import logging
-import re
 import datetime as dt
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 import requests
-import certifi
-
-from requests.adapters import HTTPAdapter
-from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl
 from .Token import Token
 from .Vehicle import Vehicle, MonthTripInfo, DayTripInfo, DayTripCounts, TripInfo
+from .utils import parse_date_br
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
@@ -27,74 +23,6 @@ from .const import (
 from .exceptions import APIError
 
 _LOGGER = logging.getLogger(__name__)
-
-CIPHERS = "DEFAULT@SECLEVEL=1"
-
-
-# Helper functions for date handling
-def _parse_date_string(date_string: str) -> dt.datetime:
-    """Parse date string in format YYYYMMDD or YYYYMMDDHHMMSS to datetime."""
-    if not date_string:
-        return None
-
-    # Try full datetime format first (YYYYMMDDHHMMSS)
-    if len(date_string) >= 14:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", date_string)
-        if m:
-            return dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                hour=int(m.group(4)),
-                minute=int(m.group(5)),
-                second=int(m.group(6)),
-                tzinfo=dt.timezone(dt.timedelta(hours=-3)),  # Brazil timezone
-            )
-
-    # Try date only format (YYYYMMDD)
-    if len(date_string) >= 8:
-        m = re.match(r"(\d{4})(\d{2})(\d{2})", date_string)
-        if m:
-            return dt.datetime(
-                year=int(m.group(1)),
-                month=int(m.group(2)),
-                day=int(m.group(3)),
-                tzinfo=dt.timezone(dt.timedelta(hours=-3)),
-            )
-
-    return None
-
-
-def _date_to_yyyymm(date_obj) -> str:
-    """Convert date object to YYYYMM string."""
-    if hasattr(date_obj, "strftime"):
-        return date_obj.strftime("%Y%m")
-    return str(date_obj)
-
-
-def _date_to_yyyymmdd(date_obj) -> str:
-    """Convert date object to YYYYMMDD string."""
-    if hasattr(date_obj, "strftime"):
-        return date_obj.strftime("%Y%m%d")
-    return str(date_obj)
-
-
-class CipherAdapter(HTTPAdapter):
-    """A HTTPAdapter that re-enables poor ciphers required by Hyundai."""
-
-    def _setup_ssl_context(self):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        context.options |= 0x4
-        return context
-
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-        kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
-
-    def proxy_manager_for(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-        return super().proxy_manager_for(*args, **kwargs)
 
 
 class HyundaiBlueLinkApiBR(ApiImpl):
@@ -132,9 +60,6 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         }
 
         self.session = requests.Session()
-        # NOTE: CipherAdapter may not be needed for Brazilian API
-        # self.session.mount(f"https://{self.base_url}", CipherAdapter())
-
         self.temperature_range = range(62, 82)
 
     def _build_api_url(self, path: str) -> str:
@@ -317,7 +242,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         """Update vehicle properties from state."""
         # Parse timestamp
         if state.get("time"):
-            vehicle.last_updated_at = _parse_date_string(state["time"])
+            vehicle.last_updated_at = parse_date_br(state["time"], self.data_timezone)
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
@@ -445,7 +370,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         time_str = location_data.get("time")
 
         if lat and lon:
-            location_time = _parse_date_string(time_str) if time_str else None
+            location_time = parse_date_br(time_str, self.data_timezone) if time_str else None
             vehicle.location = (lat, lon, location_time)
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:

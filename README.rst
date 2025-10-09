@@ -74,14 +74,6 @@ An example call would be::
     vm.update_all_vehicles_with_cached_state()
     print(vm.vehicles)
 
-Example for Brazilian Hyundai BlueLink (region 8)::
-
-    from hyundai_kia_connect_api import *
-    vm = VehicleManager(region=8, brand=2, username="username@gmail.com", password="password", pin="")
-    vm.check_and_refresh_token()
-    vm.update_all_vehicles_with_cached_state()
-    print(vm.vehicles)
-
 If geolocation is required you can also allow this by running::
 
     vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234", geocode_api_enable=True, geocode_api_use_email=True)
