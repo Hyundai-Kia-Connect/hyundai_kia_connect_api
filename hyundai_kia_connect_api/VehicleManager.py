@@ -14,6 +14,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
 )
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .KiaUvoApiUSA import KiaUvoApiUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
@@ -29,6 +30,7 @@ from .const import (
     BRANDS,
     DOMAIN,
     REGION_AUSTRALIA,
+    REGION_BRAZIL,
     REGION_CANADA,
     REGION_EUROPE,
     REGION_USA,
@@ -324,5 +326,7 @@ class VehicleManager:
                 )
         elif REGIONS[region] == REGION_INDIA:
             return KiaUvoApiIN(brand)
+        elif REGIONS[region] == REGION_BRAZIL:
+            return HyundaiBlueLinkApiBR(region, brand, language)
         else:
             raise APIError(f"Unknown region {region}")

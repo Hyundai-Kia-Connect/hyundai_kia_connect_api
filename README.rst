@@ -38,7 +38,7 @@ Python 3.10 or newer is required to use this package. Vehicle manager is the key
 
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_NZ}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
 
@@ -70,6 +70,14 @@ An example call would be::
 
     from hyundai_kia_connect_api import *
     vm = VehicleManager(region=2, brand=1, username="username@gmail.com", password="password", pin="1234")
+    vm.check_and_refresh_token()
+    vm.update_all_vehicles_with_cached_state()
+    print(vm.vehicles)
+
+Example for Brazilian Hyundai BlueLink (region 8)::
+
+    from hyundai_kia_connect_api import *
+    vm = VehicleManager(region=8, brand=2, username="username@gmail.com", password="password", pin="")
     vm.check_and_refresh_token()
     vm.update_all_vehicles_with_cached_state()
     print(vm.vehicles)
