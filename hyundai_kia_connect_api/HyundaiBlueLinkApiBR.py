@@ -370,7 +370,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         time_str = location_data.get("time")
 
         if lat and lon:
-            location_time = parse_date_br(time_str, self.data_timezone) if time_str else None
+            location_time = (
+                parse_date_br(time_str, self.data_timezone) if time_str else None
+            )
             vehicle.location = (lat, lon, location_time)
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
