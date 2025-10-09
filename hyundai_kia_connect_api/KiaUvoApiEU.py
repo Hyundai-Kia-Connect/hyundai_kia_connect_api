@@ -801,9 +801,9 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
-        except Exception:
-            _LOGGER.warning(f"{DOMAIN} - _get_location failed")
+            return response["resMsg"]["coord"]
+        except Exception as e:
+            _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
