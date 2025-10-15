@@ -114,7 +114,7 @@ class KiaUvoApiEU(ApiImplType1):
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
-            self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com/"
+            self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
