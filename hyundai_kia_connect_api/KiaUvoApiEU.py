@@ -177,7 +177,7 @@ class KiaUvoApiEU(ApiImplType1):
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
-        if BRANDS[self.brand] == BRAND_KIA:
+        if BRANDS[self.brand] == BRAND_KIA or BRANDS[self.brand] == BRAND_HYUNDAI:
             refresh_token = password
 
             _, access_token, authorization_code, expires_in = self._get_access_token(
