@@ -103,15 +103,16 @@ class KiaUvoApiEU(ApiImplType1):
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
+            self.BASE_DOMAIN: str = "https://prd.eu-ccapi.hyundai.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+            self.CCS_SERVICE_SECRET: str = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
-            self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
+            self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com/"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
@@ -148,8 +149,7 @@ class KiaUvoApiEU(ApiImplType1):
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
             self.LOGIN_FORM_URL: str = (
-                "https://"
-                + self.LOGIN_FORM_HOST
+                self.LOGIN_FORM_HOST
                 + "/auth/realms/euhyundaiidm/protocol/openid-connect/auth?client_id="
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
@@ -1337,35 +1337,15 @@ class KiaUvoApiEU(ApiImplType1):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        if BRANDS[self.brand] == BRAND_HYUNDAI:
-            url = self.USER_API_URL + "oauth2/token"
-            headers = {
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "Stamp": stamp,
-                "Content-type": "application/x-www-form-urlencoded",
-                "Host": self.BASE_URL,
-                "Connection": "close",
-                "Accept-Encoding": "gzip, deflate",
-                "User-Agent": USER_AGENT_OK_HTTP,
-            }
+        url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": authorization_code,
+            "client_id": self.CCSP_SERVICE_ID,
+            "client_secret": self.CCS_SERVICE_SECRET,
+        }
 
-            data = (
-                "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
-                + self.BASE_DOMAIN
-                + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
-                + authorization_code
-            )
-            response = requests.post(url, data=data, headers=headers)
-        else:
-            url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
-            data = {
-                "grant_type": "refresh_token",
-                "refresh_token": authorization_code,
-                "client_id": self.CCSP_SERVICE_ID,
-                "client_secret": "secret",
-            }
-
-            response = requests.post(url, data=data, allow_redirects=False)
+        response = requests.post(url, data=data, allow_redirects=False)
 
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
