@@ -106,7 +106,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "https://prd.eu-ccapi.hyundai.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.CCS_SERVICE_SECRET: str = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
+            self.CCS_SERVICE_SECRET: str = (
+                "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
+            )
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
