@@ -103,7 +103,7 @@ class KiaUvoApiEU(ApiImplType1):
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "https://prd.eu-ccapi.hyundai.com"
+            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
             self.CCS_SERVICE_SECRET: str = (
