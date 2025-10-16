@@ -93,6 +93,7 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
+            self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.CFB: str = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
@@ -120,6 +121,7 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
             self.PORT: int = 443
             self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
