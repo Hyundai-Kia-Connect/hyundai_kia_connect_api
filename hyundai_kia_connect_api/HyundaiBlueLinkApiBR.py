@@ -2,23 +2,29 @@
 
 # pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
 
-import logging
 import datetime as dt
+import logging
+import uuid
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
+from time import sleep
+
 import requests
 
-from .ApiImpl import ApiImpl
+from .ApiImpl import ApiImpl, WindowRequestOptions, ClimateRequestOptions
 from .Token import Token
 from .Vehicle import Vehicle, MonthTripInfo, DayTripInfo, DayTripCounts, TripInfo
-from .utils import parse_date_br
+from .utils import parse_date_br, get_index_into_hex_temp
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DISTANCE_UNITS,
     DOMAIN,
+    ORDER_STATUS,
+    VEHICLE_LOCK_ACTION,
     SEAT_STATUS,
     ENGINE_TYPES,
+    WINDOW_STATE,
 )
 from .exceptions import APIError
 
@@ -40,6 +46,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self.language = language
         self.base_url = "br-ccapi.hyundai.com.br"
         self.api_url = f"https://{self.base_url}/api/v1/"
+        self.api_v2_url = f"https://{self.base_url}/api/v2/"
         self.ccsp_device_id = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
         self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
         self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
@@ -66,10 +73,15 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         """Build full API URL from path."""
         return urljoin(self.api_url, path.lstrip("/"))
 
+    def _build_api_v2_url(self, path: str) -> str:
+        """Build API v2 URL from path."""
+        return urljoin(self.api_v2_url, path.lstrip("/"))
+
     def _get_authenticated_headers(self, token: Token) -> dict:
         """Get headers with authentication."""
         headers = dict(self.api_headers)
-        headers["ccsp-device-id"] = self.ccsp_device_id
+        device_id = token.device_id or self.ccsp_device_id
+        headers["ccsp-device-id"] = device_id
         headers["ccsp-application-id"] = self.ccsp_application_id
         headers["Authorization"] = f"Bearer {token.access_token}"
         return headers
@@ -84,9 +96,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         url = self._build_api_url("/user/oauth2/authorize")
         _LOGGER.debug(f"{DOMAIN} - Requesting cookies from {url}")
-        response = self.session.get(
-            url, params=params
-        )  # Use self.session instead of requests
+        response = self.session.get(url, params=params)
         response.raise_for_status()
         cookies = response.cookies.get_dict()
         _LOGGER.debug(f"{DOMAIN} - Got cookies: {cookies}")
@@ -161,6 +171,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             valid_until=expires_at,
             username=username,
             password=password,
+            device_id=str(uuid.uuid4()),
         )
 
     def get_vehicles(self, token: Token) -> list:
@@ -390,6 +401,296 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         self._update_vehicle_properties(vehicle, state)
         self._update_vehicle_location(vehicle, location_data)
+
+    def _ensure_control_token(self, token: Token) -> str:
+        """Ensure we have a valid control token for remote commands."""
+        control_token = getattr(token, "control_token", None)
+        expires_at = getattr(token, "control_token_expires_at", None)
+        if (
+            control_token
+            and expires_at
+            and expires_at - dt.timedelta(seconds=5) > dt.datetime.now(dt.timezone.utc)
+        ):
+            return control_token
+
+        if not token.pin:
+            raise APIError("PIN is required for remote commands.")
+
+        device_id = token.device_id or self.ccsp_device_id
+        token.device_id = device_id
+
+        url = self._build_api_url("/user/pin")
+        headers = self._get_authenticated_headers(token)
+        payload = {"pin": token.pin, "deviceId": device_id}
+
+        response = self.session.put(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("controlToken") is None:
+            raise APIError("Failed to obtain control token.")
+
+        control_token = f"Bearer {data['controlToken']}"
+        expires_in = data.get("expiresTime", 0)
+        expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=expires_in or 600
+        )
+
+        token.control_token = control_token
+        token.control_token_expires_at = expires_at
+        return control_token
+
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        """Lock or unlock the vehicle."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self.ccsp_device_id
+
+        url = self._build_api_v2_url(
+            f"spa/vehicles/{vehicle.id}/control/door",
+        )
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"deviceId": device_id, "action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Lock action request: %s", payload)
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Lock action response: %s", data)
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Lock action failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return data.get("msgId")
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        """Check status of a previously submitted remote command."""
+        if synchronous:
+            if timeout < 1:
+                raise APIError("Timeout must be 1 or higher for synchronous checks.")
+
+            end_time = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=timeout)
+            while dt.datetime.now(dt.timezone.utc) < end_time:
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
+                if state == ORDER_STATUS.PENDING:
+                    sleep(5)
+                    continue
+                return state
+
+            return ORDER_STATUS.TIMEOUT
+
+        url = self._build_api_url(f"/spa/notifications/{vehicle.id}/records")
+        headers = self._get_authenticated_headers(token)
+
+        response = self.session.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Action status response: %s", data)
+
+        records = data.get("resMsg", [])
+        for record in records:
+            if record.get("recordId") != action_id:
+                continue
+
+            result = (record.get("result") or "").lower()
+            if result == "success":
+                return ORDER_STATUS.SUCCESS
+            if result == "fail":
+                return ORDER_STATUS.FAILED
+            if result == "non-response":
+                return ORDER_STATUS.TIMEOUT
+            if result in ("", "pending", None):
+                return ORDER_STATUS.PENDING
+
+        return ORDER_STATUS.UNKNOWN
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Open or close all windows (BR API controls all windows together)."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self.ccsp_device_id
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/window")
+
+        # Brazilian API uses simple action for all windows at once
+        # Check if any window should be open, otherwise close
+        action = "open"
+        if options.front_left == WINDOW_STATE.CLOSED:
+            action = "close"
+        elif options.front_right == WINDOW_STATE.CLOSED:
+            action = "close"
+        elif options.back_left == WINDOW_STATE.CLOSED:
+            action = "close"
+        elif options.back_right == WINDOW_STATE.CLOSED:
+            action = "close"
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"action": action, "deviceId": device_id}
+        _LOGGER.debug(f"{DOMAIN} - Window action request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Window action response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Window action failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return data.get("msgId")
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        """Turn on hazard lights (lights only, no horn)."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self.ccsp_device_id
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/light")
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        _LOGGER.debug(f"{DOMAIN} - Hazard lights request")
+
+        response = self.session.post(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Hazard lights response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Hazard lights failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return data.get("msgId")
+
+    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list:
+        """Get notification history (for debugging and tracking command results)."""
+        url = self._build_api_url(f"/spa/notifications/{vehicle.id}/history")
+        headers = self._get_authenticated_headers(token)
+
+        response = self.session.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Notification history response")
+
+        return data.get("resMsg", [])
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        """Start climate control with temperature and seat heating settings."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self.ccsp_device_id
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
+
+        # Set defaults
+        if options.set_temp is None:
+            options.set_temp = 21  # 21°C default
+        if options.duration is None:
+            options.duration = 10  # 10 minutes default
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
+        if options.front_left_seat is None:
+            options.front_left_seat = 0
+
+        # Convert temperature to hex code
+        # BR API uses direct Celsius value converted to hex
+        temp_celsius = int(options.set_temp)
+        temp_code = get_index_into_hex_temp(temp_celsius)
+
+        # Map seat heating level (0-5 in ClimateRequestOptions to 0-8 for BR API)
+        # 0=off, 1-3=heat levels, 4-5=cool levels (BR uses similar mapping)
+        seat_heat_cmd = options.front_left_seat if options.front_left_seat else 0
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {
+            "action": "start",
+            "options": {
+                "airCtrl": 1 if options.climate else 0,
+                "heating1": int(options.heating),
+                "seatHeaterVentCMD": {"drvSeatOptCmd": seat_heat_cmd},
+                "defrost": options.defrost,
+                "igniOnDuration": options.duration,
+            },
+            "hvacType": 1,
+            "deviceId": device_id,
+            "tempCode": temp_code,
+            "unit": "C",
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Start climate request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Start climate response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Start climate failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return data.get("msgId")
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        """Stop climate control."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self.ccsp_device_id
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"action": "stop", "deviceId": device_id}
+
+        _LOGGER.debug(f"{DOMAIN} - Stop climate request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Stop climate response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Stop climate failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return data.get("msgId")
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str
