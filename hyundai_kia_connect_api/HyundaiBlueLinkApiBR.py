@@ -453,9 +453,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
         headers["Authorization"] = control_token
         headers["ccsp-device-id"] = device_id
-        headers["ccuCCS2ProtocolSupport"] = str(
-            vehicle.ccu_ccs2_protocol_support or 0
-        )
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
 
         payload = {"deviceId": device_id, "action": action.value}
         _LOGGER.debug(f"{DOMAIN} - Lock action request: %s", payload)
@@ -546,9 +544,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
         headers["Authorization"] = control_token
         headers["ccsp-device-id"] = device_id
-        headers["ccuCCS2ProtocolSupport"] = str(
-            vehicle.ccu_ccs2_protocol_support or 0
-        )
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
 
         payload = {"action": action, "deviceId": device_id}
         _LOGGER.debug(f"{DOMAIN} - Window action request: {payload}")
@@ -574,9 +570,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
         headers["Authorization"] = control_token
         headers["ccsp-device-id"] = device_id
-        headers["ccuCCS2ProtocolSupport"] = str(
-            vehicle.ccu_ccs2_protocol_support or 0
-        )
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
 
         _LOGGER.debug(f"{DOMAIN} - Hazard lights request")
 
@@ -639,9 +633,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
         headers["Authorization"] = control_token
         headers["ccsp-device-id"] = device_id
-        headers["ccuCCS2ProtocolSupport"] = str(
-            vehicle.ccu_ccs2_protocol_support or 0
-        )
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
 
         payload = {
             "action": "start",
@@ -682,9 +674,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         headers = self._get_authenticated_headers(token)
         headers["Authorization"] = control_token
         headers["ccsp-device-id"] = device_id
-        headers["ccuCCS2ProtocolSupport"] = str(
-            vehicle.ccu_ccs2_protocol_support or 0
-        )
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
 
         payload = {"action": "stop", "deviceId": device_id}
 
