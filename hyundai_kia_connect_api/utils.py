@@ -3,6 +3,7 @@
 
 import datetime
 import re
+from typing import Optional
 
 
 def get_child_value(data, key):
@@ -98,7 +99,7 @@ def detect_timezone_for_date(
     date: datetime.datetime,
     ref_date: datetime.datetime,
     timezones: list[datetime.timezone],
-) -> datetime.timezone | None:
+) -> Optional[datetime.timezone]:
     """
     Guess an appropriate timezone given a date with an unknown timezone and a
     nearby reference time in any valid timezone.
