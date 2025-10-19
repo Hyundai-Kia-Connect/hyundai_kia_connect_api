@@ -1,3 +1,4 @@
 beautifulsoup4>=4.10.0
 requests
 certifi>=2024.6.2
+tzdata>=2025.2
