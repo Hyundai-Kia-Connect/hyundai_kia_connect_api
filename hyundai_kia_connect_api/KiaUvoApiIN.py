@@ -11,9 +11,8 @@ import re
 import math
 from urllib.parse import parse_qs, urlparse
 from typing import Optional
-import pytz
 import requests
-from dateutil import tz
+from zoneinfo import ZoneInfo
 from .ApiImpl import (
     ClimateRequestOptions,
 )
@@ -78,7 +77,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 
 class KiaUvoApiIN(ApiImplType1):
-    data_timezone = tz.gettz("Asia/Kolkata")
+    data_timezone = ZoneInfo("Asia/Kolkata")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, brand: int) -> None:
@@ -150,7 +149,7 @@ class KiaUvoApiIN(ApiImplType1):
             stamp, authorization_code
         )
         _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
 
         return Token(
             username=username,

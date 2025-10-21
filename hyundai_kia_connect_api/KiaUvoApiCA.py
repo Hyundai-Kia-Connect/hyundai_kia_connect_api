@@ -6,10 +6,8 @@ import time
 import datetime as dt
 import json
 import logging
-import pytz
 import requests
-
-from dateutil.tz import tzoffset
+from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .Token import Token
@@ -34,6 +32,7 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     parse_datetime,
+    detect_timezone_for_date,
 )
 
 
@@ -65,6 +64,12 @@ firefox = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
+
+
+CA_TIMEZONES = [
+    ZoneInfo(f"Canada/{zone}")
+    for zone in "Newfoundland Atlantic Eastern Central Mountain Pacific".split()
+]
 
 
 # Use the custom cipher order
@@ -121,7 +126,6 @@ class KiaUvoApiCA(ApiImpl):
     temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int, language: str) -> None:
-        self.vehicle_timezone = self.data_timezone
         self.LANGUAGE: str = language
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA:
@@ -198,7 +202,9 @@ class KiaUvoApiCA(ApiImpl):
         access_token = response["accessToken"]
         refresh_token = response["refreshToken"]
 
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=token_expire_in)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=token_expire_in
+        )
 
         return Token(
             username=username,
@@ -282,18 +288,21 @@ class KiaUvoApiCA(ApiImpl):
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
 
-        # Calculate offset between vehicle last_updated_at and UTC
-        self.vehicle_timezone = vehicle.timezone
+        # lastStatusDate uses one of the Canadian timezones configured through
+        # the car entertainment system.
         last_updated_at = parse_datetime(
-            get_child_value(state, "status.lastStatusDate"), self.data_timezone
+            get_child_value(state, "status.lastStatusDate"), dt.timezone.utc
         )
-        now_utc: dt = dt.datetime.now(pytz.utc)
-        offset = round((last_updated_at - now_utc).total_seconds() / 3600)
-        _LOGGER.debug(f"{DOMAIN} - Offset between vehicle and UTC: {offset} hours")
-        if offset != 0:
-            # Set our timezone to account for the offset
-            vehicle.timezone = tzoffset("VEHICLETIME", offset * 3600)
-            _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to UTC + {offset} hours")
+        ref_date = dt.datetime.now(tz=dt.timezone.utc)
+        tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
+        if tz:
+            _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
+            vehicle.timezone = tz
+        else:
+            delta = (ref_date - last_updated_at).total_seconds() / 3600
+            _LOGGER.warning(
+                f"{DOMAIN} - could not guess Canadian timezone! delta is {delta} hours"
+            )
 
         self._update_vehicle_properties_base(vehicle, state)
 
@@ -320,7 +329,6 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
-        self.vehicle_timezone = vehicle.timezone
         vehicle.last_updated_at = parse_datetime(
             get_child_value(state, "status.lastStatusDate"), self.data_timezone
         )
@@ -524,7 +532,6 @@ class KiaUvoApiCA(ApiImpl):
         self, vehicle: Vehicle, state: dict
     ) -> None:
         if get_child_value(state, "coord.lat"):
-            self.vehicle_timezone = vehicle.timezone
             vehicle.location = (
                 get_child_value(state, "coord.lat"),
                 get_child_value(state, "coord.lon"),

@@ -3,9 +3,8 @@
 # pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
 
 import datetime as dt
+from datetime import timedelta
 import logging
-
-import pytz
 
 from .exceptions import APIError
 from .ApiImpl import (
@@ -15,6 +14,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
 )
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .KiaUvoApiUSA import KiaUvoApiUSA
 from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiEU import KiaUvoApiEU
@@ -30,6 +30,7 @@ from .const import (
     BRANDS,
     DOMAIN,
     REGION_AUSTRALIA,
+    REGION_BRAZIL,
     REGION_CANADA,
     REGION_EUROPE,
     REGION_USA,
@@ -116,7 +117,7 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt = dt.datetime.now(pytz.utc)
+        started_at_utc: dt.datetime = dt.datetime.now(dt.timezone.utc)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
             _LOGGER.debug(
@@ -146,7 +147,8 @@ class VehicleManager:
         if self.token is None:
             self.initialize()
         if (
-            self.token.valid_until <= dt.datetime.now(pytz.utc)
+            self.token.valid_until - timedelta(seconds=10)
+            <= dt.datetime.now(dt.timezone.utc)
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
@@ -324,5 +326,7 @@ class VehicleManager:
                 )
         elif REGIONS[region] == REGION_INDIA:
             return KiaUvoApiIN(brand)
+        elif REGIONS[region] == REGION_BRAZIL:
+            return HyundaiBlueLinkApiBR(region, brand, language)
         else:
             raise APIError(f"Unknown region {region}")
