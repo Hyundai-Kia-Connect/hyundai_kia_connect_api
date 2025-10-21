@@ -10,10 +10,9 @@ import uuid
 import re
 from urllib.parse import parse_qs, urlparse
 
-import pytz
 import requests
 from bs4 import BeautifulSoup
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 
 from .ApiImplType1 import ApiImplType1
@@ -51,12 +50,9 @@ from .utils import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-DEBUG_HTTP_DUMP = True  # išjunk į False, jei nebenori dump'ų
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-
-USER_AGENT_GENESIS: str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS"  # noqa
 ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
 
 SUPPORTED_LANGUAGES_LIST = [
@@ -79,7 +75,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 
 class KiaUvoApiEU(ApiImplType1):
-    data_timezone = tz.gettz("Europe/Berlin")
+    data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -97,6 +93,7 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
+            self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.CFB: str = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
@@ -110,17 +107,21 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+            self.CCS_SERVICE_SECRET: str = (
+                "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
+            )
             self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
             self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="  # noqa
-            self.LOGIN_FORM_HOST = "eu-account.hyundai.com"
+            self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
             self.PORT: int = 443
             self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
@@ -152,8 +153,7 @@ class KiaUvoApiEU(ApiImplType1):
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
             auth_client_id = "64621b96-0f0d-11ec-82a8-0242ac130003"
             self.LOGIN_FORM_URL: str = (
-                "https://"
-                + self.LOGIN_FORM_HOST
+                self.LOGIN_FORM_HOST
                 + "/auth/realms/euhyundaiidm/protocol/openid-connect/auth?client_id="
                 + auth_client_id
                 + "&scope=openid%20profile%20email%20phone&response_type=code&hkid_session_reset=true&redirect_uri="  # noqa
@@ -181,210 +181,59 @@ class KiaUvoApiEU(ApiImplType1):
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
-        authorization_code = None
+        if BRANDS[self.brand] == BRAND_KIA or BRANDS[self.brand] == BRAND_HYUNDAI:
+            refresh_token = password
 
-        # For Genesis brand, use the new authorization flow
-        if BRANDS[self.brand] == BRAND_GENESIS:
-            try:
-                authorization_code = self._get_authorization_code_genesis(
-                    username, password
-                )
-            except Exception as e:
-                _LOGGER.error(f"{DOMAIN} - Genesis authentication failed: {e}")
-                raise AuthenticationError("Genesis Login Failed") from e
+            _, access_token, authorization_code, expires_in = self._get_access_token(
+                stamp, refresh_token
+            )
+            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=expires_in
+            )
+
+            return Token(
+                username=username,
+                password=password,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                device_id=device_id,
+                valid_until=valid_until,
+            )
+
         else:
-            # For other brands, try the redirect URL method first, then fallback to form method
+            authorization_code = None
             try:
                 authorization_code = self._get_authorization_code_with_redirect_url(
                     username, password, cookies
                 )
             except Exception:
-                _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
+                _LOGGER.debug(
+                    f"{DOMAIN} - get_authorization_code_with_redirect_url failed"
+                )
                 authorization_code = self._get_authorization_code_with_form(
                     username, password, cookies
                 )
 
-        if authorization_code is None:
-            raise AuthenticationError("Login Failed")
+            if authorization_code is None:
+                raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code, expires_in = self._get_access_token(
-            stamp, authorization_code
-        )
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(seconds=expires_in)
-
-        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-
-        return Token(
-            username=username,
-            password=password,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            device_id=device_id,
-            valid_until=valid_until,
-        )
-
-    def _get_authorization_code_genesis(self, username: str, password: str) -> str:
-        # Create a session for handling cookies
-        session = requests.Session()
-        session.headers.update(
-            {
-                "User-Agent": USER_AGENT_MOZILLA,
-                "Accept-Language": f"{self.LANGUAGE}-{self.LANGUAGE.upper()},{self.LANGUAGE};q=0.9",
-            }
-        )
-
-        # Step 1: Get initial cookie
-        url = f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/authorize?response_type=code&client_id={self.CCSP_SERVICE_ID}&redirect_uri=https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2&lang={self.LANGUAGE}&scope=url.newapp"
-        response = session.get(url, allow_redirects=False)
-        self._dump_response(response, "initial_oauth2")
-        _LOGGER.debug(
-            f"{DOMAIN} - Initial OAuth2 request status: {response.status_code}"
-        )
-        _LOGGER.debug(f"{DOMAIN} - Initial OAuth2 URL: {url}")
-
-        if response.status_code != 302:
-            _LOGGER.error(
-                f"{DOMAIN} - Initial OAuth2 request failed with status: {response.status_code}"
+            _, access_token, authorization_code, expires_in = self._get_access_token(
+                stamp, authorization_code
             )
-            raise AuthenticationError("Failed to get initial OAuth2 redirect")
-
-        # Step 2: Follow redirect to authorize page
-        location_url = response.headers["Location"]
-        response = session.get(location_url)
-
-        if response.status_code != 200:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to load authorize page with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to load authorize page")
-
-        # Step 3: Get session
-        url = f"https://{self.BASE_DOMAIN}/api/v1/user/session"
-        response = session.get(url)
-        _LOGGER.debug(f"{DOMAIN} - Session request status: {response.status_code}")
-
-        if response.status_code != 204:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to establish session with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to establish session")
-
-        # Step 4: Set language
-        url = f"https://{self.BASE_DOMAIN}/api/v1/user/language"
-        headers = {"Content-Type": "text/plain;charset=UTF-8"}
-        response = session.post(url, headers=headers, json={"lang": self.LANGUAGE})
-        _LOGGER.debug(f"{DOMAIN} - Set language request status: {response.status_code}")
-
-        if response.status_code != 204:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to set language with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to set language")
-
-        # Step 5: Get integration info
-        url = f"https://{self.BASE_DOMAIN}/api/v1/user/integrationinfo"
-        response = session.get(url)
-        _LOGGER.debug(
-            f"{DOMAIN} - Integration info request status: {response.status_code}"
-        )
-
-        if response.status_code != 200:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to get integration info with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to get integration info")
-
-        integration_info = response.json()
-        service_id = integration_info.get("serviceId")
-        user_id = integration_info.get("userId")
-
-        if not service_id or not user_id:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to extract service or user ID from integration info"
-            )
-            raise AuthenticationError("Failed to extract service or user ID")
-
-        # Step 6: Perform login
-        url = f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/protocol/openid-connect/auth?client_id=ga-gcs&scope=openid%20profile%20email%20phone&response_type=code&redirect_uri=https://{self.BASE_DOMAIN}/api/v1/user/integration/redirect/login&ui_locales={self.LANGUAGE}&state={service_id}:{user_id}"
-        _LOGGER.debug(f"{DOMAIN} - Login form URL: {url}")
-        response = session.get(url)
-        _LOGGER.debug(f"{DOMAIN} - Login page request status: {response.status_code}")
-
-        if response.status_code != 200:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to load login page with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to load login page")
-
-        # Extract login action URL from response
-        match = re.search(r'"loginAction":\s*"(https://.*?)"', response.text)
-        if not match:
-            _LOGGER.error(f"{DOMAIN} - Could not find loginAction URL in response")
-            _LOGGER.debug(f"{DOMAIN} - Response content: {response.text[:500]}...")
-            raise AuthenticationError("Could not find loginAction URL")
-
-        login_action_url = match.group(1)
-        _LOGGER.debug(f"{DOMAIN} - Login action URL: {login_action_url}")
-
-        # Submit login credentials
-        payload = {"username": username, "password": password}
-        response = session.post(login_action_url, data=payload, allow_redirects=False)
-        _LOGGER.debug(f"{DOMAIN} - Login submission status: {response.status_code}")
-
-        if response.status_code != 302:
-            _LOGGER.error(
-                f"{DOMAIN} - Login submission failed with status: {response.status_code}"
-            )
-            _LOGGER.debug(
-                f"{DOMAIN} - Login response content: {response.text[:500]}..."
-            )
-            raise AuthenticationError("Login submission failed")
-
-        # Step 7: Follow redirects
-        redirect_url = response.headers["Location"]
-        _LOGGER.debug(f"{DOMAIN} - Redirect URL after login: {redirect_url}")
-        response = session.get(redirect_url, allow_redirects=True)
-        _LOGGER.debug(f"{DOMAIN} - Final redirect status: {response.status_code}")
-
-        if response.status_code != 200:
-            _LOGGER.error(
-                f"{DOMAIN} - Failed to follow login redirects with status: {response.status_code}"
-            )
-            raise AuthenticationError("Failed to follow login redirects")
-
-        # Step 8: Perform silent signin
-        url = f"https://{self.BASE_DOMAIN}/api/v1/user/silentsignin"
-        headers = {"Content-Type": "text/plain;charset=UTF-8"}
-        response = session.post(url, headers=headers, json={"intUserId": ""})
-        _LOGGER.debug(f"{DOMAIN} - Silent signin status: {response.status_code}")
-
-        if response.status_code != 200:
-            _LOGGER.error(
-                f"{DOMAIN} - Silent signin failed with status: {response.status_code}"
-            )
-            raise AuthenticationError("Silent signin failed")
-
-        redirect_url_with_code = response.json().get("redirectUrl")
-        if not redirect_url_with_code:
-            _LOGGER.error(f"{DOMAIN} - No redirect URL in silent signin response")
-            raise AuthenticationError("No redirect URL in silent signin response")
-
-        _LOGGER.debug(f"{DOMAIN} - Redirect URL with code: {redirect_url_with_code}")
-
-        # Extract authorization code from redirect URL
-        match = re.search(r"code=([^&]*)", redirect_url_with_code)
-        if not match:
-            _LOGGER.error(
-                f"{DOMAIN} - Could not extract authorization code from redirect URL"
-            )
-            raise AuthenticationError(
-                "Could not extract authorization code from redirect URL"
+            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=expires_in
             )
 
-        authorization_code = match.group(1)
-        _LOGGER.debug(f"{DOMAIN} - Genesis authorization code obtained successfully")
+            _, refresh_token = self._get_refresh_token(stamp, authorization_code)
 
-        return authorization_code
+            return Token(
+                username=username,
+                password=password,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                device_id=device_id,
+                valid_until=valid_until,
+            )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -588,9 +437,15 @@ class KiaUvoApiEU(ApiImplType1):
         elif ev_charge_port_door_is_open == 2:
             vehicle.ev_charge_port_door_is_open = False
 
-        vehicle.ev_charging_power = get_child_value(
-            state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
-        )
+        if (
+            get_child_value(
+                state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
+            )
+            is not None
+        ):
+            vehicle.ev_charging_power = get_child_value(
+                state, "vehicleStatus.evStatus.batteryPower.batteryStndChrgPower"
+            )
 
         if (
             get_child_value(
@@ -1174,13 +1029,13 @@ class KiaUvoApiEU(ApiImplType1):
                 if (
                     drivingInfoItem["drivingPeriod"] == 0
                     and next(
-                        (
-                            v
-                            for k, v in drivingInfoItem.items()
-                            if k.lower() == "calculativeodo"
-                        ),
-                        0,
-                    )
+                    (
+                        v
+                        for k, v in drivingInfoItem.items()
+                        if k.lower() == "calculativeodo"
+                    ),
+                    0,
+                )
                     > 0
                 ):
                     drivingInfo["consumption30d"] = round(
@@ -1267,26 +1122,6 @@ class KiaUvoApiEU(ApiImplType1):
         return session.cookies.get_dict()
         # return session
 
-    def _set_session_language(self, cookies) -> None:
-        # Set Language for Session #
-        url = self.USER_API_URL + "language"
-        headers = {"Content-type": "application/json"}
-        payload = {"lang": self.LANGUAGE}
-        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
-
-    def _dump_response(self, response, label: str):
-        if not DEBUG_HTTP_DUMP:
-            return
-        try:
-            import os, tempfile, time
-            ts = int(time.time())
-            fn = os.path.join(tempfile.gettempdir(), f"kiauvoapi_{label}_{ts}.html")
-            with open(fn, "w", encoding="utf-8") as f:
-                f.write(response.text if hasattr(response, "text") else str(response))
-            _LOGGER.debug(f"{DOMAIN} - HTTP dump saved: {fn}")
-        except Exception as e:
-            _LOGGER.warning(f"{DOMAIN} - Failed to dump HTTP response: {e}")
-
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
@@ -1368,19 +1203,6 @@ class KiaUvoApiEU(ApiImplType1):
 
             return code
 
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            url = self.USER_API_URL + "signin"
-            headers = {"Content-type": "application/json"}
-            data = {"email": username, "password": password}
-            response = requests.post(
-                url, json=data, headers=headers, cookies=cookies
-            ).json()
-            _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
-            parsed_url = urlparse(response["redirectUrl"])
-            code = "".join(parse_qs(parsed_url.query)["code"])
-
-            return code
-
         else:
             url = self.LOGIN_FORM_URL
             headers = {"Content-type": "application/json"}
@@ -1403,8 +1225,8 @@ class KiaUvoApiEU(ApiImplType1):
                 "orgHmgSid": "",
                 "password": password,
                 "redirect_uri": "https://"
-                + self.BASE_DOMAIN
-                + ":8080/api/v1/user/oauth2/redirect",
+                                + self.BASE_DOMAIN
+                                + ":8080/api/v1/user/oauth2/redirect",
                 "state": "ccsp",
                 "username": username,
                 "remember_me": "false",
@@ -1519,64 +1341,19 @@ class KiaUvoApiEU(ApiImplType1):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
-        if BRANDS[self.brand] == BRAND_GENESIS:
-            # Genesis specific access token flow
-            url = self.USER_API_URL + "oauth2/token"
+        url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
+        data = {
+            "grant_type": "refresh_token",
+            "refresh_token": authorization_code,
+            "client_id": self.CCSP_SERVICE_ID,
+            "client_secret": self.CCS_SERVICE_SECRET,
+        }
 
-            data = {
-                "client_id": self.CCSP_SERVICE_ID,
-                "code": authorization_code,
-                "grant_type": "authorization_code",
-                "redirect_uri": f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2",
-            }
-
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "User-Agent": USER_AGENT_MOZILLA,
-            }
-
-            response = requests.post(url, data=data, headers=headers)
-            response_json = response.json()
-
-            if "access_token" not in response_json:
-                raise AuthenticationError("Failed to get Genesis access token")
-
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            # Get Access Token #
-            url = self.USER_API_URL + "oauth2/token"
-            headers = {
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "Stamp": stamp,
-                "Content-type": "application/x-www-form-urlencoded",
-                "Host": self.BASE_URL,
-                "Connection": "close",
-                "Accept-Encoding": "gzip, deflate",
-                "User-Agent": USER_AGENT_OK_HTTP,
-            }
-
-            data = (
-                "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
-                + self.BASE_DOMAIN
-                + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
-                + authorization_code
-            )
-            response = requests.post(url, data=data, headers=headers)
-        else:
-            url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
-            data = {
-                "grant_type": "authorization_code",
-                "code": authorization_code,
-                "redirect_uri": "https://"
-                                + self.BASE_DOMAIN
-                                + ":8080/api/v1/user/oauth2/redirect",
-                "client_id": self.CCSP_SERVICE_ID,
-                "client_secret": "secret",
-            }
-
-            response = requests.post(url, data=data, allow_redirects=False)
+        response = requests.post(url, data=data, allow_redirects=False)
 
         response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
+        _check_response_for_errors(response)
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
@@ -1586,62 +1363,23 @@ class KiaUvoApiEU(ApiImplType1):
 
     def _get_refresh_token(self, stamp, authorization_code):
         # Get Refresh Token #
-        if BRANDS[self.brand] == BRAND_HYUNDAI:
-            # Get Access Token #
-            url = self.USER_API_URL + "oauth2/token"
-            headers = {
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "Stamp": stamp,
-                "Content-type": "application/x-www-form-urlencoded",
-                "Host": self.BASE_URL,
-                "Connection": "close",
-                "Accept-Encoding": "gzip, deflate",
-                "User-Agent": USER_AGENT_OK_HTTP,
-            }
+        url = self.USER_API_URL + "oauth2/token"
+        headers = {
+            "Authorization": self.BASIC_AUTHORIZATION,
+            "Stamp": stamp,
+            "Content-type": "application/x-www-form-urlencoded",
+            "Host": self.BASE_URL,
+            "Connection": "close",
+            "Accept-Encoding": "gzip, deflate",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
 
-            data = (
-                "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
-                + self.BASE_DOMAIN
-                + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
-                + authorization_code
-            )
-            response = requests.post(url, data=data, headers=headers)
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            url = self.USER_API_URL + "oauth2/token"
-
-            payload = {
-                "client_id": self.CCSP_SERVICE_ID,
-                "refresh_token": authorization_code,
-                "grant_type": "refresh_token",
-                "redirect_uri": f"https://{self.LOGIN_FORM_HOST}/realms/eugenesisidm/ga-api/redirect2",
-            }
-
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "User-Agent": USER_AGENT_MOZILLA,
-            }
-
-            response = requests.post(url, headers=headers, data=payload)
-        else:
-            url = self.USER_API_URL + "oauth2/token"
-            headers = {
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "Stamp": stamp,
-                "Content-type": "application/x-www-form-urlencoded",
-                "Host": self.BASE_URL,
-                "Connection": "close",
-                "Accept-Encoding": "gzip, deflate",
-                "User-Agent": USER_AGENT_OK_HTTP,
-            }
-
-            data = (
-                "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
-                + authorization_code
-            )
-            response = requests.post(url, data=data, headers=headers)
+        data = (
+            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
+            + authorization_code
+        )
+        response = requests.post(url, data=data, headers=headers)
         response = response.json()
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-
