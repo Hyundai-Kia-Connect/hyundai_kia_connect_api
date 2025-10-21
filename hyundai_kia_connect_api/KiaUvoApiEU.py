@@ -40,9 +40,6 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
-from .exceptions import (
-    AuthenticationError,
-)
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
@@ -198,7 +195,6 @@ class KiaUvoApiEU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
         )
-
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
