@@ -9,9 +9,8 @@ import random
 import uuid
 from urllib.parse import parse_qs, urlparse
 
-import pytz
 import requests
-from dateutil import tz
+from zoneinfo import ZoneInfo
 
 from .ApiImplType1 import ApiImplType1
 from .Token import Token
@@ -54,7 +53,7 @@ USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build
 
 
 class KiaUvoApiAU(ApiImplType1):
-    data_timezone = tz.gettz("Australia/Sydney")
+    data_timezone = ZoneInfo("Australia/Sydney")
     temperature_range = [x * 0.5 for x in range(34, 54)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -109,7 +108,7 @@ class KiaUvoApiAU(ApiImplType1):
             authorization_code, stamp
         )
         _, refresh_token = self._get_refresh_token(authorization_code, stamp)
-        valid_until = dt.datetime.now(pytz.utc) + dt.timedelta(hours=23)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
 
         return Token(
             username=username,

@@ -26,7 +26,7 @@ jobs:
                   git tag ${{ steps.semantic_release_info.outputs.git_tag }}
             - name: Push changes
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: ad-m/github-push-action@v0.8.0
+              uses: ad-m/github-push-action@v1.0.0
               with:
                   github_token: ${{ github.token }}
                   tags: true
@@ -51,7 +51,7 @@ jobs:
               run: python -m build
             - name: Publish package to PyPi Test
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
+              uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
               with:
                   user: __token__
                   password: ${{ secrets.TEST_PYPI_API_TOKEN }}
@@ -59,7 +59,7 @@ jobs:
                   verbose: true
             - name: Publish package to PyPi Live
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
+              uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
               with:
                   user: __token__
                   password: ${{ secrets.PYPI_API_TOKEN }}

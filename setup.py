@@ -33,6 +33,9 @@ setup(
     ],
     description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
     install_requires=requirements,
+    extras_require={
+        "google": ["geopy>=2.2.0"],
+    },
     license="MIT license",
     long_description=long_description,
     include_package_data=True,
@@ -47,6 +50,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api",
-    version="3.44.5",
+    version="3.49.0",
     zip_safe=False,
 )
