@@ -4,7 +4,10 @@
 
 import datetime as dt
 from datetime import timedelta
+import inspect as insp
 import logging
+
+import typing as ty
 
 from .exceptions import APIError
 from .ApiImpl import (
@@ -60,6 +63,7 @@ class VehicleManager:
         geocode_provider: int = 1,
         geocode_api_key: str = None,
         language: str = "en",
+        otp_handler: ty.Callable[[dict], dict] | None = None,
     ):
         self.region: int = region
         self.brand: int = brand
@@ -71,6 +75,7 @@ class VehicleManager:
         self.pin: str = pin
         self.language: str = language
         self.geocode_api_key: str = geocode_api_key
+        self.otp_handler = otp_handler
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
@@ -81,7 +86,13 @@ class VehicleManager:
         self.vehicles_valid = False
 
     def initialize(self) -> None:
-        self.token: Token = self.api.login(self.username, self.password)
+        login_sig = insp.signature(self.api.login)
+        kwargs = {}
+        if "token" in login_sig.parameters:
+            kwargs["token"] = self.token
+        if "otp_handler" in login_sig.parameters:
+            kwargs["otp_handler"] = self.otp_handler
+        self.token: Token = self.api.login(self.username, self.password, **kwargs)
         self.token.pin = self.pin
         self.initialize_vehicles()
 
@@ -159,7 +170,13 @@ class VehicleManager:
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            self.token: Token = self.api.login(self.username, self.password)
+            login_sig = insp.signature(self.api.login)
+            kwargs = {}
+            if "token" in login_sig.parameters:
+                kwargs["token"] = self.token
+            if "otp_handler" in login_sig.parameters:
+                kwargs["otp_handler"] = self.otp_handler
+            self.token: Token = self.api.login(self.username, self.password, **kwargs)
             self.token.pin = self.pin
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
