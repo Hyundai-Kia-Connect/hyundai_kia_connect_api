@@ -65,7 +65,12 @@ def request_with_active_session(func):
             self = args[0]
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
-            new_token = self.login(token.username, token.password, token, getattr(self, "_otp_handler", None))
+            new_token = self.login(
+                token.username,
+                token.password,
+                token,
+                getattr(self, "_otp_handler", None),
+            )
             token.access_token = new_token.access_token
             token.refresh_token = new_token.refresh_token
             token.valid_until = new_token.valid_until
@@ -239,7 +244,13 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
-    def login(self, username: str, password: str, token: Token = None, otp_handler: ty.Callable[[dict], dict] | None = None) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         """Login into cloud endpoints and return Token
 
         Parameters
@@ -312,13 +323,17 @@ class KiaUvoApiUSA(ApiImpl):
                     if nt in ("EMAIL", "PHONE"):
                         notify_type = nt
                 except Exception:
-                    _LOGGER.debug(f"{DOMAIN} - otp_handler choose_destination failed; using default")
+                    _LOGGER.debug(
+                        f"{DOMAIN} - otp_handler choose_destination failed; using default"
+                    )
             else:
                 if payload.get("hasEmail") and payload.get("hasPhone"):
                     print("\nOTP Authentication Required")
                     print(f"Email: {payload.get('email', 'N/A')}")
                     print(f"Phone: {payload.get('phone', 'N/A')}")
-                    choice = input("Send OTP to (E)mail or (P)hone? [E/P]: ").strip().upper()
+                    choice = (
+                        input("Send OTP to (E)mail or (P)hone? [E/P]: ").strip().upper()
+                    )
                     if choice == "P":
                         notify_type = "PHONE"
                 elif payload.get("hasPhone"):
