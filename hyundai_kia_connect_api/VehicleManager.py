@@ -162,8 +162,6 @@ class VehicleManager:
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
-        elif not self.vehicles_valid:
-            self.initialize_vehicles()
         if (
             self.token.valid_until - timedelta(seconds=10)
             <= dt.datetime.now(dt.timezone.utc)

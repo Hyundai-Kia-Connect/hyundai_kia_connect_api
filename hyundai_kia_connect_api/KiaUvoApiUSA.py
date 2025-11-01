@@ -244,6 +244,105 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
+    def start_login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+    ) -> tuple[Token | None, dict | None]:
+        """Start login and return either a Token or an OTP context.
+
+        Parameters
+        ----------
+        username : str
+            User email address
+        password : str
+            User password
+        token : Token | None
+            Existing token with stored rmtoken for reuse
+
+        Returns
+        -------
+        tuple[Token | None, dict | None]
+            (Token, None) if login succeeded without OTP, otherwise (None, ctx)
+            where ctx contains 'otpKey', 'xid', 'email', 'phone', 'hasEmail', 'hasPhone'.
+        """
+        url = self.API_URL + "prof/authUser"
+        data = {
+            "deviceKey": "",
+            "deviceType": 2,
+            "userCredential": {"userId": username, "password": password},
+        }
+        headers = self.api_headers()
+        if token and getattr(token, "device_id", None):
+            self.device_id = token.device_id
+
+        if token and token.refresh_token:
+            _LOGGER.debug(f"{DOMAIN} - Attempting start_login with stored rmtoken")
+            headers["rmtoken"] = token.refresh_token
+        response = self.session.post(url, json=data, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Start Sign In Response {response.text}")
+        response_json = response.json()
+        session_id = response.headers.get("sid")
+        if session_id:
+            _LOGGER.debug(f"got session id {session_id}")
+            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
+            existing_rmtoken = token.refresh_token if token else None
+            return (
+                Token(
+                    username=username,
+                    password=password,
+                    access_token=session_id,
+                    refresh_token=existing_rmtoken,
+                    valid_until=valid_until,
+                    device_id=self.device_id,
+                ),
+                None,
+            )
+        if "payload" in response_json and "otpKey" in response_json["payload"]:
+            payload = response_json["payload"]
+            xid = response.headers.get("xid", "")
+            ctx = {
+                "otpKey": payload["otpKey"],
+                "xid": xid,
+                "email": payload.get("email"),
+                "phone": payload.get("phone"),
+                "hasEmail": bool(payload.get("hasEmail")),
+                "hasPhone": bool(payload.get("hasPhone")),
+                "rmTokenExpired": bool(payload.get("rmTokenExpired")),
+            }
+            return None, ctx
+        raise Exception(
+            f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
+        )
+
+    def send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict:
+        """Public helper to send OTP to the selected destination."""
+        return self._send_otp(otp_key, notify_type, xid)
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_key: str,
+        xid: str,
+        otp_code: str,
+    ) -> Token:
+        """Verify OTP and complete the login producing a Token."""
+        sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
+        final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
+        _LOGGER.debug(f"got final session id {final_sid}")
+        _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
+        valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
+        return Token(
+            username=username,
+            password=password,
+            access_token=final_sid,
+            refresh_token=rmtoken,
+            valid_until=valid_until,
+            device_id=self.device_id,
+        )
+
     def login(
         self,
         username: str,
@@ -277,6 +376,8 @@ class KiaUvoApiUSA(ApiImpl):
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
         }
+        if token and getattr(token, "device_id", None):
+            self.device_id = token.device_id
         if otp_handler is not None:
             self._otp_handler = otp_handler
         headers = self.api_headers()
@@ -297,6 +398,7 @@ class KiaUvoApiUSA(ApiImpl):
                 access_token=session_id,
                 refresh_token=existing_rmtoken,
                 valid_until=valid_until,
+                device_id=self.device_id,
             )
         if "payload" in response_json and "otpKey" in response_json["payload"]:
             payload = response_json["payload"]
@@ -370,6 +472,7 @@ class KiaUvoApiUSA(ApiImpl):
                 access_token=final_sid,
                 refresh_token=rmtoken,
                 valid_until=valid_until,
+                device_id=self.device_id,
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
@@ -413,20 +516,24 @@ class KiaUvoApiUSA(ApiImpl):
         response = response.json()
         if isinstance(vehicles, dict):
             for entry in response["payload"]["vehicleSummary"]:
-                if vehicles[entry["vehicleIdentifier"]]:
-                    vehicles[entry["vehicleIdentifier"]].name = entry["nickName"]
-                    vehicles[entry["vehicleIdentifier"]].model = entry["modelName"]
-                    vehicles[entry["vehicleIdentifier"]].key = entry["vehicleKey"]
+                vid = entry.get("vehicleIdentifier")
+                if vid is None:
+                    continue
+                vobj = vehicles.get(vid)
+                if vobj is not None:
+                    vobj.name = entry.get("nickName")
+                    vobj.model = entry.get("modelName")
+                    vobj.key = entry.get("vehicleKey")
                 else:
                     vehicle: Vehicle = Vehicle(
-                        id=entry["vehicleIdentifier"],
-                        name=entry["nickName"],
-                        model=entry["modelName"],
-                        key=entry["vehicleKey"],
+                        id=vid,
+                        name=entry.get("nickName"),
+                        model=entry.get("modelName"),
+                        key=entry.get("vehicleKey"),
                         timezone=self.data_timezone,
                     )
-                    vehicles.append(vehicle)
-                return vehicles
+                    vehicles[vid] = vehicle
+            return vehicles
         else:
             # For readability work with vehicle without s
             vehicle = vehicles
