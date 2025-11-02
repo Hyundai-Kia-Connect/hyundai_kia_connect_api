@@ -40,9 +40,6 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
-from .exceptions import (
-    AuthenticationError,
-)
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
@@ -127,7 +124,7 @@ class KiaUvoApiEU(ApiImplType1):
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
             self.BASIC_AUTHORIZATION: str = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="  # noqa
-            self.LOGIN_FORM_HOST = "accounts-eu.genesis.com"
+            self.LOGIN_FORM_HOST = "https://idpconnect-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
@@ -181,59 +178,23 @@ class KiaUvoApiEU(ApiImplType1):
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
-        if BRANDS[self.brand] == BRAND_KIA or BRANDS[self.brand] == BRAND_HYUNDAI:
-            refresh_token = password
+        refresh_token = password
 
-            _, access_token, authorization_code, expires_in = self._get_access_token(
-                stamp, refresh_token
-            )
-            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-                seconds=expires_in
-            )
+        _, access_token, authorization_code, expires_in = self._get_access_token(
+            stamp, refresh_token
+        )
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=expires_in
+        )
 
-            return Token(
-                username=username,
-                password=password,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                device_id=device_id,
-                valid_until=valid_until,
-            )
-
-        else:
-            authorization_code = None
-            try:
-                authorization_code = self._get_authorization_code_with_redirect_url(
-                    username, password, cookies
-                )
-            except Exception:
-                _LOGGER.debug(
-                    f"{DOMAIN} - get_authorization_code_with_redirect_url failed"
-                )
-                authorization_code = self._get_authorization_code_with_form(
-                    username, password, cookies
-                )
-
-            if authorization_code is None:
-                raise AuthenticationError("Login Failed")
-
-            _, access_token, authorization_code, expires_in = self._get_access_token(
-                stamp, authorization_code
-            )
-            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-                seconds=expires_in
-            )
-
-            _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-
-            return Token(
-                username=username,
-                password=password,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                device_id=device_id,
-                valid_until=valid_until,
-            )
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            device_id=device_id,
+            valid_until=valid_until,
+        )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -1125,7 +1086,7 @@ class KiaUvoApiEU(ApiImplType1):
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
     ) -> str:
-        if BRANDS[self.brand] == BRAND_HYUNDAI:
+        if BRANDS[self.brand] == BRAND_HYUNDAI or BRANDS[self.brand] == BRAND_GENESIS:
             url = self.USER_API_URL + "signin"
             headers = {"Content-type": "application/json"}
             data = {"email": username, "password": password}
