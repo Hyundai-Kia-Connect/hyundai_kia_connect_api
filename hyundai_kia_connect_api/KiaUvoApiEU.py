@@ -3,21 +3,23 @@
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
-import random
 import datetime as dt
 import logging
-import uuid
+import random
 import re
+import typing as ty
+import uuid
 from urllib.parse import parse_qs, urlparse
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
-from zoneinfo import ZoneInfo
 
-
-from .ApiImplType1 import ApiImplType1
-from .ApiImplType1 import _check_response_for_errors
-
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .const import (BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS,
+                    CHARGE_PORT_ACTION, DISTANCE_UNITS, DOMAIN, ENGINE_TYPES,
+                    SEAT_STATUS, TEMPERATURE_UNITS, VALET_MODE_ACTION)
+from .exceptions import AuthenticationError
 from .Token import Token
 from .Vehicle import (
     Vehicle,
@@ -176,7 +178,13 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()

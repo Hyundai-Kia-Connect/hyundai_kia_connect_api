@@ -3,49 +3,29 @@
 # pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
 
 import datetime as dt
-from datetime import timedelta
-import inspect as insp
 import logging
-
 import typing as ty
+from datetime import timedelta
 
+from .ApiImpl import (ApiImpl, ClimateRequestOptions,
+                      ScheduleChargingClimateRequestOptions,
+                      WindowRequestOptions)
+from .const import (BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS,
+                    CHARGE_PORT_ACTION, DOMAIN, ORDER_STATUS, REGION_AUSTRALIA,
+                    REGION_BRAZIL, REGION_CANADA, REGION_CHINA, REGION_EUROPE,
+                    REGION_INDIA, REGION_NZ, REGION_USA, REGIONS,
+                    VALET_MODE_ACTION, VEHICLE_LOCK_ACTION)
 from .exceptions import APIError
-from .ApiImpl import (
-    ApiImpl,
-    ClimateRequestOptions,
-    WindowRequestOptions,
-    ScheduleChargingClimateRequestOptions,
-)
-from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
-from .KiaUvoApiUSA import KiaUvoApiUSA
-from .KiaUvoApiCA import KiaUvoApiCA
-from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoApiCN import KiaUvoApiCN
+from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .KiaUvoApiAU import KiaUvoApiAU
+from .KiaUvoApiCA import KiaUvoApiCA
+from .KiaUvoApiCN import KiaUvoApiCN
+from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
+from .KiaUvoApiUSA import KiaUvoApiUSA
 from .Token import Token
 from .Vehicle import Vehicle
-from .const import (
-    BRAND_GENESIS,
-    BRAND_HYUNDAI,
-    BRAND_KIA,
-    BRANDS,
-    DOMAIN,
-    REGION_AUSTRALIA,
-    REGION_BRAZIL,
-    REGION_CANADA,
-    REGION_EUROPE,
-    REGION_USA,
-    REGION_CHINA,
-    REGION_NZ,
-    REGION_INDIA,
-    REGIONS,
-    VEHICLE_LOCK_ACTION,
-    CHARGE_PORT_ACTION,
-    ORDER_STATUS,
-    VALET_MODE_ACTION,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -86,13 +66,12 @@ class VehicleManager:
         self.vehicles_valid = False
 
     def initialize(self) -> None:
-        login_sig = insp.signature(self.api.login)
-        kwargs = {}
-        if "token" in login_sig.parameters:
-            kwargs["token"] = self.token
-        if "otp_handler" in login_sig.parameters:
-            kwargs["otp_handler"] = self.otp_handler
-        self.token: Token = self.api.login(self.username, self.password, **kwargs)
+        self.token: Token = self.api.login(
+            self.username,
+            self.password,
+            token=self.token,
+            otp_handler=self.otp_handler,
+        )
         self.token.pin = self.pin
         self.initialize_vehicles()
 
@@ -168,13 +147,12 @@ class VehicleManager:
             or self.api.test_token(self.token) is False
         ):
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            login_sig = insp.signature(self.api.login)
-            kwargs = {}
-            if "token" in login_sig.parameters:
-                kwargs["token"] = self.token
-            if "otp_handler" in login_sig.parameters:
-                kwargs["otp_handler"] = self.otp_handler
-            self.token: Token = self.api.login(self.username, self.password, **kwargs)
+            self.token: Token = self.api.login(
+                self.username,
+                self.password,
+                token=self.token,
+                otp_handler=self.otp_handler,
+            )
             self.token.pin = self.pin
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True

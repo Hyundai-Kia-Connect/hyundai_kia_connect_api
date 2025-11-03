@@ -2,37 +2,25 @@
 
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
+import datetime as dt
 import logging
 import time
-import datetime as dt
-import requests
-import certifi
+import typing as ty
 
+import certifi
+import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError
 
-from .const import (
-    DOMAIN,
-    VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    ENGINE_TYPES,
-)
-from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .const import (DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, SEAT_STATUS,
+                    TEMPERATURE_UNITS, VEHICLE_LOCK_ACTION)
 from .Token import Token
-from .Vehicle import (
-    DailyDrivingStats,
-    DayTripCounts,
-    DayTripInfo,
-    MonthTripInfo,
-    TripInfo,
-    Vehicle,
-)
-
+from .utils import get_child_value, get_float, parse_datetime
+from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
+                      MonthTripInfo, TripInfo, Vehicle)
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
@@ -124,7 +112,13 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["vin"] = vehicle.VIN
         return headers
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         # Sign In with Email and Password and Get Authorization Code
         url = self.LOGIN_API + "oauth/token"
         data = {"username": username, "password": password}

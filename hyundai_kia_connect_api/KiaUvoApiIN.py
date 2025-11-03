@@ -3,53 +3,30 @@
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
-import random
 import datetime as dt
 import logging
-import uuid
-import re
 import math
-from urllib.parse import parse_qs, urlparse
+import random
+import re
+import typing as ty
+import uuid
 from typing import Optional
-import requests
+from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
-from .ApiImpl import (
-    ClimateRequestOptions,
-)
 
-from .ApiImplType1 import ApiImplType1
-from .ApiImplType1 import _check_response_for_errors
+import requests
 
+from .ApiImpl import ClimateRequestOptions
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, CHARGE_PORT_ACTION,
+                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, SEAT_STATUS,
+                    TEMPERATURE_UNITS, VALET_MODE_ACTION, VEHICLE_LOCK_ACTION)
+from .exceptions import AuthenticationError
 from .Token import Token
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
-)
-from .const import (
-    BRAND_HYUNDAI,
-    BRAND_KIA,
-    BRANDS,
-    CHARGE_PORT_ACTION,
-    DISTANCE_UNITS,
-    DOMAIN,
-    ENGINE_TYPES,
-    SEAT_STATUS,
-    TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION,
-    VALET_MODE_ACTION,
-)
-from .exceptions import (
-    AuthenticationError,
-)
-from .utils import (
-    get_child_value,
-    get_index_into_hex_temp,
-    get_hex_temp_into_index,
-)
+from .utils import (get_child_value, get_hex_temp_into_index,
+                    get_index_into_hex_temp)
+from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
+                      MonthTripInfo, TripInfo, Vehicle)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,7 +107,13 @@ class KiaUvoApiIN(ApiImplType1):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()

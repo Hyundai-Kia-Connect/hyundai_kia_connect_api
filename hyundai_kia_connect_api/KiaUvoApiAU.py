@@ -6,45 +6,22 @@ import base64
 import datetime as dt
 import logging
 import random
+import typing as ty
 import uuid
 from urllib.parse import parse_qs, urlparse
-
-import requests
 from zoneinfo import ZoneInfo
 
-from .ApiImplType1 import ApiImplType1
+import requests
+
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, CHARGE_PORT_ACTION,
+                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, REGION_AUSTRALIA,
+                    REGION_NZ, REGIONS, SEAT_STATUS, TEMPERATURE_UNITS)
+from .exceptions import AuthenticationError
 from .Token import Token
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
-)
-from .ApiImplType1 import _check_response_for_errors
-from .const import (
-    BRAND_HYUNDAI,
-    BRAND_KIA,
-    BRANDS,
-    REGIONS,
-    DOMAIN,
-    REGION_AUSTRALIA,
-    REGION_NZ,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    SEAT_STATUS,
-    CHARGE_PORT_ACTION,
-    ENGINE_TYPES,
-)
-from .exceptions import (
-    AuthenticationError,
-)
-from .utils import (
-    get_child_value,
-    get_hex_temp_into_index,
-    parse_datetime,
-)
+from .utils import get_child_value, get_hex_temp_into_index, parse_datetime
+from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
+                      MonthTripInfo, TripInfo, Vehicle)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +65,13 @@ class KiaUvoApiAU(ApiImplType1):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()

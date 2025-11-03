@@ -3,6 +3,7 @@
 # pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
 import datetime as dt
 import logging
+import typing as ty
 from dataclasses import dataclass
 
 import requests
@@ -13,20 +14,12 @@ try:
 except ImportError:
     GoogleV3 = None
 
-from .utils import get_child_value
+from .const import (CHARGE_PORT_ACTION, DOMAIN, GEO_LOCATION_PROVIDERS, GOOGLE,
+                    OPENSTREETMAP, ORDER_STATUS, VALET_MODE_ACTION,
+                    VEHICLE_LOCK_ACTION, WINDOW_STATE)
 from .Token import Token
+from .utils import get_child_value
 from .Vehicle import Vehicle
-from .const import (
-    WINDOW_STATE,
-    CHARGE_PORT_ACTION,
-    ORDER_STATUS,
-    DOMAIN,
-    VALET_MODE_ACTION,
-    VEHICLE_LOCK_ACTION,
-    GEO_LOCATION_PROVIDERS,
-    OPENSTREETMAP,
-    GOOGLE,
-)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +75,13 @@ class ApiImpl:
     def __init__(self) -> None:
         """Initialize."""
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         """Login into cloud endpoints and return Token"""
         pass
 

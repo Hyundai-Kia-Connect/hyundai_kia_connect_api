@@ -3,60 +3,32 @@
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import datetime as dt
-import math
 import logging
+import math
+import typing as ty
 import uuid
-from typing import Optional
 from time import sleep
+from typing import Optional
 from urllib.parse import parse_qs, urlparse
-
-import requests
 from zoneinfo import ZoneInfo
 
-from .ApiImpl import (
-    ClimateRequestOptions,
-)
-from .ApiImplType1 import ApiImplType1
+import requests
 
+from .ApiImpl import ClimateRequestOptions
+from .ApiImplType1 import ApiImplType1
+from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, CHARGE_PORT_ACTION,
+                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, LOGIN_TOKEN_LIFETIME,
+                    ORDER_STATUS, SEAT_STATUS, TEMPERATURE_UNITS,
+                    VEHICLE_LOCK_ACTION)
+from .exceptions import (APIError, AuthenticationError, DuplicateRequestError,
+                         InvalidAPIResponseError, NoDataFound,
+                         RateLimitingError, RequestTimeoutError,
+                         ServiceTemporaryUnavailable)
 from .Token import Token
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
-)
-from .const import (
-    BRAND_HYUNDAI,
-    BRAND_KIA,
-    BRANDS,
-    CHARGE_PORT_ACTION,
-    DISTANCE_UNITS,
-    DOMAIN,
-    ENGINE_TYPES,
-    LOGIN_TOKEN_LIFETIME,
-    ORDER_STATUS,
-    SEAT_STATUS,
-    TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION,
-)
-from .exceptions import (
-    AuthenticationError,
-    DuplicateRequestError,
-    RequestTimeoutError,
-    ServiceTemporaryUnavailable,
-    NoDataFound,
-    InvalidAPIResponseError,
-    APIError,
-    RateLimitingError,
-)
-from .utils import (
-    get_child_value,
-    get_index_into_hex_temp,
-    get_hex_temp_into_index,
-    parse_datetime,
-)
+from .utils import (get_child_value, get_hex_temp_into_index,
+                    get_index_into_hex_temp, parse_datetime)
+from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
+                      MonthTripInfo, TripInfo, Vehicle)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -156,7 +128,13 @@ class KiaUvoApiCN(ApiImplType1):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         device_id = self._get_device_id()
         cookies = self._get_cookies()
         self._set_session_language(cookies)
