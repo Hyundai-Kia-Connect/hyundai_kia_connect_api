@@ -40,6 +40,9 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
+from .exceptions import (
+    AuthenticationError,
+)
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
@@ -179,6 +182,14 @@ class KiaUvoApiEU(ApiImplType1):
         cookies = self._get_cookies()
         self._set_session_language(cookies)
         refresh_token = password
+
+        # Plaintext passwords can no longer be used due to reCaptcha
+        # requirements on the log in page. Users must provide a valid
+        # "refresh_token" to avoid "Received unexpected statusCode" errors.
+        if not re.match(r"^[A-Z0-9]{48}$", refresh_token):
+            raise AuthenticationError(
+                "Passwords are no longer supported, provide a refresh_token instead"
+            )
 
         _, access_token, authorization_code, expires_in = self._get_access_token(
             stamp, refresh_token
