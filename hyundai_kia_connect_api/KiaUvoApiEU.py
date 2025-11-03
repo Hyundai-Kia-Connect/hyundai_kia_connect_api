@@ -16,19 +16,6 @@ import requests
 from bs4 import BeautifulSoup
 
 from .ApiImplType1 import ApiImplType1, _check_response_for_errors
-from .const import (BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS,
-                    CHARGE_PORT_ACTION, DISTANCE_UNITS, DOMAIN, ENGINE_TYPES,
-                    SEAT_STATUS, TEMPERATURE_UNITS, VALET_MODE_ACTION)
-from .exceptions import AuthenticationError
-from .Token import Token
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
-)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -42,8 +29,14 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
-from .exceptions import (
-    AuthenticationError,
+from .Token import Token
+from .Vehicle import (
+    Vehicle,
+    DailyDrivingStats,
+    MonthTripInfo,
+    DayTripInfo,
+    TripInfo,
+    DayTripCounts,
 )
 from .utils import (
     get_child_value,

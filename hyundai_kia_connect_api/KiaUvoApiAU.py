@@ -14,14 +14,31 @@ from zoneinfo import ZoneInfo
 import requests
 
 from .ApiImplType1 import ApiImplType1, _check_response_for_errors
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, CHARGE_PORT_ACTION,
-                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, REGION_AUSTRALIA,
-                    REGION_NZ, REGIONS, SEAT_STATUS, TEMPERATURE_UNITS)
+from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    REGION_AUSTRALIA,
+    REGION_NZ,
+    REGIONS,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+)
 from .exceptions import AuthenticationError
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, parse_datetime
-from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
-                      MonthTripInfo, TripInfo, Vehicle)
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

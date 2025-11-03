@@ -13,14 +13,21 @@ from urllib.parse import urljoin, urlparse
 import requests
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
-from .const import (BRAND_HYUNDAI, BRANDS, DISTANCE_UNITS, DOMAIN,
-                    ENGINE_TYPES, ORDER_STATUS, SEAT_STATUS,
-                    VEHICLE_LOCK_ACTION, WINDOW_STATE)
+from .const import (
+    BRAND_HYUNDAI,
+    BRANDS,
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    ORDER_STATUS,
+    SEAT_STATUS,
+    VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
+)
 from .exceptions import APIError
 from .Token import Token
 from .utils import get_index_into_hex_temp, parse_date_br
-from .Vehicle import (DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo,
-                      Vehicle)
+from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 

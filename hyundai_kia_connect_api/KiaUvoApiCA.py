@@ -11,19 +11,34 @@ from zoneinfo import ZoneInfo
 
 import certifi
 import requests
+
 # Try to fix hyundai/cloudflare
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .const import (BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS,
-                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, ORDER_STATUS,
-                    SEAT_STATUS, TEMPERATURE_UNITS, VEHICLE_LOCK_ACTION)
+from .const import (
+    BRAND_GENESIS,
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    ORDER_STATUS,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
+)
 from .exceptions import APIError, AuthenticationError
 from .Token import Token
-from .utils import (detect_timezone_for_date, get_child_value,
-                    get_hex_temp_into_index, get_index_into_hex_temp,
-                    parse_datetime)
+from .utils import (
+    detect_timezone_for_date,
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+    parse_datetime,
+)
 from .Vehicle import DailyDrivingStats, Vehicle
 
 # Firefox Fingerprint

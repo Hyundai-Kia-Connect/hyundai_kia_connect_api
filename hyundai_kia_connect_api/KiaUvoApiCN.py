@@ -16,19 +16,45 @@ import requests
 
 from .ApiImpl import ClimateRequestOptions
 from .ApiImplType1 import ApiImplType1
-from .const import (BRAND_HYUNDAI, BRAND_KIA, BRANDS, CHARGE_PORT_ACTION,
-                    DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, LOGIN_TOKEN_LIFETIME,
-                    ORDER_STATUS, SEAT_STATUS, TEMPERATURE_UNITS,
-                    VEHICLE_LOCK_ACTION)
-from .exceptions import (APIError, AuthenticationError, DuplicateRequestError,
-                         InvalidAPIResponseError, NoDataFound,
-                         RateLimitingError, RequestTimeoutError,
-                         ServiceTemporaryUnavailable)
+from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
+    ORDER_STATUS,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
+)
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    DuplicateRequestError,
+    InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+)
 from .Token import Token
-from .utils import (get_child_value, get_hex_temp_into_index,
-                    get_index_into_hex_temp, parse_datetime)
-from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
-                      MonthTripInfo, TripInfo, Vehicle)
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+    parse_datetime,
+)
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 _LOGGER = logging.getLogger(__name__)
 

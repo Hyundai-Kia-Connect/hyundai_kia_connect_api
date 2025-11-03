@@ -15,12 +15,24 @@ from urllib3.util.ssl_ import create_urllib3_context
 from hyundai_kia_connect_api.exceptions import APIError
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .const import (DISTANCE_UNITS, DOMAIN, ENGINE_TYPES, SEAT_STATUS,
-                    TEMPERATURE_UNITS, VEHICLE_LOCK_ACTION)
+from .const import (
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
+)
 from .Token import Token
 from .utils import get_child_value, get_float, parse_datetime
-from .Vehicle import (DailyDrivingStats, DayTripCounts, DayTripInfo,
-                      MonthTripInfo, TripInfo, Vehicle)
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
