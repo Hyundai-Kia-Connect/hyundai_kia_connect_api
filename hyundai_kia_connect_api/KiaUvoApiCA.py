@@ -138,20 +138,26 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.1) Gecko/20100101 Firefox/141.1",
-            "content-type": "application/json",
-            "accept": "application/json",
-            "accept-encoding": "gzip",
-            "accept-language": "en-US,en;q=0.9",
-            "host": self.BASE_URL,
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Content-Type": "application/json;charset=UTF-8",
+            "from": "CWP",
+            "offset": "-5",
+            "language": "0",
+            "Origin": "https://kiaconnect.ca",
+            "Connection": "keep-alive",
+            "Referer": "https://kiaconnect.ca/login",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Priority": "u=0",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
+            "TE": "trailers",
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
-            "from": "SPA",
-            "language": "0",
-            "offset": "-5",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
         }
         self._sessions = None
 
