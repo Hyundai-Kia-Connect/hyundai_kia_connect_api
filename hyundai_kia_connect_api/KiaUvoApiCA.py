@@ -155,7 +155,6 @@ class KiaUvoApiCA(ApiImpl):
             "Priority": "u=0",
             "Pragma": "no-cache",
             "Cache-Control": "no-cache",
-            "TE": "trailers",
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
         }
