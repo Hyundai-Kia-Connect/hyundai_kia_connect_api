@@ -40,9 +40,6 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
-from .exceptions import (
-    AuthenticationError,
-)
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
@@ -198,7 +195,6 @@ class KiaUvoApiEU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
         )
-
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
@@ -994,13 +990,13 @@ class KiaUvoApiEU(ApiImplType1):
                 if (
                     drivingInfoItem["drivingPeriod"] == 0
                     and next(
-                    (
-                        v
-                        for k, v in drivingInfoItem.items()
-                        if k.lower() == "calculativeodo"
-                    ),
-                    0,
-                )
+                        (
+                            v
+                            for k, v in drivingInfoItem.items()
+                            if k.lower() == "calculativeodo"
+                        ),
+                        0,
+                    )
                     > 0
                 ):
                     drivingInfo["consumption30d"] = round(
@@ -1190,8 +1186,8 @@ class KiaUvoApiEU(ApiImplType1):
                 "orgHmgSid": "",
                 "password": password,
                 "redirect_uri": "https://"
-                                + self.BASE_DOMAIN
-                                + ":8080/api/v1/user/oauth2/redirect",
+                + self.BASE_DOMAIN
+                + ":8080/api/v1/user/oauth2/redirect",
                 "state": "ccsp",
                 "username": username,
                 "remember_me": "false",
