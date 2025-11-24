@@ -3,19 +3,30 @@
 # pylint:disable=missing-timeout,missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
 
 import base64
+import random
 import datetime as dt
 import logging
-import random
-import re
-import typing as ty
 import uuid
+import re
 from urllib.parse import parse_qs, urlparse
-from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
+from zoneinfo import ZoneInfo
 
-from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+
+from .ApiImplType1 import ApiImplType1
+from .ApiImplType1 import _check_response_for_errors
+
+from .Token import Token
+from .Vehicle import (
+    Vehicle,
+    DailyDrivingStats,
+    MonthTripInfo,
+    DayTripInfo,
+    TripInfo,
+    DayTripCounts,
+)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -29,14 +40,8 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
 )
-from .Token import Token
-from .Vehicle import (
-    Vehicle,
-    DailyDrivingStats,
-    MonthTripInfo,
-    DayTripInfo,
-    TripInfo,
-    DayTripCounts,
+from .exceptions import (
+    AuthenticationError,
 )
 from .utils import (
     get_child_value,
