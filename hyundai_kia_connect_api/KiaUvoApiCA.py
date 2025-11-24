@@ -179,7 +179,7 @@ class KiaUvoApiCA(ApiImpl):
         - 7402: "Account Locked Out"
         :param response: the API's JSON response
         """
-
+        print("J is dumb")
         error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
         if response["responseHeader"]["responseCode"] == 1:
             if response["error"]["errorCode"] in error_code_mapping:
