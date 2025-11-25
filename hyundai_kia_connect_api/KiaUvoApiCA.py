@@ -925,6 +925,10 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["from"] = "SPA"
+        headers["offset"] = "-8"
+        headers["priority"] = "u=1, i"
+        headers["Referer"] = "https://kiaconnect.ca/remote/"
 
         payload = {
             "tsoc": [
@@ -940,9 +944,9 @@ class KiaUvoApiCA(ApiImpl):
             "pin": token.pin,
         }
 
+        _LOGGER.debug(f"{DOMAIN} - Planned set_charge_limits payload {payload}")
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
-
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
