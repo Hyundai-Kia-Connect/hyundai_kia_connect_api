@@ -431,7 +431,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.sleep_mode_check = get_child_value(state, "status.sleepModeCheck")
 
         # lamp wire status (nested)
-        vehicle.headlamp_on = get_child_value(
+        vehicle.headlamp_status = get_child_value(
             state, "status.lampWireStatus.headLamp.headLampStatus"
         )
         vehicle.headlamp_left_low = get_child_value(
