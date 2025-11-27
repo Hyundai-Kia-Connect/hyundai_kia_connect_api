@@ -185,6 +185,24 @@ class Vehicle:
     # feature only available for some regions (getter/setter for sorting)
     _daily_stats: list[DailyDrivingStats] = field(default_factory=list)
 
+    # Other statuses from KiaCA logs
+    accessory_on: bool = None
+    ign3: bool = None
+    remote_ignition: bool = None
+    transmission_condition: str = None
+    sleep_mode_check: bool = None
+
+    # Lamp status fields (KiaUvoApiEU and CA)
+    headlamp_status: str = None
+    headlamp_left_low: bool = None
+    headlamp_right_low: bool = None
+    stop_lamp_left: bool = None
+    stop_lamp_right: bool = None
+    turn_signal_left_front: bool = None
+    turn_signal_right_front: bool = None
+    turn_signal_left_rear: bool = None
+    turn_signal_right_rear: bool = None
+
     @property
     def daily_stats(self):
         return self._daily_stats

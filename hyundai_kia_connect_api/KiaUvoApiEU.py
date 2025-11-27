@@ -347,6 +347,34 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.rear_right_seat_status = SEAT_STATUS[
             get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
         ]
+        # lamp wire status (nested)
+        vehicle.headlamp_status = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.headLampStatus"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.leftLowLamp"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.rightLowLamp"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "vehicleStatus.lampWireStatus.stopLamp.leftLamp"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "vehicleStatus.lampWireStatus.stopLamp.rightLamp"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.leftFrontLamp"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.rightFrontLamp"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.leftRearLamp"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.rightRearLamp"
+        )
         vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
