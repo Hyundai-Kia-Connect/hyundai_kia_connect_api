@@ -978,5 +978,6 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
+
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
