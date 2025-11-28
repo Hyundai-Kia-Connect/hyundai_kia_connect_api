@@ -820,7 +820,9 @@ class KiaUvoApiCA(ApiImpl):
                 },
                 "pin": token.pin,
             }
-        _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned start_climate payload {self._mask_sensitive_data(payload)}"
+        )
 
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
@@ -901,7 +903,9 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         data = json.dumps({"pin": token.pin})
-        _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
+        )
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
@@ -960,6 +964,10 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["from"] = "SPA"
+        headers["offset"] = "-8"
+        headers["priority"] = "u=1, i"
+        headers["Referer"] = "https://kiaconnect.ca/remote/"
 
         payload = {
             "tsoc": [
@@ -975,9 +983,22 @@ class KiaUvoApiCA(ApiImpl):
             "pin": token.pin,
         }
 
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned set_charge_limits payload {self._mask_sensitive_data(payload)}"
+        )
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
-
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
+
+    def _mask_sensitive_data(self, data: dict) -> dict:
+        """Create a copy of data with sensitive fields masked for logging."""
+        import copy
+
+        masked = copy.deepcopy(data)
+        sensitive_keys = ["pin", "password"]
+        for key in sensitive_keys:
+            if key in masked:
+                masked[key] = "****"
+        return masked
