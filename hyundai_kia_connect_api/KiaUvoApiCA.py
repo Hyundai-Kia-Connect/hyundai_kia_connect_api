@@ -975,7 +975,6 @@ class KiaUvoApiCA(ApiImpl):
             "pin": token.pin,
         }
 
-        _LOGGER.debug(f"{DOMAIN} - Planned set_charge_limits payload {payload}")
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
