@@ -423,6 +423,41 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.rear_right_seat_status = SEAT_STATUS[
             get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
         ]
+        # Additional status fields observed in logs (exposed as binary sensors)
+        vehicle.accessory_on = get_child_value(state, "status.acc")
+        vehicle.ign3 = get_child_value(state, "status.ign3")
+        vehicle.remote_ignition = get_child_value(state, "status.remoteIgnition")
+        vehicle.transmission_condition = get_child_value(state, "status.transCond")
+        vehicle.sleep_mode_check = get_child_value(state, "status.sleepModeCheck")
+
+        # lamp wire status (nested)
+        vehicle.headlamp_status = get_child_value(
+            state, "status.lampWireStatus.headLamp.headLampStatus"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "status.lampWireStatus.headLamp.leftLowLamp"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "status.lampWireStatus.headLamp.rightLowLamp"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "status.lampWireStatus.stopLamp.leftLamp"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "status.lampWireStatus.stopLamp.rightLamp"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.leftFrontLamp"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.rightFrontLamp"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.leftRearLamp"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.rightRearLamp"
+        )
         vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "status.doorOpen.frontLeft"
