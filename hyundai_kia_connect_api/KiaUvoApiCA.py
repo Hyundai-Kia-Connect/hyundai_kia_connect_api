@@ -981,4 +981,3 @@ class KiaUvoApiCA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
-    
