@@ -120,15 +120,15 @@ class ApiImplType1(ApiImpl):
     def _sanitize_ice_value(self, state: dict) -> None:
         """
         Sanitize oversized ICE (Internal Combustion Engine) values in DTE data.
-        
+
         Hyundai's API sometimes returns corrupted ICE values that are too large
         (beyond 64-bit integer limits), which can cause issues when:
         - Serializing to JSON for JavaScript consumers
         - Storing in databases with 64-bit integer limits
         - Processing in other systems
-        
+
         This function replaces invalid ICE values with None and logs a warning.
-        
+
         Args:
             state: The vehicle state dictionary (modified in place)
         """
@@ -137,7 +137,7 @@ class ApiImplType1(ApiImpl):
             fuel_system = state.get("Drivetrain", {}).get("FuelSystem", {})
             dte = fuel_system.get("DTE", {})
             ice_value = dte.get("ICE")
-            
+
             if ice_value is not None:
                 # Check if the value is a number and unreasonably large
                 # A reasonable ICE range should be < 1,000,000 km/miles
@@ -147,7 +147,7 @@ class ApiImplType1(ApiImpl):
                     # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
                     max_safe_integer = 9007199254740991
                     max_reasonable_range = 1000000
-                    
+
                     if ice_value > max_safe_integer or ice_value > max_reasonable_range:
                         _LOGGER.warning(
                             f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
