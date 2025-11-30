@@ -117,6 +117,49 @@ class ApiImplType1(ApiImpl):
     def __init__(self) -> None:
         """Initialize."""
 
+    def _sanitize_ice_value(self, state: dict) -> None:
+        """
+        Sanitize oversized ICE (Internal Combustion Engine) values in DTE data.
+        
+        Hyundai's API sometimes returns corrupted ICE values that are too large
+        (beyond 64-bit integer limits), which can cause issues when:
+        - Serializing to JSON for JavaScript consumers
+        - Storing in databases with 64-bit integer limits
+        - Processing in other systems
+        
+        This function replaces invalid ICE values with None and logs a warning.
+        
+        Args:
+            state: The vehicle state dictionary (modified in place)
+        """
+        try:
+            # Navigate to DTE.ICE in the nested structure
+            fuel_system = state.get("Drivetrain", {}).get("FuelSystem", {})
+            dte = fuel_system.get("DTE", {})
+            ice_value = dte.get("ICE")
+            
+            if ice_value is not None:
+                # Check if the value is a number and unreasonably large
+                # A reasonable ICE range should be < 1,000,000 km/miles
+                # Values larger than this are likely corrupted API data
+                if isinstance(ice_value, (int, float)):
+                    # Also check if it exceeds JavaScript's Number.MAX_SAFE_INTEGER
+                    # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
+                    max_safe_integer = 9007199254740991
+                    max_reasonable_range = 1000000
+                    
+                    if ice_value > max_safe_integer or ice_value > max_reasonable_range:
+                        _LOGGER.warning(
+                            f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
+                            "too large to be valid. Replacing with None. "
+                            "This appears to be corrupted data from Hyundai's API."
+                        )
+                        dte["ICE"] = None
+        except (KeyError, TypeError, AttributeError):
+            # If the structure doesn't exist or is malformed, silently continue
+            # This is defensive programming in case the API structure changes
+            pass
+
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = requests.get(
@@ -499,6 +542,11 @@ class ApiImplType1(ApiImpl):
                 get_child_value(state, "Location.GeoCoord.Longitude"),
                 location_last_updated_at,
             )
+
+        # Sanitize corrupted ICE values before storing in vehicle.data
+        # This prevents issues with oversized integers when serializing to JSON
+        # or storing in databases
+        self._sanitize_ice_value(state)
 
         vehicle.data = state
 
