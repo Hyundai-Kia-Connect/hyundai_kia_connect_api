@@ -4,7 +4,6 @@
 
 import datetime as dt
 import logging
-import uuid
 from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 from time import sleep
