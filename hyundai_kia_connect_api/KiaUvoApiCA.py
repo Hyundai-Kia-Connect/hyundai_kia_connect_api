@@ -6,6 +6,9 @@ import time
 import datetime as dt
 import json
 import requests
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
