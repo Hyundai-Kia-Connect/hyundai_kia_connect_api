@@ -47,56 +47,16 @@ from .utils import (
 
 
 # Try to fix hyundai/cloudflare
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
-import certifi
-
-# Firefox Fingerprint
-firefox = [
-    "TLS_AES_128_GCM_SHA256",
-    "TLS_CHACHA20_POLY1305_SHA256",
-    "TLS_AES_256_GCM_SHA384",
-    "ECDHE-ECDSA-AES128-GCM-SHA256",
-    "ECDHE-RSA-AES128-GCM-SHA256",
-    "ECDHE-ECDSA-CHACHA20-POLY1305",
-    "ECDHE-RSA-CHACHA20-POLY1305",
-    "ECDHE-ECDSA-AES256-GCM-SHA384",
-    "ECDHE-RSA-AES256-GCM-SHA384",
-    "ECDHE-ECDSA-AES256-SHA",
-    "ECDHE-ECDSA-AES128-SHA",
-    "ECDHE-RSA-AES128-SHA",
-    "ECDHE-RSA-AES256-SHA",
-    "DHE-RSA-AES128-SHA",
-    "DHE-RSA-AES256-SHA",
-    "AES128-SHA",
-    "AES256-SHA",
-    "DES-CBC3-SHA",
-]
-
-_LOGGER = logging.getLogger(__name__)
-
-
-CA_TIMEZONES = [
-    ZoneInfo(f"Canada/{zone}")
-    for zone in "Newfoundland Atlantic Eastern Central Mountain Pacific".split()
-]
-
-
-# Use the custom cipher order
-class CustomCipherAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=":".join(firefox))
-        kwargs["ssl_context"] = context
-        return super().init_poolmanager(*args, **kwargs)
-
 
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
-        super().mount("https://", CustomCipherAdapter())
         self.max_retries = max_retries
         self.delay = delay
         self.backoff = backoff
+
+    def post(self, url, **kwargs):
+        return self._request_with_retry("POST", url, **kwargs)
 
     def post(self, url, **kwargs):
         return self._request_with_retry("POST", url, **kwargs, verify=certifi.where())
