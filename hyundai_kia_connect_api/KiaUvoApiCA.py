@@ -138,7 +138,7 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
             "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -199,8 +199,8 @@ class KiaUvoApiCA(ApiImpl):
         import uuid
         import base64
         
-        # Base string simulating a browser User-Agent
-        base_device_id = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"
+        # Base string simulating a mobile User-Agent
+        base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
         # Append a random UUID to make it unique per session
         unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
         
