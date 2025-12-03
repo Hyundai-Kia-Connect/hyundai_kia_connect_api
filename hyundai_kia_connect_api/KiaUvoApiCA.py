@@ -801,7 +801,7 @@ class KiaUvoApiCA(ApiImpl):
                         }
                     )
             else:
-                if vehicle.name == "IONIQ9":
+                if vehicle.model == "IONIQ 9":
                     payload["remoteControl"] = climate_settings
                     payload["remoteControl"].update(
                         {
