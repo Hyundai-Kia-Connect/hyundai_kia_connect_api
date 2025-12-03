@@ -5,9 +5,7 @@
 import time
 import datetime as dt
 import json
-import logging
 import requests
-from zoneinfo import ZoneInfo
 
 import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
@@ -47,6 +45,7 @@ from .utils import (
 
 
 # Try to fix hyundai/cloudflare
+
 
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
