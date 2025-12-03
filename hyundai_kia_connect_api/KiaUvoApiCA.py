@@ -195,9 +195,16 @@ class KiaUvoApiCA(ApiImpl):
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         headers.pop("accessToken", None)
-        headers["Deviceid"] = (
-            "TW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEzOC4wLjAuMCBTYWZhcmkvNTM3LjM2IEVkZy8xMzguMC4wLjArV2luMzIrMTIzNCsxMjM0"
-        )
+        # Generate a random device ID to avoid static fingerprinting
+        import uuid
+        import base64
+        
+        # Base string simulating a browser User-Agent
+        base_device_id = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"
+        # Append a random UUID to make it unique per session
+        unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
+        
+        headers["Deviceid"] = base64.b64encode(unique_device_id.encode()).decode()
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
