@@ -163,21 +163,28 @@ class KiaUvoApiCA(ApiImpl):
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
 
+
 class ForceIPv4Adapter(requests.adapters.HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
         import socket
         import urllib3.poolmanager
-        kwargs["socket_options"] = urllib3.poolmanager.PoolManager.DEFAULT_SOCKET_OPTIONS + [
-            (socket.SOL_IP, socket.IP_TOS, 0x00),
-        ]
+
+        kwargs["socket_options"] = (
+            urllib3.poolmanager.PoolManager.DEFAULT_SOCKET_OPTIONS
+            + [
+                (socket.SOL_IP, socket.IP_TOS, 0x00),
+            ]
+        )
         super().init_poolmanager(*args, **kwargs)
 
         # Monkey-patch getaddrinfo to force IPv4
         original_getaddrinfo = socket.getaddrinfo
+
         def ipv4_getaddrinfo(*args, **kwargs):
             if args[0] == socket.AF_INET6:
                 return []
             return original_getaddrinfo(*args, **kwargs)
+
         socket.getaddrinfo = ipv4_getaddrinfo
 
     @property
