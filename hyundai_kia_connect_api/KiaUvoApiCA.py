@@ -198,12 +198,12 @@ class KiaUvoApiCA(ApiImpl):
         # Generate a random device ID to avoid static fingerprinting
         import uuid
         import base64
-        
+
         # Base string simulating a mobile User-Agent
         base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
         # Append a random UUID to make it unique per session
         unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
-        
+
         headers["Deviceid"] = base64.b64encode(unique_device_id.encode()).decode()
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
