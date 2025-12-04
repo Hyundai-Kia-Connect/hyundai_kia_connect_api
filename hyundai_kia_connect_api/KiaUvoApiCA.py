@@ -2,15 +2,15 @@
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
 
-import time
 import datetime as dt
 import json
-import requests
 import logging
-
-_LOGGER = logging.getLogger(__name__)
-
 import socket
+import time
+import typing as ty
+from zoneinfo import ZoneInfo
+
+import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 
@@ -20,9 +20,15 @@ def allowed_gai_family():
 
 urllib3_cn.allowed_gai_family = allowed_gai_family
 
+_LOGGER = logging.getLogger(__name__)
+
+import certifi
+
+# Try to fix hyundai/cloudflare
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.ssl_ import create_urllib3_context
+
 from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .Token import Token
-from .Vehicle import Vehicle, DailyDrivingStats
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -36,18 +42,22 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-
-from .exceptions import AuthenticationError, APIError
+from .exceptions import APIError, AuthenticationError
+from .Token import Token
 from .utils import (
+    detect_timezone_for_date,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     parse_datetime,
-    detect_timezone_for_date,
 )
+from .Vehicle import DailyDrivingStats, Vehicle
 
 
-# Try to fix hyundai/cloudflare
+CA_TIMEZONES = [
+    ZoneInfo(f"Canada/{zone}")
+    for zone in "Newfoundland Atlantic Eastern Central Mountain Pacific".split()
+]
 
 
 class RetrySession(requests.Session):
@@ -161,7 +171,13 @@ class KiaUvoApiCA(ApiImpl):
             else:
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
