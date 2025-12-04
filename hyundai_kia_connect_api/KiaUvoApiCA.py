@@ -60,7 +60,6 @@ class RetrySession(requests.Session):
     def post(self, url, **kwargs):
         return self._request_with_retry("POST", url, **kwargs)
 
-
     def _request_with_retry(self, method, url, **kwargs):
         attempt = 0
         current_delay = self.delay
