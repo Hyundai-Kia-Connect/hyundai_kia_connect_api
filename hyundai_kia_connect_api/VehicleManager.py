@@ -159,11 +159,21 @@ class VehicleManager:
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
-        if (
-            self.token.valid_until - timedelta(seconds=10)
-            <= dt.datetime.now(dt.timezone.utc)
-            or self.api.test_token(self.token) is False
-        ):
+        now_utc = dt.datetime.now(dt.timezone.utc)
+        grace_period = timedelta(seconds=10)
+        min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+        valid_until = self.token.valid_until
+        token_expired = False
+        if not isinstance(valid_until, dt.datetime):
+            token_expired = True
+        else:
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=dt.timezone.utc)
+            if valid_until <= min_supported_datetime + grace_period:
+                token_expired = True
+            else:
+                token_expired = valid_until - grace_period <= now_utc
+        if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token: Token = self.api.login(
                 self.username,
