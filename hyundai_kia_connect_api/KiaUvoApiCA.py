@@ -10,13 +10,10 @@ import time
 import typing as ty
 from zoneinfo import ZoneInfo
 
-import certifi
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
