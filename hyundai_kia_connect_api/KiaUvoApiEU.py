@@ -8,6 +8,7 @@ import datetime as dt
 import logging
 import uuid
 import re
+import typing as ty
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -176,7 +177,13 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        token: Token | None = None,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+    ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
