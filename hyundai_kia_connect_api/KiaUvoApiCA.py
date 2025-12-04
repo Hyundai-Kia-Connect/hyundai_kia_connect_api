@@ -505,6 +505,13 @@ class KiaUvoApiCA(ApiImpl):
                 get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
                 "m",
             )
+            vehicle.ev_battery_precondition_enabled = get_child_value(
+                state, "status.evStatus.batteryPreconditiong"
+            )
+            vehicle.ev_estimated_station_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
+                "m",
+            )
         vehicle.fuel_driving_range = (
             get_child_value(
                 state,
