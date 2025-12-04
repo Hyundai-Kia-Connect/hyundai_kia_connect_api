@@ -43,4 +43,3 @@ def test_check_and_refresh_token_handles_min_datetime(monkeypatch):
     manager.token = Token(valid_until=dt.datetime.min)
     assert manager.check_and_refresh_token() is True
     assert dummy_api.login_calls == 1
-
