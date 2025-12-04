@@ -277,8 +277,6 @@ class Vehicle:
 
     _ev_estimated_portable_charge_duration: int = None
     _ev_estimated_portable_charge_duration_value: int = None
-    ev_estimated_portable_charge_duration: tuple = None
-    ev_estimated_station_charge_duration: tuple = None
     ev_battery_precondition_enabled: bool = None
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
