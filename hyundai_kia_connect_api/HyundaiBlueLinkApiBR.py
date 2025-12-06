@@ -5,7 +5,6 @@
 import datetime as dt
 import logging
 import typing as ty
-import uuid
 from datetime import timedelta
 from time import sleep
 from urllib.parse import urljoin, urlparse
@@ -178,7 +177,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             valid_until=expires_at,
             username=username,
             password=password,
-            device_id=str(uuid.uuid4()),
+            device_id=self.ccsp_device_id,
         )
 
     def get_vehicles(self, token: Token) -> list:
