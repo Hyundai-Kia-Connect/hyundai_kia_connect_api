@@ -331,8 +331,6 @@ class VehicleManager:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )
-    
-    
 
     @staticmethod
     def get_implementation_by_region_brand(
