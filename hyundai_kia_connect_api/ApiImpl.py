@@ -79,6 +79,7 @@ class ApiImpl:
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
+    supports_otp: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
