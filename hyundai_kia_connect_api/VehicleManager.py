@@ -93,6 +93,11 @@ class VehicleManager:
         self.token.pin = self.pin
         self.initialize_vehicles()
 
+    @property
+    def supports_otp(self) -> bool:
+        """Return whether the selected API implementation supports OTP."""
+        return getattr(self.api, "supports_otp", False)
+
     def initialize_vehicles(self):
         vehicles = self.api.get_vehicles(self.token)
         self.vehicles_valid = True
