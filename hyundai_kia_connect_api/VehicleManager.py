@@ -93,6 +93,11 @@ class VehicleManager:
         self.token.pin = self.pin
         self.initialize_vehicles()
 
+    @property
+    def supports_otp(self) -> bool:
+        """Return whether the selected API implementation supports OTP."""
+        return getattr(self.api, "supports_otp", False)
+
     def initialize_vehicles(self):
         vehicles = self.api.get_vehicles(self.token)
         self.vehicles_valid = True
@@ -326,6 +331,8 @@ class VehicleManager:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )
+    
+    
 
     @staticmethod
     def get_implementation_by_region_brand(
