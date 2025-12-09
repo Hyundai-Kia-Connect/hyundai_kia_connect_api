@@ -1,6 +1,5 @@
 import datetime as dt
 
-import pytest  # type: ignore[import]
 
 from hyundai_kia_connect_api.ApiImpl import ApiImpl
 from hyundai_kia_connect_api.Token import Token
@@ -55,9 +54,9 @@ class DummyPersistedTokenApi(ApiImpl):
 
     def login(self, username, password, token=None, otp_handler=None) -> Token:
         self.login_calls += 1
-        assert (
-            password == self.required_secret
-        ), "login() should receive the persisted refresh token when password is missing"
+        assert password == self.required_secret, (
+            "login() should receive the persisted refresh token when password is missing"
+        )
         return Token(
             username=username,
             password=password,
