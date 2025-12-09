@@ -62,6 +62,7 @@ class VehicleManager:
         geocode_api_key: str = None,
         language: str = "en",
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        token: Token = None,
     ):
         self.region: int = region
         self.brand: int = brand
@@ -79,7 +80,7 @@ class VehicleManager:
             self.region, self.brand, self.language
         )
 
-        self.token: Token = None
+        self.token: Token = token
         self.vehicles: dict = {}
         self.vehicles_valid = False
 
