@@ -86,7 +86,7 @@ class VehicleManager:
     def initialize(self) -> None:
         self.token: Token = self.api.login(
             self.username,
-            self.password,
+            self._get_auth_secret(),
             token=self.token,
             otp_handler=self.otp_handler,
         )
@@ -182,7 +182,7 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             self.token: Token = self.api.login(
                 self.username,
-                self.password,
+                self._get_auth_secret(),
                 token=self.token,
                 otp_handler=self.otp_handler,
             )
@@ -190,6 +190,17 @@ class VehicleManager:
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         return False
+
+    def _get_auth_secret(self) -> str | None:
+        """Return the best available credential for login/refresh attempts."""
+        if self.password:
+            return self.password
+        if self.token:
+            if self.token.refresh_token:
+                return self.token.refresh_token
+            if self.token.password:
+                return self.token.password
+        return None
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
