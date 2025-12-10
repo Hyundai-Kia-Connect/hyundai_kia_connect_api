@@ -62,4 +62,3 @@ Verify that the reported version is `99.99.99` and the location points to the si
 4. Leave the integration running for at least an hour to confirm the token refresh continues to work with the new API build.
 
 Please report whether the test passes and which region/brand you exercised so we can ensure non-US regions remain healthy.
-
