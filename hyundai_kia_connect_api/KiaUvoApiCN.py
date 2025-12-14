@@ -160,6 +160,7 @@ class KiaUvoApiCN(ApiImplType1):
         password: str,
         token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
     ) -> Token:
         device_id = self._get_device_id()
         cookies = self._get_cookies()
@@ -186,6 +187,7 @@ class KiaUvoApiCN(ApiImplType1):
             refresh_token=refresh_token,
             device_id=device_id,
             valid_until=valid_until,
+            pin=pin,
         )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:

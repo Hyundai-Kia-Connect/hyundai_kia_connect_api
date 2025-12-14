@@ -100,9 +100,10 @@ class VehicleManager:
 
     def initialize_vehicles(self):
         vehicles = self.api.get_vehicles(self.token)
-        self.vehicles_valid = True
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
+         self.vehicles_valid = True
+
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
@@ -164,6 +165,8 @@ class VehicleManager:
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             self.initialize()
+        elif not self.vehicles_valid:
+            self.initialize_vehicles()
         now_utc = dt.datetime.now(dt.timezone.utc)
         grace_period = timedelta(seconds=10)
         min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
@@ -185,8 +188,8 @@ class VehicleManager:
                 self.password,
                 token=self.token,
                 otp_handler=self.otp_handler,
+                pin=self.pin,
             )
-            self.token.pin = self.pin
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         return False
