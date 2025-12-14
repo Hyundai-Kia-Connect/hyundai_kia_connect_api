@@ -104,7 +104,6 @@ class VehicleManager:
             self.vehicles[vehicle.id] = vehicle
         self.vehicles_valid = True
 
-
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
 
