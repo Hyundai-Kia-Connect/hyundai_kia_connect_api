@@ -156,7 +156,6 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
     ) -> Token:
         """Login to Brazilian Hyundai API."""

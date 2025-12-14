@@ -158,7 +158,6 @@ class KiaUvoApiCN(ApiImplType1):
         self,
         username: str,
         password: str,
-        token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
     ) -> Token:
         device_id = self._get_device_id()

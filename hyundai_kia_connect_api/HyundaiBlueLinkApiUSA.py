@@ -128,7 +128,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
     ) -> Token:
         # Sign In with Email and Password and Get Authorization Code
