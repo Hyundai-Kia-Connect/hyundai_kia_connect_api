@@ -102,7 +102,7 @@ class VehicleManager:
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
-         self.vehicles_valid = True
+        self.vehicles_valid = True
 
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
