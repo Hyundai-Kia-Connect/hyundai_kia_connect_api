@@ -89,8 +89,8 @@ class VehicleManager:
             self.password,
             token=self.token,
             otp_handler=self.otp_handler,
+            pin=self.pin,
         )
-        self.token.pin = self.pin
         self.initialize_vehicles()
 
     @property
