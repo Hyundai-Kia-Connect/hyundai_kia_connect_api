@@ -90,6 +90,7 @@ class ApiImpl:
         password: str,
         token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
     ) -> Token:
         """Login into cloud endpoints and return Token"""
         pass

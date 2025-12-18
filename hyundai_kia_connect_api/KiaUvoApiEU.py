@@ -183,6 +183,7 @@ class KiaUvoApiEU(ApiImplType1):
         password: str,
         token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
@@ -212,6 +213,7 @@ class KiaUvoApiEU(ApiImplType1):
             refresh_token=refresh_token,
             device_id=device_id,
             valid_until=valid_until,
+            pin=pin,
         )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:

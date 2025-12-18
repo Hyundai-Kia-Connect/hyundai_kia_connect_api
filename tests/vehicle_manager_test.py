@@ -10,7 +10,7 @@ class DummyApi(ApiImpl):
         super().__init__()
         self.login_calls = 0
 
-    def login(self, username, password, token=None, otp_handler=None):
+    def login(self, username, password, token=None, otp_handler=None, pin=None):
         self.login_calls += 1
         return Token(
             username=username,

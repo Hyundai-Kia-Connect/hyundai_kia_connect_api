@@ -158,6 +158,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         password: str,
         token: Token | None = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
     ) -> Token:
         """Login to Brazilian Hyundai API."""
         _LOGGER.debug(f"{DOMAIN} - Logging in to Brazilian API")
@@ -178,6 +179,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             username=username,
             password=password,
             device_id=self.ccsp_device_id,
+            pin=pin,
         )
 
     def get_vehicles(self, token: Token) -> list:
