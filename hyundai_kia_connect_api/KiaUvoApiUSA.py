@@ -350,6 +350,7 @@ class KiaUvoApiUSA(ApiImpl):
         password: str,
         token: Token = None,
         otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
     ) -> Token:
         """Login into cloud endpoints and return Token
 
@@ -365,6 +366,7 @@ class KiaUvoApiUSA(ApiImpl):
             Non-interactive OTP handler. Called twice:
             - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'PHONE'}
             - stage='input_code' -> return {'otp_code': '<code>'}
+        pin : str, optional
 
         Returns
         -------
@@ -474,6 +476,7 @@ class KiaUvoApiUSA(ApiImpl):
                 refresh_token=rmtoken,
                 valid_until=valid_until,
                 device_id=self.device_id,
+                pin=pin,
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
