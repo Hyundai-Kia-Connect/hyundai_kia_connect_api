@@ -75,7 +75,6 @@ class VehicleManager:
         self.pin: str = pin
         self.language: str = language
         self.geocode_api_key: str = geocode_api_key
-        self.otp_handler = otp_handler
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
@@ -113,11 +112,6 @@ class VehicleManager:
 
     def confirm_otp(self, otp_code: str) -> None:
         self.token = self.api.confirm_otp(self.token, otp_code)
-
-    @property
-    def supports_otp(self) -> bool:
-        """Return whether the selected API implementation supports OTP."""
-        return getattr(self.api, "supports_otp", False)
 
     def initialize_vehicles(self):
         vehicles = self.api.get_vehicles(self.token)
