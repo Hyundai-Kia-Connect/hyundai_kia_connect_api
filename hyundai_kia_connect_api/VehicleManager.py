@@ -184,7 +184,6 @@ class VehicleManager:
             self.token: Token = self.api.login(
                 self.username,
                 self.password,
-                token=self.token,
                 otp_handler=self.otp_handler,
                 pin=self.pin,
             )
