@@ -3,7 +3,6 @@
 # pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
 import datetime as dt
 import logging
-import typing as ty
 from dataclasses import dataclass
 
 import requests
@@ -52,6 +51,7 @@ class WindowRequestOptions:
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
+
 
 @dataclass
 class OTPOptions:
