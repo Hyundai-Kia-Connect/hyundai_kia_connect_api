@@ -95,12 +95,12 @@ class VehicleManager:
         self.initialize_vehicles()
 
     def login(self) -> bool | OTPOptions:
-        '''Returns True if login successful, or OTPOptions if OTP is required'''
+        """Returns True if login successful, or OTPOptions if OTP is required"""
         result = self.api.login(
             self.username,
             self.password,
             pin=self.pin,
-            )
+        )
         if isinstance(result, Token):
             self.token: Token = result
             self.initialize_vehicles()
@@ -210,7 +210,7 @@ class VehicleManager:
                 self.username,
                 self.password,
                 pin=self.pin,
-                )
+            )
             if isinstance(result, Token):
                 self.token: Token = result
                 self.initialize_vehicles()
@@ -360,7 +360,6 @@ class VehicleManager:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )
-
 
     @staticmethod
     def get_implementation_by_region_brand(
