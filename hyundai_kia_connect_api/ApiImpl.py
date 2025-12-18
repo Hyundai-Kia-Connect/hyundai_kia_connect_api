@@ -56,7 +56,7 @@ class WindowRequestOptions:
 @dataclass
 class OTPOptions:
     has_email: bool | None
-    has_sms: str | None
+    has_sms: bool | None
     email: str | None
     sms: str | None
 
