@@ -12,6 +12,7 @@ from .ApiImpl import (
     ClimateRequestOptions,
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
+    OTPOptions,
 )
 from .const import (
     BRAND_GENESIS,
@@ -33,7 +34,7 @@ from .const import (
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import APIError
+from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .KiaUvoApiAU import KiaUvoApiAU
@@ -60,6 +61,7 @@ class VehicleManager:
         geocode_api_use_email: bool = False,
         geocode_provider: int = 1,
         geocode_api_key: str = None,
+        token: Token = None,
         language: str = "en",
         otp_handler: ty.Callable[[dict], dict] | None = None,
     ):
@@ -79,18 +81,38 @@ class VehicleManager:
             self.region, self.brand, self.language
         )
 
-        self.token: Token = None
+        self.token: Token = token
         self.vehicles: dict = {}
         self.vehicles_valid = False
 
+    @DeprecationWarning
     def initialize(self) -> None:
         self.token: Token = self.api.login(
             self.username,
             self.password,
-            otp_handler=self.otp_handler,
             pin=self.pin,
         )
         self.initialize_vehicles()
+
+    def login(self) -> bool | OTPOptions:
+        '''Returns True if login successful, or OTPOptions if OTP is required'''
+        result = self.api.login(
+            self.username,
+            self.password,
+            pin=self.pin,
+            )
+        if isinstance(result, Token):
+            self.token: Token = result
+            self.initialize_vehicles()
+            return True
+        if isinstance(result, OTPOptions):
+            return result
+
+    def sent_otp(self, otp_destination: str, otp_via: str) -> None:
+        self.api.sent_otp(self.token, otp_destination, otp_via)
+
+    def confirm_otp(self, otp_code: str) -> None:
+        self.token = self.api.confirm_otp(self.token, otp_code)
 
     @property
     def supports_otp(self) -> bool:
@@ -162,7 +184,10 @@ class VehicleManager:
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
-            self.initialize()
+            if self.login() is True:
+                return True
+            else:
+                raise AuthenticationOTPRequired("OTP required to refresh token")
         elif not self.vehicles_valid:
             self.initialize_vehicles()
         now_utc = dt.datetime.now(dt.timezone.utc)
@@ -181,13 +206,16 @@ class VehicleManager:
                 token_expired = valid_until - grace_period <= now_utc
         if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            self.token: Token = self.api.login(
+            result = self.api.login(
                 self.username,
                 self.password,
-                token=self.token,
-                otp_handler=self.otp_handler,
                 pin=self.pin,
-            )
+                )
+            if isinstance(result, Token):
+                self.token: Token = result
+                self.initialize_vehicles()
+            if isinstance(result, OTPOptions):
+                raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         return False
@@ -332,6 +360,7 @@ class VehicleManager:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )
+
 
     @staticmethod
     def get_implementation_by_region_brand(

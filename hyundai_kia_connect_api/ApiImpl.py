@@ -53,6 +53,13 @@ class WindowRequestOptions:
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
 
+@dataclass
+class OTPOptions:
+    has_email: bool | None
+    has_sms: str | None
+    email: str | None
+    sms: str | None
+
 
 @dataclass
 class ScheduleChargingClimateRequestOptions:
@@ -88,10 +95,17 @@ class ApiImpl:
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
-    ) -> Token:
-        """Login into cloud endpoints and return Token"""
+    ) -> Token | OTPOptions:
+        """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
+        pass
+
+    def sent_otp(self, token: Token, otp_destination: str, otp_via: str) -> None:
+        """Sends OTP to the user via selected destination and via"""
+        pass
+
+    def confirm_otp(self, token: Token, otp_code: str) -> Token:
+        """Confirms OTP code sent to the user"""
         pass
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
