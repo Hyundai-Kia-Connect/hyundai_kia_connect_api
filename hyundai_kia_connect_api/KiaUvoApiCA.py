@@ -269,6 +269,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
+                gen_type=entry.get("genType"),
             )
             result.append(vehicle)
         return result
@@ -966,7 +967,6 @@ class KiaUvoApiCA(ApiImpl):
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
-        url = self.API_URL + "evc/setsoc"
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
@@ -976,19 +976,38 @@ class KiaUvoApiCA(ApiImpl):
         headers["priority"] = "u=1, i"
         headers["Referer"] = "https://kiaconnect.ca/remote/"
 
-        payload = {
-            "tsoc": [
-                {
-                    "plugType": 0,
-                    "level": dc,
-                },
-                {
-                    "plugType": 1,
-                    "level": ac,
-                },
-            ],
-            "pin": token.pin,
-        }
+        if vehicle.gen_type == "G3":
+            # Gen3 Vehicles (like IONIQ 9) use a different endpoint and payload
+            url = self.API_URL + "v2/ev/reserv/socset"
+            payload = {
+                "targetSOClist": [
+                    {
+                        "plugType": 0,
+                        "targetSOClevel": dc,
+                    },
+                    {
+                        "plugType": 1,
+                        "targetSOClevel": ac,
+                    },
+                ],
+                "pin": token.pin,
+            }
+        else:
+            # Legacy Gen1/Gen2 Payload
+            url = self.API_URL + "evc/setsoc"
+            payload = {
+                "tsoc": [
+                    {
+                        "plugType": 0,
+                        "level": dc,
+                    },
+                    {
+                        "plugType": 1,
+                        "level": ac,
+                    },
+                ],
+                "pin": token.pin,
+            }
 
         _LOGGER.debug(
             f"{DOMAIN} - Planned set_charge_limits payload {self._mask_sensitive_data(payload)}"

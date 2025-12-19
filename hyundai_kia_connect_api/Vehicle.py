@@ -80,6 +80,9 @@ class Vehicle:
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
+    # Generation type (e.g. "G3")
+    gen_type: str = None
+
     # Shared (EV/PHEV/HEV/IC)
     # General
     _total_driving_range: float = None
