@@ -5,16 +5,15 @@
 import datetime as dt
 import json
 import logging
+import socket
 import time
 import typing as ty
 from zoneinfo import ZoneInfo
 
-import certifi
 import requests
+import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
@@ -41,27 +40,12 @@ from .utils import (
 )
 from .Vehicle import DailyDrivingStats, Vehicle
 
-# Firefox Fingerprint
-firefox = [
-    "TLS_AES_128_GCM_SHA256",
-    "TLS_CHACHA20_POLY1305_SHA256",
-    "TLS_AES_256_GCM_SHA384",
-    "ECDHE-ECDSA-AES128-GCM-SHA256",
-    "ECDHE-RSA-AES128-GCM-SHA256",
-    "ECDHE-ECDSA-CHACHA20-POLY1305",
-    "ECDHE-RSA-CHACHA20-POLY1305",
-    "ECDHE-ECDSA-AES256-GCM-SHA384",
-    "ECDHE-RSA-AES256-GCM-SHA384",
-    "ECDHE-ECDSA-AES256-SHA",
-    "ECDHE-ECDSA-AES128-SHA",
-    "ECDHE-RSA-AES128-SHA",
-    "ECDHE-RSA-AES256-SHA",
-    "DHE-RSA-AES128-SHA",
-    "DHE-RSA-AES256-SHA",
-    "AES128-SHA",
-    "AES256-SHA",
-    "DES-CBC3-SHA",
-]
+
+def allowed_gai_family():
+    return socket.AF_INET
+
+
+urllib3_cn.allowed_gai_family = allowed_gai_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,24 +56,15 @@ CA_TIMEZONES = [
 ]
 
 
-# Use the custom cipher order
-class CustomCipherAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=":".join(firefox))
-        kwargs["ssl_context"] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
-        super().mount("https://", CustomCipherAdapter())
         self.max_retries = max_retries
         self.delay = delay
         self.backoff = backoff
 
     def post(self, url, **kwargs):
-        return self._request_with_retry("POST", url, **kwargs, verify=certifi.where())
+        return self._request_with_retry("POST", url, **kwargs)
 
     def _request_with_retry(self, method, url, **kwargs):
         attempt = 0
@@ -138,7 +113,7 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
             "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -146,9 +121,9 @@ class KiaUvoApiCA(ApiImpl):
             "from": "CWP",
             "offset": "-5",
             "language": "0",
-            "Origin": "https://kiaconnect.ca",
+            "Origin": f"https://{self.BASE_URL}",
             "Connection": "keep-alive",
-            "Referer": "https://kiaconnect.ca/login",
+            "Referer": f"https://{self.BASE_URL}/login",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
@@ -159,6 +134,9 @@ class KiaUvoApiCA(ApiImpl):
             "client_secret": "CLISCR01AHSPA",
         }
         self._sessions = None
+
+    def get_implementation_by_region_brand(self, region, brand, language):
+        return KiaUvoApiCA(region, brand, language)
 
     @property
     def sessions(self):
@@ -201,9 +179,16 @@ class KiaUvoApiCA(ApiImpl):
         data = {"loginId": username, "password": password}
         headers = self.API_HEADERS
         headers.pop("accessToken", None)
-        headers["Deviceid"] = (
-            "TW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEzOC4wLjAuMCBTYWZhcmkvNTM3LjM2IEVkZy8xMzguMC4wLjArV2luMzIrMTIzNCsxMjM0"
-        )
+        # Generate a random device ID to avoid static fingerprinting
+        import uuid
+        import base64
+
+        # Base string simulating a mobile User-Agent
+        base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+        # Append a random UUID to make it unique per session
+        unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
+
+        headers["Deviceid"] = base64.b64encode(unique_device_id.encode()).decode()
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
@@ -533,6 +518,13 @@ class KiaUvoApiCA(ApiImpl):
                 get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
                 "m",
             )
+            vehicle.ev_battery_precondition_enabled = get_child_value(
+                state, "status.evStatus.batteryPreconditiong"
+            )
+            vehicle.ev_estimated_station_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
+                "m",
+            )
         vehicle.fuel_driving_range = (
             get_child_value(
                 state,
@@ -809,7 +801,32 @@ class KiaUvoApiCA(ApiImpl):
                         }
                     )
             else:
-                payload["hvacInfo"] = climate_settings
+                if vehicle.model == "IONIQ 9":
+                    payload["remoteControl"] = climate_settings
+                    payload["remoteControl"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )
+                else:
+                    payload["hvacInfo"] = climate_settings
+                    payload["hvacInfo"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )
         else:
             payload = {
                 "setting": {
