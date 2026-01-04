@@ -12,7 +12,7 @@ import typing as ty
 from datetime import datetime
 
 import certifi
-import hashlib
+import uuid
 import requests
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
@@ -144,7 +144,7 @@ class KiaUvoApiUSA(ApiImpl):
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
         # Generate clientuuid as hash of device_id (similar to iOS app)
-        client_uuid = hashlib.sha256(self.device_id.encode("utf-8")).hexdigest()
+        client_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, self.device_id)
 
         headers = {
             "content-type": "application/json;charset=utf-8",
