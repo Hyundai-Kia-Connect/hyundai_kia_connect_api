@@ -12,6 +12,7 @@ import typing as ty
 from datetime import datetime
 
 import certifi
+import hashlib
 import requests
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
@@ -142,24 +143,30 @@ class KiaUvoApiUSA(ApiImpl):
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
+        # Generate clientuuid as hash of device_id (similar to iOS app)
+        client_uuid = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()
+        
         headers = {
-            "content-type": "application/json;charset=UTF-8",
-            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json;charset=utf-8",
+            "accept": "application/json",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
+            "accept-charset": "utf-8",
             "apptype": "L",
-            "appversion": "7.15.2",
-            "clientid": "MWAMOBILE",
+            "appversion": "7.22.0",
+            "clientid": "SPACL716-APL",
+            "clientuuid": client_uuid,
             "from": "SPA",
             "host": self.BASE_URL,
             "language": "0",
             "offset": str(int(offset)),
-            "ostype": "Android",
-            "osversion": "11",
-            "secretkey": "98er-w34rf-ibf3-3f6h",
+            "ostype": "iOS",
+            "osversion": "15.8.5",
+            "phonebrand": "iPhone",
+            "secretkey": "sydnat-9kykci-Kuhtep-h5nK",
             "to": "APIGW",
-            "tokentype": "G",
-            "user-agent": "okhttp/4.10.0",
+            "tokentype": "A",
+            "user-agent": "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0",
         }
         # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
         # May require adjusting locale to en_US
