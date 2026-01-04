@@ -144,8 +144,8 @@ class KiaUvoApiUSA(ApiImpl):
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
         # Generate clientuuid as hash of device_id (similar to iOS app)
-        client_uuid = hashlib.sha256(self.device_id.encode('utf-8')).hexdigest()
-        
+        client_uuid = hashlib.sha256(self.device_id.encode("utf-8")).hexdigest()
+
         headers = {
             "content-type": "application/json;charset=utf-8",
             "accept": "application/json",
