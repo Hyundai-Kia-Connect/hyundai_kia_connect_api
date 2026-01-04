@@ -3,15 +3,13 @@
 # pylint:disable=logging-fstring-interpolation,unused-argument,missing-timeout,bare-except,missing-function-docstring,invalid-name,unnecessary-pass,broad-exception-raised
 import datetime as dt
 import logging
-import random
-import secrets
 import ssl
-import string
 import time
 import typing as ty
 from datetime import datetime
 
 import certifi
+import uuid
 import requests
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
@@ -118,13 +116,7 @@ class KiaUvoApiUSA(ApiImpl):
         self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
-        self.device_id = (
-            "".join(
-                random.choice(string.ascii_letters + string.digits) for _ in range(22)
-            )
-            + ":"
-            + secrets.token_urlsafe(105)
-        )
+        self.device_id = str(uuid.uuid4()).upper()
 
         self.BASE_URL: str = "api.owners.kia.com"
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
@@ -142,27 +134,31 @@ class KiaUvoApiUSA(ApiImpl):
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
+        # Generate clientuuid as hash of device_id (similar to iOS app)
+        client_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, self.device_id)
+
         headers = {
-            "content-type": "application/json;charset=UTF-8",
-            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json;charset=utf-8",
+            "accept": "application/json",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
+            "accept-charset": "utf-8",
             "apptype": "L",
-            "appversion": "7.15.2",
-            "clientid": "MWAMOBILE",
+            "appversion": "7.22.0",
+            "clientid": "SPACL716-APL",
+            "clientuuid": client_uuid,
             "from": "SPA",
             "host": self.BASE_URL,
             "language": "0",
             "offset": str(int(offset)),
-            "ostype": "Android",
-            "osversion": "11",
-            "secretkey": "98er-w34rf-ibf3-3f6h",
+            "ostype": "iOS",
+            "osversion": "15.8.5",
+            "phonebrand": "iPhone",
+            "secretkey": "sydnat-9kykci-Kuhtep-h5nK",
             "to": "APIGW",
-            "tokentype": "G",
-            "user-agent": "okhttp/4.10.0",
+            "tokentype": "A",
+            "user-agent": "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0",
         }
-        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
-        # May require adjusting locale to en_US
         date = datetime.now(tz=dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
@@ -229,7 +225,7 @@ class KiaUvoApiUSA(ApiImpl):
         """Complete login with sid and rmtoken to get final session id"""
         url = self.API_URL + "prof/authUser"
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
         }
@@ -270,7 +266,7 @@ class KiaUvoApiUSA(ApiImpl):
         """
         url = self.API_URL + "prof/authUser"
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
         }
@@ -375,9 +371,10 @@ class KiaUvoApiUSA(ApiImpl):
         """
         url = self.API_URL + "prof/authUser"
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
+            "tncFlag": 1,
         }
         if token and getattr(token, "device_id", None):
             self.device_id = token.device_id
@@ -385,6 +382,7 @@ class KiaUvoApiUSA(ApiImpl):
             self._otp_handler = otp_handler
         headers = self.api_headers()
         if token and token.refresh_token:
+            data["deviceKey"] = self.device_id
             _LOGGER.debug(f"{DOMAIN} - Attempting login with stored rmtoken")
             headers["rmtoken"] = token.refresh_token
         response = self.session.post(url, json=data, headers=headers)
