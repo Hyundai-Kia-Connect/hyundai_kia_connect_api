@@ -45,12 +45,13 @@ Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Co
 
 Once this is done you can now make the following calls against the vehicle manager::
 
- #login
+#login
 
     login(self)
 
+#OTP Details are Alpha - not used yet. 
 #Sent OTP
-    send_otp(self)
+    send_otp(self, method)
 
 #Verify OTP
     verify_otp(self, otp_code)
