@@ -100,7 +100,9 @@ class ApiImpl:
         """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
         pass
 
-    def send_otp(self, otp_request: OTPRequest, otp_destination: str, otp_via: str) -> None:
+    def send_otp(
+        self, otp_request: OTPRequest, otp_destination: str, otp_via: str
+    ) -> None:
         """Sends OTP to the user via selected destination and via"""
         pass
 

@@ -108,7 +108,7 @@ class VehicleManager:
 
     def send_otp(self, otp_destination: str, otp_via: str) -> None:
         self.api.send_otp(self.otp_request, otp_destination, otp_via)
-        
+
     def verify_otp(self, otp_code: str) -> None:
         self.token = self.api.verify_otp(self.otp_request, otp_code)
         self.initialize_vehicles()
