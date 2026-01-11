@@ -290,7 +290,7 @@ class KiaUvoApiUSA(ApiImpl):
             Existing token with stored rmtoken for reuse
         otp_handler : Callable[[dict], dict], optional
             Non-interactive OTP handler. Called twice:
-            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'PHONE'}
+            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'SMS'}
             - stage='input_code' -> return {'otp_code': '<code>'}
         pin : str, optional
 

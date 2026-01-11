@@ -120,4 +120,4 @@ class VALET_MODE_ACTION(Enum):
 
 class OTP_NOTIFY_TYPE(Enum):
     EMAIL = "EMAIL"
-    PHONE = "PHONE"
+    SMS = "SMS"
