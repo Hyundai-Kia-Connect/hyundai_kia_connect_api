@@ -26,7 +26,7 @@ from .const import (
     GEO_LOCATION_PROVIDERS,
     OPENSTREETMAP,
     GOOGLE,
-    OTP_NOTIFY_TYPE
+    OTP_NOTIFY_TYPE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -106,8 +106,14 @@ class ApiImpl:
         """Sends OTP to the user via selected destination and via"""
         pass
 
-    def verify_otp_and_complete_login(self, username: str,        password: str,
-        pin: str | None = None, otp_request: OTPRequest = None, otp_code: str = None) -> Token:
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        pin: str | None = None,
+        otp_request: OTPRequest = None,
+        otp_code: str = None,
+    ) -> Token:
         """Confirms OTP code sent to the user"""
         pass
 

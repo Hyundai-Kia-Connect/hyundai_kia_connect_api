@@ -25,7 +25,7 @@ from .const import (
     ORDER_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
-    OTP_NOTIFY_TYPE
+    OTP_NOTIFY_TYPE,
 )
 from .utils import get_child_value, parse_datetime
 from .exceptions import AuthenticationError
@@ -313,7 +313,9 @@ class KiaUvoApiUSA(ApiImpl):
             f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
         )
 
-    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE, xid: str) -> dict:
+    def send_otp(
+        self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE, xid: str
+    ) -> dict:
         """Public helper to send OTP to the selected destination."""
         return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
 

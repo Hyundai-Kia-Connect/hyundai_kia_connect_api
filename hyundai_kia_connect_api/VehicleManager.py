@@ -32,7 +32,7 @@ from .const import (
     REGIONS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
-    OTP_NOTIFY_TYPE
+    OTP_NOTIFY_TYPE,
 )
 from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
@@ -109,9 +109,11 @@ class VehicleManager:
 
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
         self.api.send_otp(self.otp_request, notify_type)
-        
+
     def verify_otp_and_complete_login(self, otp_code: str) -> None:
-        self.token = self.api.verify_otp_and_complete_login(self.username, self.password, self.pin, self.otp_request, otp_code)
+        self.token = self.api.verify_otp_and_complete_login(
+            self.username, self.password, self.pin, self.otp_request, otp_code
+        )
         self.initialize_vehicles()
 
     def initialize_vehicles(self):
