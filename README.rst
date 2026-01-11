@@ -46,16 +46,17 @@ Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Co
 Once this is done you can now make the following calls against the vehicle manager::
 
 
-#login
+ #login
 
-    login(self)
+ login(self)
 
-#OTP Details are Alpha - not used yet. 
-#Sent OTP
-    send_otp(self, method)
+ #OTP Details are Alpha - not used yet. 
 
-#Verify OTP
-    verify_otp(self, otp_code)
+ #Sent OTP
+ send_otp(self, method)
+
+ #Verify OTP
+ verify_otp(self, otp_code)
 
  #Checks the token is still valid and updates it if not.  Should be called before anything else if the code has been running for any length of time.
  check_and_refresh_token(self)
