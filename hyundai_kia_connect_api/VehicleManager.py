@@ -108,7 +108,7 @@ class VehicleManager:
 
     def send_otp(self, otp_destination: str, otp_via: str) -> None:
         self.api.send_otp(self.otp_request, otp_destination, otp_via)
-        
+
     def verify_otp(self, otp_code: str) -> None:
         self.token = self.api.verify_otp(self.otp_request, otp_code)
         self.initialize_vehicles()
@@ -199,15 +199,13 @@ class VehicleManager:
                 token_expired = valid_until - grace_period <= now_utc
         if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            result = self.api.login(
-                self.username,
-                self.password,
-                pin=self.pin,
+            result = self.api.refresh_access_token(
+                self.token,
             )
             if isinstance(result, Token):
                 self.token: Token = result
                 self.initialize_vehicles()
-            if isinstance(result, OTPOptions):
+            if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True

@@ -100,7 +100,9 @@ class ApiImpl:
         """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
         pass
 
-    def send_otp(self, otp_request: OTPRequest, otp_destination: str, otp_via: str) -> None:
+    def send_otp(
+        self, otp_request: OTPRequest, otp_destination: str, otp_via: str
+    ) -> None:
         """Sends OTP to the user via selected destination and via"""
         pass
 
@@ -316,3 +318,8 @@ class ApiImpl:
         Set the vehicle to load limit. Returns the tracking ID
         """
         pass
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        # By default, just call login again, ideally use the refresh token flow
+        return self.login(token.username, token.password, token.pin)
