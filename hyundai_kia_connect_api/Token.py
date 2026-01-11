@@ -15,6 +15,7 @@ class Token:
     access_token: str = None
     refresh_token: str = None
     device_id: str = None
+    # Access Token expiry:
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
     pin: str = None

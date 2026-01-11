@@ -316,3 +316,8 @@ class ApiImpl:
         Set the vehicle to load limit. Returns the tracking ID
         """
         pass
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        # By default, just call login again, ideally use the refresh token flow
+        return self.login(token.username, token.password, token.pin)
