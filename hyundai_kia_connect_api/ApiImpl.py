@@ -110,9 +110,9 @@ class ApiImpl:
         self,
         username: str,
         password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
         pin: str | None = None,
-        otp_request: OTPRequest = None,
-        otp_code: str = None,
     ) -> Token:
         """Confirms OTP code sent to the user"""
         pass

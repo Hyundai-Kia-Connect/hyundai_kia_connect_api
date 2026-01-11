@@ -241,80 +241,8 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
-    def start_login(
-        self,
-        username: str,
-        password: str,
-        token: Token | None = None,
-    ) -> tuple[Token | None, dict | None]:
-        """Start login and return either a Token or an OTP context.
-
-        Parameters
-        ----------
-        username : str
-            User email address
-        password : str
-            User password
-        token : Token | None
-            Existing token with stored rmtoken for reuse
-
-        Returns
-        -------
-        tuple[Token | None, dict | None]
-            (Token, None) if login succeeded without OTP, otherwise (None, ctx)
-            where ctx contains 'otpKey', 'xid', 'email', 'phone', 'hasEmail', 'hasPhone'.
-        """
-        url = self.API_URL + "prof/authUser"
-        data = {
-            "deviceKey": self.device_id,
-            "deviceType": 2,
-            "userCredential": {"userId": username, "password": password},
-        }
-        headers = self.api_headers()
-        if token and getattr(token, "device_id", None):
-            self.device_id = token.device_id
-
-        if token and token.refresh_token:
-            _LOGGER.debug(f"{DOMAIN} - Attempting start_login with stored rmtoken")
-            headers["rmtoken"] = token.refresh_token
-        response = self.session.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Start Sign In Response {response.text}")
-        response_json = response.json()
-        session_id = response.headers.get("sid")
-        if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            existing_rmtoken = token.refresh_token if token else None
-            return (
-                Token(
-                    username=username,
-                    password=password,
-                    access_token=session_id,
-                    refresh_token=existing_rmtoken,
-                    valid_until=valid_until,
-                    device_id=self.device_id,
-                ),
-                None,
-            )
-        if "payload" in response_json and "otpKey" in response_json["payload"]:
-            payload = response_json["payload"]
-            xid = response.headers.get("xid", "")
-            ctx = {
-                "otpKey": payload["otpKey"],
-                "xid": xid,
-                "email": payload.get("email"),
-                "phone": payload.get("phone"),
-                "hasEmail": bool(payload.get("hasEmail")),
-                "hasPhone": bool(payload.get("hasPhone")),
-                "rmTokenExpired": bool(payload.get("rmTokenExpired")),
-            }
-            return None, ctx
-        raise Exception(
-            f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
-        )
-
     def send_otp(
-        self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE, xid: str
+        self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE
     ) -> dict:
         """Public helper to send OTP to the selected destination."""
         return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
@@ -323,12 +251,12 @@ class KiaUvoApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        otp_key: str,
-        xid: str,
         otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
-        sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
+        sid, rmtoken = self._verify_otp(otp_request.otp_key, otp_code, otp_request.request_id)
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
         _LOGGER.debug(f"got final session id {final_sid}")
         _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
@@ -340,6 +268,7 @@ class KiaUvoApiUSA(ApiImpl):
             refresh_token=rmtoken,
             valid_until=valid_until,
             device_id=self.device_id,
+            pin=pin
         )
 
     def login(
@@ -407,76 +336,13 @@ class KiaUvoApiUSA(ApiImpl):
             payload = response_json["payload"]
             if payload.get("rmTokenExpired"):
                 _LOGGER.info(f"{DOMAIN} - Stored rmtoken has expired, need new OTP")
-            otp_key = payload["otpKey"]
-            xid = response.headers.get("xid", "")
-            _LOGGER.info(f"{DOMAIN} - OTP required for login")
-            _LOGGER.info(f"{DOMAIN} - Email: {payload.get('email', 'N/A')}")
-            _LOGGER.info(f"{DOMAIN} - Phone: {payload.get('phone', 'N/A')}")
-            notify_type = "EMAIL"
-            handler = otp_handler or getattr(self, "_otp_handler", None)
-            if handler:
-                try:
-                    ctx_choice = {
-                        "stage": "choose_destination",
-                        "hasEmail": bool(payload.get("hasEmail")),
-                        "hasPhone": bool(payload.get("hasPhone")),
-                        "email": payload.get("email"),
-                        "phone": payload.get("phone"),
-                    }
-                    res = handler(ctx_choice) or {}
-                    nt = str(res.get("notify_type", notify_type)).upper()
-                    if nt in ("EMAIL", "PHONE"):
-                        notify_type = nt
-                except Exception:
-                    _LOGGER.debug(
-                        f"{DOMAIN} - otp_handler choose_destination failed; using default"
-                    )
-            else:
-                if payload.get("hasEmail") and payload.get("hasPhone"):
-                    print("\nOTP Authentication Required")
-                    print(f"Email: {payload.get('email', 'N/A')}")
-                    print(f"Phone: {payload.get('phone', 'N/A')}")
-                    choice = (
-                        input("Send OTP to (E)mail or (P)hone? [E/P]: ").strip().upper()
-                    )
-                    if choice == "P":
-                        notify_type = "PHONE"
-                elif payload.get("hasPhone"):
-                    notify_type = "PHONE"
-            self._send_otp(otp_key, notify_type, xid)
-            if not handler:
-                print(f"\nOTP sent to {notify_type.lower()}")
-            otp_code = None
-            if handler:
-                try:
-                    ctx_code = {
-                        "stage": "input_code",
-                        "notify_type": notify_type,
-                        "otpKey": otp_key,
-                        "xid": xid,
-                    }
-                    res2 = handler(ctx_code) or {}
-                    otp_code = str(res2.get("otp_code", "")).strip()
-                except Exception:
-                    _LOGGER.debug(f"{DOMAIN} - otp_handler input_code failed")
-            if not otp_code:
-                if handler is None:
-                    otp_code = input("Enter OTP code: ").strip()
-                else:
-                    raise AuthenticationError(f"{DOMAIN} - OTP code required")
-            sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
-            final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-            _LOGGER.debug(f"got final session id {final_sid}")
-            _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            return Token(
-                username=username,
-                password=password,
-                access_token=final_sid,
-                refresh_token=rmtoken,
-                valid_until=valid_until,
-                device_id=self.device_id,
-                pin=pin,
+            return OTPRequest(
+                otp_key=payload["otpKey"],
+                request_id=response.headers.get("xid", ""),
+                email=payload.get("email"),
+                phone=payload.get("phone"),
+                has_email=bool(payload.get("hasEmail")),
+                has_phone=bool(payload.get("hasPhone")),       
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
