@@ -123,7 +123,6 @@ class KiaUvoApiUSA(ApiImpl):
         self._session = None
 
         self._otp_handler = None
-        self.supports_otp: bool = True
 
     @property
     def session(self):
