@@ -54,7 +54,8 @@ class WindowRequestOptions:
 
 
 @dataclass
-class OTPOptions:
+class OTPRequest:
+    request_id: str | None
     has_email: bool | None
     has_sms: bool | None
     email: str | None
@@ -95,15 +96,15 @@ class ApiImpl:
         username: str,
         password: str,
         pin: str | None = None,
-    ) -> Token | OTPOptions:
+    ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
         pass
 
-    def sent_otp(self, token: Token, otp_destination: str, otp_via: str) -> None:
+    def send_otp(self, otp_request: OTPRequest, otp_destination: str, otp_via: str) -> None:
         """Sends OTP to the user via selected destination and via"""
         pass
 
-    def confirm_otp(self, token: Token, otp_code: str) -> Token:
+    def verify_otp(self, otp_request: OTPRequest, otp_code: str) -> Token:
         """Confirms OTP code sent to the user"""
         pass
 

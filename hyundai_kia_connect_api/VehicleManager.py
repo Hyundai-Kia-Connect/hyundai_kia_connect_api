@@ -11,7 +11,7 @@ from .ApiImpl import (
     ClimateRequestOptions,
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
-    OTPOptions,
+    OTPRequest,
 )
 from .const import (
     BRAND_GENESIS,
@@ -80,6 +80,7 @@ class VehicleManager:
 
         self.token: Token = token
         self.vehicles: dict = {}
+        self.otp_request: OTPRequest = None
 
     @DeprecationWarning
     def initialize(self) -> None:
@@ -90,7 +91,7 @@ class VehicleManager:
         )
         self.initialize_vehicles()
 
-    def login(self) -> bool | OTPOptions:
+    def login(self) -> bool | OTPRequest:
         """Returns True if login successful, or OTPOptions if OTP is required"""
         result = self.api.login(
             self.username,
@@ -101,14 +102,15 @@ class VehicleManager:
             self.token: Token = result
             self.initialize_vehicles()
             return True
-        if isinstance(result, OTPOptions):
+        if isinstance(result, OTPRequest):
+            self.otp_request = result
             return result
 
-    def sent_otp(self, otp_destination: str, otp_via: str) -> None:
-        self.api.sent_otp(self.token, otp_destination, otp_via)
-
-    def confirm_otp(self, otp_code: str) -> None:
-        self.token = self.api.confirm_otp(self.token, otp_code)
+    def send_otp(self, otp_destination: str, otp_via: str) -> None:
+        self.api.send_otp(self.otp_request, otp_destination, otp_via)
+        
+    def verify_otp(self, otp_code: str) -> None:
+        self.token = self.api.verify_otp(self.otp_request, otp_code)
         self.initialize_vehicles()
 
     def initialize_vehicles(self):
