@@ -4,7 +4,6 @@
 
 import datetime as dt
 import logging
-import typing as ty
 from datetime import timedelta
 
 from .ApiImpl import (
