@@ -15,7 +15,7 @@ from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -25,6 +25,7 @@ from .const import (
     ORDER_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    OTP_NOTIFY_TYPE
 )
 from .utils import get_child_value, parse_datetime
 from .exceptions import AuthenticationError
@@ -312,9 +313,9 @@ class KiaUvoApiUSA(ApiImpl):
             f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
         )
 
-    def send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE, xid: str) -> dict:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(otp_key, notify_type, xid)
+        return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
 
     def verify_otp_and_complete_login(
         self,

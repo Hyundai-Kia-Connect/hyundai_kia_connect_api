@@ -26,6 +26,7 @@ from .const import (
     GEO_LOCATION_PROVIDERS,
     OPENSTREETMAP,
     GOOGLE,
+    OTP_NOTIFY_TYPE
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ class WindowRequestOptions:
 @dataclass
 class OTPRequest:
     request_id: str | None
+    otp_key: str | None
     has_email: bool | None
     has_sms: bool | None
     email: str | None
@@ -100,11 +102,12 @@ class ApiImpl:
         """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
         pass
 
-    def send_otp(self, otp_request: OTPRequest, otp_destination: str, otp_via: str) -> None:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Sends OTP to the user via selected destination and via"""
         pass
 
-    def verify_otp(self, otp_request: OTPRequest, otp_code: str) -> Token:
+    def verify_otp_and_complete_login(self, username: str,        password: str,
+        pin: str | None = None, otp_request: OTPRequest = None, otp_code: str = None) -> Token:
         """Confirms OTP code sent to the user"""
         pass
 
