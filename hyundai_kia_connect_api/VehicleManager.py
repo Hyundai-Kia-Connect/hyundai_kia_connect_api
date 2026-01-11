@@ -63,7 +63,6 @@ class VehicleManager:
         geocode_api_key: str = None,
         token: Token = None,
         language: str = "en",
-        otp_handler: ty.Callable[[dict], dict] | None = None,
     ):
         self.region: int = region
         self.brand: int = brand
@@ -82,7 +81,6 @@ class VehicleManager:
 
         self.token: Token = token
         self.vehicles: dict = {}
-        self.vehicles_valid = False
 
     @DeprecationWarning
     def initialize(self) -> None:
@@ -112,12 +110,12 @@ class VehicleManager:
 
     def confirm_otp(self, otp_code: str) -> None:
         self.token = self.api.confirm_otp(self.token, otp_code)
+        self.initialize_vehicles()
 
     def initialize_vehicles(self):
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
-        self.vehicles_valid = True
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
@@ -182,7 +180,7 @@ class VehicleManager:
                 return True
             else:
                 raise AuthenticationOTPRequired("OTP required to refresh token")
-        elif not self.vehicles_valid:
+        elif len(self.vehicles) == 0:
             self.initialize_vehicles()
         now_utc = dt.datetime.now(dt.timezone.utc)
         grace_period = timedelta(seconds=10)
