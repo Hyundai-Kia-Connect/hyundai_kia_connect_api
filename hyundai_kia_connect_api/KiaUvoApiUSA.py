@@ -341,7 +341,7 @@ class KiaUvoApiUSA(ApiImpl):
                 email=payload.get("email"),
                 phone=payload.get("phone"),
                 has_email=bool(payload.get("hasEmail")),
-                has_phone=bool(payload.get("hasPhone")),
+                has_sms=bool(payload.get("hasPhone")),
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
