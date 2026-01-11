@@ -28,7 +28,6 @@ from .const import (
     OTP_NOTIFY_TYPE,
 )
 from .utils import get_child_value, parse_datetime
-from .exceptions import AuthenticationError
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -241,9 +240,7 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
-    def send_otp(
-        self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE
-    ) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
         """Public helper to send OTP to the selected destination."""
         return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
 
@@ -256,7 +253,9 @@ class KiaUvoApiUSA(ApiImpl):
         pin: str | None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
-        sid, rmtoken = self._verify_otp(otp_request.otp_key, otp_code, otp_request.request_id)
+        sid, rmtoken = self._verify_otp(
+            otp_request.otp_key, otp_code, otp_request.request_id
+        )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
         _LOGGER.debug(f"got final session id {final_sid}")
         _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
@@ -268,7 +267,7 @@ class KiaUvoApiUSA(ApiImpl):
             refresh_token=rmtoken,
             valid_until=valid_until,
             device_id=self.device_id,
-            pin=pin
+            pin=pin,
         )
 
     def login(
@@ -342,7 +341,7 @@ class KiaUvoApiUSA(ApiImpl):
                 email=payload.get("email"),
                 phone=payload.get("phone"),
                 has_email=bool(payload.get("hasEmail")),
-                has_phone=bool(payload.get("hasPhone")),       
+                has_phone=bool(payload.get("hasPhone")),
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"

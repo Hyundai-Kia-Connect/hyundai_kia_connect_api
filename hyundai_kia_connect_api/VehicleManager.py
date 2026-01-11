@@ -112,7 +112,11 @@ class VehicleManager:
 
     def verify_otp_and_complete_login(self, otp_code: str) -> None:
         self.token = self.api.verify_otp_and_complete_login(
-            username=self.username, password=self.password, otp_code=otp_code, otp_request=self.otp_request, pin=self.pin,
+            username=self.username,
+            password=self.password,
+            otp_code=otp_code,
+            otp_request=self.otp_request,
+            pin=self.pin,
         )
         self.initialize_vehicles()
 
