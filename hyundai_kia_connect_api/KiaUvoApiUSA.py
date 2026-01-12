@@ -343,7 +343,7 @@ class KiaUvoApiUSA(ApiImpl):
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
         )
-    
+
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
         self.login(token.username, token.password, token)
