@@ -346,7 +346,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
-        self.login(token.username, token.password, token)
+        return self.login(token.username, token.password, token)
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
