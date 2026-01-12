@@ -15,7 +15,7 @@ from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -25,9 +25,9 @@ from .const import (
     ORDER_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    OTP_NOTIFY_TYPE,
 )
 from .utils import get_child_value, parse_datetime
-from .exceptions import AuthenticationError
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -240,92 +240,22 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
-    def start_login(
-        self,
-        username: str,
-        password: str,
-        token: Token | None = None,
-    ) -> tuple[Token | None, dict | None]:
-        """Start login and return either a Token or an OTP context.
-
-        Parameters
-        ----------
-        username : str
-            User email address
-        password : str
-            User password
-        token : Token | None
-            Existing token with stored rmtoken for reuse
-
-        Returns
-        -------
-        tuple[Token | None, dict | None]
-            (Token, None) if login succeeded without OTP, otherwise (None, ctx)
-            where ctx contains 'otpKey', 'xid', 'email', 'phone', 'hasEmail', 'hasPhone'.
-        """
-        url = self.API_URL + "prof/authUser"
-        data = {
-            "deviceKey": self.device_id,
-            "deviceType": 2,
-            "userCredential": {"userId": username, "password": password},
-        }
-        headers = self.api_headers()
-        if token and getattr(token, "device_id", None):
-            self.device_id = token.device_id
-
-        if token and token.refresh_token:
-            _LOGGER.debug(f"{DOMAIN} - Attempting start_login with stored rmtoken")
-            headers["rmtoken"] = token.refresh_token
-        response = self.session.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Start Sign In Response {response.text}")
-        response_json = response.json()
-        session_id = response.headers.get("sid")
-        if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            existing_rmtoken = token.refresh_token if token else None
-            return (
-                Token(
-                    username=username,
-                    password=password,
-                    access_token=session_id,
-                    refresh_token=existing_rmtoken,
-                    valid_until=valid_until,
-                    device_id=self.device_id,
-                ),
-                None,
-            )
-        if "payload" in response_json and "otpKey" in response_json["payload"]:
-            payload = response_json["payload"]
-            xid = response.headers.get("xid", "")
-            ctx = {
-                "otpKey": payload["otpKey"],
-                "xid": xid,
-                "email": payload.get("email"),
-                "phone": payload.get("phone"),
-                "hasEmail": bool(payload.get("hasEmail")),
-                "hasPhone": bool(payload.get("hasPhone")),
-                "rmTokenExpired": bool(payload.get("rmTokenExpired")),
-            }
-            return None, ctx
-        raise Exception(
-            f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
-        )
-
-    def send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(otp_key, notify_type, xid)
+        return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
 
     def verify_otp_and_complete_login(
         self,
         username: str,
         password: str,
-        otp_key: str,
-        xid: str,
         otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
-        sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
+        sid, rmtoken = self._verify_otp(
+            otp_request.otp_key, otp_code, otp_request.request_id
+        )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
         _LOGGER.debug(f"got final session id {final_sid}")
         _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
@@ -337,6 +267,7 @@ class KiaUvoApiUSA(ApiImpl):
             refresh_token=rmtoken,
             valid_until=valid_until,
             device_id=self.device_id,
+            pin=pin,
         )
 
     def login(
@@ -344,7 +275,6 @@ class KiaUvoApiUSA(ApiImpl):
         username: str,
         password: str,
         token: Token = None,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login into cloud endpoints and return Token
@@ -359,7 +289,7 @@ class KiaUvoApiUSA(ApiImpl):
             Existing token with stored rmtoken for reuse
         otp_handler : Callable[[dict], dict], optional
             Non-interactive OTP handler. Called twice:
-            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'PHONE'}
+            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'SMS'}
             - stage='input_code' -> return {'otp_code': '<code>'}
         pin : str, optional
 
@@ -377,19 +307,17 @@ class KiaUvoApiUSA(ApiImpl):
         }
         if token and getattr(token, "device_id", None):
             self.device_id = token.device_id
-        if otp_handler is not None:
-            self._otp_handler = otp_handler
         headers = self.api_headers()
         if token and token.refresh_token:
             data["deviceKey"] = self.device_id
-            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored rmtoken")
+            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored Refresh Token")
             headers["rmtoken"] = token.refresh_token
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response_json = response.json()
         session_id = response.headers.get("sid")
         if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
+            _LOGGER.debug(f"Got session id {session_id}")
             valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
             existing_rmtoken = token.refresh_token if token else None
             return Token(
@@ -404,80 +332,21 @@ class KiaUvoApiUSA(ApiImpl):
             payload = response_json["payload"]
             if payload.get("rmTokenExpired"):
                 _LOGGER.info(f"{DOMAIN} - Stored rmtoken has expired, need new OTP")
-            otp_key = payload["otpKey"]
-            xid = response.headers.get("xid", "")
-            _LOGGER.info(f"{DOMAIN} - OTP required for login")
-            _LOGGER.info(f"{DOMAIN} - Email: {payload.get('email', 'N/A')}")
-            _LOGGER.info(f"{DOMAIN} - Phone: {payload.get('phone', 'N/A')}")
-            notify_type = "EMAIL"
-            handler = otp_handler or getattr(self, "_otp_handler", None)
-            if handler:
-                try:
-                    ctx_choice = {
-                        "stage": "choose_destination",
-                        "hasEmail": bool(payload.get("hasEmail")),
-                        "hasPhone": bool(payload.get("hasPhone")),
-                        "email": payload.get("email"),
-                        "phone": payload.get("phone"),
-                    }
-                    res = handler(ctx_choice) or {}
-                    nt = str(res.get("notify_type", notify_type)).upper()
-                    if nt in ("EMAIL", "PHONE"):
-                        notify_type = nt
-                except Exception:
-                    _LOGGER.debug(
-                        f"{DOMAIN} - otp_handler choose_destination failed; using default"
-                    )
-            else:
-                if payload.get("hasEmail") and payload.get("hasPhone"):
-                    print("\nOTP Authentication Required")
-                    print(f"Email: {payload.get('email', 'N/A')}")
-                    print(f"Phone: {payload.get('phone', 'N/A')}")
-                    choice = (
-                        input("Send OTP to (E)mail or (P)hone? [E/P]: ").strip().upper()
-                    )
-                    if choice == "P":
-                        notify_type = "PHONE"
-                elif payload.get("hasPhone"):
-                    notify_type = "PHONE"
-            self._send_otp(otp_key, notify_type, xid)
-            if not handler:
-                print(f"\nOTP sent to {notify_type.lower()}")
-            otp_code = None
-            if handler:
-                try:
-                    ctx_code = {
-                        "stage": "input_code",
-                        "notify_type": notify_type,
-                        "otpKey": otp_key,
-                        "xid": xid,
-                    }
-                    res2 = handler(ctx_code) or {}
-                    otp_code = str(res2.get("otp_code", "")).strip()
-                except Exception:
-                    _LOGGER.debug(f"{DOMAIN} - otp_handler input_code failed")
-            if not otp_code:
-                if handler is None:
-                    otp_code = input("Enter OTP code: ").strip()
-                else:
-                    raise AuthenticationError(f"{DOMAIN} - OTP code required")
-            sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
-            final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-            _LOGGER.debug(f"got final session id {final_sid}")
-            _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            return Token(
-                username=username,
-                password=password,
-                access_token=final_sid,
-                refresh_token=rmtoken,
-                valid_until=valid_until,
-                device_id=self.device_id,
-                pin=pin,
+            return OTPRequest(
+                otp_key=payload["otpKey"],
+                request_id=response.headers.get("xid", ""),
+                email=payload.get("email"),
+                sms=payload.get("phone"),
+                has_email=bool(payload.get("hasEmail")),
+                has_sms=bool(payload.get("hasPhone")),
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
         )
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        return self.login(token.username, token.password, token)
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""

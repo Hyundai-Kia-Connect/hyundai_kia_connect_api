@@ -116,3 +116,8 @@ class WINDOW_STATE(IntEnum):
 class VALET_MODE_ACTION(Enum):
     ACTIVATE = "activate"
     DEACTIVATE = "deactivate"
+
+
+class OTP_NOTIFY_TYPE(Enum):
+    EMAIL = "EMAIL"
+    SMS = "SMS"
