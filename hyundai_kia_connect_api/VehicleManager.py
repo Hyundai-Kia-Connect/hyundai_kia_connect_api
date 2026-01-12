@@ -206,10 +206,8 @@ class VehicleManager:
                 token_expired = valid_until - grace_period <= now_utc
         if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            result = self.api.login(
-                self.username,
-                self.password,
-                pin=self.pin,
+            result = self.api.refresh_access_token(
+                self.token,
             )
             if isinstance(result, Token):
                 self.token: Token = result
