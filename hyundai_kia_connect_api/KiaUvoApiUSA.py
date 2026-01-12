@@ -275,7 +275,6 @@ class KiaUvoApiUSA(ApiImpl):
         username: str,
         password: str,
         token: Token = None,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login into cloud endpoints and return Token
@@ -308,19 +307,17 @@ class KiaUvoApiUSA(ApiImpl):
         }
         if token and getattr(token, "device_id", None):
             self.device_id = token.device_id
-        if otp_handler is not None:
-            self._otp_handler = otp_handler
         headers = self.api_headers()
         if token and token.refresh_token:
             data["deviceKey"] = self.device_id
-            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored rmtoken")
+            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored Refresh Token")
             headers["rmtoken"] = token.refresh_token
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response_json = response.json()
         session_id = response.headers.get("sid")
         if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
+            _LOGGER.debug(f"Got session id {session_id}")
             valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
             existing_rmtoken = token.refresh_token if token else None
             return Token(
@@ -346,6 +343,10 @@ class KiaUvoApiUSA(ApiImpl):
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
         )
+    
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        self.login(token.username, token.password, token)
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
