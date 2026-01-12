@@ -254,7 +254,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
-                gen_type=entry.get("genType"),
+                generation=entry.get("genType"),
             )
             result.append(vehicle)
         return result
@@ -993,7 +993,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["priority"] = "u=1, i"
         headers["Referer"] = "https://kiaconnect.ca/remote/"
 
-        if vehicle.gen_type == "G3":
+        if vehicle.generation == "G3":
             # Gen3 Vehicles (like IONIQ 9) use a different endpoint and payload
             url = self.API_URL + "v2/ev/reserv/socset"
             payload = {

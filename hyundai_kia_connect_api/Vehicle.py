@@ -76,12 +76,9 @@ class Vehicle:
     # EU or Type 1 version:
     ccu_ccs2_protocol_support: int = None
     # Hyundai USA:
-    generation: int = None
+    generation: typing.Union[int, str] = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
-
-    # Generation type (e.g. "G3")
-    gen_type: str = None
 
     # Shared (EV/PHEV/HEV/IC)
     # General
