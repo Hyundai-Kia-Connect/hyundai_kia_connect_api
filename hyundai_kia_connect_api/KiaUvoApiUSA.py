@@ -336,7 +336,7 @@ class KiaUvoApiUSA(ApiImpl):
                 otp_key=payload["otpKey"],
                 request_id=response.headers.get("xid", ""),
                 email=payload.get("email"),
-                phone=payload.get("phone"),
+                sms=payload.get("phone"),
                 has_email=bool(payload.get("hasEmail")),
                 has_sms=bool(payload.get("hasPhone")),
             )
