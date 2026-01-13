@@ -242,7 +242,9 @@ class KiaUvoApiUSA(ApiImpl):
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(otp_request.otp_key, str(notify_type), otp_request.request_id)
+        return self._send_otp(
+            otp_request.otp_key, str(notify_type), otp_request.request_id
+        )
 
     def verify_otp_and_complete_login(
         self,
@@ -257,8 +259,7 @@ class KiaUvoApiUSA(ApiImpl):
             otp_request.otp_key, otp_code, otp_request.request_id
         )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-        _LOGGER.debug(f"got final session id {final_sid}")
-        _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
+        _LOGGER.debug("OTP Successful, obtained final session id")
         valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
