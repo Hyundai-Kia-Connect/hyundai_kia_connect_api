@@ -191,6 +191,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers = self.api_headers()
         headers["otpkey"] = otp_key
         headers["notifytype"] = notify_type
+        _LOGGER.debug(f"{DOMAIN} - Sending OTP to {notify_type}")
         headers["xid"] = xid
         response = self.session.post(url, json={}, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
