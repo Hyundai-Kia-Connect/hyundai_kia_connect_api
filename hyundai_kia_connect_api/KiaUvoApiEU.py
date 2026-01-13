@@ -813,8 +813,7 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            res_msg = response.get("resMsg", {})
-            return res_msg.get("coord") or res_msg.get("gpsDetail")
+            return response["resMsg"]["gpsDetail"]["coord"]
         except Exception as e:
             _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
