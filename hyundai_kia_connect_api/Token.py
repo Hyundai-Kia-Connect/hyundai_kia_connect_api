@@ -3,7 +3,7 @@
 # pylint:disable=invalid-name
 
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 
 @dataclass
