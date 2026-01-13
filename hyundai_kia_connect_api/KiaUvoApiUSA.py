@@ -257,8 +257,7 @@ class KiaUvoApiUSA(ApiImpl):
             otp_request.otp_key, otp_code, otp_request.request_id
         )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-        _LOGGER.debug(f"got final session id {final_sid}")
-        _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
+        _LOGGER.debug("OTP Successful, obtained final session id")
         valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
