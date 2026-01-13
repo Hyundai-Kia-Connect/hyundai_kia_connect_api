@@ -242,7 +242,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(otp_request.otp_key, notify_type, otp_request.request_id)
+        return self._send_otp(otp_request.otp_key, str(notify_type), otp_request.request_id)
 
     def verify_otp_and_complete_login(
         self,
