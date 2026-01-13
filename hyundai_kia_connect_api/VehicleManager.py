@@ -188,8 +188,6 @@ class VehicleManager:
                 return True
             else:
                 raise AuthenticationOTPRequired("OTP required to refresh token")
-        elif len(self.vehicles) == 0:
-            self.initialize_vehicles()
         now_utc = dt.datetime.now(dt.timezone.utc)
         grace_period = timedelta(seconds=10)
         min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
@@ -216,6 +214,8 @@ class VehicleManager:
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
+        if len(self.vehicles) == 0:
+            self.initialize_vehicles()
         return False
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
