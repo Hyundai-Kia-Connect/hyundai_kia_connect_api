@@ -50,7 +50,7 @@ Once this is done you can now make the following calls against the vehicle manag
 
  login(self)
 
- #OTP Details are Alpha - not used yet.
+ #OTP Details
 
  #Sent OTP
  send_otp(self, method)
