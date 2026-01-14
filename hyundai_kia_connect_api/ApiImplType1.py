@@ -42,7 +42,6 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
-    PINMissingError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
