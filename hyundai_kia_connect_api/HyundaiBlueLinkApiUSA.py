@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
@@ -138,6 +138,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
+        if response.get("access_token") is None:
+            raise AuthenticationError("Login failed: " + response.get("errorMessage", ""))
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
