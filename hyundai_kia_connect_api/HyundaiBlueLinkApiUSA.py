@@ -139,7 +139,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         if response.get("access_token") is None:
-            raise AuthenticationError("Login failed: " + response.get("errorMessage", ""))
+            raise AuthenticationError(
+                "Login failed: " + response.get("errorMessage", "")
+            )
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
