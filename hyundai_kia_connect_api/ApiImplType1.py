@@ -42,7 +42,6 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
-    PINMissingError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -1033,8 +1032,6 @@ class ApiImplType1(ApiImpl):
         return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
-        if token.pin is None:
-            raise PINMissingError("PIN is not set, action will fail.")
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
@@ -1048,6 +1045,8 @@ class ApiImplType1(ApiImpl):
         response = requests.put(url, json=data, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        if response.get("controlToken") is None:
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
         control_token = "Bearer " + response["controlToken"]
         control_token_expire_at = math.floor(
             dt.datetime.now().timestamp() + response["expiresTime"]
