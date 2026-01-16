@@ -209,6 +209,9 @@ class VehicleManager:
             )
             if isinstance(result, Token):
                 self.token: Token = result
+                 # Temp correction to fix bad data do to a bug.
+                if self.token.pin != self.pin:
+                    self.token.pin = self.pin
                 self.initialize_vehicles()
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
