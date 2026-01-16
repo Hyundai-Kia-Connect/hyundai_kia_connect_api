@@ -329,6 +329,7 @@ class KiaUvoApiUSA(ApiImpl):
                 refresh_token=existing_rmtoken,
                 valid_until=valid_until,
                 device_id=self.device_id,
+                pin=pin,
             )
         if "payload" in response_json and "otpKey" in response_json["payload"]:
             payload = response_json["payload"]
