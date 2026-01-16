@@ -329,4 +329,7 @@ class ApiImpl:
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
         # By default, just call login again, ideally use the refresh token flow
-        return self.login(token.username, token.password, token.pin)
+        # Pass the pin explicitly as a keyword to avoid positional
+        # argument mis-binding in subclasses that accept different
+        # login() signatures (some accept a `token` positional arg).
+        return self.login(username=token.username, password=token.password, pin=token.pin)
