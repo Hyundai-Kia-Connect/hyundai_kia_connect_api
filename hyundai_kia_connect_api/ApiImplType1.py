@@ -545,7 +545,7 @@ class ApiImplType1(ApiImpl):
         # Sanitize corrupted ICE values before storing in vehicle.data
         # This prevents issues with oversized integers when serializing to JSON
         # or storing in databases
-        # May cause update failure.  Commenting out to test. 
+        # May cause update failure.  Commenting out to test.
         # self._sanitize_ice_value(state)
 
         vehicle.data = state

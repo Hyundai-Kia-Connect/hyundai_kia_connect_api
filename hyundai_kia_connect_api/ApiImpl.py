@@ -332,4 +332,6 @@ class ApiImpl:
         # Pass the pin explicitly as a keyword to avoid positional
         # argument mis-binding in subclasses that accept different
         # login() signatures (some accept a `token` positional arg).
-        return self.login(username=token.username, password=token.password, pin=token.pin)
+        return self.login(
+            username=token.username, password=token.password, pin=token.pin
+        )
