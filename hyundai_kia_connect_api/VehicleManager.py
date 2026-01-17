@@ -86,8 +86,8 @@ class VehicleManager:
     @DeprecationWarning
     def initialize(self) -> None:
         self.token: Token = self.api.login(
-            self.username,
-            self.password,
+            username=self.username,
+            password=self.password,
             pin=self.pin,
         )
         self.initialize_vehicles()
@@ -95,8 +95,8 @@ class VehicleManager:
     def login(self) -> bool | OTPRequest:
         """Returns True if login successful, or OTPOptions if OTP is required"""
         result = self.api.login(
-            self.username,
-            self.password,
+            username=self.username,
+            password=self.password,
             pin=self.pin,
         )
         if isinstance(result, Token):
@@ -211,7 +211,7 @@ class VehicleManager:
             )
             if isinstance(result, Token):
                 self.token: Token = result
-                 # Temp correction to fix bad data do to a bug.
+                # Temp correction to fix bad data do to a bug.
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin
                 if len(self.vehicles) == 0:
