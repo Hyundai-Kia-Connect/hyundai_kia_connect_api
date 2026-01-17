@@ -185,6 +185,8 @@ class VehicleManager:
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             if self.login() is True:
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
                 return True
             else:
                 raise AuthenticationOTPRequired("OTP required to refresh token")
@@ -212,7 +214,8 @@ class VehicleManager:
                  # Temp correction to fix bad data do to a bug.
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin
-                self.initialize_vehicles()
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
