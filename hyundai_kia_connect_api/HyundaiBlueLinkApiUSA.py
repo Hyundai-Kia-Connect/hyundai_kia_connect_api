@@ -737,6 +737,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "enrolledVehicleDetails" not in response:
+            raise AuthenticationError("Missing enrolledVehicleDetails in response")
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]

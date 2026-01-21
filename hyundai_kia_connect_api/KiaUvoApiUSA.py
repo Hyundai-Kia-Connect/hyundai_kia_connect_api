@@ -16,6 +16,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
+from .exceptions import APIError, AuthenticationError
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -46,17 +47,11 @@ class KiaSSLAdapter(HTTPAdapter):
         return super().init_poolmanager(*args, **kwargs)
 
 
-class AuthError(RequestException):
-    """AuthError"""
-
-    pass
-
-
 def request_with_active_session(func):
     def request_with_active_session_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except AuthError:
+        except AuthenticationError:
             _LOGGER.debug(
                 f"{DOMAIN} - Got invalid session, attempting to repair and resend"
             )
@@ -101,7 +96,7 @@ def request_with_logging(func):
             and response_json["status"]["errorCode"] in [1003, 1005]
         ):
             _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
-            raise AuthError
+            raise AuthenticationError("Session invalid")
         _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
@@ -359,6 +354,18 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "status" in response:
+            status = response.get("status", {})
+            if status.get("statusCode") != 0:
+                if (
+                    status.get("statusCode") == 1
+                    and status.get("errorType") == 1
+                    and status.get("errorCode") in [1003, 1005]
+                ):
+                    raise AuthenticationError("Session invalid")
+                raise APIError(f"Error response: {response}")
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         result = []
         for entry in response["payload"]["vehicleSummary"]:
             vehicle: Vehicle = Vehicle(
@@ -385,8 +392,21 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
-
         response = response.json()
+        if "status" in response:
+            status = response.get("status", {})
+            if status.get("statusCode") != 0:
+                if (
+                    status.get("statusCode") == 1
+                    and status.get("errorType") == 1
+                    and status.get("errorCode") in [1003, 1005]
+                ):
+                    _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
+                    raise AuthenticationError("Session invalid")
+                _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response}")
+                raise APIError(f"Error response: {response}")
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):
             for entry in response["payload"]["vehicleSummary"]:
                 vid = entry.get("vehicleIdentifier")

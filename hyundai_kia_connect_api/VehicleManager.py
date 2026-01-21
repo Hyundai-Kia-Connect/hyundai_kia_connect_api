@@ -13,6 +13,7 @@ from .ApiImpl import (
     WindowRequestOptions,
     OTPRequest,
 )
+from .exceptions import AuthenticationError, APIError, AuthenticationOTPRequired
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -34,7 +35,6 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
-from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .KiaUvoApiAU import KiaUvoApiAU
@@ -121,9 +121,23 @@ class VehicleManager:
         self.initialize_vehicles()
 
     def initialize_vehicles(self):
-        vehicles = self.api.get_vehicles(self.token)
-        for vehicle in vehicles:
-            self.vehicles[vehicle.id] = vehicle
+        try:
+            vehicles = self.api.get_vehicles(self.token)
+            for vehicle in vehicles:
+                self.vehicles[vehicle.id] = vehicle
+        except (AuthenticationError, APIError) as e:
+            _LOGGER.warning(f"{DOMAIN} - Failed to get vehicles during initialization, will retry: {e}")
+            try:
+                result = self.api.refresh_access_token(self.token)
+                if isinstance(result, Token):
+                    self.token = result
+                    vehicles = self.api.get_vehicles(self.token)
+                    for vehicle in vehicles:
+                        self.vehicles[vehicle.id] = vehicle
+                elif isinstance(result, OTPRequest):
+                    _LOGGER.error(f"{DOMAIN} - OTP required to refresh token during initialization")
+            except Exception as ex:
+                _LOGGER.error(f"{DOMAIN} - Failed to refresh token during initialization: {ex}")
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
