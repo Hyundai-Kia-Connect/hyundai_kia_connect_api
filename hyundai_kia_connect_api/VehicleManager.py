@@ -126,7 +126,9 @@ class VehicleManager:
             for vehicle in vehicles:
                 self.vehicles[vehicle.id] = vehicle
         except (AuthenticationError, APIError) as e:
-            _LOGGER.warning(f"{DOMAIN} - Failed to get vehicles during initialization, will retry: {e}")
+            _LOGGER.warning(
+                f"{DOMAIN} - Failed to get vehicles during initialization, will retry: {e}"
+            )
             try:
                 result = self.api.refresh_access_token(self.token)
                 if isinstance(result, Token):
@@ -135,9 +137,13 @@ class VehicleManager:
                     for vehicle in vehicles:
                         self.vehicles[vehicle.id] = vehicle
                 elif isinstance(result, OTPRequest):
-                    _LOGGER.error(f"{DOMAIN} - OTP required to refresh token during initialization")
+                    _LOGGER.error(
+                        f"{DOMAIN} - OTP required to refresh token during initialization"
+                    )
             except Exception as ex:
-                _LOGGER.error(f"{DOMAIN} - Failed to refresh token during initialization: {ex}")
+                _LOGGER.error(
+                    f"{DOMAIN} - Failed to refresh token during initialization: {ex}"
+                )
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
