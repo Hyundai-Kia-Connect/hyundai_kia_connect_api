@@ -13,7 +13,6 @@ from .ApiImpl import (
     WindowRequestOptions,
     OTPRequest,
 )
-from .exceptions import AuthenticationError, APIError, AuthenticationOTPRequired
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -35,6 +34,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
+from .exceptions import AuthenticationError, APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .KiaUvoApiAU import KiaUvoApiAU

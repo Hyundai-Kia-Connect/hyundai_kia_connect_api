@@ -16,7 +16,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
-from .exceptions import APIError, AuthenticationError
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -28,6 +27,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
+from .exceptions import APIError, AuthenticationError
 from .utils import get_child_value, parse_datetime
 
 
