@@ -218,7 +218,9 @@ class VehicleManager:
                     try:
                         self.initialize_vehicles()
                     except APIError as e:
-                        _LOGGER.warning(f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}")
+                        _LOGGER.warning(
+                            f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
+                        )
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
@@ -238,7 +240,9 @@ class VehicleManager:
                     try:
                         self.initialize_vehicles()
                     except APIError as e:
-                        _LOGGER.warning(f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}")
+                        _LOGGER.warning(
+                            f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
+                        )
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
@@ -247,7 +251,9 @@ class VehicleManager:
             try:
                 self.initialize_vehicles()
             except AuthenticationError:
-                _LOGGER.debug(f"{DOMAIN} - Token invalid during vehicle initialization, refreshing")
+                _LOGGER.debug(
+                    f"{DOMAIN} - Token invalid during vehicle initialization, refreshing"
+                )
                 result = self.api.refresh_access_token(self.token)
                 if isinstance(result, Token):
                     self.token = result
@@ -257,7 +263,9 @@ class VehicleManager:
                 elif isinstance(result, OTPRequest):
                     raise AuthenticationOTPRequired("OTP required to refresh token")
             except APIError as e:
-                _LOGGER.warning(f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}")
+                _LOGGER.warning(
+                    f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
+                )
         return False
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
