@@ -346,6 +346,20 @@ class KiaUvoApiUSA(ApiImpl):
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
 
+    def test_token(self, token: Token) -> bool:
+        """Test if token is valid by making a lightweight API call"""
+        url = self.API_URL + "ownr/gvl"
+        headers = self.api_headers()
+        headers["sid"] = token.access_token
+        try:
+            response = self.session.get(url, headers=headers)
+            _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
+            response = response.json()
+            return True
+        except Exception as e:
+            _LOGGER.debug(f"{DOMAIN} - Token test failed with exception: {e}")
+            return False
+
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
@@ -354,16 +368,6 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        if "status" in response:
-            status = response.get("status", {})
-            if status.get("statusCode") != 0:
-                if (
-                    status.get("statusCode") == 1
-                    and status.get("errorType") == 1
-                    and status.get("errorCode") in [1003, 1005]
-                ):
-                    raise AuthenticationError("Session invalid")
-                raise APIError(f"Error response: {response}")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         result = []
@@ -393,18 +397,6 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
         response = response.json()
-        if "status" in response:
-            status = response.get("status", {})
-            if status.get("statusCode") != 0:
-                if (
-                    status.get("statusCode") == 1
-                    and status.get("errorType") == 1
-                    and status.get("errorCode") in [1003, 1005]
-                ):
-                    _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
-                    raise AuthenticationError("Session invalid")
-                _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response}")
-                raise APIError(f"Error response: {response}")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):

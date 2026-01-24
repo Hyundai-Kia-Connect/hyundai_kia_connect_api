@@ -34,7 +34,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
-from .exceptions import AuthenticationError, APIError, AuthenticationOTPRequired
+from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .KiaUvoApiAU import KiaUvoApiAU
@@ -204,8 +204,8 @@ class VehicleManager:
                 token_expired = True
             else:
                 token_expired = valid_until - grace_period <= now_utc
-        if token_expired:
-            _LOGGER.debug(f"{DOMAIN} - Token expired based on valid_until, refreshing")
+        if token_expired or self.api.test_token(self.token) is False:
+            _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
             result = self.api.refresh_access_token(
                 self.token,
             )
@@ -215,57 +215,13 @@ class VehicleManager:
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin
                 if len(self.vehicles) == 0:
-                    try:
-                        self.initialize_vehicles()
-                    except APIError as e:
-                        _LOGGER.warning(
-                            f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
-                        )
-            if isinstance(result, OTPRequest):
-                raise AuthenticationOTPRequired("OTP required to refresh token")
-            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
-            return True
-        # Test token validity with the API
-        if self.api.test_token(self.token) is False:
-            _LOGGER.debug(f"{DOMAIN} - Token failed validation, refreshing")
-            result = self.api.refresh_access_token(
-                self.token,
-            )
-            if isinstance(result, Token):
-                self.token: Token = result
-                # Temp correction to fix bad data due to a bug.
-                if self.token.pin != self.pin:
-                    self.token.pin = self.pin
-                if len(self.vehicles) == 0:
-                    try:
-                        self.initialize_vehicles()
-                    except APIError as e:
-                        _LOGGER.warning(
-                            f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
-                        )
+                    self.initialize_vehicles()
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         if len(self.vehicles) == 0:
-            try:
-                self.initialize_vehicles()
-            except AuthenticationError:
-                _LOGGER.debug(
-                    f"{DOMAIN} - Token invalid during vehicle initialization, refreshing"
-                )
-                result = self.api.refresh_access_token(self.token)
-                if isinstance(result, Token):
-                    self.token = result
-                    if self.token.pin != self.pin:
-                        self.token.pin = self.pin
-                    self.initialize_vehicles()
-                elif isinstance(result, OTPRequest):
-                    raise AuthenticationOTPRequired("OTP required to refresh token")
-            except APIError as e:
-                _LOGGER.warning(
-                    f"{DOMAIN} - Failed to initialize vehicles, will retry later: {e}"
-                )
+            self.initialize_vehicles()
         return False
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
