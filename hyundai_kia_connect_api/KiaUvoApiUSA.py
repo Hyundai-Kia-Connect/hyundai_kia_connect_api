@@ -73,7 +73,7 @@ def request_with_active_session(func):
             token.refresh_token = new_token.refresh_token
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
-            vehicle = self.refresh_vehicles(token, vehicle)
+            self.refresh_vehicles(token, vehicle)
             if json_body is not None and json_body.get("vinKey", None):
                 json_body["vinKey"] = [vehicle.key]
             response = func(*args, **kwargs)
@@ -373,7 +373,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def refresh_vehicles(
         self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
-    ) -> ty.Union[list[Vehicle], Vehicle]:
+    ) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
@@ -406,7 +406,6 @@ class KiaUvoApiUSA(ApiImpl):
                         timezone=self.data_timezone,
                     )
                     vehicles[vid] = vehicle
-            return vehicles
         else:
             # For readability work with vehicle without s
             vehicle = vehicles
@@ -415,7 +414,6 @@ class KiaUvoApiUSA(ApiImpl):
                     vehicle.name = entry["nickName"]
                     vehicle.model = entry["modelName"]
                     vehicle.key = entry["vehicleKey"]
-                    return vehicle
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
