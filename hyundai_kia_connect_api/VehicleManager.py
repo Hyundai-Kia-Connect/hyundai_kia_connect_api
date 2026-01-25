@@ -122,7 +122,9 @@ class VehicleManager:
 
     def initialize_vehicles(self):
         if self.vehicle.len(self.vehicles) > 0:
-            _LOGGER.warning("Vehicles already initialized, this will re-initialize and cause data loss mapping errors")
+            _LOGGER.warning(
+                "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
+            )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
