@@ -121,7 +121,7 @@ class VehicleManager:
         self.initialize_vehicles()
 
     def initialize_vehicles(self):
-        if self.vehicles.len(self.vehicles) > 0:
+        if len(self.vehicles) > 0:
             _LOGGER.warning(
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
