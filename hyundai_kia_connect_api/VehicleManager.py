@@ -121,6 +121,10 @@ class VehicleManager:
         self.initialize_vehicles()
 
     def initialize_vehicles(self):
+        if len(self.vehicles) > 0:
+            _LOGGER.warning(
+                "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
+            )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
@@ -218,7 +222,7 @@ class VehicleManager:
                     self.initialize_vehicles()
             if isinstance(result, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
-            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
+            self.api.refresh_vehicles(self.token, self.vehicles)
             return True
         if len(self.vehicles) == 0:
             self.initialize_vehicles()
