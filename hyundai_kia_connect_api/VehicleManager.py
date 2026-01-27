@@ -215,7 +215,7 @@ class VehicleManager:
             )
             if isinstance(result, Token):
                 self.token: Token = result
-                # Temp correction to fix bad data do to a bug.
+                # Temp correction to fix bad data due to a bug.
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin
                 if len(self.vehicles) == 0:

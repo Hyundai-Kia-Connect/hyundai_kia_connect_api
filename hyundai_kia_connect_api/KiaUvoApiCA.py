@@ -236,6 +236,9 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        self._check_response_for_errors(response)
+        if "result" not in response or "vehicles" not in response.get("result", {}):
+            raise APIError("Missing result or vehicles in response")
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None

@@ -27,6 +27,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
+from .exceptions import APIError, AuthenticationError
 from .utils import get_child_value, parse_datetime
 
 
@@ -46,17 +47,11 @@ class KiaSSLAdapter(HTTPAdapter):
         return super().init_poolmanager(*args, **kwargs)
 
 
-class AuthError(RequestException):
-    """AuthError"""
-
-    pass
-
-
 def request_with_active_session(func):
     def request_with_active_session_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except AuthError:
+        except AuthenticationError:
             _LOGGER.debug(
                 f"{DOMAIN} - Got invalid session, attempting to repair and resend"
             )
@@ -101,7 +96,7 @@ def request_with_logging(func):
             and response_json["status"]["errorCode"] in [1003, 1005]
         ):
             _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
-            raise AuthError
+            raise AuthenticationError("Session invalid")
         _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
@@ -351,6 +346,20 @@ class KiaUvoApiUSA(ApiImpl):
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
 
+    def test_token(self, token: Token) -> bool:
+        """Test if token is valid by making a lightweight API call"""
+        url = self.API_URL + "ownr/gvl"
+        headers = self.api_headers()
+        headers["sid"] = token.access_token
+        try:
+            response = self.session.get(url, headers=headers)
+            _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
+            response = response.json()
+            return True
+        except Exception as e:
+            _LOGGER.debug(f"{DOMAIN} - Token test failed with exception: {e}")
+            return False
+
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
@@ -359,6 +368,8 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         result = []
         for entry in response["payload"]["vehicleSummary"]:
             vehicle: Vehicle = Vehicle(
@@ -385,8 +396,9 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
-
         response = response.json()
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):
             for entry in response["payload"]["vehicleSummary"]:
                 vid = entry.get("vehicleIdentifier")
