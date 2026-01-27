@@ -25,6 +25,7 @@ options.add_argument(
     "Chrome/125.0.0.0 Safari/537.36_CCS_APP_AOS"
 )
 
+
 def install_driver():
     """
     Ensure a matching chromedriver is installed and return its path.
@@ -33,7 +34,9 @@ def install_driver():
     try:
         _ = chromedriver_autoinstaller.get_chrome_version()
     except Exception:
-        print("ERROR: Google Chrome not found. Please install Google Chrome and try again.")
+        print(
+            "ERROR: Google Chrome not found. Please install Google Chrome and try again."
+        )
         sys.exit(1)
 
     try:
@@ -41,6 +44,7 @@ def install_driver():
         return driver_path
     except Exception:
         return None
+
 
 def safe_install_and_start():
     """
@@ -78,6 +82,7 @@ def safe_install_and_start():
             print("ERROR: Could not start Chrome WebDriver after reinstall.")
             print("Reason:", final_err)
             sys.exit(1)
+
 
 # Start: install driver and launch browser without printing Chrome version
 driver = safe_install_and_start()
@@ -127,7 +132,9 @@ if match:
         token = response.json().get("refresh_token")
         print("\n" + "=" * 60)
         print(f"REFRESH TOKEN:\n{token}\n")
-        print("Use this token as your password in your Hyundai integration in Home Assistant.")
+        print(
+            "Use this token as your password in your Hyundai integration in Home Assistant."
+        )
         print("=" * 60)
     else:
         print(f"Error while retrieving token: {response.text}")
