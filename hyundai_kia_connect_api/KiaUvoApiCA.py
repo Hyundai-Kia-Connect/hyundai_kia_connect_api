@@ -210,7 +210,7 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=valid_until,
             pin=pin,
         )
-    
+
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Sends OTP to the user via selected destination and via"""
         url = self.API_URL + "mfa/sendotp"
