@@ -17,7 +17,12 @@ import pytest
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
-from tests.fixture_helpers import discover_fixtures, get_fixture_expected, get_fixture_meta, load_fixture
+from tests.fixture_helpers import (
+    discover_fixtures,
+    get_fixture_expected,
+    get_fixture_meta,
+    load_fixture,
+)
 
 # ---------------------------------------------------------------------------
 # Discover all US fixture files (both cached and force-refresh variants)
