@@ -614,6 +614,41 @@ class KiaUvoApiIN(ApiImplType1):
         _check_response_for_errors(response)
         return response
 
+    # The "/tripinfo" API in Bluelink India does not provide complete trip info. It just returns the summary info. Instead, it uses the "/tripinfo/detail" API to fetch the trip details.
+    # PS: Since I have tested in Hyundai EV vehicle only, have added check to use the API only for EV vehicles. Can remove the check based on testing on non-EV vehicles
+    def _get_detailed_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip: dict,
+    ) -> dict:
+        if vehicle.engine_type != ENGINE_TYPES.EV or BRANDS[self.brand] != BRAND_HYUNDAI:
+            return None
+
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo/detail"
+        payload = {"tripPeriodType": 1, "setTripDay": date_string, "setTripStartTime": trip["tripStartTime"], "setServiceTID":trip["serviceTID"], "tripStartTime":trip["tripStartTime"], "tripEndTime":trip["tripEndTime"]}
+        response = requests.post(
+            url,
+            json=payload,
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        response = response.json()
+        tripinfo = response["resMsg"]["tripInfo"]
+        processed_trip = TripInfo(
+                hhmmss = trip["tripStartTime"][8:],
+            drive_time = tripinfo["tripDrvTime"],
+            idle_time = tripinfo["tripIdleTime"],
+            distance = tripinfo["tripDist"],
+            avg_speed = tripinfo["tripAvgSpeed"],
+            max_speed = tripinfo["tripMaxSpeed"],
+        )
+
+        return processed_trip
+
+
     def update_month_trip_info(
         self,
         token,
@@ -694,14 +729,19 @@ class KiaUvoApiIN(ApiImplType1):
                 ),
             )
             for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
-                )
+                # Hyundai EVs do not provide full trip info. Used "/tripinfo/detail" API instead
+                if ("tripTime" in trip):
+                    processed_trip = TripInfo(
+                        hhmmss=trip["tripTime"],
+                        drive_time=trip["tripDrvTime"],
+                        idle_time=trip["tripIdleTime"],
+                        distance=trip["tripDist"],
+                        avg_speed=trip["tripAvgSpeed"],
+                        max_speed=trip["tripMaxSpeed"],
+                    )
+                else:
+                    processed_trip = self._get_detailed_trip_info(token, vehicle, yyyymmdd_string, trip)
+
                 result.trip_list.append(processed_trip)
 
             vehicle.day_trip_info = result
