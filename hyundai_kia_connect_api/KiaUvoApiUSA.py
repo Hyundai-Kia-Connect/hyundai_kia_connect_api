@@ -609,14 +609,10 @@ class KiaUvoApiUSA(ApiImpl):
         if ChargeDict is not None:
             try:
                 ac_values = [
-                    x["targetSOClevel"]
-                    for x in ChargeDict
-                    if x["plugType"] == 1
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
                 ]
                 dc_values = [
-                    x["targetSOClevel"]
-                    for x in ChargeDict
-                    if x["plugType"] == 0
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
                 ]
                 if ac_values:
                     vehicle.ev_charge_limits_ac = ac_values[-1]
@@ -813,18 +809,14 @@ class KiaUvoApiUSA(ApiImpl):
             "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
         )
         if charge_dict is None:
-            _LOGGER.debug(
-                f"{DOMAIN} - targetSOC not found in force refresh response"
-            )
+            _LOGGER.debug(f"{DOMAIN} - targetSOC not found in force refresh response")
             return
-        _LOGGER.debug(f"{DOMAIN} - Found targetSOC in force refresh response: {charge_dict}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Found targetSOC in force refresh response: {charge_dict}"
+        )
         try:
-            ac_values = [
-                x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1
-            ]
-            dc_values = [
-                x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0
-            ]
+            ac_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1]
+            dc_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0]
             if ac_values:
                 vehicle.ev_charge_limits_ac = ac_values[-1]
             if dc_values:

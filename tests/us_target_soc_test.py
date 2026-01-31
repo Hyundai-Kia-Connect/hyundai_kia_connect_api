@@ -10,7 +10,6 @@ preserved across subsequent cached updates.
 """
 
 import datetime as dt
-import json
 
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -234,7 +233,9 @@ def test_force_refresh_with_missing_target_soc():
     api = _make_api()
     vehicle = _make_vehicle()
 
-    empty_response = {"payload": {"vehicleStatusRpt": {"vehicleStatus": {"evStatus": {}}}}}
+    empty_response = {
+        "payload": {"vehicleStatusRpt": {"vehicleStatus": {"evStatus": {}}}}
+    }
     api._update_charge_limits_from_force_refresh(vehicle, empty_response)
 
     assert vehicle.ev_charge_limits_ac is None
