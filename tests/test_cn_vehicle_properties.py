@@ -9,7 +9,12 @@ import pytest
 from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
-from tests.fixture_helpers import discover_fixtures, get_fixture_expected, get_fixture_meta, load_fixture
+from tests.fixture_helpers import (
+    discover_fixtures,
+    get_fixture_expected,
+    get_fixture_meta,
+    load_fixture,
+)
 
 CN_FIXTURE_FILES = discover_fixtures("cn_")
 

@@ -10,7 +10,12 @@ import pytest
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
-from tests.fixture_helpers import discover_fixtures, get_fixture_expected, get_fixture_meta, load_fixture
+from tests.fixture_helpers import (
+    discover_fixtures,
+    get_fixture_expected,
+    get_fixture_meta,
+    load_fixture,
+)
 
 BLUELINK_FIXTURE_FILES = discover_fixtures("us_hyundai_")
 
@@ -28,7 +33,9 @@ def vehicle() -> Vehicle:
     return Vehicle()
 
 
-@pytest.mark.parametrize("fixture_file", BLUELINK_FIXTURE_FILES, ids=BLUELINK_FIXTURE_FILES)
+@pytest.mark.parametrize(
+    "fixture_file", BLUELINK_FIXTURE_FILES, ids=BLUELINK_FIXTURE_FILES
+)
 class TestBlueLinkUSAUpdateVehicleProperties:
     def test_ev_battery_percentage(self, bluelink_api, vehicle, fixture_file):
         data = load_fixture(fixture_file)

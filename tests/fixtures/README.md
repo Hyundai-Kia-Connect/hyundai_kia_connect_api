@@ -4,15 +4,15 @@ This directory contains JSON files representing real API response shapes from th
 
 ## Supported Regions & API Classes
 
-| Region       | API Class                | Test File                                | Fixture Prefix   | Response Structure                                     |
-| ------------ | ------------------------ | ---------------------------------------- | ---------------- | ------------------------------------------------------ |
-| US (Kia)     | `KiaUvoApiUSA`           | `test_usa_vehicle_properties.py`         | `us_kia_`        | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*`     |
-| US (Hyundai) | `HyundaiBlueLinkApiUSA`  | `test_bluelink_usa_vehicle_properties.py`| `us_hyundai_`    | `vehicleStatus.*`                                      |
-| EU           | `KiaUvoApiEU`            | `test_eu_vehicle_properties.py`          | `eu_kia_ev6_` (non-CCS2) | `vehicleStatus.*`                             |
-| EU (CCS2)    | `ApiImplType1`           | `test_ccs2_vehicle_properties.py`        | `eu_kia_ev9_`    | `Green.*`, `Cabin.*`, `Body.*`                         |
-| CA           | `KiaUvoApiCA`            | `test_ca_vehicle_properties.py`          | `ca_`            | `status.*`                                             |
-| AU           | `KiaUvoApiAU`            | `test_au_vehicle_properties.py`          | `au_`            | `status.*`                                             |
-| CN           | `KiaUvoApiCN`            | `test_cn_vehicle_properties.py`          | `cn_`            | `status.*`                                             |
+| Region       | API Class               | Test File                                 | Fixture Prefix           | Response Structure                                 |
+| ------------ | ----------------------- | ----------------------------------------- | ------------------------ | -------------------------------------------------- |
+| US (Kia)     | `KiaUvoApiUSA`          | `test_usa_vehicle_properties.py`          | `us_kia_`                | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*` |
+| US (Hyundai) | `HyundaiBlueLinkApiUSA` | `test_bluelink_usa_vehicle_properties.py` | `us_hyundai_`            | `vehicleStatus.*`                                  |
+| EU           | `KiaUvoApiEU`           | `test_eu_vehicle_properties.py`           | `eu_kia_ev6_` (non-CCS2) | `vehicleStatus.*`                                  |
+| EU (CCS2)    | `ApiImplType1`          | `test_ccs2_vehicle_properties.py`         | `eu_kia_ev9_`            | `Green.*`, `Cabin.*`, `Body.*`                     |
+| CA           | `KiaUvoApiCA`           | `test_ca_vehicle_properties.py`           | `ca_`                    | `status.*`                                         |
+| AU           | `KiaUvoApiAU`           | `test_au_vehicle_properties.py`           | `au_`                    | `status.*`                                         |
+| CN           | `KiaUvoApiCN`           | `test_cn_vehicle_properties.py`           | `cn_`                    | `status.*`                                         |
 
 ## Naming Convention
 
@@ -20,13 +20,13 @@ This directory contains JSON files representing real API response shapes from th
 {region}_{brand}_{model}_{year}_{scenario}.json
 ```
 
-| Component  | Description                         | Examples                                       |
-| ---------- | ----------------------------------- | ---------------------------------------------- |
-| `region`   | Two-letter region code              | `us`, `eu`, `ca`, `au`, `cn`                   |
-| `brand`    | Vehicle brand                       | `kia`, `hyundai`                               |
-| `model`    | Model name (underscores for spaces) | `niro_ev`, `ioniq_5`, `ev6`                    |
-| `year`     | Model year                          | `2020`, `2024`                                 |
-| `scenario` | What the response represents        | `cached`, `force_refresh`, `with_soc`, `ccs2`  |
+| Component  | Description                         | Examples                                      |
+| ---------- | ----------------------------------- | --------------------------------------------- |
+| `region`   | Two-letter region code              | `us`, `eu`, `ca`, `au`, `cn`                  |
+| `brand`    | Vehicle brand                       | `kia`, `hyundai`                              |
+| `model`    | Model name (underscores for spaces) | `niro_ev`, `ioniq_5`, `ev6`                   |
+| `year`     | Model year                          | `2020`, `2024`                                |
+| `scenario` | What the response represents        | `cached`, `force_refresh`, `with_soc`, `ccs2` |
 
 **Current fixtures:**
 
