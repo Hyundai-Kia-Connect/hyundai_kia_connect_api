@@ -15,7 +15,7 @@ import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -25,6 +25,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -171,9 +172,8 @@ class KiaUvoApiCA(ApiImpl):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
-    ) -> Token:
+    ) -> Token | OTPRequest:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
@@ -210,6 +210,55 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=valid_until,
             pin=pin,
         )
+    
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Sends OTP to the user via selected destination and via"""
+        url = self.API_URL + "mfa/sendotp"
+        headers = self.API_HEADERS
+        data = {
+            "otpMethod ": notify_type,
+            "mfaApiCode": "0107",
+            "userAccount": otp_request.email,
+            "userPhone": otp_request.sms,
+            "userInfoUuid": otp_request.request_id,
+        }
+
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        response = response.json()
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Confirms OTP code sent to the user"""
+        url = self.API_URL + "mfa/validateotp"
+        headers = self.API_HEADERS
+        data = {
+            # "otpNo ": otp_code, # Need to figure out number
+            "userAccount": username,
+            "otpKey": otp_code,
+            "mfaApiCode": "0107"
+        }
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
+        response = response.json()
+        return Token(
+            username=username,
+            password=password,
+            access_token=response["result"]["token"]["accessToken"],
+            refresh_token=response["result"]["token"]["refreshToken"],
+            valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=int(response["result"]["token"]["expireIn"]) - 60
+            )
+
+        pin=pin        )
+
 
     def test_token(self, token: Token) -> bool:
         # Use "get number of notifications" as a dummy request to test the token
@@ -236,9 +285,6 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        self._check_response_for_errors(response)
-        if "result" not in response or "vehicles" not in response.get("result", {}):
-            raise APIError("Missing result or vehicles in response")
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
