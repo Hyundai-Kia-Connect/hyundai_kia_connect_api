@@ -432,12 +432,17 @@ class KiaUvoApiUSA(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        self._get_forced_vehicle_state(token, vehicle)
+        state = self._get_forced_vehicle_state(token, vehicle)
         # Force update needs work to return the correct data for processing
         # self._update_vehicle_properties(vehicle, state)
         # Temp call a cached state since we are removing this from parent logic in
         # other commits should be removed when the above is fixed
         self.update_vehicle_with_cached_state(token, vehicle)
+        # The cmm/gvi (cached) endpoint does not return targetSOC for some
+        # vehicles (e.g. 2020 Kia Niro EV), but the rems/rvs (force refresh)
+        # response does include it. Parse charge limits from the force refresh
+        # response after the cached update so they aren't lost.
+        self._update_charge_limits_from_force_refresh(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
@@ -601,15 +606,35 @@ class KiaUvoApiUSA(ApiImpl):
         ChargeDict = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC"
         )
-        try:
-            vehicle.ev_charge_limits_ac = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
-            ][-1]
-            vehicle.ev_charge_limits_dc = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
-            ][-1]
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+        if ChargeDict is not None:
+            try:
+                ac_values = [
+                    x["targetSOClevel"]
+                    for x in ChargeDict
+                    if x["plugType"] == 1
+                ]
+                dc_values = [
+                    x["targetSOClevel"]
+                    for x in ChargeDict
+                    if x["plugType"] == 0
+                ]
+                if ac_values:
+                    vehicle.ev_charge_limits_ac = ac_values[-1]
+                if dc_values:
+                    vehicle.ev_charge_limits_dc = dc_values[-1]
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Failed to parse targetSOC from cached response. "
+                    f"Data: {ChargeDict}"
+                )
+        else:
+            # cmm/gvi does not include targetSOC for some vehicles (e.g. 2020
+            # Kia Niro EV).  Preserve any values previously set by a force
+            # refresh rather than overwriting them with None.
+            _LOGGER.debug(
+                f"{DOMAIN} - targetSOC not present in cached response. "
+                "Charge limits will be populated on next force refresh."
+            )
 
         vehicle.ev_driving_range = (
             get_child_value(
@@ -769,6 +794,50 @@ class KiaUvoApiUSA(ApiImpl):
         )
         response_body = response.json()
         return response_body
+
+    def _update_charge_limits_from_force_refresh(
+        self, vehicle: Vehicle, state: dict
+    ) -> None:
+        """Parse targetSOC from the rems/rvs (force refresh) response.
+
+        The cmm/gvi (cached state) endpoint does not include targetSOC data
+        for some vehicles, but the rems/rvs endpoint does. This method
+        extracts charge limits from the force refresh response so they are
+        available even when the cached endpoint omits them.
+        """
+        if vehicle.ev_charge_limits_ac is not None:
+            # Already populated from the cached response, nothing to do
+            return
+        charge_dict = get_child_value(
+            state,
+            "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
+        )
+        if charge_dict is None:
+            _LOGGER.debug(
+                f"{DOMAIN} - targetSOC not found in force refresh response"
+            )
+            return
+        _LOGGER.debug(f"{DOMAIN} - Found targetSOC in force refresh response: {charge_dict}")
+        try:
+            ac_values = [
+                x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1
+            ]
+            dc_values = [
+                x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0
+            ]
+            if ac_values:
+                vehicle.ev_charge_limits_ac = ac_values[-1]
+            if dc_values:
+                vehicle.ev_charge_limits_dc = dc_values[-1]
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge limits from force refresh - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to parse targetSOC from force refresh response. "
+                f"Data: {charge_dict}"
+            )
 
     def check_action_status(
         self,
