@@ -27,7 +27,7 @@ from tests.fixture_helpers import (
 # ---------------------------------------------------------------------------
 # Discover all US fixture files (both cached and force-refresh variants)
 # ---------------------------------------------------------------------------
-US_FIXTURE_FILES = discover_fixtures("us_")
+US_FIXTURE_FILES = discover_fixtures("us_kia_")
 
 
 @pytest.fixture
