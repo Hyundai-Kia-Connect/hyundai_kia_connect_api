@@ -1,0 +1,180 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Hyundai Ioniq 5",
+        "year": 2023,
+        "region": "AU",
+        "brand": "Hyundai",
+        "endpoint": "vehicles/{vehicleId}/status/latest",
+        "description": "AU Hyundai Ioniq 5 response with targetSOC. Uses status root (not vehicleStatus) with hex-encoded temperature.",
+        "has_target_soc": true,
+        "expected": {
+            "ev_battery_percentage": 64,
+            "ev_charge_limits_dc": 80,
+            "ev_charge_limits_ac": 90,
+            "car_battery_percentage": 78,
+            "engine_is_running": false,
+            "is_locked": true,
+            "ev_battery_is_charging": false,
+            "ev_battery_is_plugged_in": 0
+        }
+    },
+    "status": {
+        "time": "20240715080000",
+        "odometer": {
+            "value": 22450,
+            "unit": 1
+        },
+        "battery": {
+            "batSoc": 78
+        },
+        "engine": false,
+        "airTemp": {
+            "value": "0AH",
+            "unit": 0
+        },
+        "defrost": false,
+        "steerWheelHeat": 0,
+        "sideBackWindowHeat": 0,
+        "sideMirrorHeat": 0,
+        "seatHeaterVentState": {
+            "flSeatHeatState": 0,
+            "frSeatHeatState": 0,
+            "rlSeatHeatState": 0,
+            "rrSeatHeatState": 0
+        },
+        "doorLock": true,
+        "doorOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "hoodOpen": false,
+        "trunkOpen": false,
+        "windowOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "tirePressureLamp": {
+            "tirePressureLampFL": 0,
+            "tirePressureLampFR": 0,
+            "tirePressureLampRL": 0,
+            "tirePressureLampRR": 0,
+            "tirePressureLampAll": 0
+        },
+        "washerFluidStatus": false,
+        "breakOilStatus": false,
+        "smartKeyBatteryWarning": false,
+        "fuelLevel": 0,
+        "lowFuelLight": false,
+        "airCtrlOn": false,
+        "evStatus": {
+            "batteryStatus": 64,
+            "batteryCharge": false,
+            "batteryPlugin": 0,
+            "chargePortDoorOpenStatus": 2,
+            "drvDistance": [
+                {
+                    "rangeByFuel": {
+                        "evModeRange": {
+                            "value": 260,
+                            "unit": 1
+                        },
+                        "totalAvailableRange": {
+                            "value": 260,
+                            "unit": 1
+                        }
+                    }
+                }
+            ],
+            "remainTime2": {
+                "atc": {
+                    "value": 0
+                },
+                "etc1": {
+                    "value": 0
+                },
+                "etc2": {
+                    "value": 0
+                },
+                "etc3": {
+                    "value": 0
+                }
+            },
+            "reservChargeInfos": {
+                "targetSOClist": [
+                    {
+                        "plugType": 0,
+                        "targetSOClevel": 80,
+                        "dte": {
+                            "rangeByFuel": {
+                                "totalAvailableRange": {
+                                    "value": 326,
+                                    "unit": 1
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "plugType": 1,
+                        "targetSOClevel": 90,
+                        "dte": {
+                            "rangeByFuel": {
+                                "totalAvailableRange": {
+                                    "value": 367,
+                                    "unit": 1
+                                }
+                            }
+                        }
+                    }
+                ],
+                "reservChargeInfo": {
+                    "reservChargeInfoDetail": {
+                        "reservChargeSet": false,
+                        "reservInfo": {
+                            "day": [9],
+                            "time": {
+                                "time": "0800",
+                                "timeSection": 0
+                            }
+                        }
+                    }
+                },
+                "reserveChargeInfo2": {
+                    "reservChargeInfoDetail": {
+                        "reservChargeSet": false,
+                        "reservInfo": {
+                            "day": [9],
+                            "time": {
+                                "time": "0800",
+                                "timeSection": 0
+                            }
+                        }
+                    }
+                },
+                "offpeakPowerInfo": {
+                    "offPeakPowerTime1": {
+                        "starttime": {
+                            "time": "2200",
+                            "timeSection": 1
+                        },
+                        "endtime": {
+                            "time": "0600",
+                            "timeSection": 0
+                        }
+                    },
+                    "offPeakPowerFlag": 0
+                }
+            }
+        }
+    },
+    "vehicleLocation": {
+        "coord": {
+            "lat": -33.8688,
+            "lon": 151.2093
+        },
+        "time": "20240715080000"
+    }
+}
