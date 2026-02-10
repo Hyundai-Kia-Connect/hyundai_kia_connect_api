@@ -9,6 +9,8 @@ import socket
 import time
 import typing as ty
 from zoneinfo import ZoneInfo
+import uuid
+import base64
 
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
@@ -180,8 +182,6 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers.pop("accessToken", None)
         # Generate a random device ID to avoid static fingerprinting
-        import uuid
-        import base64
 
         # Base string simulating a mobile User-Agent
         base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
