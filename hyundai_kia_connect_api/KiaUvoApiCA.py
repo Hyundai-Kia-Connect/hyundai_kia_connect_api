@@ -242,7 +242,7 @@ class KiaUvoApiCA(ApiImpl):
             "otpNo ": otp_code,
             "userAccount": username,
             "otpKey": otp_request.otp_key,
-            "mfaApiCode": "0107"
+            "mfaApiCode": "0107",
         }
         response = self.sessions.post(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
