@@ -256,8 +256,7 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(
                 seconds=int(response["result"]["token"]["expireIn"]) - 60
             )
-
-        pin=pin        )
+            pin=pin        )
 
 
     def test_token(self, token: Token) -> bool:
