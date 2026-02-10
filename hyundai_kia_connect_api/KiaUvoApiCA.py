@@ -7,7 +7,6 @@ import json
 import logging
 import socket
 import time
-import typing as ty
 from zoneinfo import ZoneInfo
 import uuid
 import base64
@@ -223,7 +222,6 @@ class KiaUvoApiCA(ApiImpl):
             "userInfoUuid": otp_request.request_id,
         }
 
-
         response = self.sessions.post(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
         otp_request.otp_key = response.json()["result"]["otpKey"]
@@ -254,11 +252,10 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=response["result"]["token"]["accessToken"],
             refresh_token=response["result"]["token"]["refreshToken"],
-            valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-                seconds=int(response["result"]["token"]["expireIn"]) - 60
-            ),
-            pin=pin        )
-
+            valid_until=dt.datetime.now(dt.timezone.utc)
+            + dt.timedelta(seconds=int(response["result"]["token"]["expireIn"]) - 60),
+            pin=pin,
+        )
 
     def test_token(self, token: Token) -> bool:
         # Use "get number of notifications" as a dummy request to test the token
