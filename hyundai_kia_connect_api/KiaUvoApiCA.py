@@ -157,6 +157,7 @@ class KiaUvoApiCA(ApiImpl):
         - 0000: no error
         - 7404: "Wrong Username and password"
         - 7402: "Account Locked Out"
+        - 7110: "OTP Required"
         :param response: the API's JSON response
         """
 
@@ -191,6 +192,13 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
+        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] == "7110":
+            otp_request = OTPRequest(
+                email=username,
+                has_email=True,
+                has_sms=False,
+            )
+            return otp_request
         self._check_response_for_errors(response)
         response = response["result"]["token"]
         token_expire_in = int(response["expireIn"]) - 60
