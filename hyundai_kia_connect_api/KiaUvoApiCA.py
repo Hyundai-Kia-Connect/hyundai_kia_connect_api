@@ -192,7 +192,10 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
-        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] == "7110":
+        if (
+            response["responseHeader"]["responseCode"] == 1
+            and response["error"]["errorCode"] == "7110"
+        ):
             otp_request = OTPRequest(
                 email=username,
                 has_email=True,
