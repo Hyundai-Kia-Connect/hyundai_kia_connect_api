@@ -226,6 +226,7 @@ class KiaUvoApiCA(ApiImpl):
 
         response = self.sessions.post(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        otp_request.otp_key = response.json()["result"]["otpKey"]
         response = response.json()
 
     def verify_otp_and_complete_login(
@@ -240,9 +241,9 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "mfa/validateotp"
         headers = self.API_HEADERS
         data = {
-            # "otpNo ": otp_code, # Need to figure out number
+            "otpNo ": otp_code,
             "userAccount": username,
-            "otpKey": otp_code,
+            "otpKey": otp_request.otp_key,
             "mfaApiCode": "0107"
         }
         response = self.sessions.post(url, headers=headers, json=data)
