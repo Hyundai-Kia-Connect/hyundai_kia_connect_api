@@ -255,7 +255,7 @@ class KiaUvoApiCA(ApiImpl):
             refresh_token=response["result"]["token"]["refreshToken"],
             valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(
                 seconds=int(response["result"]["token"]["expireIn"]) - 60
-            )
+            ),
             pin=pin        )
 
 
