@@ -192,7 +192,10 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
-        if response["responseHeader"]["responseCode"] == 1 and response["error"]["errorCode"] == "7110":
+        if (
+            response["responseHeader"]["responseCode"] == 1
+            and response["error"]["errorCode"] == "7110"
+        ):
             return self._get_otp_methods(username)
         self._check_response_for_errors(response)
         response = response["result"]["token"]
@@ -212,7 +215,7 @@ class KiaUvoApiCA(ApiImpl):
             valid_until=valid_until,
             pin=pin,
         )
-    
+
     def _get_otp_methods(self, email: str) -> OTPRequest:
         """Get the OTP Methods and UUID for a login attempt"""
         url = self.API_URL + "mfa/selverifmeth"
@@ -231,7 +234,6 @@ class KiaUvoApiCA(ApiImpl):
             has_sms=False,
         )
         return otp_request
-
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Sends OTP to the user via selected destination and via"""
