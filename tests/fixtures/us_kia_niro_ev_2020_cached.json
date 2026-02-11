@@ -1,0 +1,143 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia Niro EV",
+        "year": 2020,
+        "region": "US",
+        "brand": "Kia",
+        "endpoint": "cmm/gvi",
+        "description": "Cached vehicle state from cmm/gvi endpoint. This response does NOT include targetSOC under evStatus; it uses the older path structure without targetSOC.",
+        "has_target_soc": false,
+        "expected": {
+            "ev_battery_percentage": 68,
+            "ev_charge_limits_dc": null,
+            "ev_charge_limits_ac": null,
+            "odometer_value": 23456,
+            "car_battery_percentage": 87,
+            "engine_is_running": false,
+            "is_locked": true,
+            "ev_battery_is_charging": false,
+            "ev_battery_is_plugged_in": 0
+        }
+    },
+    "vehicleConfig": {
+        "vehicleDetail": {
+            "vehicle": {
+                "mileage": "23456",
+                "modelName": "NIRO EV",
+                "modelYear": "2020",
+                "fuelKindCode": "E"
+            }
+        },
+        "maintenance": {
+            "nextServiceMile": 30000
+        }
+    },
+    "service": {
+        "imatServiceOdometer": 30000,
+        "msopServiceOdometer": 20000
+    },
+    "lastVehicleInfo": {
+        "vehicleStatusRpt": {
+            "vehicleStatus": {
+                "syncDate": {
+                    "utc": "20240615143000"
+                },
+                "batteryStatus": {
+                    "stateOfCharge": 87
+                },
+                "engine": false,
+                "climate": {
+                    "airTemp": {
+                        "value": "72"
+                    },
+                    "defrost": false,
+                    "airCtrl": false,
+                    "heatingAccessory": {
+                        "steeringWheel": 0,
+                        "rearWindow": 0,
+                        "sideMirror": 0
+                    }
+                },
+                "washerFluidStatus": false,
+                "breakOilStatus": false,
+                "smartKeyBatteryWarning": false,
+                "tirePressure": {
+                    "all": 0
+                },
+                "seatHeaterVentState": {
+                    "flSeatHeatState": 0,
+                    "frSeatHeatState": 0,
+                    "rlSeatHeatState": 0,
+                    "rrSeatHeatState": 0
+                },
+                "doorLock": true,
+                "doorStatus": {
+                    "frontLeft": 0,
+                    "frontRight": 0,
+                    "backLeft": 0,
+                    "backRight": 0,
+                    "hood": 0,
+                    "trunk": 0
+                },
+                "sunroofOpen": 0,
+                "windowOpen": {
+                    "frontLeft": 0,
+                    "frontRight": 0,
+                    "backLeft": 0,
+                    "backRight": 0
+                },
+                "evStatus": {
+                    "batteryStatus": 68,
+                    "batteryCharge": false,
+                    "batteryPlugin": 0,
+                    "realTimePower": 0.0,
+                    "drvDistance": [
+                        {
+                            "rangeByFuel": {
+                                "evModeRange": {
+                                    "value": 170,
+                                    "unit": 3
+                                },
+                                "totalAvailableRange": {
+                                    "value": 170,
+                                    "unit": 3
+                                }
+                            }
+                        }
+                    ],
+                    "remainChargeTime": [
+                        {
+                            "timeInterval": {
+                                "value": 0
+                            },
+                            "etc1": {
+                                "value": 0
+                            },
+                            "etc2": {
+                                "value": 0
+                            },
+                            "etc3": {
+                                "value": 0
+                            }
+                        }
+                    ]
+                },
+                "lowFuelLight": false,
+                "fuelLevel": 0
+            }
+        },
+        "location": {
+            "coord": {
+                "lat": 37.7749,
+                "lon": -122.4194
+            },
+            "syncDate": {
+                "utc": "20240615143000"
+            }
+        },
+        "activeDTC": {
+            "dtcActiveCount": 0,
+            "dtcCategory": []
+        }
+    }
+}
