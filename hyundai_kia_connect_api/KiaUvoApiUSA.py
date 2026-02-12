@@ -651,6 +651,10 @@ class KiaUvoApiUSA(ApiImpl):
             ),
             "m",
         )
+        vehicle.ev_battery_precondition_enabled = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPrecondition",
+        )
         vehicle.total_driving_range = (
             get_child_value(
                 state,
