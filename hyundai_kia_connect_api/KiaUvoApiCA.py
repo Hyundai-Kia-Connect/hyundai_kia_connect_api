@@ -7,15 +7,16 @@ import json
 import logging
 import socket
 import time
-import typing as ty
 from zoneinfo import ZoneInfo
+import uuid
+import base64
 
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -25,6 +26,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -135,6 +137,9 @@ class KiaUvoApiCA(ApiImpl):
         }
         self._sessions = None
 
+        # Generate a device ID once on initialization
+        self.device_id = base64.b64encode(str(uuid.uuid4()).encode()).decode()
+
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
 
@@ -153,13 +158,21 @@ class KiaUvoApiCA(ApiImpl):
         - F: failure
         resCode / resMsg known values:
         - 0000: no error
-        - 7404: "Wrong Username and password"
+        - 7110: "OTP Required" (MFA verification needed)
         - 7402: "Account Locked Out"
+        - 7403: "Your authentication has expired"
+        - 7404: "Wrong Username and password"
+        - 7445: "Your request could not be processed"
+        - 7602: "Access token is deleted"
+        - 7710 : "Device ID is not valid"
         :param response: the API's JSON response
         """
 
         error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
         if response["responseHeader"]["responseCode"] == 1:
+            # Don't raise error for 7110 - it's handled in login method
+            if response["error"]["errorCode"] == "7110":
+                return
             if response["error"]["errorCode"] in error_code_mapping:
                 raise error_code_mapping[response["error"]["errorCode"]](
                     response["error"]["errorDesc"]
@@ -171,32 +184,80 @@ class KiaUvoApiCA(ApiImpl):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
+        token: Token = None,
         pin: str | None = None,
-    ) -> Token:
+    ) -> Token | OTPRequest:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers.pop("accessToken", None)
-        # Generate a random device ID to avoid static fingerprinting
-        import uuid
-        import base64
 
-        # Base string simulating a mobile User-Agent
-        base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
-        # Append a random UUID to make it unique per session
-        unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
+        # Reuse device ID from stored token if available, otherwise use instance device_id
+        if token and token.device_id:
+            device_id = token.device_id
+            _LOGGER.debug(f"{DOMAIN} - Reusing stored device ID to avoid OTP")
+        else:
+            device_id = self.device_id
+            _LOGGER.debug(f"{DOMAIN} - Using instance device ID")
 
-        headers["Deviceid"] = base64.b64encode(unique_device_id.encode()).decode()
+        headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
-        response = response.json()
-        self._check_response_for_errors(response)
-        response = response["result"]["token"]
-        token_expire_in = int(response["expireIn"]) - 60
-        access_token = response["accessToken"]
-        refresh_token = response["refreshToken"]
+        response_json = response.json()
+
+        # Check if OTP is required (error code 7110)
+        if (
+            response_json["responseHeader"]["responseCode"] == 1
+            and response_json.get("error", {}).get("errorCode") == "7110"
+        ):
+            _LOGGER.info(f"{DOMAIN} - OTP verification required for new device")
+
+            # Call mfa/selverifmeth to get userInfoUuid and available methods
+            selverifmeth_url = self.API_URL + "mfa/selverifmeth"
+            selverifmeth_headers = self.API_HEADERS.copy()
+            selverifmeth_headers.pop("accessToken", None)
+            selverifmeth_headers["Deviceid"] = device_id
+            selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
+
+            selverifmeth_response = self.sessions.post(
+                selverifmeth_url, json=selverifmeth_data, headers=selverifmeth_headers
+            )
+            _LOGGER.debug(
+                f"{DOMAIN} - Select Verification Method Response {selverifmeth_response.text}"
+            )
+            selverifmeth_json = selverifmeth_response.json()
+
+            # Check for errors
+            if selverifmeth_json.get("responseHeader", {}).get("responseCode") != 0:
+                error_desc = selverifmeth_json.get("error", {}).get(
+                    "errorDesc", "Unknown error"
+                )
+                raise APIError(f"Failed to get verification methods: {error_desc}")
+
+            # Extract userInfoUuid and emailList
+            result = selverifmeth_json.get("result", {})
+            user_info_uuid = result.get("userInfoUuid")
+            email_list = result.get("emailList", [])
+
+            return OTPRequest(
+                request_id=user_info_uuid,
+                otp_key=None,
+                has_email=len(email_list) > 0,
+                has_sms=False,
+                email=email_list[0] if email_list else username,
+                sms=None,
+                device_id=device_id,
+            )
+
+        # Check for other errors
+        self._check_response_for_errors(response_json)
+
+        # Normal login successful
+        response_data = response_json["result"]["token"]
+        token_expire_in = int(response_data["expireIn"]) - 60
+        access_token = response_data["accessToken"]
+        refresh_token = response_data["refreshToken"]
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             seconds=token_expire_in
@@ -208,7 +269,128 @@ class KiaUvoApiCA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
+            device_id=device_id,
             pin=pin,
+        )
+
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> str:
+        """Sends OTP to the user via selected destination and returns the otpKey"""
+        url = self.API_URL + "mfa/sendotp"
+        headers = self.API_HEADERS.copy()
+        if otp_request.device_id:
+            headers["Deviceid"] = otp_request.device_id
+        data = {
+            "otpMethod": "E",
+            "mfaApiCode": "0107",
+            "userAccount": otp_request.email,
+            "userPhone": "",
+            "userInfoUuid": otp_request.request_id,
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Unknown error"
+            )
+            raise APIError(f"Failed to send OTP: {error_desc}")
+
+        otp_key = response_json["result"]["otpKey"]
+        otp_request.otp_key = otp_key
+
+        return otp_key
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Confirms OTP code sent to the user and completes login"""
+        url = self.API_URL + "mfa/validateotp"
+        headers = self.API_HEADERS.copy()
+        if otp_request.device_id:
+            headers["Deviceid"] = otp_request.device_id
+        data = {
+            "otpNo": otp_code,
+            "userAccount": username,
+            "otpKey": otp_request.otp_key,
+            "mfaApiCode": "0107",
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Invalid OTP code"
+            )
+            raise AuthenticationError(f"OTP verification failed: {error_desc}")
+
+        if not response_json["result"].get("verifiedOtp", False):
+            raise AuthenticationError("OTP verification failed")
+
+        otp_validation_key = response_json["result"]["otpValidationKey"]
+
+        # Call mfa/genmfatkn to get the access token and refresh token
+        genmfatkn_url = self.API_URL + "mfa/genmfatkn"
+        genmfatkn_headers = self.API_HEADERS.copy()
+        if otp_request.device_id:
+            genmfatkn_headers["Deviceid"] = otp_request.device_id
+        genmfatkn_data = {
+            "userAccount": username,
+            "otpEmail": otp_request.email,
+            "mfaApiCode": "0107",
+            "otpValidationKey": otp_validation_key,
+            "mfaYn": "N",
+        }
+
+        genmfatkn_response = self.sessions.post(
+            genmfatkn_url, json=genmfatkn_data, headers=genmfatkn_headers
+        )
+        _LOGGER.debug(
+            f"{DOMAIN} - Generate MFA Token Response {genmfatkn_response.text}"
+        )
+        genmfatkn_json = genmfatkn_response.json()
+
+        if genmfatkn_json["responseHeader"]["responseCode"] != 0:
+            error_desc = genmfatkn_json.get("error", {}).get(
+                "errorDesc", "Token generation failed"
+            )
+            raise AuthenticationError(f"Failed to generate token: {error_desc}")
+
+        token_data = genmfatkn_json["result"]["token"]
+        token_expire_in = int(token_data["expireIn"]) - 60
+        access_token = token_data["accessToken"]
+        refresh_token = token_data["refreshToken"]
+
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=token_expire_in
+        )
+
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            valid_until=valid_until,
+            device_id=otp_request.device_id,
+            pin=pin,
+        )
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token, reusing device_id to avoid OTP"""
+        _LOGGER.debug(f"{DOMAIN} - Refreshing access token")
+        return self.login(
+            username=token.username,
+            password=token.password,
+            token=token,  # Pass the token to reuse device_id
+            pin=token.pin,
         )
 
     def test_token(self, token: Token) -> bool:
@@ -236,9 +418,6 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        self._check_response_for_errors(response)
-        if "result" not in response or "vehicles" not in response.get("result", {}):
-            raise APIError("Missing result or vehicles in response")
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
