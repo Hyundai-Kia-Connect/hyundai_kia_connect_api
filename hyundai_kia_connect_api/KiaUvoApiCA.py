@@ -142,7 +142,7 @@ class KiaUvoApiCA(ApiImpl):
         """Generate a deterministic device ID based on MAC address and hostname.
         This ensures the same device ID is used across sessions, avoiding OTP triggers."""
         device_uuid = uuid.uuid5(
-            uuid.NAMESPACE_DNS, f'{uuid.getnode():x}-{platform.node() or ""}'
+            uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
         )
         return base64.b64encode(device_uuid.hex.encode()).decode()
 
