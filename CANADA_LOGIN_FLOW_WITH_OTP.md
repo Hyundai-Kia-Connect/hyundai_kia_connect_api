@@ -3,6 +3,7 @@
 This document describes the complete authentication flow for the Kia Canada API, including the One-Time Password (OTP) verification process required for new devices.
 
 ## Table of Contents
+
 - [Initial Login with OTP](#initial-login-with-otp)
 - [Subsequent Login (Device Remembered)](#subsequent-login-device-remembered)
 - [Important Headers](#important-headers)
@@ -18,6 +19,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/v2/login`
 
 **Request Body:**
+
 ```json
 {
     "loginId": "user@example.com",
@@ -26,6 +28,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Response:** `200 OK` (with error in payload)
+
 ```json
 {
     "error": {
@@ -47,6 +50,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/mfa/selverifmeth`
 
 **Request Body:**
+
 ```json
 {
     "mfaApiCode": "0107",
@@ -55,10 +59,12 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Parameters:**
+
 - `mfaApiCode`: Always `"0107"` for Canada
 - `userAccount`: User's email address
 
 **Response:** `200 OK`
+
 ```json
 {
     "responseHeader": {
@@ -68,14 +74,13 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
     "result": {
         "userInfoUuid": "ff36138e-4aa8-4030-ba5d-25090485fece",
         "otpKey": "",
-        "emailList": [
-            "user@example.com"
-        ]
+        "emailList": ["user@example.com"]
     }
 }
 ```
 
 **Response Fields:**
+
 - `userInfoUuid`: Unique identifier for this OTP session (required for subsequent steps)
 - `otpKey`: Empty at this stage
 - `emailList`: Available email addresses for OTP delivery
@@ -87,6 +92,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/mfa/sendotp`
 
 **Request Body:**
+
 ```json
 {
     "otpMethod": "E",
@@ -98,6 +104,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Parameters:**
+
 - `otpMethod`: `"E"` for email (Canada only supports email OTP)
 - `mfaApiCode`: Always `"0107"` for Canada
 - `userAccount`: User's email address
@@ -105,6 +112,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 - `userInfoUuid`: The UUID received from Step 2
 
 **Response:** `200 OK`
+
 ```json
 {
     "responseHeader": {
@@ -118,6 +126,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Response Fields:**
+
 - `otpKey`: Key required for OTP validation (Step 4)
 
 **Note:** This triggers the server to send a 6-digit OTP code to the user's email address.
@@ -129,6 +138,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/mfa/validateotp`
 
 **Request Body:**
+
 ```json
 {
     "otpNo": "123456",
@@ -139,12 +149,14 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Parameters:**
+
 - `otpNo`: The 6-digit OTP code received via email
 - `userAccount`: User's email address
 - `otpKey`: The key received from Step 3
 - `mfaApiCode`: Always `"0107"` for Canada
 
 **Response:** `200 OK`
+
 ```json
 {
     "responseHeader": {
@@ -159,6 +171,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Response Fields:**
+
 - `otpValidationKey`: Validation key required for token generation (Step 5)
 - `verifiedOtp`: Boolean indicating if OTP was successfully verified
 
@@ -171,6 +184,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/mfa/genmfatkn`
 
 **Request Body:**
+
 ```json
 {
     "userAccount": "user@example.com",
@@ -182,6 +196,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Parameters:**
+
 - `userAccount`: User's email address
 - `otpEmail`: Email address where OTP was sent
 - `mfaApiCode`: Always `"0107"` for Canada
@@ -191,6 +206,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
     - `"Y"` = Remember device for 90 days
 
 **Response:** `200 OK`
+
 ```json
 {
     "responseHeader": {
@@ -212,6 +228,7 @@ When logging in from a new device, the Kia Canada API requires OTP verification 
 ```
 
 **Response Fields:**
+
 - `verifiedTnC`: Terms and conditions verification status
 - `token.accessToken`: Bearer token for API authentication
 - `token.refreshToken`: Token for refreshing the access token
@@ -232,6 +249,7 @@ When the device has been remembered (by setting `mfaYn: "Y"` in Step 5), subsequ
 **Endpoint:** `POST https://kiaconnect.ca/tods/api/v2/login`
 
 **Request Body:**
+
 ```json
 {
     "loginId": "user@example.com",
@@ -242,6 +260,7 @@ When the device has been remembered (by setting `mfaYn: "Y"` in Step 5), subsequ
 **Important:** The same `Deviceid` header must be sent that was used during the initial OTP flow.
 
 **Response:** `200 OK`
+
 ```json
 {
     "responseHeader": {
@@ -289,21 +308,23 @@ When the device has been remembered (by setting `mfaYn: "Y"` in Step 5), subsequ
 ```
 
 **Response Fields:**
+
 - `accountInformation`: User's account details and preferences
 - `token`: Authentication tokens (same structure as Step 5)
 - `verifiedTnC`: Terms and conditions verification status
+
 ---
 
 ## Important Headers
 
 All API requests must include these headers:
 
-| Header | Value | Description |
-|--------|-------|-------------|
-| `Content-Type` | `application/json;charset=UTF-8` | Request content type |
-| `Deviceid` | Base64-encoded device identifier | **Critical:** Must be consistent across all requests in the OTP flow and stored for future logins |
-| `from` | `CWP` | Client identifier (Customer Web Portal) |
-| `language` | `0` | Language preference (0 = English) |
-| `offset` | `-5` (or user's timezone) | Timezone offset from UTC |
-| `Origin` | `https://kiaconnect.ca` | Request origin |
-| `Referer` | `https://kiaconnect.ca/login` | Referrer URL |
+| Header         | Value                            | Description                                                                                       |
+| -------------- | -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `Content-Type` | `application/json;charset=UTF-8` | Request content type                                                                              |
+| `Deviceid`     | Base64-encoded device identifier | **Critical:** Must be consistent across all requests in the OTP flow and stored for future logins |
+| `from`         | `CWP`                            | Client identifier (Customer Web Portal)                                                           |
+| `language`     | `0`                              | Language preference (0 = English)                                                                 |
+| `offset`       | `-5` (or user's timezone)        | Timezone offset from UTC                                                                          |
+| `Origin`       | `https://kiaconnect.ca`          | Request origin                                                                                    |
+| `Referer`      | `https://kiaconnect.ca/login`    | Referrer URL                                                                                      |
