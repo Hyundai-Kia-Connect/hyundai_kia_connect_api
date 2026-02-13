@@ -5,6 +5,7 @@
 import datetime as dt
 import json
 import logging
+import platform
 import socket
 import time
 from zoneinfo import ZoneInfo
@@ -137,8 +138,13 @@ class KiaUvoApiCA(ApiImpl):
         }
         self._sessions = None
 
-        # Generate a device ID once on initialization
-        self.device_id = base64.b64encode(str(uuid.uuid4()).encode()).decode()
+    def _get_device_id(self) -> str:
+        """Generate a deterministic device ID based on MAC address and hostname.
+        This ensures the same device ID is used across sessions, avoiding OTP triggers."""
+        device_uuid = uuid.uuid5(
+            uuid.NAMESPACE_DNS, f'{uuid.getnode():x}-{platform.node() or ""}'
+        )
+        return base64.b64encode(device_uuid.hex.encode()).decode()
 
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
@@ -193,13 +199,9 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers.pop("accessToken", None)
 
-        # Reuse device ID from stored token if available, otherwise use instance device_id
-        if token and token.device_id:
-            device_id = token.device_id
-            _LOGGER.debug(f"{DOMAIN} - Reusing stored device ID to avoid OTP")
-        else:
-            device_id = self.device_id
-            _LOGGER.debug(f"{DOMAIN} - Using instance device ID")
+        # Use deterministic device ID based on MAC address to avoid OTP triggers
+        device_id = self._get_device_id()
+        _LOGGER.debug(f"{DOMAIN} - Using deterministic device ID")
 
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
@@ -217,7 +219,7 @@ class KiaUvoApiCA(ApiImpl):
             selverifmeth_url = self.API_URL + "mfa/selverifmeth"
             selverifmeth_headers = self.API_HEADERS.copy()
             selverifmeth_headers.pop("accessToken", None)
-            selverifmeth_headers["Deviceid"] = device_id
+            selverifmeth_headers["Deviceid"] = self._get_device_id()
             selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
 
             selverifmeth_response = self.sessions.post(
@@ -247,7 +249,6 @@ class KiaUvoApiCA(ApiImpl):
                 has_sms=False,
                 email=email_list[0] if email_list else username,
                 sms=None,
-                device_id=device_id,
             )
 
         # Check for other errors
@@ -269,7 +270,6 @@ class KiaUvoApiCA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
-            device_id=device_id,
             pin=pin,
         )
 
@@ -277,8 +277,7 @@ class KiaUvoApiCA(ApiImpl):
         """Sends OTP to the user via selected destination and returns the otpKey"""
         url = self.API_URL + "mfa/sendotp"
         headers = self.API_HEADERS.copy()
-        if otp_request.device_id:
-            headers["Deviceid"] = otp_request.device_id
+        headers["Deviceid"] = self._get_device_id()
         data = {
             "otpMethod": "E",
             "mfaApiCode": "0107",
@@ -313,8 +312,7 @@ class KiaUvoApiCA(ApiImpl):
         """Confirms OTP code sent to the user and completes login"""
         url = self.API_URL + "mfa/validateotp"
         headers = self.API_HEADERS.copy()
-        if otp_request.device_id:
-            headers["Deviceid"] = otp_request.device_id
+        headers["Deviceid"] = self._get_device_id()
         data = {
             "otpNo": otp_code,
             "userAccount": username,
@@ -340,8 +338,7 @@ class KiaUvoApiCA(ApiImpl):
         # Call mfa/genmfatkn to get the access token and refresh token
         genmfatkn_url = self.API_URL + "mfa/genmfatkn"
         genmfatkn_headers = self.API_HEADERS.copy()
-        if otp_request.device_id:
-            genmfatkn_headers["Deviceid"] = otp_request.device_id
+        genmfatkn_headers["Deviceid"] = self._get_device_id()
         genmfatkn_data = {
             "userAccount": username,
             "otpEmail": otp_request.email,
@@ -352,9 +349,6 @@ class KiaUvoApiCA(ApiImpl):
 
         genmfatkn_response = self.sessions.post(
             genmfatkn_url, json=genmfatkn_data, headers=genmfatkn_headers
-        )
-        _LOGGER.debug(
-            f"{DOMAIN} - Generate MFA Token Response {genmfatkn_response.text}"
         )
         genmfatkn_json = genmfatkn_response.json()
 
@@ -379,17 +373,15 @@ class KiaUvoApiCA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
-            device_id=otp_request.device_id,
             pin=pin,
         )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
-        """Refresh the token using the refresh token, reusing device_id to avoid OTP"""
+        """Refresh the token using the refresh token"""
         _LOGGER.debug(f"{DOMAIN} - Refreshing access token")
         return self.login(
             username=token.username,
             password=token.password,
-            token=token,  # Pass the token to reuse device_id
             pin=token.pin,
         )
 
