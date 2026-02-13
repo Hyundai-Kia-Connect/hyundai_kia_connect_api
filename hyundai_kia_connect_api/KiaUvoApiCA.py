@@ -174,7 +174,12 @@ class KiaUvoApiCA(ApiImpl):
         :param response: the API's JSON response
         """
 
-        error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
+        error_code_mapping = {
+            "7404": AuthenticationError,
+            "7402": AuthenticationError,
+            "7403": AuthenticationError,  # Auth expired - triggers re-login
+            "7602": AuthenticationError,  # Access token deleted - triggers re-login
+        }
         if response["responseHeader"]["responseCode"] == 1:
             # Don't raise error for 7110 - it's handled in login method
             if response["error"]["errorCode"] == "7110":
@@ -386,11 +391,10 @@ class KiaUvoApiCA(ApiImpl):
         )
 
     def test_token(self, token: Token) -> bool:
-        # Use "get number of notifications" as a dummy request to test the token
-        # Use this api because it's likely checked more frequently than other APIs, less
-        # chance to get banned. And it's short and simple.
-        url = self.API_URL + "ntcmsgcnt"
-        headers = self.API_HEADERS
+        # Use "get vehicle list" to test the token and keep it alive
+        # Calling this endpoint every 5 minutes prevents the accessToken from expiring
+        url = self.API_URL + "vhcllst"
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
@@ -405,11 +409,15 @@ class KiaUvoApiCA(ApiImpl):
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
@@ -754,7 +762,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_trip_details(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "alerts/maintenance/evTripDetails"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -764,6 +772,10 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(
                 f"{DOMAIN} - Received _update_vehicle_properties_trip_details response {response}"
             )
+
+            # Check for errors (including 7602 - access token deleted)
+            self._check_response_for_errors(response)
+
             if "result" in response and "tripdetails" in response["result"]:
                 trip_stats = []
                 for trip in response["result"]["tripdetails"]:
@@ -796,13 +808,17 @@ class KiaUvoApiCA(ApiImpl):
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
 
         status = {}
@@ -812,7 +828,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rltmvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -820,6 +836,10 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
         status = {}
         status["status"] = response
@@ -827,13 +847,17 @@ class KiaUvoApiCA(ApiImpl):
         return status
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         url = self.API_URL + "nxtsvc"
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Service status data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["maintenanceInfo"]
         return response
 
@@ -1144,13 +1168,16 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received get_charge_limits: {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
 
         return response["result"]
 
