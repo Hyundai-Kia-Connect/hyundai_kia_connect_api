@@ -62,7 +62,7 @@ class OTPRequest:
     has_sms: bool | None
     email: str | None
     sms: str | None
-
+    device_id: str | None = None
 
 @dataclass
 class ScheduleChargingClimateRequestOptions:
