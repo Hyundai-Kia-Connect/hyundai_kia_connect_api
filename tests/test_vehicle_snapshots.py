@@ -10,7 +10,9 @@ To update snapshots after an intentional change::
 """
 
 import pytest
-from syrupy.assertion import SnapshotAssertion
+
+syrupy = pytest.importorskip("syrupy")
+from syrupy.assertion import SnapshotAssertion  # noqa: E402
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
