@@ -18,6 +18,7 @@ long_description = readme
 
 test_requirements = [
     "pytest>=3",
+    "syrupy>=4.0.0",
 ]
 
 setup(
