@@ -1,0 +1,126 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Hyundai Ioniq 5",
+        "year": 2024,
+        "region": "US",
+        "brand": "Hyundai",
+        "api_class": "HyundaiBlueLinkApiUSA",
+        "endpoint": "vehicleStatus",
+        "description": "Hyundai USA (BlueLinkAPI) Ioniq 5 cached response with targetSOC. Uses vehicleStatus root (not lastVehicleInfo). Temperature in Fahrenheit. Tire pressure fields use 'Warning' naming.",
+        "has_target_soc": true,
+        "expected": {
+            "ev_battery_percentage": 85,
+            "ev_charge_limits_dc": 80,
+            "ev_charge_limits_ac": 100,
+            "car_battery_percentage": 92,
+            "engine_is_running": false,
+            "is_locked": true,
+            "ev_battery_is_charging": false,
+            "ev_battery_is_plugged_in": 0
+        }
+    },
+    "vehicleStatus": {
+        "dateTime": "20240901120000",
+        "battery": {
+            "batSoc": 92
+        },
+        "engine": false,
+        "airTemp": {
+            "value": "72"
+        },
+        "defrost": false,
+        "steerWheelHeat": 0,
+        "sideBackWindowHeat": 0,
+        "sideMirrorHeat": 0,
+        "seatHeaterVentState": {
+            "flSeatHeatState": 0,
+            "frSeatHeatState": 0,
+            "rlSeatHeatState": 0,
+            "rrSeatHeatState": 0
+        },
+        "tirePressureLamp": {
+            "tirePressureWarningLampFrontLeft": false,
+            "tirePressureWarningLampFrontRight": false,
+            "tirePressureWarningLampRearLeft": false,
+            "tirePressureWarningLampRearRight": false,
+            "tirePressureWarningLampAll": false
+        },
+        "doorLock": true,
+        "doorOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "hoodOpen": false,
+        "trunkOpen": false,
+        "windowOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "washerFluidStatus": false,
+        "breakOilStatus": false,
+        "smartKeyBatteryWarning": false,
+        "fuelLevel": 0,
+        "lowFuelLight": false,
+        "airCtrlOn": false,
+        "evStatus": {
+            "batteryStatus": 85,
+            "batteryCharge": false,
+            "batteryPlugin": 0,
+            "batteryStndChrgPower": 0.0,
+            "drvDistance": [
+                {
+                    "rangeByFuel": {
+                        "evModeRange": {
+                            "value": 240,
+                            "unit": 3
+                        },
+                        "totalAvailableRange": {
+                            "value": 240,
+                            "unit": 3
+                        }
+                    }
+                }
+            ],
+            "remainTime2": {
+                "atc": {
+                    "value": 0
+                },
+                "etc1": {
+                    "value": 0
+                },
+                "etc2": {
+                    "value": 0
+                },
+                "etc3": {
+                    "value": 0
+                }
+            },
+            "reservChargeInfos": {
+                "targetSOClist": [
+                    {
+                        "plugType": 0,
+                        "targetSOClevel": 80
+                    },
+                    {
+                        "plugType": 1,
+                        "targetSOClevel": 100
+                    }
+                ]
+            }
+        },
+        "vehicleLocation": {
+            "coord": {
+                "lat": 34.0522,
+                "lon": -118.2437
+            },
+            "time": "20240901120000"
+        }
+    },
+    "vehicleDetails": {
+        "odometer": 12500
+    }
+}
