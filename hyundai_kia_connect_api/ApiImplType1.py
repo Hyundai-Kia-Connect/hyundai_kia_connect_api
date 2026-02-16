@@ -266,7 +266,10 @@ class ApiImplType1(ApiImpl):
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
-        vehicle.outside_temperature = (outside_temp, TEMPERATURE_UNITS[outside_temp_unit])
+        vehicle.outside_temperature = (
+            outside_temp,
+            TEMPERATURE_UNITS[outside_temp_unit],
+        )
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
@@ -390,9 +393,9 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_chiller_rpm = get_child_value(
             state, "Green.BatteryManagement.ChillerRPM"
         )
-        vehicle.ev_battery_heating_state = bool(get_child_value(
-            state, "Green.BatteryManagement.HeatingState"
-        ))
+        vehicle.ev_battery_heating_state = bool(
+            get_child_value(state, "Green.BatteryManagement.HeatingState")
+        )
         vehicle.ev_battery_water_temperature = get_child_value(
             state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
         )
@@ -402,9 +405,9 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_temperature_max = get_child_value(
             state, "Green.BatteryManagement.Temperature.Max.Raw"
         )
-        vehicle.ev_battery_winter_mode = bool(get_child_value(
-            state, "Green.BatteryManagement.WinterModeOperation"
-        ))
+        vehicle.ev_battery_winter_mode = bool(
+            get_child_value(state, "Green.BatteryManagement.WinterModeOperation")
+        )
 
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
