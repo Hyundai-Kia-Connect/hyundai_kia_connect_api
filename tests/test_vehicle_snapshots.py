@@ -103,9 +103,7 @@ def cn_api() -> KiaUvoApiCN:
 
 
 @pytest.mark.parametrize("fixture_file", US_KIA_FILES, ids=US_KIA_FILES)
-def test_usa_kia_vehicle_snapshot(
-    usa_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_usa_kia_vehicle_snapshot(usa_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
     usa_api._update_vehicle_properties(vehicle, data)
@@ -123,9 +121,7 @@ def test_bluelink_usa_vehicle_snapshot(
 
 
 @pytest.mark.parametrize("fixture_file", EU_FILES, ids=EU_FILES)
-def test_eu_vehicle_snapshot(
-    eu_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_eu_vehicle_snapshot(eu_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
     eu_api._update_vehicle_properties(vehicle, data)
@@ -133,9 +129,7 @@ def test_eu_vehicle_snapshot(
 
 
 @pytest.mark.parametrize("fixture_file", CCS2_FILES, ids=CCS2_FILES)
-def test_ccs2_vehicle_snapshot(
-    ccs2_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_ccs2_vehicle_snapshot(ccs2_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
     ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
@@ -143,9 +137,7 @@ def test_ccs2_vehicle_snapshot(
 
 
 @pytest.mark.parametrize("fixture_file", CA_FILES, ids=CA_FILES)
-def test_ca_vehicle_snapshot(
-    ca_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_ca_vehicle_snapshot(ca_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     vehicle.year = 2022  # needed for temperature_range selection
     data = load_fixture(fixture_file)
@@ -154,9 +146,7 @@ def test_ca_vehicle_snapshot(
 
 
 @pytest.mark.parametrize("fixture_file", AU_FILES, ids=AU_FILES)
-def test_au_vehicle_snapshot(
-    au_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_au_vehicle_snapshot(au_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
     au_api._update_vehicle_properties(vehicle, data)
@@ -164,9 +154,7 @@ def test_au_vehicle_snapshot(
 
 
 @pytest.mark.parametrize("fixture_file", CN_FILES, ids=CN_FILES)
-def test_cn_vehicle_snapshot(
-    cn_api, fixture_file, snapshot: SnapshotAssertion
-):
+def test_cn_vehicle_snapshot(cn_api, fixture_file, snapshot: SnapshotAssertion):
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
     cn_api._update_vehicle_properties(vehicle, data)
