@@ -195,7 +195,6 @@ class KiaUvoApiCA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token = None,
         pin: str | None = None,
     ) -> Token | OTPRequest:
         # Sign In with Email and Password and Get Authorization Code
@@ -379,15 +378,6 @@ class KiaUvoApiCA(ApiImpl):
             refresh_token=refresh_token,
             valid_until=valid_until,
             pin=pin,
-        )
-
-    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
-        """Refresh the token using the refresh token"""
-        _LOGGER.debug(f"{DOMAIN} - Refreshing access token")
-        return self.login(
-            username=token.username,
-            password=token.password,
-            pin=token.pin,
         )
 
     def test_token(self, token: Token) -> bool:
