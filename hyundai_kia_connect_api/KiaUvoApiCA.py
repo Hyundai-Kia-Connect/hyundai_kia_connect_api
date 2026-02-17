@@ -277,8 +277,8 @@ class KiaUvoApiCA(ApiImpl):
             pin=pin,
         )
 
-    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> str:
-        """Sends OTP to the user via selected destination and returns the otpKey"""
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Sends OTP to the user via selected destination"""
         url = self.API_URL + "mfa/sendotp"
         headers = self.API_HEADERS.copy()
         headers["Deviceid"] = self._get_device_id()
@@ -302,8 +302,6 @@ class KiaUvoApiCA(ApiImpl):
 
         otp_key = response_json["result"]["otpKey"]
         otp_request.otp_key = otp_key
-
-        return otp_key
 
     def verify_otp_and_complete_login(
         self,
