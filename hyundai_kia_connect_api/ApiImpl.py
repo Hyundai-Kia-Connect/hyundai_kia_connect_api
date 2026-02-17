@@ -63,6 +63,7 @@ class OTPRequest:
     email: str | None
     sms: str | None
 
+
 @dataclass
 class ScheduleChargingClimateRequestOptions:
     @dataclass
