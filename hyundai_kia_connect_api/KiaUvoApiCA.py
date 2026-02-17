@@ -346,7 +346,7 @@ class KiaUvoApiCA(ApiImpl):
             "otpEmail": otp_request.email,
             "mfaApiCode": "0107",
             "otpValidationKey": otp_validation_key,
-            "mfaYn": "N",
+            "mfaYn": "Y",
         }
 
         genmfatkn_response = self.sessions.post(
