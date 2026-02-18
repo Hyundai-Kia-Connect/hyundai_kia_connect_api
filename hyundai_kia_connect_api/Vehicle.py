@@ -173,6 +173,9 @@ class Vehicle:
     )
     ev_v2l_discharge_limit: typing.Union[int, None] = None
 
+    ev_v2l_status: typing.Union[int, None] = None
+    ev_v2h_status: typing.Union[int, None] = None
+
     # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
