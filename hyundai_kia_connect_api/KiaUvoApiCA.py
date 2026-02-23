@@ -1206,6 +1206,7 @@ class KiaUvoApiCA(ApiImpl):
         return response_headers["transactionId"]
 
     def _mask_sensitive_data(self, data: dict) -> dict:
+        if isinstance(data, str): return data
         """Create a copy of data with sensitive fields masked for logging."""
         import copy
 
