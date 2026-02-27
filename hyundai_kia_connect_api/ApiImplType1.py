@@ -392,7 +392,9 @@ class ApiImplType1(ApiImpl):
             state, "Green.BatteryManagement.ChillerRPM"
         )
 
-        battery_heating_state = get_child_value(state, "Green.BatteryManagement.HeatingState")
+        battery_heating_state = get_child_value(
+            state, "Green.BatteryManagement.HeatingState"
+        )
         if battery_heating_state is not None:
             vehicle.ev_battery_heating_state = bool(battery_heating_state)
 
@@ -406,7 +408,9 @@ class ApiImplType1(ApiImpl):
             state, "Green.BatteryManagement.Temperature.Max.Raw"
         )
 
-        battery_winter_mode = get_child_value(state, "Green.BatteryManagement.WinterModeOperation")
+        battery_winter_mode = get_child_value(
+            state, "Green.BatteryManagement.WinterModeOperation"
+        )
         if battery_winter_mode is not None:
             vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
 
