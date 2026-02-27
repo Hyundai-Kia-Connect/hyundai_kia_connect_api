@@ -1,0 +1,126 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia Niro EV",
+        "year": 2022,
+        "region": "CA",
+        "brand": "Kia",
+        "endpoint": "lststatus",
+        "description": "CA Kia Niro EV cached status response. Uses status root with hex-encoded temperature. Charge limits are handled via a separate evc/selsoc call, not in this response.",
+        "has_target_soc": false,
+        "expected": {
+            "ev_battery_percentage": 82,
+            "ev_charge_limits_dc": null,
+            "ev_charge_limits_ac": null,
+            "car_battery_percentage": 91,
+            "engine_is_running": false,
+            "is_locked": true,
+            "ev_battery_is_charging": true,
+            "ev_battery_is_plugged_in": 1
+        }
+    },
+    "status": {
+        "lastStatusDate": "20240801093000",
+        "battery": {
+            "batSoc": 91
+        },
+        "engine": false,
+        "airTemp": {
+            "value": "10H",
+            "unit": 0
+        },
+        "defrost": false,
+        "steerWheelHeat": 0,
+        "sideBackWindowHeat": 0,
+        "sideMirrorHeat": 0,
+        "acc": false,
+        "ign3": false,
+        "remoteIgnition": false,
+        "transCond": 0,
+        "sleepModeCheck": false,
+        "seatHeaterVentState": {
+            "flSeatHeatState": 0,
+            "frSeatHeatState": 0,
+            "rlSeatHeatState": 0,
+            "rrSeatHeatState": 0
+        },
+        "lampWireStatus": {
+            "headLamp": {
+                "headLampStatus": 0,
+                "leftLowLamp": 0,
+                "rightLowLamp": 0
+            },
+            "stopLamp": {
+                "leftLamp": 0,
+                "rightLamp": 0
+            },
+            "turnSignalLamp": {
+                "leftFrontLamp": 0,
+                "rightFrontLamp": 0,
+                "leftRearLamp": 0,
+                "rightRearLamp": 0
+            }
+        },
+        "doorLock": true,
+        "doorOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "hoodOpen": false,
+        "sunroofOpen": 0,
+        "trunkOpen": false,
+        "windowOpen": {
+            "frontLeft": 0,
+            "frontRight": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "tirePressureLamp": {
+            "tirePressureLampFL": 0,
+            "tirePressureLampFR": 0,
+            "tirePressureLampRL": 0,
+            "tirePressureLampRR": 0,
+            "tirePressureLampAll": 0
+        },
+        "washerFluidStatus": false,
+        "breakOilStatus": false,
+        "fuelLevel": 0,
+        "lowFuelLight": false,
+        "airCtrlOn": false,
+        "evStatus": {
+            "batteryStatus": 82,
+            "batteryCharge": true,
+            "batteryPlugin": 1,
+            "batteryPreconditiong": false,
+            "drvDistance": [
+                {
+                    "rangeByFuel": {
+                        "evModeRange": {
+                            "value": 290,
+                            "unit": 1
+                        },
+                        "totalAvailableRange": {
+                            "value": 290,
+                            "unit": 1
+                        }
+                    }
+                }
+            ],
+            "remainTime2": {
+                "atc": {
+                    "value": 180
+                },
+                "etc1": {
+                    "value": 35
+                },
+                "etc2": {
+                    "value": 420
+                },
+                "etc3": {
+                    "value": 90
+                }
+            }
+        }
+    }
+}

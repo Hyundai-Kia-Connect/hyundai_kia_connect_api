@@ -5,17 +5,19 @@
 import datetime as dt
 import json
 import logging
+import platform
 import socket
 import time
-import typing as ty
 from zoneinfo import ZoneInfo
+import uuid
+import base64
 
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -25,6 +27,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -135,6 +138,14 @@ class KiaUvoApiCA(ApiImpl):
         }
         self._sessions = None
 
+    def _get_device_id(self) -> str:
+        """Generate a deterministic device ID based on MAC address and hostname.
+        This ensures the same device ID is used across sessions, avoiding OTP triggers."""
+        device_uuid = uuid.uuid5(
+            uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
+        )
+        return base64.b64encode(device_uuid.hex.encode()).decode()
+
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
 
@@ -153,13 +164,26 @@ class KiaUvoApiCA(ApiImpl):
         - F: failure
         resCode / resMsg known values:
         - 0000: no error
-        - 7404: "Wrong Username and password"
+        - 7110: "OTP Required" (MFA verification needed)
         - 7402: "Account Locked Out"
+        - 7403: "Your authentication has expired"
+        - 7404: "Wrong Username and password"
+        - 7445: "Your request could not be processed"
+        - 7602: "Access token is deleted"
+        - 7710 : "Device ID is not valid"
         :param response: the API's JSON response
         """
 
-        error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
+        error_code_mapping = {
+            "7404": AuthenticationError,
+            "7402": AuthenticationError,
+            "7403": AuthenticationError,  # Auth expired - triggers re-login
+            "7602": AuthenticationError,  # Access token deleted - triggers re-login
+        }
         if response["responseHeader"]["responseCode"] == 1:
+            # Don't raise error for 7110 - it's handled in login method
+            if response["error"]["errorCode"] == "7110":
+                return
             if response["error"]["errorCode"] in error_code_mapping:
                 raise error_code_mapping[response["error"]["errorCode"]](
                     response["error"]["errorDesc"]
@@ -171,32 +195,175 @@ class KiaUvoApiCA(ApiImpl):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
-    ) -> Token:
+    ) -> Token | OTPRequest:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers.pop("accessToken", None)
-        # Generate a random device ID to avoid static fingerprinting
-        import uuid
-        import base64
 
-        # Base string simulating a mobile User-Agent
-        base_device_id = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
-        # Append a random UUID to make it unique per session
-        unique_device_id = f"{base_device_id}+{str(uuid.uuid4())}"
+        # Use deterministic device ID based on MAC address to avoid OTP triggers
+        device_id = self._get_device_id()
+        _LOGGER.debug(f"{DOMAIN} - Using deterministic device ID")
 
-        headers["Deviceid"] = base64.b64encode(unique_device_id.encode()).decode()
+        headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
-        response = response.json()
-        self._check_response_for_errors(response)
-        response = response["result"]["token"]
-        token_expire_in = int(response["expireIn"]) - 60
-        access_token = response["accessToken"]
-        refresh_token = response["refreshToken"]
+        response_json = response.json()
+
+        # Check if OTP is required (error code 7110)
+        if (
+            response_json["responseHeader"]["responseCode"] == 1
+            and response_json.get("error", {}).get("errorCode") == "7110"
+        ):
+            _LOGGER.info(f"{DOMAIN} - OTP verification required for new device")
+
+            # Call mfa/selverifmeth to get userInfoUuid and available methods
+            selverifmeth_url = self.API_URL + "mfa/selverifmeth"
+            selverifmeth_headers = self.API_HEADERS.copy()
+            selverifmeth_headers.pop("accessToken", None)
+            selverifmeth_headers["Deviceid"] = self._get_device_id()
+            selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
+
+            selverifmeth_response = self.sessions.post(
+                selverifmeth_url, json=selverifmeth_data, headers=selverifmeth_headers
+            )
+            _LOGGER.debug(
+                f"{DOMAIN} - Select Verification Method Response {selverifmeth_response.text}"
+            )
+            selverifmeth_json = selverifmeth_response.json()
+
+            # Check for errors
+            if selverifmeth_json.get("responseHeader", {}).get("responseCode") != 0:
+                error_desc = selverifmeth_json.get("error", {}).get(
+                    "errorDesc", "Unknown error"
+                )
+                raise APIError(f"Failed to get verification methods: {error_desc}")
+
+            # Extract userInfoUuid and emailList
+            result = selverifmeth_json.get("result", {})
+            user_info_uuid = result.get("userInfoUuid")
+            email_list = result.get("emailList", [])
+
+            return OTPRequest(
+                request_id=user_info_uuid,
+                otp_key=None,
+                has_email=len(email_list) > 0,
+                has_sms=False,
+                email=email_list[0] if email_list else username,
+                sms=None,
+            )
+
+        # Check for other errors
+        self._check_response_for_errors(response_json)
+
+        # Normal login successful
+        response_data = response_json["result"]["token"]
+        token_expire_in = int(response_data["expireIn"]) - 60
+        access_token = response_data["accessToken"]
+        refresh_token = response_data["refreshToken"]
+
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=token_expire_in
+        )
+
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            valid_until=valid_until,
+            pin=pin,
+        )
+
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Sends OTP to the user via selected destination"""
+        url = self.API_URL + "mfa/sendotp"
+        headers = self.API_HEADERS.copy()
+        headers["Deviceid"] = self._get_device_id()
+        data = {
+            "otpMethod": "E",
+            "mfaApiCode": "0107",
+            "userAccount": otp_request.email,
+            "userPhone": "",
+            "userInfoUuid": otp_request.request_id,
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Unknown error"
+            )
+            raise APIError(f"Failed to send OTP: {error_desc}")
+
+        otp_key = response_json["result"]["otpKey"]
+        otp_request.otp_key = otp_key
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Confirms OTP code sent to the user and completes login"""
+        url = self.API_URL + "mfa/validateotp"
+        headers = self.API_HEADERS.copy()
+        headers["Deviceid"] = self._get_device_id()
+        data = {
+            "otpNo": otp_code,
+            "userAccount": username,
+            "otpKey": otp_request.otp_key,
+            "mfaApiCode": "0107",
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Invalid OTP code"
+            )
+            raise AuthenticationError(f"OTP verification failed: {error_desc}")
+
+        if not response_json["result"].get("verifiedOtp", False):
+            raise AuthenticationError("OTP verification failed")
+
+        otp_validation_key = response_json["result"]["otpValidationKey"]
+
+        # Call mfa/genmfatkn to get the access token and refresh token
+        genmfatkn_url = self.API_URL + "mfa/genmfatkn"
+        genmfatkn_headers = self.API_HEADERS.copy()
+        genmfatkn_headers["Deviceid"] = self._get_device_id()
+        genmfatkn_data = {
+            "userAccount": username,
+            "otpEmail": otp_request.email,
+            "mfaApiCode": "0107",
+            "otpValidationKey": otp_validation_key,
+            "mfaYn": "Y",
+        }
+
+        genmfatkn_response = self.sessions.post(
+            genmfatkn_url, json=genmfatkn_data, headers=genmfatkn_headers
+        )
+        genmfatkn_json = genmfatkn_response.json()
+
+        if genmfatkn_json["responseHeader"]["responseCode"] != 0:
+            error_desc = genmfatkn_json.get("error", {}).get(
+                "errorDesc", "Token generation failed"
+            )
+            raise AuthenticationError(f"Failed to generate token: {error_desc}")
+
+        token_data = genmfatkn_json["result"]["token"]
+        token_expire_in = int(token_data["expireIn"]) - 60
+        access_token = token_data["accessToken"]
+        refresh_token = token_data["refreshToken"]
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             seconds=token_expire_in
@@ -212,11 +379,10 @@ class KiaUvoApiCA(ApiImpl):
         )
 
     def test_token(self, token: Token) -> bool:
-        # Use "get number of notifications" as a dummy request to test the token
-        # Use this api because it's likely checked more frequently than other APIs, less
-        # chance to get banned. And it's short and simple.
-        url = self.API_URL + "ntcmsgcnt"
-        headers = self.API_HEADERS
+        # Use "get vehicle list" to test the token and keep it alive
+        # Calling this endpoint every 5 minutes prevents the accessToken from expiring
+        url = self.API_URL + "vhcllst"
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
@@ -231,14 +397,15 @@ class KiaUvoApiCA(ApiImpl):
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+
+        # Check for errors (including 7602 - access token deleted)
         self._check_response_for_errors(response)
-        if "result" not in response or "vehicles" not in response.get("result", {}):
-            raise APIError("Missing result or vehicles in response")
+
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
@@ -583,7 +750,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_trip_details(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "alerts/maintenance/evTripDetails"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -593,6 +760,10 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(
                 f"{DOMAIN} - Received _update_vehicle_properties_trip_details response {response}"
             )
+
+            # Check for errors (including 7602 - access token deleted)
+            self._check_response_for_errors(response)
+
             if "result" in response and "tripdetails" in response["result"]:
                 trip_stats = []
                 for trip in response["result"]["tripdetails"]:
@@ -625,13 +796,17 @@ class KiaUvoApiCA(ApiImpl):
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
 
         status = {}
@@ -641,7 +816,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rltmvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -649,6 +824,10 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
         status = {}
         status["status"] = response
@@ -656,13 +835,17 @@ class KiaUvoApiCA(ApiImpl):
         return status
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         url = self.API_URL + "nxtsvc"
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Service status data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["maintenanceInfo"]
         return response
 
@@ -973,13 +1156,16 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received get_charge_limits: {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
 
         return response["result"]
 
@@ -1019,8 +1205,10 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
 
-    def _mask_sensitive_data(self, data: dict) -> dict:
+    def _mask_sensitive_data(self, data: dict | str) -> dict | str:
         """Create a copy of data with sensitive fields masked for logging."""
+        if isinstance(data, str):
+            return data
         import copy
 
         masked = copy.deepcopy(data)
