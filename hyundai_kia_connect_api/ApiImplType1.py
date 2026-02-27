@@ -7,9 +7,7 @@ import math
 from typing import Optional
 from datetime import timedelta, timezone
 
-
 from time import sleep
-
 
 from .ApiImpl import (
     ApiImpl,
@@ -393,9 +391,11 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_chiller_rpm = get_child_value(
             state, "Green.BatteryManagement.ChillerRPM"
         )
-        vehicle.ev_battery_heating_state = bool(
-            get_child_value(state, "Green.BatteryManagement.HeatingState")
-        )
+
+        battery_heating_state = get_child_value(state, "Green.BatteryManagement.HeatingState")
+        if battery_heating_state is not None:
+            vehicle.ev_battery_heating_state = bool(battery_heating_state)
+
         vehicle.ev_battery_water_temperature = get_child_value(
             state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
         )
@@ -405,9 +405,10 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_temperature_max = get_child_value(
             state, "Green.BatteryManagement.Temperature.Max.Raw"
         )
-        vehicle.ev_battery_winter_mode = bool(
-            get_child_value(state, "Green.BatteryManagement.WinterModeOperation")
-        )
+
+        battery_winter_mode = get_child_value(state, "Green.BatteryManagement.WinterModeOperation")
+        if battery_winter_mode is not None:
+            vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
 
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
