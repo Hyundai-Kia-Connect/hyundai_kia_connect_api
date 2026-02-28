@@ -436,6 +436,32 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2x_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+                )
+            )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2l_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+                )
+            )
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
