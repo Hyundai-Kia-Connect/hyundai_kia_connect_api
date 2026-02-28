@@ -7,9 +7,7 @@ import math
 from typing import Optional
 from datetime import timedelta, timezone
 
-
 from time import sleep
-
 
 from .ApiImpl import (
     ApiImpl,
@@ -42,7 +40,6 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
-    PINMissingError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -265,6 +262,13 @@ class ApiImplType1(ApiImpl):
         if air_temp != "OFF":
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
 
+        outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
+        outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
+        vehicle.outside_temperature = (
+            outside_temp,
+            TEMPERATURE_UNITS[outside_temp_unit],
+        )
+
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
@@ -380,6 +384,36 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+
+        vehicle.ev_battery_pack_voltage = get_child_value(
+            state, "Green.BatteryManagement.BatteryPackVoltage"
+        )
+        vehicle.ev_battery_chiller_rpm = get_child_value(
+            state, "Green.BatteryManagement.ChillerRPM"
+        )
+
+        battery_heating_state = get_child_value(
+            state, "Green.BatteryManagement.HeatingState"
+        )
+        if battery_heating_state is not None:
+            vehicle.ev_battery_heating_state = bool(battery_heating_state)
+
+        vehicle.ev_battery_water_temperature = get_child_value(
+            state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+        )
+        vehicle.ev_battery_temperature_min = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Min.Raw"
+        )
+        vehicle.ev_battery_temperature_max = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Max.Raw"
+        )
+
+        battery_winter_mode = get_child_value(
+            state, "Green.BatteryManagement.WinterModeOperation"
+        )
+        if battery_winter_mode is not None:
+            vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
+
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
                 state, "Green.Electric.SmartGrid.RealTimePower"
@@ -492,6 +526,17 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
 
+        vehicle.ev_power_consumption_battery_cooling = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryCooling"
+        )
+
+        vehicle.ev_power_consumption_battery_heater = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryHeater"
+        )
+        vehicle.ev_power_consumption_air_conditioning = get_child_value(
+            state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
+        )
+
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
         # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
@@ -546,7 +591,8 @@ class ApiImplType1(ApiImpl):
         # Sanitize corrupted ICE values before storing in vehicle.data
         # This prevents issues with oversized integers when serializing to JSON
         # or storing in databases
-        self._sanitize_ice_value(state)
+        # May cause update failure.  Commenting out to test.
+        # self._sanitize_ice_value(state)
 
         vehicle.data = state
 
@@ -1033,8 +1079,6 @@ class ApiImplType1(ApiImpl):
         return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
-        if token.pin is None:
-            raise PINMissingError("PIN is not set, action will fail.")
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
@@ -1048,6 +1092,8 @@ class ApiImplType1(ApiImpl):
         response = requests.put(url, json=data, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        if response.get("controlToken") is None:
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
         control_token = "Bearer " + response["controlToken"]
         control_token_expire_at = math.floor(
             dt.datetime.now().timestamp() + response["expiresTime"]

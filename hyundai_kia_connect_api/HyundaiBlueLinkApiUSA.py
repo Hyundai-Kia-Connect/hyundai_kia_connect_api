@@ -12,7 +12,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
 from .ApiImpl import ApiImpl, ClimateRequestOptions
 from .const import (
@@ -138,6 +138,10 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
+        if response.get("access_token") is None:
+            raise AuthenticationError(
+                "Login failed: " + response.get("errorMessage", "")
+            )
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
@@ -432,6 +436,32 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2x_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+                )
+            )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2l_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+                )
+            )
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
@@ -733,6 +763,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "enrolledVehicleDetails" not in response:
+            raise AuthenticationError("Missing enrolledVehicleDetails in response")
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]

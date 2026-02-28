@@ -189,9 +189,11 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response = self.session.get(url, headers=headers)
         response.raise_for_status()
         response_data = response.json()
-
         _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
-
+        if "resMsg" not in response_data or "vehicles" not in response_data.get(
+            "resMsg", {}
+        ):
+            raise APIError("Missing resMsg or vehicles in response")
         result = []
         for entry in response_data["resMsg"]["vehicles"]:
             # Map vehicle type to engine type

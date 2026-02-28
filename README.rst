@@ -20,6 +20,7 @@ API Usage
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
 Europe Kia must follow unique steps: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/wiki/Kia-Europe-Login-Flow
+Hyundai steps are here: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/tree/master/Hyundai%20Token%20Solution
 
 Python 3.10 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
@@ -44,6 +45,19 @@ Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Co
 
 
 Once this is done you can now make the following calls against the vehicle manager::
+
+
+ #login
+
+ login(self)
+
+ #OTP Details
+
+ #Sent OTP
+ send_otp(self, method)
+
+ #Verify OTP
+ verify_otp(self, otp_code)
 
  #Checks the token is still valid and updates it if not.  Should be called before anything else if the code has been running for any length of time.
  check_and_refresh_token(self)

@@ -3,21 +3,19 @@
 # pylint:disable=logging-fstring-interpolation,unused-argument,missing-timeout,bare-except,missing-function-docstring,invalid-name,unnecessary-pass,broad-exception-raised
 import datetime as dt
 import logging
-import random
-import secrets
 import ssl
-import string
 import time
 import typing as ty
 from datetime import datetime
 
 import certifi
+import uuid
 import requests
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -27,9 +25,10 @@ from .const import (
     ORDER_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    OTP_NOTIFY_TYPE,
 )
+from .exceptions import APIError, AuthenticationError
 from .utils import get_child_value, parse_datetime
-from .exceptions import AuthenticationError
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,17 +47,11 @@ class KiaSSLAdapter(HTTPAdapter):
         return super().init_poolmanager(*args, **kwargs)
 
 
-class AuthError(RequestException):
-    """AuthError"""
-
-    pass
-
-
 def request_with_active_session(func):
     def request_with_active_session_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except AuthError:
+        except AuthenticationError:
             _LOGGER.debug(
                 f"{DOMAIN} - Got invalid session, attempting to repair and resend"
             )
@@ -75,7 +68,7 @@ def request_with_active_session(func):
             token.refresh_token = new_token.refresh_token
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
-            vehicle = self.refresh_vehicles(token, vehicle)
+            self.refresh_vehicles(token, vehicle)
             if json_body is not None and json_body.get("vinKey", None):
                 json_body["vinKey"] = [vehicle.key]
             response = func(*args, **kwargs)
@@ -103,7 +96,7 @@ def request_with_logging(func):
             and response_json["status"]["errorCode"] in [1003, 1005]
         ):
             _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
-            raise AuthError
+            raise AuthenticationError("Session invalid")
         _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
@@ -118,20 +111,13 @@ class KiaUvoApiUSA(ApiImpl):
         self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
-        self.device_id = (
-            "".join(
-                random.choice(string.ascii_letters + string.digits) for _ in range(22)
-            )
-            + ":"
-            + secrets.token_urlsafe(105)
-        )
+        self.device_id = str(uuid.uuid4()).upper()
 
         self.BASE_URL: str = "api.owners.kia.com"
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
         self._session = None
 
         self._otp_handler = None
-        self.supports_otp: bool = True
 
     @property
     def session(self):
@@ -142,27 +128,31 @@ class KiaUvoApiUSA(ApiImpl):
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
+        # Generate clientuuid as hash of device_id (similar to iOS app)
+        client_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, self.device_id))
+
         headers = {
-            "content-type": "application/json;charset=UTF-8",
-            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json;charset=utf-8",
+            "accept": "application/json",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
+            "accept-charset": "utf-8",
             "apptype": "L",
-            "appversion": "7.15.2",
-            "clientid": "MWAMOBILE",
+            "appversion": "7.22.0",
+            "clientid": "SPACL716-APL",
+            "clientuuid": client_uuid,
             "from": "SPA",
             "host": self.BASE_URL,
             "language": "0",
             "offset": str(int(offset)),
-            "ostype": "Android",
-            "osversion": "11",
-            "secretkey": "98er-w34rf-ibf3-3f6h",
+            "ostype": "iOS",
+            "osversion": "15.8.5",
+            "phonebrand": "iPhone",
+            "secretkey": "sydnat-9kykci-Kuhtep-h5nK",
             "to": "APIGW",
-            "tokentype": "G",
-            "user-agent": "okhttp/4.10.0",
+            "tokentype": "A",
+            "user-agent": "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0",
         }
-        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
-        # May require adjusting locale to en_US
         date = datetime.now(tz=dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
@@ -196,6 +186,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers = self.api_headers()
         headers["otpkey"] = otp_key
         headers["notifytype"] = notify_type
+        _LOGGER.debug(f"{DOMAIN} - Sending OTP to {notify_type}")
         headers["xid"] = xid
         response = self.session.post(url, json={}, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
@@ -229,7 +220,7 @@ class KiaUvoApiUSA(ApiImpl):
         """Complete login with sid and rmtoken to get final session id"""
         url = self.API_URL + "prof/authUser"
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
         }
@@ -245,95 +236,26 @@ class KiaUvoApiUSA(ApiImpl):
             )
         return final_sid
 
-    def start_login(
-        self,
-        username: str,
-        password: str,
-        token: Token | None = None,
-    ) -> tuple[Token | None, dict | None]:
-        """Start login and return either a Token or an OTP context.
-
-        Parameters
-        ----------
-        username : str
-            User email address
-        password : str
-            User password
-        token : Token | None
-            Existing token with stored rmtoken for reuse
-
-        Returns
-        -------
-        tuple[Token | None, dict | None]
-            (Token, None) if login succeeded without OTP, otherwise (None, ctx)
-            where ctx contains 'otpKey', 'xid', 'email', 'phone', 'hasEmail', 'hasPhone'.
-        """
-        url = self.API_URL + "prof/authUser"
-        data = {
-            "deviceKey": "",
-            "deviceType": 2,
-            "userCredential": {"userId": username, "password": password},
-        }
-        headers = self.api_headers()
-        if token and getattr(token, "device_id", None):
-            self.device_id = token.device_id
-
-        if token and token.refresh_token:
-            _LOGGER.debug(f"{DOMAIN} - Attempting start_login with stored rmtoken")
-            headers["rmtoken"] = token.refresh_token
-        response = self.session.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Start Sign In Response {response.text}")
-        response_json = response.json()
-        session_id = response.headers.get("sid")
-        if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            existing_rmtoken = token.refresh_token if token else None
-            return (
-                Token(
-                    username=username,
-                    password=password,
-                    access_token=session_id,
-                    refresh_token=existing_rmtoken,
-                    valid_until=valid_until,
-                    device_id=self.device_id,
-                ),
-                None,
-            )
-        if "payload" in response_json and "otpKey" in response_json["payload"]:
-            payload = response_json["payload"]
-            xid = response.headers.get("xid", "")
-            ctx = {
-                "otpKey": payload["otpKey"],
-                "xid": xid,
-                "email": payload.get("email"),
-                "phone": payload.get("phone"),
-                "hasEmail": bool(payload.get("hasEmail")),
-                "hasPhone": bool(payload.get("hasPhone")),
-                "rmTokenExpired": bool(payload.get("rmTokenExpired")),
-            }
-            return None, ctx
-        raise Exception(
-            f"{DOMAIN} - No session id returned in start_login. Response: {response.text}"
-        )
-
-    def send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(otp_key, notify_type, xid)
+        return self._send_otp(
+            otp_request.otp_key, notify_type.value, otp_request.request_id
+        )
 
     def verify_otp_and_complete_login(
         self,
         username: str,
         password: str,
-        otp_key: str,
-        xid: str,
         otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
-        sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
+        sid, rmtoken = self._verify_otp(
+            otp_request.otp_key, otp_code, otp_request.request_id
+        )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-        _LOGGER.debug(f"got final session id {final_sid}")
-        _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
+        _LOGGER.debug("OTP Successful, obtained final session id")
         valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
@@ -342,6 +264,7 @@ class KiaUvoApiUSA(ApiImpl):
             refresh_token=rmtoken,
             valid_until=valid_until,
             device_id=self.device_id,
+            pin=pin,
         )
 
     def login(
@@ -349,7 +272,6 @@ class KiaUvoApiUSA(ApiImpl):
         username: str,
         password: str,
         token: Token = None,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login into cloud endpoints and return Token
@@ -364,7 +286,7 @@ class KiaUvoApiUSA(ApiImpl):
             Existing token with stored rmtoken for reuse
         otp_handler : Callable[[dict], dict], optional
             Non-interactive OTP handler. Called twice:
-            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'PHONE'}
+            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'SMS'}
             - stage='input_code' -> return {'otp_code': '<code>'}
         pin : str, optional
 
@@ -375,24 +297,24 @@ class KiaUvoApiUSA(ApiImpl):
         """
         url = self.API_URL + "prof/authUser"
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
+            "tncFlag": 1,
         }
         if token and getattr(token, "device_id", None):
             self.device_id = token.device_id
-        if otp_handler is not None:
-            self._otp_handler = otp_handler
         headers = self.api_headers()
         if token and token.refresh_token:
-            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored rmtoken")
+            data["deviceKey"] = self.device_id
+            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored Refresh Token")
             headers["rmtoken"] = token.refresh_token
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response_json = response.json()
         session_id = response.headers.get("sid")
         if session_id:
-            _LOGGER.debug(f"got session id {session_id}")
+            _LOGGER.debug(f"Got session id {session_id}")
             valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
             existing_rmtoken = token.refresh_token if token else None
             return Token(
@@ -402,85 +324,41 @@ class KiaUvoApiUSA(ApiImpl):
                 refresh_token=existing_rmtoken,
                 valid_until=valid_until,
                 device_id=self.device_id,
+                pin=pin,
             )
         if "payload" in response_json and "otpKey" in response_json["payload"]:
             payload = response_json["payload"]
             if payload.get("rmTokenExpired"):
                 _LOGGER.info(f"{DOMAIN} - Stored rmtoken has expired, need new OTP")
-            otp_key = payload["otpKey"]
-            xid = response.headers.get("xid", "")
-            _LOGGER.info(f"{DOMAIN} - OTP required for login")
-            _LOGGER.info(f"{DOMAIN} - Email: {payload.get('email', 'N/A')}")
-            _LOGGER.info(f"{DOMAIN} - Phone: {payload.get('phone', 'N/A')}")
-            notify_type = "EMAIL"
-            handler = otp_handler or getattr(self, "_otp_handler", None)
-            if handler:
-                try:
-                    ctx_choice = {
-                        "stage": "choose_destination",
-                        "hasEmail": bool(payload.get("hasEmail")),
-                        "hasPhone": bool(payload.get("hasPhone")),
-                        "email": payload.get("email"),
-                        "phone": payload.get("phone"),
-                    }
-                    res = handler(ctx_choice) or {}
-                    nt = str(res.get("notify_type", notify_type)).upper()
-                    if nt in ("EMAIL", "PHONE"):
-                        notify_type = nt
-                except Exception:
-                    _LOGGER.debug(
-                        f"{DOMAIN} - otp_handler choose_destination failed; using default"
-                    )
-            else:
-                if payload.get("hasEmail") and payload.get("hasPhone"):
-                    print("\nOTP Authentication Required")
-                    print(f"Email: {payload.get('email', 'N/A')}")
-                    print(f"Phone: {payload.get('phone', 'N/A')}")
-                    choice = (
-                        input("Send OTP to (E)mail or (P)hone? [E/P]: ").strip().upper()
-                    )
-                    if choice == "P":
-                        notify_type = "PHONE"
-                elif payload.get("hasPhone"):
-                    notify_type = "PHONE"
-            self._send_otp(otp_key, notify_type, xid)
-            if not handler:
-                print(f"\nOTP sent to {notify_type.lower()}")
-            otp_code = None
-            if handler:
-                try:
-                    ctx_code = {
-                        "stage": "input_code",
-                        "notify_type": notify_type,
-                        "otpKey": otp_key,
-                        "xid": xid,
-                    }
-                    res2 = handler(ctx_code) or {}
-                    otp_code = str(res2.get("otp_code", "")).strip()
-                except Exception:
-                    _LOGGER.debug(f"{DOMAIN} - otp_handler input_code failed")
-            if not otp_code:
-                if handler is None:
-                    otp_code = input("Enter OTP code: ").strip()
-                else:
-                    raise AuthenticationError(f"{DOMAIN} - OTP code required")
-            sid, rmtoken = self._verify_otp(otp_key, otp_code, xid)
-            final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
-            _LOGGER.debug(f"got final session id {final_sid}")
-            _LOGGER.info(f"{DOMAIN} - Storing rmtoken for future logins")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
-            return Token(
-                username=username,
-                password=password,
-                access_token=final_sid,
-                refresh_token=rmtoken,
-                valid_until=valid_until,
-                device_id=self.device_id,
-                pin=pin,
+            return OTPRequest(
+                otp_key=payload["otpKey"],
+                request_id=response.headers.get("xid", ""),
+                email=payload.get("email"),
+                sms=payload.get("phone"),
+                has_email=bool(payload.get("hasEmail")),
+                has_sms=bool(payload.get("hasPhone")),
             )
         raise Exception(
             f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
         )
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        return self.login(token.username, token.password, token)
+
+    def test_token(self, token: Token) -> bool:
+        """Test if token is valid by making a lightweight API call"""
+        url = self.API_URL + "ownr/gvl"
+        headers = self.api_headers()
+        headers["sid"] = token.access_token
+        try:
+            response = self.session.get(url, headers=headers)
+            _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
+            response = response.json()
+            return True
+        except Exception as e:
+            _LOGGER.debug(f"{DOMAIN} - Token test failed with exception: {e}")
+            return False
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
@@ -490,6 +368,8 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         result = []
         for entry in response["payload"]["vehicleSummary"]:
             vehicle: Vehicle = Vehicle(
@@ -504,7 +384,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def refresh_vehicles(
         self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
-    ) -> ty.Union[list[Vehicle], Vehicle]:
+    ) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
@@ -516,8 +396,9 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
-
         response = response.json()
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):
             for entry in response["payload"]["vehicleSummary"]:
                 vid = entry.get("vehicleIdentifier")
@@ -537,7 +418,6 @@ class KiaUvoApiUSA(ApiImpl):
                         timezone=self.data_timezone,
                     )
                     vehicles[vid] = vehicle
-            return vehicles
         else:
             # For readability work with vehicle without s
             vehicle = vehicles
@@ -546,19 +426,23 @@ class KiaUvoApiUSA(ApiImpl):
                     vehicle.name = entry["nickName"]
                     vehicle.model = entry["modelName"]
                     vehicle.key = entry["vehicleKey"]
-                    return vehicle
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        self._get_forced_vehicle_state(token, vehicle)
+        state = self._get_forced_vehicle_state(token, vehicle)
         # Force update needs work to return the correct data for processing
         # self._update_vehicle_properties(vehicle, state)
         # Temp call a cached state since we are removing this from parent logic in
         # other commits should be removed when the above is fixed
         self.update_vehicle_with_cached_state(token, vehicle)
+        # The cmm/gvi (cached) endpoint does not return targetSOC for some
+        # vehicles (e.g. 2020 Kia Niro EV), but the rems/rvs (force refresh)
+        # response does include it. Parse charge limits from the force refresh
+        # response after the cached update so they aren't lost.
+        self._update_charge_limits_from_force_refresh(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
@@ -722,15 +606,31 @@ class KiaUvoApiUSA(ApiImpl):
         ChargeDict = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC"
         )
-        try:
-            vehicle.ev_charge_limits_ac = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
-            ][-1]
-            vehicle.ev_charge_limits_dc = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
-            ][-1]
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+        if ChargeDict is not None:
+            try:
+                ac_values = [
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
+                ]
+                dc_values = [
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
+                ]
+                if ac_values:
+                    vehicle.ev_charge_limits_ac = ac_values[-1]
+                if dc_values:
+                    vehicle.ev_charge_limits_dc = dc_values[-1]
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Failed to parse targetSOC from cached response. "
+                    f"Data: {ChargeDict}"
+                )
+        else:
+            # cmm/gvi does not include targetSOC for some vehicles (e.g. 2020
+            # Kia Niro EV).  Preserve any values previously set by a force
+            # refresh rather than overwriting them with None.
+            _LOGGER.debug(
+                f"{DOMAIN} - targetSOC not present in cached response. "
+                "Charge limits will be populated on next force refresh."
+            )
 
         vehicle.ev_driving_range = (
             get_child_value(
@@ -771,6 +671,10 @@ class KiaUvoApiUSA(ApiImpl):
                 "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",  # noqa
             ),
             "m",
+        )
+        vehicle.ev_battery_precondition_enabled = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPrecondition",
         )
         vehicle.total_driving_range = (
             get_child_value(
@@ -890,6 +794,46 @@ class KiaUvoApiUSA(ApiImpl):
         )
         response_body = response.json()
         return response_body
+
+    def _update_charge_limits_from_force_refresh(
+        self, vehicle: Vehicle, state: dict
+    ) -> None:
+        """Parse targetSOC from the rems/rvs (force refresh) response.
+
+        The cmm/gvi (cached state) endpoint does not include targetSOC data
+        for some vehicles, but the rems/rvs endpoint does. This method
+        extracts charge limits from the force refresh response so they are
+        available even when the cached endpoint omits them.
+        """
+        if vehicle.ev_charge_limits_ac is not None:
+            # Already populated from the cached response, nothing to do
+            return
+        charge_dict = get_child_value(
+            state,
+            "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
+        )
+        if charge_dict is None:
+            _LOGGER.debug(f"{DOMAIN} - targetSOC not found in force refresh response")
+            return
+        _LOGGER.debug(
+            f"{DOMAIN} - Found targetSOC in force refresh response: {charge_dict}"
+        )
+        try:
+            ac_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1]
+            dc_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0]
+            if ac_values:
+                vehicle.ev_charge_limits_ac = ac_values[-1]
+            if dc_values:
+                vehicle.ev_charge_limits_dc = dc_values[-1]
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge limits from force refresh - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to parse targetSOC from force refresh response. "
+                f"Data: {charge_dict}"
+            )
 
     def check_action_status(
         self,

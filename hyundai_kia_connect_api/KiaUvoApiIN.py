@@ -356,6 +356,39 @@ class KiaUvoApiIN(ApiImplType1):
                 DISTANCE_UNITS[get_child_value(state, "dte.unit")],
             )
 
+        vehicle.washer_fluid_warning_is_on = get_child_value(state, "washerFluidStatus")
+        vehicle.accessory_on = bool(get_child_value(state, "acc"))
+        vehicle.ign3 = bool(get_child_value(state, "ign3"))
+        vehicle.transmission_condition = bool(get_child_value(state, "transCond"))
+        vehicle.sleep_mode_check = bool(get_child_value(state, "sleepModeCheck"))
+        vehicle.headlamp_status = bool(
+            get_child_value(state, "lampWireStatus.headLamp.headLampStatus")
+        )
+        vehicle.headlamp_left_low = bool(
+            get_child_value(state, "lampWireStatus.headLamp.leftLowLamp")
+        )
+        vehicle.headlamp_right_low = bool(
+            get_child_value(state, "lampWireStatus.headLamp.rightLowLamp")
+        )
+        vehicle.stop_lamp_left = bool(
+            get_child_value(state, "lampWireStatus.stopLamp.leftLamp")
+        )
+        vehicle.stop_lamp_right = bool(
+            get_child_value(state, "lampWireStatus.stopLamp.rightLamp")
+        )
+        vehicle.turn_signal_left_front = bool(
+            get_child_value(state, "lampWireStatus.turnSignalLamp.leftFrontLamp")
+        )
+        vehicle.turn_signal_right_front = bool(
+            get_child_value(state, "lampWireStatus.turnSignalLamp.rightFrontLamp")
+        )
+        vehicle.turn_signal_left_rear = bool(
+            get_child_value(state, "lampWireStatus.turnSignalLamp.leftRearLamp")
+        )
+        vehicle.turn_signal_right_rear = bool(
+            get_child_value(state, "lampWireStatus.turnSignalLamp.rightRearLamp")
+        )
+
         vehicle.brake_fluid_warning_is_on = get_child_value(state, "breakOilStatus")
         vehicle.fuel_level = get_child_value(state, "fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
@@ -363,6 +396,80 @@ class KiaUvoApiIN(ApiImplType1):
         vehicle.smart_key_battery_warning_is_on = get_child_value(
             state, "smartKeyBatteryWarning"
         )
+
+        if (
+            get_child_value(
+                state,
+                "evStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_battery_percentage = get_child_value(
+                state, "evStatus.batteryStatus"
+            )
+            vehicle.ev_battery_is_charging = get_child_value(
+                state, "evStatus.batteryCharge"
+            )
+            vehicle.ev_battery_is_plugged_in = get_child_value(
+                state, "evStatus.batteryPlugin"
+            )
+
+            vehicle.ev_estimated_current_charge_duration = (
+                get_child_value(state, "evStatus.remainTime2.atc.value"),
+                "m",
+            )
+            vehicle.ev_estimated_fast_charge_duration = (
+                get_child_value(state, "evStatus.remainTime2.etc1.value"),
+                "m",
+            )
+            vehicle.ev_estimated_portable_charge_duration = (
+                get_child_value(state, "evStatus.remainTime2.etc2.value"),
+                "m",
+            )
+            vehicle.ev_estimated_station_charge_duration = (
+                get_child_value(state, "evStatus.remainTime2.etc3.value"),
+                "m",
+            )
+
+            vehicle.ev_driving_range = (
+                round(
+                    float(
+                        get_child_value(
+                            state,
+                            "evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                        )
+                    ),
+                    1,
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                    )
+                ],
+            )
+
+            vehicle.total_driving_range = (
+                round(
+                    float(
+                        get_child_value(
+                            state,
+                            "evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                        )
+                    ),
+                    1,
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    )
+                ],
+            )
+            vehicle.sunroof_is_open = get_child_value(state, "sunroofOpen")
+            vehicle.ev_charge_port_door_is_open = bool(
+                get_child_value(state, "chargePortDoorOpenStatus")
+            )
 
         vehicle.data = state
 
@@ -579,6 +686,50 @@ class KiaUvoApiIN(ApiImplType1):
         _check_response_for_errors(response)
         return response
 
+    # The "/tripinfo" API in Bluelink India does not provide complete trip info. It just returns the summary info. Instead, it uses the "/tripinfo/detail" API to fetch the trip details.
+    # PS: Since I have tested in Hyundai EV vehicle only, have added check to use the API only for EV vehicles. Can remove the check based on testing on non-EV vehicles
+    def _get_detailed_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip: dict,
+    ) -> dict:
+        if (
+            vehicle.engine_type != ENGINE_TYPES.EV
+            or BRANDS[self.brand] != BRAND_HYUNDAI
+        ):
+            return None
+
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo/detail"
+        payload = {
+            "tripPeriodType": 1,
+            "setTripDay": date_string,
+            "setTripStartTime": trip["tripStartTime"],
+            "setServiceTID": trip["serviceTID"],
+            "tripStartTime": trip["tripStartTime"],
+            "tripEndTime": trip["tripEndTime"],
+        }
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        response = response.json()
+        tripinfo = response["resMsg"]["tripInfo"]
+        processed_trip = TripInfo(
+            hhmmss=trip["tripStartTime"][8:],
+            drive_time=tripinfo["tripDrvTime"],
+            idle_time=tripinfo["tripIdleTime"],
+            distance=tripinfo["tripDist"],
+            avg_speed=tripinfo["tripAvgSpeed"],
+            max_speed=tripinfo["tripMaxSpeed"],
+        )
+
+        return processed_trip
+
     def update_month_trip_info(
         self,
         token,
@@ -601,7 +752,7 @@ class KiaUvoApiIN(ApiImplType1):
             0,  # month trip info
         )
         msg = json_result["resMsg"]
-        if msg["monthTripDayCnt"] > 0:
+        if msg.get("monthTripDayCnt", 0) > 0 or len(msg.get("tripDayList", [])) > 0:
             result = MonthTripInfo(
                 yyyymm=yyyymm_string,
                 day_list=[],
@@ -659,14 +810,21 @@ class KiaUvoApiIN(ApiImplType1):
                 ),
             )
             for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
-                )
+                # Hyundai EVs do not provide full trip info. Used "/tripinfo/detail" API instead
+                if "tripTime" in trip:
+                    processed_trip = TripInfo(
+                        hhmmss=trip["tripTime"],
+                        drive_time=trip["tripDrvTime"],
+                        idle_time=trip["tripIdleTime"],
+                        distance=trip["tripDist"],
+                        avg_speed=trip["tripAvgSpeed"],
+                        max_speed=trip["tripMaxSpeed"],
+                    )
+                else:
+                    processed_trip = self._get_detailed_trip_info(
+                        token, vehicle, yyyymmdd_string, trip
+                    )
+
                 result.trip_list.append(processed_trip)
 
             vehicle.day_trip_info = result

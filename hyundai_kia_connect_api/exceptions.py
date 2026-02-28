@@ -27,6 +27,14 @@ class AuthenticationError(HyundaiKiaException):
     pass
 
 
+class AuthenticationOTPRequired(AuthenticationError):
+    """
+    Raised when OTP is required for authentication.
+    """
+
+    pass
+
+
 class APIError(HyundaiKiaException):
     """
     Generic API error
