@@ -7,9 +7,7 @@ import math
 from typing import Optional
 from datetime import timedelta, timezone
 
-
 from time import sleep
-
 
 from .ApiImpl import (
     ApiImpl,
@@ -264,6 +262,13 @@ class ApiImplType1(ApiImpl):
         if air_temp != "OFF":
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
 
+        outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
+        outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
+        vehicle.outside_temperature = (
+            outside_temp,
+            TEMPERATURE_UNITS[outside_temp_unit],
+        )
+
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
             vehicle.defrost_is_on = False
@@ -379,6 +384,36 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+
+        vehicle.ev_battery_pack_voltage = get_child_value(
+            state, "Green.BatteryManagement.BatteryPackVoltage"
+        )
+        vehicle.ev_battery_chiller_rpm = get_child_value(
+            state, "Green.BatteryManagement.ChillerRPM"
+        )
+
+        battery_heating_state = get_child_value(
+            state, "Green.BatteryManagement.HeatingState"
+        )
+        if battery_heating_state is not None:
+            vehicle.ev_battery_heating_state = bool(battery_heating_state)
+
+        vehicle.ev_battery_water_temperature = get_child_value(
+            state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+        )
+        vehicle.ev_battery_temperature_min = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Min.Raw"
+        )
+        vehicle.ev_battery_temperature_max = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Max.Raw"
+        )
+
+        battery_winter_mode = get_child_value(
+            state, "Green.BatteryManagement.WinterModeOperation"
+        )
+        if battery_winter_mode is not None:
+            vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
+
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
                 state, "Green.Electric.SmartGrid.RealTimePower"
@@ -489,6 +524,17 @@ class ApiImplType1(ApiImpl):
 
         vehicle.ev_second_departure_enabled = bool(
             get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        )
+
+        vehicle.ev_power_consumption_battery_cooling = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryCooling"
+        )
+
+        vehicle.ev_power_consumption_battery_heater = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryHeater"
+        )
+        vehicle.ev_power_consumption_air_conditioning = get_child_value(
+            state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
         )
 
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
