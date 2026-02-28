@@ -436,8 +436,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
-        vehicle.ev_v2h_status = get_child_value(
-            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2hStatus"
+        vehicle.ev_v2x_status = get_child_value(
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus"
         )
         vehicle.ev_v2l_status = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus"
