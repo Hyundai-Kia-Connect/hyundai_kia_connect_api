@@ -20,12 +20,6 @@ jobs:
           pip install build
       - name: Build package
         run: python -m build
-      - name: Publish package to PyPi Test
-        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
       - name: Publish package to PyPi Live
         if: ${{ github.event.release.prerelease == false }}
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e
