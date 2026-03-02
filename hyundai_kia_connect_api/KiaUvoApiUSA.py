@@ -271,9 +271,9 @@ class KiaUvoApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token = None,
+        token: Token | None = None,
         pin: str | None = None,
-    ) -> Token:
+    ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token
 
         Parameters
@@ -345,20 +345,6 @@ class KiaUvoApiUSA(ApiImpl):
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
-
-    def test_token(self, token: Token) -> bool:
-        """Test if token is valid by making a lightweight API call"""
-        url = self.API_URL + "ownr/gvl"
-        headers = self.api_headers()
-        headers["sid"] = token.access_token
-        try:
-            response = self.session.get(url, headers=headers)
-            _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
-            response = response.json()
-            return True
-        except Exception as e:
-            _LOGGER.debug(f"{DOMAIN} - Token test failed with exception: {e}")
-            return False
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
