@@ -6,8 +6,6 @@ on:
     branches:
       - master
       - beta
-  release:
-    types: [published]
 
 jobs:
   # Semantic release: compute next version, update setup.py, tag and create a GitHub release
@@ -47,6 +45,3 @@ jobs:
           body: ${{ steps.semantic_release_info.outputs.notes }}
           draft: false
           prerelease: ${{ github.ref == 'refs/heads/beta' }}
-
-  # Deploy job: runs on GitHub Release events (including prereleases)
-  # NOTE: publishing has been moved to the separate pypi.yml workflow
