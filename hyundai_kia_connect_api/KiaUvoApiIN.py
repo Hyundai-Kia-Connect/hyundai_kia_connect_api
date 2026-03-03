@@ -585,6 +585,7 @@ class KiaUvoApiIN(ApiImplType1):
             "options": {
                 "defrost": options.defrost,
                 "heating1": int(options.heating),
+                "igniOnDuration": options.duration,
             },
             "tempCode": hex_set_temp,
             "unit": "C",
