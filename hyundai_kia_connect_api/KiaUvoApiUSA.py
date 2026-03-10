@@ -809,18 +809,18 @@ class KiaUvoApiUSA(ApiImpl):
             new_ac = ac_values[-1] if ac_values else None
             new_dc = dc_values[-1] if dc_values else None
 
-            if isinstance(new_ac, (int, float)):
+            if isinstance(new_ac, (int, float)) and not isinstance(new_ac, bool):
                 vehicle.ev_charge_limits_ac = int(new_ac)
-            elif vehicle.ev_charge_limits_ac is not None:
+            elif new_ac is not None and vehicle.ev_charge_limits_ac is not None:
                 _LOGGER.warning(
                     f"{DOMAIN} - Force refresh returned invalid AC charge limit "
                     f"({new_ac!r}), keeping cached value "
                     f"({vehicle.ev_charge_limits_ac})"
                 )
 
-            if isinstance(new_dc, (int, float)):
+            if isinstance(new_dc, (int, float)) and not isinstance(new_dc, bool):
                 vehicle.ev_charge_limits_dc = int(new_dc)
-            elif vehicle.ev_charge_limits_dc is not None:
+            elif new_dc is not None and vehicle.ev_charge_limits_dc is not None:
                 _LOGGER.warning(
                     f"{DOMAIN} - Force refresh returned invalid DC charge limit "
                     f"({new_dc!r}), keeping cached value "
@@ -831,10 +831,11 @@ class KiaUvoApiUSA(ApiImpl):
                 f"{DOMAIN} - Charge limits from force refresh - "
                 f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
             )
-        except Exception:
-            _LOGGER.debug(
-                f"{DOMAIN} - Failed to parse targetSOC from force refresh response. "
-                f"Data: {charge_dict}"
+        except Exception as err:
+            _LOGGER.warning(
+                f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
+                f"{err}. Data: {charge_dict}",
+                exc_info=True,
             )
 
     def check_action_status(

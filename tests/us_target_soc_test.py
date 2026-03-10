@@ -10,6 +10,7 @@ preserved across subsequent cached updates.
 """
 
 import datetime as dt
+import logging
 
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -165,7 +166,7 @@ def _make_vehicle():
 def _make_api():
     api = object.__new__(KiaUvoApiUSA)
     api.data_timezone = dt.timezone(dt.timedelta(hours=-5))
-    api.temperature_range = list(range(62, 82))
+    api.temperature_range = range(62, 83)
     return api
 
 
@@ -266,5 +267,325 @@ def test_force_refresh_preserves_cached_when_response_has_no_valid_values():
     api._update_charge_limits_from_force_refresh(vehicle, bad_response)
 
     # Cached values preserved since force refresh had no valid AC/DC entries
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_force_refresh_partial_ac_only():
+    """Force refresh returns only AC (plugType=1), no DC entry — DC preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    partial_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 1, "targetSOClevel": 80},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, partial_response)
+
+    assert vehicle.ev_charge_limits_ac == 80  # updated from response
+    assert vehicle.ev_charge_limits_dc == 70  # preserved cached value
+
+
+def test_force_refresh_partial_dc_only():
+    """Force refresh returns only DC (plugType=0), no AC entry — AC preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    partial_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0, "targetSOClevel": 60},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, partial_response)
+
+    assert vehicle.ev_charge_limits_ac == 90  # preserved cached value
+    assert vehicle.ev_charge_limits_dc == 60  # updated from response
+
+
+def test_force_refresh_empty_target_soc_list():
+    """Empty targetSOC list [] — cached values preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    empty_list_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": []
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, empty_list_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_force_refresh_empty_list_no_cached():
+    """Empty targetSOC list [] with no cached values — stays None."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+
+    empty_list_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": []
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, empty_list_response)
+
+    assert vehicle.ev_charge_limits_ac is None
+    assert vehicle.ev_charge_limits_dc is None
+
+
+def test_force_refresh_garbage_string_values():
+    """targetSOClevel is a string like 'unknown' — cached values preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    garbage_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0, "targetSOClevel": "unknown"},
+                            {"plugType": 1, "targetSOClevel": "N/A"},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, garbage_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_force_refresh_none_target_soc_level():
+    """targetSOClevel is None — cached values preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    none_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0, "targetSOClevel": None},
+                            {"plugType": 1, "targetSOClevel": None},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, none_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_force_refresh_missing_target_soc_level_key():
+    """targetSOC entries missing targetSOClevel key — exception caught, cached preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    malformed_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0},
+                            {"plugType": 1},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, malformed_response)
+
+    # Exception handler catches KeyError, cached values preserved
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_force_refresh_non_list_target_soc(caplog):
+    """targetSOC is a non-list type (e.g. dict) — exception caught, cached preserved."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    dict_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": {"plugType": 0, "targetSOClevel": 80}
+                    }
+                }
+            }
+        }
+    }
+    with caplog.at_level(logging.WARNING):
+        api._update_charge_limits_from_force_refresh(vehicle, dict_response)
+
+    # Exception handler catches TypeError, cached values preserved
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+    assert "Failed to parse targetSOC" in caplog.text
+
+
+def test_force_refresh_garbage_values_emit_warnings(caplog):
+    """Garbage targetSOClevel values should emit WARNING logs."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    garbage_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0, "targetSOClevel": "unknown"},
+                            {"plugType": 1, "targetSOClevel": "N/A"},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    with caplog.at_level(logging.WARNING):
+        api._update_charge_limits_from_force_refresh(vehicle, garbage_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+    assert "invalid AC charge limit" in caplog.text
+    assert "invalid DC charge limit" in caplog.text
+
+
+def test_force_refresh_empty_list_no_warning(caplog):
+    """Empty targetSOC list should NOT emit warnings (absence, not corruption)."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    empty_list_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": []
+                    }
+                }
+            }
+        }
+    }
+    with caplog.at_level(logging.WARNING):
+        api._update_charge_limits_from_force_refresh(vehicle, empty_list_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+    assert "invalid" not in caplog.text
+
+
+def test_force_refresh_missing_key_emits_warning(caplog):
+    """Missing targetSOClevel key should emit WARNING from exception handler."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    malformed_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0},
+                            {"plugType": 1},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    with caplog.at_level(logging.WARNING):
+        api._update_charge_limits_from_force_refresh(vehicle, malformed_response)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+    assert "Failed to parse targetSOC" in caplog.text
+
+
+def test_force_refresh_bool_values_rejected():
+    """Bool values should not be accepted as valid charge limits."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    bool_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 0, "targetSOClevel": True},
+                            {"plugType": 1, "targetSOClevel": False},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, bool_response)
+
+    # bool values rejected, cached values preserved
     assert vehicle.ev_charge_limits_ac == 90
     assert vehicle.ev_charge_limits_dc == 70
