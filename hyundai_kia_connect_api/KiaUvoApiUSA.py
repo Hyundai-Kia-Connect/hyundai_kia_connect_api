@@ -787,13 +787,12 @@ class KiaUvoApiUSA(ApiImpl):
         """Parse targetSOC from the rems/rvs (force refresh) response.
 
         The cmm/gvi (cached state) endpoint does not include targetSOC data
-        for some vehicles, but the rems/rvs endpoint does. This method
-        extracts charge limits from the force refresh response so they are
-        available even when the cached endpoint omits them.
+        for some vehicles, but the rems/rvs endpoint does.  When the force
+        refresh response contains valid numeric charge limits they are
+        always used (they are the freshest source).  If the force refresh
+        response lacks valid data, any existing cached values are preserved
+        so we never overwrite good data with None.
         """
-        if vehicle.ev_charge_limits_ac is not None:
-            # Already populated from the cached response, nothing to do
-            return
         charge_dict = get_child_value(
             state,
             "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
@@ -807,10 +806,27 @@ class KiaUvoApiUSA(ApiImpl):
         try:
             ac_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1]
             dc_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0]
-            if ac_values:
-                vehicle.ev_charge_limits_ac = ac_values[-1]
-            if dc_values:
-                vehicle.ev_charge_limits_dc = dc_values[-1]
+            new_ac = ac_values[-1] if ac_values else None
+            new_dc = dc_values[-1] if dc_values else None
+
+            if isinstance(new_ac, (int, float)):
+                vehicle.ev_charge_limits_ac = int(new_ac)
+            elif vehicle.ev_charge_limits_ac is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_ac})"
+                )
+
+            if isinstance(new_dc, (int, float)):
+                vehicle.ev_charge_limits_dc = int(new_dc)
+            elif vehicle.ev_charge_limits_dc is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_dc})"
+                )
+
             _LOGGER.debug(
                 f"{DOMAIN} - Charge limits from force refresh - "
                 f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"

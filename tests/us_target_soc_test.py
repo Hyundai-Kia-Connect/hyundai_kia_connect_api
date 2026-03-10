@@ -215,17 +215,17 @@ def test_charge_limits_preserved_across_cached_updates():
     assert vehicle.ev_charge_limits_dc == 80
 
 
-def test_force_refresh_skips_when_cached_already_has_values():
-    """If cached response already populated charge limits, skip force refresh parsing."""
+def test_force_refresh_overwrites_stale_cached_values():
+    """Force refresh data should overwrite stale cached values."""
     api = _make_api()
     vehicle = _make_vehicle()
     vehicle.ev_charge_limits_ac = 90
     vehicle.ev_charge_limits_dc = 70
 
-    # Should not overwrite existing values
+    # Force refresh has ac=80, dc=80 — should overwrite the stale cached values
     api._update_charge_limits_from_force_refresh(vehicle, FORCE_REFRESH_RESPONSE)
-    assert vehicle.ev_charge_limits_ac == 90
-    assert vehicle.ev_charge_limits_dc == 70
+    assert vehicle.ev_charge_limits_ac == 80
+    assert vehicle.ev_charge_limits_dc == 80
 
 
 def test_force_refresh_with_missing_target_soc():
@@ -240,3 +240,31 @@ def test_force_refresh_with_missing_target_soc():
 
     assert vehicle.ev_charge_limits_ac is None
     assert vehicle.ev_charge_limits_dc is None
+
+
+def test_force_refresh_preserves_cached_when_response_has_no_valid_values():
+    """If force refresh targetSOC has no valid numbers, keep cached values."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    # Response has targetSOC key but with no matching plugType entries
+    bad_response = {
+        "payload": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "evStatus": {
+                        "targetSOC": [
+                            {"plugType": 99, "targetSOClevel": 50},
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    api._update_charge_limits_from_force_refresh(vehicle, bad_response)
+
+    # Cached values preserved since force refresh had no valid AC/DC entries
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
