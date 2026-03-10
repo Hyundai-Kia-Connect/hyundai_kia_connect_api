@@ -332,13 +332,7 @@ def test_force_refresh_empty_target_soc_list():
 
     empty_list_response = {
         "payload": {
-            "vehicleStatusRpt": {
-                "vehicleStatus": {
-                    "evStatus": {
-                        "targetSOC": []
-                    }
-                }
-            }
+            "vehicleStatusRpt": {"vehicleStatus": {"evStatus": {"targetSOC": []}}}
         }
     }
     api._update_charge_limits_from_force_refresh(vehicle, empty_list_response)
@@ -354,13 +348,7 @@ def test_force_refresh_empty_list_no_cached():
 
     empty_list_response = {
         "payload": {
-            "vehicleStatusRpt": {
-                "vehicleStatus": {
-                    "evStatus": {
-                        "targetSOC": []
-                    }
-                }
-            }
+            "vehicleStatusRpt": {"vehicleStatus": {"evStatus": {"targetSOC": []}}}
         }
     }
     api._update_charge_limits_from_force_refresh(vehicle, empty_list_response)
@@ -462,9 +450,7 @@ def test_force_refresh_non_list_target_soc(caplog):
         "payload": {
             "vehicleStatusRpt": {
                 "vehicleStatus": {
-                    "evStatus": {
-                        "targetSOC": {"plugType": 0, "targetSOClevel": 80}
-                    }
+                    "evStatus": {"targetSOC": {"plugType": 0, "targetSOClevel": 80}}
                 }
             }
         }
@@ -517,13 +503,7 @@ def test_force_refresh_empty_list_no_warning(caplog):
 
     empty_list_response = {
         "payload": {
-            "vehicleStatusRpt": {
-                "vehicleStatus": {
-                    "evStatus": {
-                        "targetSOC": []
-                    }
-                }
-            }
+            "vehicleStatusRpt": {"vehicleStatus": {"evStatus": {"targetSOC": []}}}
         }
     }
     with caplog.at_level(logging.WARNING):
