@@ -600,9 +600,17 @@ class KiaUvoApiUSA(ApiImpl):
                 dc_values = [
                     x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
                 ]
-                if ac_values and isinstance(ac_values[-1], (int, float)) and not isinstance(ac_values[-1], bool):
+                if (
+                    ac_values
+                    and isinstance(ac_values[-1], (int, float))
+                    and not isinstance(ac_values[-1], bool)
+                ):
                     vehicle.ev_charge_limits_ac = int(ac_values[-1])
-                if dc_values and isinstance(dc_values[-1], (int, float)) and not isinstance(dc_values[-1], bool):
+                if (
+                    dc_values
+                    and isinstance(dc_values[-1], (int, float))
+                    and not isinstance(dc_values[-1], bool)
+                ):
                     vehicle.ev_charge_limits_dc = int(dc_values[-1])
             except Exception:
                 _LOGGER.debug(
