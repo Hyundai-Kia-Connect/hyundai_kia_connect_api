@@ -600,9 +600,9 @@ class KiaUvoApiUSA(ApiImpl):
                 dc_values = [
                     x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
                 ]
-                if ac_values:
+                if ac_values and isinstance(ac_values[-1], (int, float)) and not isinstance(ac_values[-1], bool):
                     vehicle.ev_charge_limits_ac = int(ac_values[-1])
-                if dc_values:
+                if dc_values and isinstance(dc_values[-1], (int, float)) and not isinstance(dc_values[-1], bool):
                     vehicle.ev_charge_limits_dc = int(dc_values[-1])
             except Exception:
                 _LOGGER.debug(
@@ -817,6 +817,11 @@ class KiaUvoApiUSA(ApiImpl):
                     f"({new_ac!r}), keeping cached value "
                     f"({vehicle.ev_charge_limits_ac})"
                 )
+            elif new_ac is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}) and no cached value to preserve"
+                )
 
             if isinstance(new_dc, (int, float)) and not isinstance(new_dc, bool):
                 vehicle.ev_charge_limits_dc = int(new_dc)
@@ -825,6 +830,11 @@ class KiaUvoApiUSA(ApiImpl):
                     f"{DOMAIN} - Force refresh returned invalid DC charge limit "
                     f"({new_dc!r}), keeping cached value "
                     f"({vehicle.ev_charge_limits_dc})"
+                )
+            elif new_dc is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}) and no cached value to preserve"
                 )
 
             _LOGGER.debug(
