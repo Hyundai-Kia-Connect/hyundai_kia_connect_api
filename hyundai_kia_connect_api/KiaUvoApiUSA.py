@@ -601,9 +601,9 @@ class KiaUvoApiUSA(ApiImpl):
                     x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
                 ]
                 if ac_values:
-                    vehicle.ev_charge_limits_ac = ac_values[-1]
+                    vehicle.ev_charge_limits_ac = int(ac_values[-1])
                 if dc_values:
-                    vehicle.ev_charge_limits_dc = dc_values[-1]
+                    vehicle.ev_charge_limits_dc = int(dc_values[-1])
             except Exception:
                 _LOGGER.debug(
                     f"{DOMAIN} - Failed to parse targetSOC from cached response. "
