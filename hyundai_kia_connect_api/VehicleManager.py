@@ -3,46 +3,48 @@
 # pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
 
 import datetime as dt
-from datetime import timedelta
 import logging
+from datetime import timedelta
 
-from .exceptions import APIError
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
-    WindowRequestOptions,
     ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+    OTPRequest,
 )
-from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
-from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
-from .KiaUvoApiUSA import KiaUvoApiUSA
-from .KiaUvoApiCA import KiaUvoApiCA
-from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoApiCN import KiaUvoApiCN
-from .KiaUvoApiAU import KiaUvoApiAU
-from .KiaUvoApiIN import KiaUvoApiIN
-from .Token import Token
-from .Vehicle import Vehicle
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
+    CHARGE_PORT_ACTION,
     DOMAIN,
+    ORDER_STATUS,
     REGION_AUSTRALIA,
     REGION_BRAZIL,
     REGION_CANADA,
-    REGION_EUROPE,
-    REGION_USA,
     REGION_CHINA,
-    REGION_NZ,
+    REGION_EUROPE,
     REGION_INDIA,
+    REGION_NZ,
+    REGION_USA,
     REGIONS,
-    VEHICLE_LOCK_ACTION,
-    CHARGE_PORT_ACTION,
-    ORDER_STATUS,
     VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
+    OTP_NOTIFY_TYPE,
 )
+from .exceptions import APIError, AuthenticationOTPRequired
+from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from .KiaUvoApiAU import KiaUvoApiAU
+from .KiaUvoApiCA import KiaUvoApiCA
+from .KiaUvoApiCN import KiaUvoApiCN
+from .KiaUvoApiEU import KiaUvoApiEU
+from .KiaUvoApiIN import KiaUvoApiIN
+from .KiaUvoApiUSA import KiaUvoApiUSA
+from .Token import Token
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +61,7 @@ class VehicleManager:
         geocode_api_use_email: bool = False,
         geocode_provider: int = 1,
         geocode_api_key: str = None,
+        token: Token = None,
         language: str = "en",
     ):
         self.region: int = region
@@ -76,12 +79,52 @@ class VehicleManager:
             self.region, self.brand, self.language
         )
 
-        self.token: Token = None
+        self.token: Token = token
         self.vehicles: dict = {}
+        self.otp_request: OTPRequest = None
 
+    @DeprecationWarning
     def initialize(self) -> None:
-        self.token: Token = self.api.login(self.username, self.password)
-        self.token.pin = self.pin
+        self.token: Token = self.api.login(
+            username=self.username,
+            password=self.password,
+            pin=self.pin,
+        )
+        self.initialize_vehicles()
+
+    def login(self) -> bool | OTPRequest:
+        """Returns True if login successful, or OTPOptions if OTP is required"""
+        result = self.api.login(
+            username=self.username,
+            password=self.password,
+            pin=self.pin,
+        )
+        if isinstance(result, Token):
+            self.token: Token = result
+            self.initialize_vehicles()
+            return True
+        if isinstance(result, OTPRequest):
+            self.otp_request = result
+            return result
+
+    def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
+        self.api.send_otp(self.otp_request, notify_type)
+
+    def verify_otp_and_complete_login(self, otp_code: str) -> None:
+        self.token = self.api.verify_otp_and_complete_login(
+            username=self.username,
+            password=self.password,
+            otp_code=otp_code,
+            otp_request=self.otp_request,
+            pin=self.pin,
+        )
+        self.initialize_vehicles()
+
+    def initialize_vehicles(self):
+        if len(self.vehicles) > 0:
+            _LOGGER.warning(
+                "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
+            )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
@@ -145,17 +188,44 @@ class VehicleManager:
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
-            self.initialize()
-        if (
-            self.token.valid_until - timedelta(seconds=10)
-            <= dt.datetime.now(dt.timezone.utc)
-            or self.api.test_token(self.token) is False
-        ):
+            if self.login() is True:
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
+                return True
+            else:
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+        now_utc = dt.datetime.now(dt.timezone.utc)
+        grace_period = timedelta(seconds=10)
+        min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+        valid_until = self.token.valid_until
+        token_expired = False
+        if not isinstance(valid_until, dt.datetime):
+            token_expired = True
+        else:
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=dt.timezone.utc)
+            if valid_until <= min_supported_datetime + grace_period:
+                token_expired = True
+            else:
+                token_expired = valid_until - grace_period <= now_utc
+        if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            self.token: Token = self.api.login(self.username, self.password)
-            self.token.pin = self.pin
-            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
+            result = self.api.refresh_access_token(
+                self.token,
+            )
+            if isinstance(result, Token):
+                self.token: Token = result
+                # Temp correction to fix bad data due to a bug.
+                if self.token.pin != self.pin:
+                    self.token.pin = self.pin
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
+            if isinstance(result, OTPRequest):
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+            self.api.refresh_vehicles(self.token, self.vehicles)
             return True
+        if len(self.vehicles) == 0:
+            self.initialize_vehicles()
         return False
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:

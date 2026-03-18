@@ -4,29 +4,29 @@
 
 import datetime as dt
 import logging
-import uuid
+import typing as ty
 from datetime import timedelta
-from urllib.parse import urljoin, urlparse
 from time import sleep
+from urllib.parse import urljoin, urlparse
 
 import requests
 
-from .ApiImpl import ApiImpl, WindowRequestOptions, ClimateRequestOptions
-from .Token import Token
-from .Vehicle import Vehicle, MonthTripInfo, DayTripInfo, DayTripCounts, TripInfo
-from .utils import parse_date_br, get_index_into_hex_temp
+from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DISTANCE_UNITS,
     DOMAIN,
-    ORDER_STATUS,
-    VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
     ENGINE_TYPES,
+    ORDER_STATUS,
+    SEAT_STATUS,
+    VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
 from .exceptions import APIError
+from .Token import Token
+from .utils import get_index_into_hex_temp, parse_date_br
+from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -152,7 +152,13 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response.raise_for_status()
         return response.json()
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
+    ) -> Token:
         """Login to Brazilian Hyundai API."""
         _LOGGER.debug(f"{DOMAIN} - Logging in to Brazilian API")
 
@@ -171,7 +177,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             valid_until=expires_at,
             username=username,
             password=password,
-            device_id=str(uuid.uuid4()),
+            device_id=self.ccsp_device_id,
+            pin=pin,
         )
 
     def get_vehicles(self, token: Token) -> list:
@@ -182,9 +189,11 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response = self.session.get(url, headers=headers)
         response.raise_for_status()
         response_data = response.json()
-
         _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
-
+        if "resMsg" not in response_data or "vehicles" not in response_data.get(
+            "resMsg", {}
+        ):
+            raise APIError("Missing resMsg or vehicles in response")
         result = []
         for entry in response_data["resMsg"]["vehicles"]:
             # Map vehicle type to engine type

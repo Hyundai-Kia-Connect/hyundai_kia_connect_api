@@ -26,6 +26,7 @@ from .const import (
     GEO_LOCATION_PROVIDERS,
     OPENSTREETMAP,
     GOOGLE,
+    OTP_NOTIFY_TYPE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,6 +52,16 @@ class WindowRequestOptions:
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
+
+
+@dataclass
+class OTPRequest:
+    request_id: str | None
+    otp_key: str | None
+    has_email: bool | None
+    has_sms: bool | None
+    email: str | None
+    sms: str | None
 
 
 @dataclass
@@ -82,8 +93,28 @@ class ApiImpl:
     def __init__(self) -> None:
         """Initialize."""
 
-    def login(self, username: str, password: str) -> Token:
-        """Login into cloud endpoints and return Token"""
+    def login(
+        self,
+        username: str,
+        password: str,
+        pin: str | None = None,
+    ) -> Token | OTPRequest:
+        """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
+        pass
+
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Sends OTP to the user via selected destination and via"""
+        pass
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Confirms OTP code sent to the user"""
         pass
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
@@ -93,7 +124,7 @@ class ApiImpl:
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific"""
-        return vehicles
+        return None
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
@@ -294,3 +325,13 @@ class ApiImpl:
         Set the vehicle to load limit. Returns the tracking ID
         """
         pass
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        # By default, just call login again, ideally use the refresh token flow
+        # Pass the pin explicitly as a keyword to avoid positional
+        # argument mis-binding in subclasses that accept different
+        # login() signatures (some accept a `token` positional arg).
+        return self.login(
+            username=token.username, password=token.password, pin=token.pin
+        )

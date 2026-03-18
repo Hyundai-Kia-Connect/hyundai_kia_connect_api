@@ -2,28 +2,29 @@
 
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
+import datetime as dt
 import logging
 import time
-import datetime as dt
-import requests
-import certifi
+import typing as ty
 
+import certifi
+import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
-from .const import (
-    DOMAIN,
-    VEHICLE_LOCK_ACTION,
-    SEAT_STATUS,
-    DISTANCE_UNITS,
-    TEMPERATURE_UNITS,
-    ENGINE_TYPES,
-)
-from .utils import get_child_value, get_float, parse_datetime
 from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .const import (
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
+)
 from .Token import Token
+from .utils import get_child_value, get_float, parse_datetime
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -32,7 +33,6 @@ from .Vehicle import (
     TripInfo,
     Vehicle,
 )
-
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
@@ -124,7 +124,13 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["vin"] = vehicle.VIN
         return headers
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
+    ) -> Token:
         # Sign In with Email and Password and Get Authorization Code
         url = self.LOGIN_API + "oauth/token"
         data = {"username": username, "password": password}
@@ -132,6 +138,10 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
+        if response.get("access_token") is None:
+            raise AuthenticationError(
+                "Login failed: " + response.get("errorMessage", "")
+            )
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
@@ -146,6 +156,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
+            pin=pin,
         )
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
@@ -425,6 +436,32 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.etc3.value"),
             "m",
         )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2x_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2xStatus",
+                )
+            )
+        if (
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+            )
+            is not None
+        ):
+            vehicle.ev_v2l_status = bool(
+                get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.v2lStatus",
+                )
+            )
         if get_child_value(
             state,
             "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
@@ -726,6 +763,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        if "enrolledVehicleDetails" not in response:
+            raise AuthenticationError("Missing enrolledVehicleDetails in response")
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]

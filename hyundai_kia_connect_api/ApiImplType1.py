@@ -7,9 +7,7 @@ import math
 from typing import Optional
 from datetime import timedelta, timezone
 
-
 from time import sleep
-
 
 from .ApiImpl import (
     ApiImpl,
@@ -42,7 +40,6 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
-    PINMissingError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -116,6 +113,49 @@ class ApiImplType1(ApiImpl):
 
     def __init__(self) -> None:
         """Initialize."""
+
+    def _sanitize_ice_value(self, state: dict) -> None:
+        """
+        Sanitize oversized ICE (Internal Combustion Engine) values in DTE data.
+
+        Hyundai's API sometimes returns corrupted ICE values that are too large
+        (beyond 64-bit integer limits), which can cause issues when:
+        - Serializing to JSON for JavaScript consumers
+        - Storing in databases with 64-bit integer limits
+        - Processing in other systems
+
+        This function replaces invalid ICE values with None and logs a warning.
+
+        Args:
+            state: The vehicle state dictionary (modified in place)
+        """
+        try:
+            # Navigate to DTE.ICE in the nested structure
+            fuel_system = state.get("Drivetrain", {}).get("FuelSystem", {})
+            dte = fuel_system.get("DTE", {})
+            ice_value = dte.get("ICE")
+
+            if ice_value is not None:
+                # Check if the value is a number and unreasonably large
+                # A reasonable ICE range should be < 1,000,000 km/miles
+                # Values larger than this are likely corrupted API data
+                if isinstance(ice_value, (int, float)):
+                    # Also check if it exceeds JavaScript's Number.MAX_SAFE_INTEGER
+                    # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
+                    max_safe_integer = 9007199254740991
+                    max_reasonable_range = 1000000
+
+                    if ice_value > max_safe_integer or ice_value > max_reasonable_range:
+                        _LOGGER.warning(
+                            f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
+                            "too large to be valid. Replacing with None. "
+                            "This appears to be corrupted data from Hyundai's API."
+                        )
+                        dte["ICE"] = None
+        except (KeyError, TypeError, AttributeError):
+            # If the structure doesn't exist or is malformed, silently continue
+            # This is defensive programming in case the API structure changes
+            pass
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
@@ -221,6 +261,13 @@ class ApiImplType1(ApiImpl):
 
         if air_temp != "OFF":
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+
+        outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
+        outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
+        vehicle.outside_temperature = (
+            outside_temp,
+            TEMPERATURE_UNITS[outside_temp_unit],
+        )
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
@@ -337,6 +384,36 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+
+        vehicle.ev_battery_pack_voltage = get_child_value(
+            state, "Green.BatteryManagement.BatteryPackVoltage"
+        )
+        vehicle.ev_battery_chiller_rpm = get_child_value(
+            state, "Green.BatteryManagement.ChillerRPM"
+        )
+
+        battery_heating_state = get_child_value(
+            state, "Green.BatteryManagement.HeatingState"
+        )
+        if battery_heating_state is not None:
+            vehicle.ev_battery_heating_state = bool(battery_heating_state)
+
+        vehicle.ev_battery_water_temperature = get_child_value(
+            state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+        )
+        vehicle.ev_battery_temperature_min = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Min.Raw"
+        )
+        vehicle.ev_battery_temperature_max = get_child_value(
+            state, "Green.BatteryManagement.Temperature.Max.Raw"
+        )
+
+        battery_winter_mode = get_child_value(
+            state, "Green.BatteryManagement.WinterModeOperation"
+        )
+        if battery_winter_mode is not None:
+            vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
+
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
                 state, "Green.Electric.SmartGrid.RealTimePower"
@@ -449,6 +526,17 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
 
+        vehicle.ev_power_consumption_battery_cooling = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryCooling"
+        )
+
+        vehicle.ev_power_consumption_battery_heater = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryHeater"
+        )
+        vehicle.ev_power_consumption_air_conditioning = get_child_value(
+            state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
+        )
+
         # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
         # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
         # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
@@ -499,6 +587,12 @@ class ApiImplType1(ApiImpl):
                 get_child_value(state, "Location.GeoCoord.Longitude"),
                 location_last_updated_at,
             )
+
+        # Sanitize corrupted ICE values before storing in vehicle.data
+        # This prevents issues with oversized integers when serializing to JSON
+        # or storing in databases
+        # May cause update failure.  Commenting out to test.
+        # self._sanitize_ice_value(state)
 
         vehicle.data = state
 
@@ -985,8 +1079,6 @@ class ApiImplType1(ApiImpl):
         return response["msgId"]
 
     def _get_control_token(self, token: Token) -> Token:
-        if token.pin is None:
-            raise PINMissingError("PIN is not set, action will fail.")
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
@@ -1000,6 +1092,8 @@ class ApiImplType1(ApiImpl):
         response = requests.put(url, json=data, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+        if response.get("controlToken") is None:
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
         control_token = "Bearer " + response["controlToken"]
         control_token_expire_at = math.floor(
             dt.datetime.now().timestamp() + response["expiresTime"]

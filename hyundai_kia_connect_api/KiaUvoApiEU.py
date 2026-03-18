@@ -8,6 +8,7 @@ import datetime as dt
 import logging
 import uuid
 import re
+import typing as ty
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -39,6 +40,9 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
+)
+from .exceptions import (
+    AuthenticationError,
 )
 from .utils import (
     get_child_value,
@@ -173,12 +177,26 @@ class KiaUvoApiEU(ApiImplType1):
                 + "&state=$service_id:$user_id"
             )
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        otp_handler: ty.Callable[[dict], dict] | None = None,
+        pin: str | None = None,
+    ) -> Token:
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
         refresh_token = password
+
+        # Plaintext passwords can no longer be used due to reCaptcha
+        # requirements on the log in page. Users must provide a valid
+        # "refresh_token" to avoid "Received unexpected statusCode" errors.
+        if not re.match(r"^[A-Z0-9]{48}$", refresh_token):
+            raise AuthenticationError(
+                "Passwords are no longer supported, provide a refresh_token instead"
+            )
 
         _, access_token, authorization_code, expires_in = self._get_access_token(
             stamp, refresh_token
@@ -194,6 +212,7 @@ class KiaUvoApiEU(ApiImplType1):
             refresh_token=refresh_token,
             device_id=device_id,
             valid_until=valid_until,
+            pin=pin,
         )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -336,6 +355,34 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.rear_right_seat_status = SEAT_STATUS[
             get_child_value(state, "vehicleStatus.seatHeaterVentState.rrSeatHeatState")
         ]
+        # lamp wire status (nested)
+        vehicle.headlamp_status = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.headLampStatus"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.leftLowLamp"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "vehicleStatus.lampWireStatus.headLamp.rightLowLamp"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "vehicleStatus.lampWireStatus.stopLamp.leftLamp"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "vehicleStatus.lampWireStatus.stopLamp.rightLamp"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.leftFrontLamp"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.rightFrontLamp"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.leftRearLamp"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "vehicleStatus.lampWireStatus.turnSignalLamp.rightRearLamp"
+        )
         vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "vehicleStatus.doorOpen.frontLeft"
@@ -767,8 +814,8 @@ class KiaUvoApiEU(ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]["gpsDetail"]
-        except Exception:
-            _LOGGER.warning(f"{DOMAIN} - _get_location failed")
+        except Exception as e:
+            _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:

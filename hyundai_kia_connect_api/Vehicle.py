@@ -106,6 +106,10 @@ class Vehicle:
     washer_fluid_warning_is_on: bool = None
     brake_fluid_warning_is_on: bool = None
 
+    _outside_temperature: float = None
+    _outside_temperature_value: float = None
+    _outside_temperature_unit: str = None
+
     # Climate
     _air_temperature: float = None
     _air_temperature_value: float = None
@@ -173,6 +177,9 @@ class Vehicle:
     )
     ev_v2l_discharge_limit: typing.Union[int, None] = None
 
+    ev_v2l_status: typing.Union[bool, None] = None
+    ev_v2x_status: typing.Union[bool, None] = None
+
     # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
@@ -184,6 +191,24 @@ class Vehicle:
 
     # feature only available for some regions (getter/setter for sorting)
     _daily_stats: list[DailyDrivingStats] = field(default_factory=list)
+
+    # Other statuses from KiaCA logs
+    accessory_on: bool = None
+    ign3: bool = None
+    remote_ignition: bool = None
+    transmission_condition: str = None
+    sleep_mode_check: bool = None
+
+    # Lamp status fields (KiaUvoApiEU and CA)
+    headlamp_status: str = None
+    headlamp_left_low: bool = None
+    headlamp_right_low: bool = None
+    stop_lamp_left: bool = None
+    stop_lamp_right: bool = None
+    turn_signal_left_front: bool = None
+    turn_signal_right_front: bool = None
+    turn_signal_left_rear: bool = None
+    turn_signal_right_rear: bool = None
 
     @property
     def daily_stats(self):
@@ -239,6 +264,13 @@ class Vehicle:
         self._day_trip_info = result
 
     ev_battery_percentage: int = None
+    ev_battery_pack_voltage: int = None
+    ev_battery_chiller_rpm: int = None
+    ev_battery_heating_state: bool = None
+    ev_battery_water_temperature: int = None
+    ev_battery_temperature_min: int = None
+    ev_battery_temperature_max: int = None
+    ev_battery_winter_mode: bool = None
     ev_battery_soh_percentage: int = None
     ev_battery_remain: int = None
     ev_battery_capacity: int = None
@@ -261,6 +293,8 @@ class Vehicle:
     _ev_estimated_portable_charge_duration_value: int = None
     _ev_estimated_portable_charge_duration_unit: str = None
 
+    ev_battery_precondition_enabled: bool = None
+
     _ev_estimated_station_charge_duration: int = None
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
@@ -272,6 +306,10 @@ class Vehicle:
     _ev_target_range_charge_DC: typing.Union[float, None] = None
     _ev_target_range_charge_DC_value: typing.Union[float, None] = None
     _ev_target_range_charge_DC_unit: typing.Union[str, None] = None
+
+    ev_power_consumption_battery_cooling: typing.Union[float, None] = None
+    ev_power_consumption_battery_heater: typing.Union[float, None] = None
+    ev_power_consumption_air_conditioning: typing.Union[float, None] = None
 
     ev_first_departure_enabled: typing.Union[bool, None] = None
     ev_second_departure_enabled: typing.Union[bool, None] = None
@@ -424,6 +462,16 @@ class Vehicle:
         self._odometer_value = float_value
         self._odometer_unit = value[1]
         self._odometer = float_value
+
+    @property
+    def outside_temperature(self):
+        return self._outside_temperature
+
+    @outside_temperature.setter
+    def outside_temperature(self, value):
+        self._outside_temperature_value = value[0]
+        self._outside_temperature_unit = value[1]
+        self._outside_temperature = value[0]
 
     @property
     def air_temperature(self):

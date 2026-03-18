@@ -2,16 +2,22 @@
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
 
-import time
 import datetime as dt
 import json
 import logging
-import requests
+import platform
+import socket
+import time
 from zoneinfo import ZoneInfo
+import uuid
+import base64
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .Token import Token
-from .Vehicle import Vehicle, DailyDrivingStats
+import requests
+import requests.packages.urllib3.util.connection as urllib3_cn
+
+# Try to fix hyundai/cloudflare
+
+from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -21,47 +27,28 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-
-from .exceptions import AuthenticationError, APIError
+from .exceptions import APIError, AuthenticationError
+from .Token import Token
 from .utils import (
+    detect_timezone_for_date,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     parse_datetime,
-    detect_timezone_for_date,
 )
+from .Vehicle import DailyDrivingStats, Vehicle
 
 
-# Try to fix hyundai/cloudflare
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.ssl_ import create_urllib3_context
-import certifi
+def allowed_gai_family():
+    return socket.AF_INET
 
-# Firefox Fingerprint
-firefox = [
-    "TLS_AES_128_GCM_SHA256",
-    "TLS_CHACHA20_POLY1305_SHA256",
-    "TLS_AES_256_GCM_SHA384",
-    "ECDHE-ECDSA-AES128-GCM-SHA256",
-    "ECDHE-RSA-AES128-GCM-SHA256",
-    "ECDHE-ECDSA-CHACHA20-POLY1305",
-    "ECDHE-RSA-CHACHA20-POLY1305",
-    "ECDHE-ECDSA-AES256-GCM-SHA384",
-    "ECDHE-RSA-AES256-GCM-SHA384",
-    "ECDHE-ECDSA-AES256-SHA",
-    "ECDHE-ECDSA-AES128-SHA",
-    "ECDHE-RSA-AES128-SHA",
-    "ECDHE-RSA-AES256-SHA",
-    "DHE-RSA-AES128-SHA",
-    "DHE-RSA-AES256-SHA",
-    "AES128-SHA",
-    "AES256-SHA",
-    "DES-CBC3-SHA",
-]
+
+urllib3_cn.allowed_gai_family = allowed_gai_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,24 +59,15 @@ CA_TIMEZONES = [
 ]
 
 
-# Use the custom cipher order
-class CustomCipherAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(ciphers=":".join(firefox))
-        kwargs["ssl_context"] = context
-        return super().init_poolmanager(*args, **kwargs)
-
-
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
-        super().mount("https://", CustomCipherAdapter())
         self.max_retries = max_retries
         self.delay = delay
         self.backoff = backoff
 
     def post(self, url, **kwargs):
-        return self._request_with_retry("POST", url, **kwargs, verify=certifi.where())
+        return self._request_with_retry("POST", url, **kwargs)
 
     def _request_with_retry(self, method, url, **kwargs):
         attempt = 0
@@ -138,22 +116,38 @@ class KiaUvoApiCA(ApiImpl):
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:141.1) Gecko/20100101 Firefox/141.1",
-            "content-type": "application/json",
-            "accept": "application/json",
-            "accept-encoding": "gzip",
-            "accept-language": "en-US,en;q=0.9",
-            "host": self.BASE_URL,
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
+            "Accept-Encoding": "gzip, deflate, br, zstd",
+            "Content-Type": "application/json;charset=UTF-8",
+            "from": "CWP",
+            "offset": "-5",
+            "language": "0",
+            "Origin": f"https://{self.BASE_URL}",
+            "Connection": "keep-alive",
+            "Referer": f"https://{self.BASE_URL}/login",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-origin",
+            "Priority": "u=0",
+            "Pragma": "no-cache",
+            "Cache-Control": "no-cache",
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
-            "from": "SPA",
-            "language": "0",
-            "offset": "-5",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
         }
         self._sessions = None
+
+    def _get_device_id(self) -> str:
+        """Generate a deterministic device ID based on MAC address and hostname.
+        This ensures the same device ID is used across sessions, avoiding OTP triggers."""
+        device_uuid = uuid.uuid5(
+            uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
+        )
+        return base64.b64encode(device_uuid.hex.encode()).decode()
+
+    def get_implementation_by_region_brand(self, region, brand, language):
+        return KiaUvoApiCA(region, brand, language)
 
     @property
     def sessions(self):
@@ -170,13 +164,26 @@ class KiaUvoApiCA(ApiImpl):
         - F: failure
         resCode / resMsg known values:
         - 0000: no error
-        - 7404: "Wrong Username and password"
+        - 7110: "OTP Required" (MFA verification needed)
         - 7402: "Account Locked Out"
+        - 7403: "Your authentication has expired"
+        - 7404: "Wrong Username and password"
+        - 7445: "Your request could not be processed"
+        - 7602: "Access token is deleted"
+        - 7710 : "Device ID is not valid"
         :param response: the API's JSON response
         """
 
-        error_code_mapping = {"7404": AuthenticationError, "7402": AuthenticationError}
+        error_code_mapping = {
+            "7404": AuthenticationError,
+            "7402": AuthenticationError,
+            "7403": AuthenticationError,  # Auth expired - triggers re-login
+            "7602": AuthenticationError,  # Access token deleted - triggers re-login
+        }
         if response["responseHeader"]["responseCode"] == 1:
+            # Don't raise error for 7110 - it's handled in login method
+            if response["error"]["errorCode"] == "7110":
+                return
             if response["error"]["errorCode"] in error_code_mapping:
                 raise error_code_mapping[response["error"]["errorCode"]](
                     response["error"]["errorDesc"]
@@ -184,23 +191,78 @@ class KiaUvoApiCA(ApiImpl):
             else:
                 raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
 
-    def login(self, username: str, password: str) -> Token:
+    def login(
+        self,
+        username: str,
+        password: str,
+        pin: str | None = None,
+    ) -> Token | OTPRequest:
         # Sign In with Email and Password and Get Authorization Code
         url = self.API_URL + "v2/login"
         data = {"loginId": username, "password": password}
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers.pop("accessToken", None)
-        headers["Deviceid"] = (
-            "TW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEzOC4wLjAuMCBTYWZhcmkvNTM3LjM2IEVkZy8xMzguMC4wLjArV2luMzIrMTIzNCsxMjM0"
-        )
+
+        # Use deterministic device ID based on MAC address to avoid OTP triggers
+        device_id = self._get_device_id()
+        _LOGGER.debug(f"{DOMAIN} - Using deterministic device ID")
+
+        headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
-        response = response.json()
-        self._check_response_for_errors(response)
-        response = response["result"]["token"]
-        token_expire_in = int(response["expireIn"]) - 60
-        access_token = response["accessToken"]
-        refresh_token = response["refreshToken"]
+        response_json = response.json()
+
+        # Check if OTP is required (error code 7110)
+        if (
+            response_json["responseHeader"]["responseCode"] == 1
+            and response_json.get("error", {}).get("errorCode") == "7110"
+        ):
+            _LOGGER.info(f"{DOMAIN} - OTP verification required for new device")
+
+            # Call mfa/selverifmeth to get userInfoUuid and available methods
+            selverifmeth_url = self.API_URL + "mfa/selverifmeth"
+            selverifmeth_headers = self.API_HEADERS.copy()
+            selverifmeth_headers.pop("accessToken", None)
+            selverifmeth_headers["Deviceid"] = self._get_device_id()
+            selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
+
+            selverifmeth_response = self.sessions.post(
+                selverifmeth_url, json=selverifmeth_data, headers=selverifmeth_headers
+            )
+            _LOGGER.debug(
+                f"{DOMAIN} - Select Verification Method Response {selverifmeth_response.text}"
+            )
+            selverifmeth_json = selverifmeth_response.json()
+
+            # Check for errors
+            if selverifmeth_json.get("responseHeader", {}).get("responseCode") != 0:
+                error_desc = selverifmeth_json.get("error", {}).get(
+                    "errorDesc", "Unknown error"
+                )
+                raise APIError(f"Failed to get verification methods: {error_desc}")
+
+            # Extract userInfoUuid and emailList
+            result = selverifmeth_json.get("result", {})
+            user_info_uuid = result.get("userInfoUuid")
+            email_list = result.get("emailList", [])
+
+            return OTPRequest(
+                request_id=user_info_uuid,
+                otp_key=None,
+                has_email=len(email_list) > 0,
+                has_sms=False,
+                email=email_list[0] if email_list else username,
+                sms=None,
+            )
+
+        # Check for other errors
+        self._check_response_for_errors(response_json)
+
+        # Normal login successful
+        response_data = response_json["result"]["token"]
+        token_expire_in = int(response_data["expireIn"]) - 60
+        access_token = response_data["accessToken"]
+        refresh_token = response_data["refreshToken"]
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             seconds=token_expire_in
@@ -212,14 +274,115 @@ class KiaUvoApiCA(ApiImpl):
             access_token=access_token,
             refresh_token=refresh_token,
             valid_until=valid_until,
+            pin=pin,
+        )
+
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Sends OTP to the user via selected destination"""
+        url = self.API_URL + "mfa/sendotp"
+        headers = self.API_HEADERS.copy()
+        headers["Deviceid"] = self._get_device_id()
+        data = {
+            "otpMethod": "E",
+            "mfaApiCode": "0107",
+            "userAccount": otp_request.email,
+            "userPhone": "",
+            "userInfoUuid": otp_request.request_id,
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Unknown error"
+            )
+            raise APIError(f"Failed to send OTP: {error_desc}")
+
+        otp_key = response_json["result"]["otpKey"]
+        otp_request.otp_key = otp_key
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Confirms OTP code sent to the user and completes login"""
+        url = self.API_URL + "mfa/validateotp"
+        headers = self.API_HEADERS.copy()
+        headers["Deviceid"] = self._get_device_id()
+        data = {
+            "otpNo": otp_code,
+            "userAccount": username,
+            "otpKey": otp_request.otp_key,
+            "mfaApiCode": "0107",
+        }
+
+        response = self.sessions.post(url, headers=headers, json=data)
+        _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
+        response_json = response.json()
+
+        if response_json["responseHeader"]["responseCode"] != 0:
+            error_desc = response_json.get("error", {}).get(
+                "errorDesc", "Invalid OTP code"
+            )
+            raise AuthenticationError(f"OTP verification failed: {error_desc}")
+
+        if not response_json["result"].get("verifiedOtp", False):
+            raise AuthenticationError("OTP verification failed")
+
+        otp_validation_key = response_json["result"]["otpValidationKey"]
+
+        # Call mfa/genmfatkn to get the access token and refresh token
+        genmfatkn_url = self.API_URL + "mfa/genmfatkn"
+        genmfatkn_headers = self.API_HEADERS.copy()
+        genmfatkn_headers["Deviceid"] = self._get_device_id()
+        genmfatkn_data = {
+            "userAccount": username,
+            "otpEmail": otp_request.email,
+            "mfaApiCode": "0107",
+            "otpValidationKey": otp_validation_key,
+            "mfaYn": "Y",
+        }
+
+        genmfatkn_response = self.sessions.post(
+            genmfatkn_url, json=genmfatkn_data, headers=genmfatkn_headers
+        )
+        genmfatkn_json = genmfatkn_response.json()
+
+        if genmfatkn_json["responseHeader"]["responseCode"] != 0:
+            error_desc = genmfatkn_json.get("error", {}).get(
+                "errorDesc", "Token generation failed"
+            )
+            raise AuthenticationError(f"Failed to generate token: {error_desc}")
+
+        token_data = genmfatkn_json["result"]["token"]
+        token_expire_in = int(token_data["expireIn"]) - 60
+        access_token = token_data["accessToken"]
+        refresh_token = token_data["refreshToken"]
+
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            seconds=token_expire_in
+        )
+
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            valid_until=valid_until,
+            pin=pin,
         )
 
     def test_token(self, token: Token) -> bool:
-        # Use "get number of notifications" as a dummy request to test the token
-        # Use this api because it's likely checked more frequently than other APIs, less
-        # chance to get banned. And it's short and simple.
-        url = self.API_URL + "ntcmsgcnt"
-        headers = self.API_HEADERS
+        # Use "get vehicle list" to test the token and keep it alive
+        # Calling this endpoint every 5 minutes prevents the accessToken from expiring
+        url = self.API_URL + "vhcllst"
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
@@ -234,11 +397,15 @@ class KiaUvoApiCA(ApiImpl):
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         result = []
         for entry in response["result"]["vehicles"]:
             entry_engine_type = None
@@ -418,6 +585,41 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.rear_right_seat_status = SEAT_STATUS[
             get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
         ]
+        # Additional status fields observed in logs (exposed as binary sensors)
+        vehicle.accessory_on = get_child_value(state, "status.acc")
+        vehicle.ign3 = get_child_value(state, "status.ign3")
+        vehicle.remote_ignition = get_child_value(state, "status.remoteIgnition")
+        vehicle.transmission_condition = get_child_value(state, "status.transCond")
+        vehicle.sleep_mode_check = get_child_value(state, "status.sleepModeCheck")
+
+        # lamp wire status (nested)
+        vehicle.headlamp_status = get_child_value(
+            state, "status.lampWireStatus.headLamp.headLampStatus"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "status.lampWireStatus.headLamp.leftLowLamp"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "status.lampWireStatus.headLamp.rightLowLamp"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "status.lampWireStatus.stopLamp.leftLamp"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "status.lampWireStatus.stopLamp.rightLamp"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.leftFrontLamp"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.rightFrontLamp"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.leftRearLamp"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "status.lampWireStatus.turnSignalLamp.rightRearLamp"
+        )
         vehicle.is_locked = get_child_value(state, "status.doorLock")
         vehicle.front_left_door_is_open = get_child_value(
             state, "status.doorOpen.frontLeft"
@@ -485,6 +687,13 @@ class KiaUvoApiCA(ApiImpl):
                 get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
                 "m",
             )
+            vehicle.ev_battery_precondition_enabled = get_child_value(
+                state, "status.evStatus.batteryPreconditiong"
+            )
+            vehicle.ev_estimated_station_charge_duration = (
+                get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
+                "m",
+            )
         vehicle.fuel_driving_range = (
             get_child_value(
                 state,
@@ -541,7 +750,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _update_vehicle_properties_trip_details(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "alerts/maintenance/evTripDetails"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -551,6 +760,10 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(
                 f"{DOMAIN} - Received _update_vehicle_properties_trip_details response {response}"
             )
+
+            # Check for errors (including 7602 - access token deleted)
+            self._check_response_for_errors(response)
+
             if "result" in response and "tripdetails" in response["result"]:
                 trip_stats = []
                 for trip in response["result"]["tripdetails"]:
@@ -583,13 +796,17 @@ class KiaUvoApiCA(ApiImpl):
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
 
         status = {}
@@ -599,7 +816,7 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rltmvhclsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
@@ -607,6 +824,10 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["status"]
         status = {}
         status["status"] = response
@@ -614,13 +835,17 @@ class KiaUvoApiCA(ApiImpl):
         return status
 
     def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         url = self.API_URL + "nxtsvc"
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Service status data {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
+
         response = response["result"]["maintenanceInfo"]
         return response
 
@@ -761,7 +986,32 @@ class KiaUvoApiCA(ApiImpl):
                         }
                     )
             else:
-                payload["hvacInfo"] = climate_settings
+                if vehicle.model == "IONIQ 9":
+                    payload["remoteControl"] = climate_settings
+                    payload["remoteControl"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )
+                else:
+                    payload["hvacInfo"] = climate_settings
+                    payload["hvacInfo"].update(
+                        {
+                            "igniOnDuration": options.duration,
+                            "seatHeaterVentCMD": {
+                                "drvSeatOptCmd": options.front_left_seat,
+                                "astSeatOptCmd": options.front_right_seat,
+                                "rlSeatOptCmd": options.rear_left_seat,
+                                "rrSeatOptCmd": options.rear_right_seat,
+                            },
+                        }
+                    )
         else:
             payload = {
                 "setting": {
@@ -780,7 +1030,9 @@ class KiaUvoApiCA(ApiImpl):
                 },
                 "pin": token.pin,
             }
-        _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload {payload}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned start_climate payload {self._mask_sensitive_data(payload)}"
+        )
 
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
@@ -861,7 +1113,9 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         data = json.dumps({"pin": token.pin})
-        _LOGGER.debug(f"{DOMAIN} - Planned start_charge payload {data}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
+        )
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
@@ -902,13 +1156,16 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "evc/selsoc"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received get_charge_limits: {response}")
+
+        # Check for errors (including 7602 - access token deleted)
+        self._check_response_for_errors(response)
 
         return response["result"]
 
@@ -920,6 +1177,10 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["from"] = "SPA"
+        headers["offset"] = "-8"
+        headers["priority"] = "u=1, i"
+        headers["Referer"] = "https://kiaconnect.ca/remote/"
 
         payload = {
             "tsoc": [
@@ -935,9 +1196,24 @@ class KiaUvoApiCA(ApiImpl):
             "pin": token.pin,
         }
 
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned set_charge_limits payload {self._mask_sensitive_data(payload)}"
+        )
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
         response_headers = response.headers
         response = response.json()
-
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
+
+    def _mask_sensitive_data(self, data: dict | str) -> dict | str:
+        """Create a copy of data with sensitive fields masked for logging."""
+        if isinstance(data, str):
+            return data
+        import copy
+
+        masked = copy.deepcopy(data)
+        sensitive_keys = ["pin", "password"]
+        for key in sensitive_keys:
+            if key in masked:
+                masked[key] = "****"
+        return masked
