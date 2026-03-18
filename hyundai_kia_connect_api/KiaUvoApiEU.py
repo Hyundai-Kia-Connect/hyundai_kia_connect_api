@@ -1368,7 +1368,7 @@ class KiaUvoApiEU(ApiImplType1):
             response_json = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
             _check_response_for_errors(response_json)
-            
+
             token_type = response_json["token_type"]
             access_token = token_type + " " + response_json["access_token"]
             # Genesis doesn't issue a new refresh_token in this response, so we keep the old one
