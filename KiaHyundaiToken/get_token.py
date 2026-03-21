@@ -280,8 +280,7 @@ def install_chromedriver():
         chromedriver_autoinstaller.get_chrome_version()
     except Exception as e:
         raise RuntimeError(
-            "Google Chrome not found. "
-            "Please install Google Chrome and try again."
+            "Google Chrome not found. Please install Google Chrome and try again."
         ) from e
     try:
         return chromedriver_autoinstaller.install()
@@ -309,7 +308,9 @@ def create_driver(user_agent):
 
     try:
         service = Service(driver_path)
-        driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
+        driver = webdriver.Chrome(
+            service=service, options=_build_chrome_options(user_agent)
+        )
         driver.maximize_window()
         return driver
     except WebDriverException:
@@ -323,13 +324,13 @@ def create_driver(user_agent):
         try:
             driver_path = chromedriver_autoinstaller.install()
             service = Service(driver_path)
-            driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
+            driver = webdriver.Chrome(
+                service=service, options=_build_chrome_options(user_agent)
+            )
             driver.maximize_window()
             return driver
         except Exception as e:
-            raise RuntimeError(
-                f"Could not start Chrome after reinstall: {e}"
-            ) from e
+            raise RuntimeError(f"Could not start Chrome after reinstall: {e}") from e
 
 
 def select_region_and_brand():
@@ -405,9 +406,11 @@ def main():
             print("=" * 50 + "\n")
             try:
                 wait = WebDriverWait(driver, 300)
-                wait.until(EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, brand["success_selector"])
-                ))
+                wait.until(
+                    EC.presence_of_element_located(
+                        (By.CSS_SELECTOR, brand["success_selector"])
+                    )
+                )
             except TimeoutException:
                 raise Exception(
                     "Timed out after 5 minutes. Login was not completed "

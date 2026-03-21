@@ -5,14 +5,14 @@ login — worldwide.
 
 ## Supported regions
 
-| # | Region       | Kia | Hyundai | Status |
-|---|--------------|-----|---------|--------|
-| 1 | Europe       | yes | yes     | Kia confirmed, Hyundai experimental |
-| 2 | China        | yes | yes     | untested |
-| 3 | Australia    | yes | yes     | untested |
-| 4 | New Zealand  | yes | —       | untested |
-| 5 | India        | yes | yes     | untested |
-| 6 | Brazil       | —   | yes     | untested |
+| #   | Region      | Kia | Hyundai | Status                              |
+| --- | ----------- | --- | ------- | ----------------------------------- |
+| 1   | Europe      | yes | yes     | Kia confirmed, Hyundai experimental |
+| 2   | China       | yes | yes     | untested                            |
+| 3   | Australia   | yes | yes     | untested                            |
+| 4   | New Zealand | yes | —       | untested                            |
+| 5   | India       | yes | yes     | untested                            |
+| 6   | Brazil      | —   | yes     | untested                            |
 
 > **USA / Canada:** These regions use a different authentication method
 > (direct API login, no browser required). Most integrations (e.g. Home
@@ -122,6 +122,7 @@ which causes `ModuleNotFoundError` even though you just installed the packages.
 ### Running again later
 
 Just paste the same block again. It will:
+
 1. Reset to the latest code from `main`
 2. Rebuild the virtual environment from scratch (avoids stale packages)
 3. Run the script
@@ -158,7 +159,7 @@ in your integration when prompted.
 In the Kia UVO / Hyundai Bluelink integration:
 
 | Field    | Value                                    |
-|----------|------------------------------------------|
+| -------- | ---------------------------------------- |
 | Region   | match your selection above               |
 | Brand    | Kia **or** Hyundai (match your choice)   |
 | Username | your account email                       |
@@ -173,10 +174,10 @@ help:
 1. **Try it.** Run the script, select your region, and report whether it
    works.
 2. **Report.** Open a GitHub issue with:
-   - Your region and brand
-   - Whether the login page loaded correctly
-   - Whether tokens were returned
-   - Any error messages
+    - Your region and brand
+    - Whether the login page loaded correctly
+    - Whether tokens were returned
+    - Any error messages
 3. **CSS selectors.** If the login page works but the script does not detect
    login automatically (you had to press Enter), inspect the page after login
    and report a CSS selector that uniquely identifies a post-login element.
@@ -256,7 +257,7 @@ make sure to check **"Add Python to PATH"** during installation.
 
 ### Script is disabled / execution policy error
 
-If you see *"running scripts is disabled on this system"*, run the one-time
+If you see _"running scripts is disabled on this system"_, run the one-time
 fix from the **Before you start** section above:
 
 ```powershell
