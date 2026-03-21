@@ -120,8 +120,7 @@ def install_chromedriver():
         chromedriver_autoinstaller.get_chrome_version()
     except Exception as e:
         raise RuntimeError(
-            "Google Chrome not found. "
-            "Please install Google Chrome and try again."
+            "Google Chrome not found. Please install Google Chrome and try again."
         ) from e
     try:
         return chromedriver_autoinstaller.install()
@@ -149,7 +148,9 @@ def create_driver(user_agent):
 
     try:
         service = Service(driver_path)
-        driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
+        driver = webdriver.Chrome(
+            service=service, options=_build_chrome_options(user_agent)
+        )
         driver.maximize_window()
         return driver
     except WebDriverException:
@@ -163,18 +164,24 @@ def create_driver(user_agent):
         try:
             driver_path = chromedriver_autoinstaller.install()
             service = Service(driver_path)
-            driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
+            driver = webdriver.Chrome(
+                service=service, options=_build_chrome_options(user_agent)
+            )
             driver.maximize_window()
             return driver
         except Exception as e:
-            raise RuntimeError(
-                f"Could not start Chrome after reinstall: {e}"
-            ) from e
+            raise RuntimeError(f"Could not start Chrome after reinstall: {e}") from e
 
 
 _REQUIRED_BRAND_KEYS = [
-    "name", "client_id", "client_secret", "login_url",
-    "token_url", "success_selector", "redirect_url_final", "redirect_url",
+    "name",
+    "client_id",
+    "client_secret",
+    "login_url",
+    "token_url",
+    "success_selector",
+    "redirect_url_final",
+    "redirect_url",
 ]
 
 
@@ -235,9 +242,11 @@ def main():
         print("=" * 50 + "\n")
         try:
             wait = WebDriverWait(driver, 300)
-            wait.until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, brand["success_selector"])
-            ))
+            wait.until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, brand["success_selector"])
+                )
+            )
             print("[OK] Login successful!")
         except TimeoutException:
             print("[WARN] Auto-detection timed out (CSS selector not found).")
@@ -251,9 +260,7 @@ def main():
         driver.get(brand["redirect_url"])
         try:
             wait = WebDriverWait(driver, 20)
-            wait.until(
-                lambda d: "code=" in d.current_url or "error=" in d.current_url
-            )
+            wait.until(lambda d: "code=" in d.current_url or "error=" in d.current_url)
         except TimeoutException:
             raise Exception(
                 "Timed out waiting for OAuth redirect. "

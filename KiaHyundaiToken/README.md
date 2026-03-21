@@ -5,9 +5,9 @@ browser login.
 
 ## Supported brands
 
-| Brand   | Status |
-|---------|--------|
-| Kia     | confirmed |
+| Brand   | Status       |
+| ------- | ------------ |
+| Kia     | confirmed    |
 | Hyundai | experimental |
 
 > **Europe only.** This tool uses the browser-based OAuth2 flow provided by
@@ -118,6 +118,7 @@ which causes `ModuleNotFoundError` even though you just installed the packages.
 ### Running again later
 
 Just paste the same block again. It will:
+
 1. Reset to the latest code from `main`
 2. Rebuild the virtual environment from scratch (avoids stale packages)
 3. Run the script
@@ -150,7 +151,7 @@ in your integration when prompted.
 In the Kia UVO / Hyundai Bluelink integration:
 
 | Field    | Value                                    |
-|----------|------------------------------------------|
+| -------- | ---------------------------------------- |
 | Region   | Europe                                   |
 | Brand    | Kia **or** Hyundai (match your choice)   |
 | Username | your account email                       |
@@ -236,7 +237,7 @@ make sure to check **"Add Python to PATH"** during installation.
 
 ### Script is disabled / execution policy error
 
-If you see *"running scripts is disabled on this system"*, run the one-time
+If you see _"running scripts is disabled on this system"_, run the one-time
 fix from the **Before you start** section above:
 
 ```powershell
