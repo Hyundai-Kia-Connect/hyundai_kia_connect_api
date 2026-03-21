@@ -20,27 +20,24 @@ DEFAULT_USER_AGENT = (
 )
 
 # ---------------------------------------------------------------------------
-# Region and brand configurations
+# Region and brand configurations  (Europe only)
 #
 # Each brand entry contains:
 #   name              – display name
-#   status            – "confirmed" | "experimental" | "untested"
+#   status            – "confirmed" | "experimental"
 #   client_id         – OAuth client ID for the token exchange
 #   client_secret     – OAuth client secret for the token exchange
 #   login_url         – URL opened in the browser for the user to log in
 #   token_url         – endpoint for the authorization-code -> token exchange
-#   success_selector  – CSS selector that appears after a successful login,
-#                       or None (manual Enter fallback)
+#   success_selector  – CSS selector that appears after a successful login
 #   redirect_url_final – redirect_uri registered with the OAuth server
-#   redirect_url      – (EU only) separate authorize URL navigated to AFTER
-#                       login in order to obtain the authorization code.
-#                       When absent the login page itself redirects to
-#                       redirect_url_final?code=... after login.
+#   redirect_url      – separate authorize URL navigated to AFTER login
+#                       in order to obtain the authorization code
 #   user_agent        – User-Agent string for the browser session
 #
 # Credential sources:
-#   EU     – tested / community-provided
-#   Others – extracted from github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api
+#   Kia     – tested / community-provided
+#   Hyundai – community-provided, experimental
 # ---------------------------------------------------------------------------
 
 REGIONS = {
@@ -101,168 +98,11 @@ REGIONS = {
             },
         },
     },
-    "2": {
-        "name": "China",
-        "brands": {
-            "1": {
-                "name": "Kia",
-                "status": "untested",
-                "client_id": "9d5df92a-06ae-435f-b459-8304f2efcc67",
-                "client_secret": "tsXdkUg08Av2ZZzXOgWzJyxUT6yeSnNNQkXXPRdKWEANwl1p",
-                "login_url": (
-                    "https://prd.cn-ccapi.kia.com/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=9d5df92a-06ae-435f-b459-8304f2efcc67"
-                    "&redirect_uri=https://prd.cn-ccapi.kia.com:443/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://prd.cn-ccapi.kia.com/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://prd.cn-ccapi.kia.com:443/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-            "2": {
-                "name": "Hyundai",
-                "status": "untested",
-                "client_id": "72b3d019-5bc7-443d-a437-08f307cf06e2",
-                "client_secret": "secret",
-                "login_url": (
-                    "https://prd.cn-ccapi.hyundai.com/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=72b3d019-5bc7-443d-a437-08f307cf06e2"
-                    "&redirect_uri=https://prd.cn-ccapi.hyundai.com:443/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://prd.cn-ccapi.hyundai.com/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://prd.cn-ccapi.hyundai.com:443/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-        },
-    },
-    "3": {
-        "name": "Australia",
-        "brands": {
-            "1": {
-                "name": "Kia",
-                "status": "untested",
-                "client_id": "8acb778a-b918-4a8d-8624-73a0beb64289",
-                "client_secret": "7ScMMm6fEYXdiEPCxaPaQmgeYdlUrfwoh4AfXGOzYIS2Cu9T",
-                "login_url": (
-                    "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=8acb778a-b918-4a8d-8624-73a0beb64289"
-                    "&redirect_uri=https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-            "2": {
-                "name": "Hyundai",
-                "status": "untested",
-                "client_id": "855c72df-dfd7-4230-ab03-67cbf902bb1c",
-                "client_secret": "e6fbwHM32YNbhQl0pviaPp3rf4t3S6k91eceA3MJLdbdThCO",
-                "login_url": (
-                    "https://au-apigw.ccs.hyundai.com.au:8080/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=855c72df-dfd7-4230-ab03-67cbf902bb1c"
-                    "&redirect_uri=https://au-apigw.ccs.hyundai.com.au:8080/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://au-apigw.ccs.hyundai.com.au:8080/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://au-apigw.ccs.hyundai.com.au:8080/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-        },
-    },
-    "4": {
-        "name": "New Zealand",
-        "brands": {
-            "1": {
-                "name": "Kia",
-                "status": "untested",
-                "client_id": "4ab606a7-cea4-48a0-a216-ed9c14a4a38c",
-                "client_secret": "0haFqXTkKktNKfzkxhZ0aku31i74g0yQFm5od2mz4LdI5mLY",
-                "login_url": (
-                    "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
-                    "&redirect_uri=https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://au-apigw.ccs.kia.com.au:8082/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-        },
-    },
-    "5": {
-        "name": "India",
-        "brands": {
-            "1": {
-                "name": "Kia",
-                "status": "untested",
-                "client_id": "d0fe4855-7527-4be0-ab6e-a481216c705d",
-                "client_secret": "SHoTtXpyfbYmP3XjNA6BrtlDglypPWj920PtKBJPfleHEYpU",
-                "login_url": (
-                    "https://prd.in-ccapi.kia.connected-car.io:8080/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=d0fe4855-7527-4be0-ab6e-a481216c705d"
-                    "&redirect_uri=https://prd.in-ccapi.kia.connected-car.io:8080/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://prd.in-ccapi.kia.connected-car.io:8080/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://prd.in-ccapi.kia.connected-car.io:8080/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-            "2": {
-                "name": "Hyundai",
-                "status": "untested",
-                "client_id": "e5b3f6d0-7f83-43c9-aff3-a254db7af368",
-                "client_secret": "5JFOCr6C24OfOzlDqZp7EwqrkL0Ww04UaxcDiE6Ud3qI5SE4",
-                "login_url": (
-                    "https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=e5b3f6d0-7f83-43c9-aff3-a254db7af368"
-                    "&redirect_uri=https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/user/oauth2/redirect",
-                "user_agent": DEFAULT_USER_AGENT,
-            },
-        },
-    },
-    "6": {
-        "name": "Brazil",
-        "brands": {
-            "1": {
-                "name": "Hyundai",
-                "status": "untested",
-                "client_id": "03f7df9b-7626-4853-b7bd-ad1e8d722bd5",
-                "client_secret": "yQz2bc6Cn8OovVOR7RDWwxTqVwWG3yKBYFDg0HsOXsyxyPlH",
-                "login_url": (
-                    "https://br-ccapi.hyundai.com.br/api/v1/user/oauth2/authorize"
-                    "?response_type=code"
-                    "&client_id=03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
-                    "&redirect_uri=https://br-ccapi.hyundai.com.br/api/v1/user/oauth2/redirect"
-                ),
-                "token_url": "https://br-ccapi.hyundai.com.br/api/v1/user/oauth2/token",
-                "success_selector": None,
-                "redirect_url_final": "https://br-ccapi.hyundai.com.br/api/v1/user/oauth2/redirect",
-                "user_agent": (
-                    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4_0 like Mac OS X) "
-                    "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
-                ),
-            },
-        },
-    },
 }
 
 STATUS_LABELS = {
     "confirmed": "",
     "experimental": " -- experimental",
-    "untested": " -- untested, community validation needed",
 }
 
 
@@ -280,7 +120,8 @@ def install_chromedriver():
         chromedriver_autoinstaller.get_chrome_version()
     except Exception as e:
         raise RuntimeError(
-            "Google Chrome not found. Please install Google Chrome and try again."
+            "Google Chrome not found. "
+            "Please install Google Chrome and try again."
         ) from e
     try:
         return chromedriver_autoinstaller.install()
@@ -308,9 +149,7 @@ def create_driver(user_agent):
 
     try:
         service = Service(driver_path)
-        driver = webdriver.Chrome(
-            service=service, options=_build_chrome_options(user_agent)
-        )
+        driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
         driver.maximize_window()
         return driver
     except WebDriverException:
@@ -324,59 +163,46 @@ def create_driver(user_agent):
         try:
             driver_path = chromedriver_autoinstaller.install()
             service = Service(driver_path)
-            driver = webdriver.Chrome(
-                service=service, options=_build_chrome_options(user_agent)
-            )
+            driver = webdriver.Chrome(service=service, options=_build_chrome_options(user_agent))
             driver.maximize_window()
             return driver
         except Exception as e:
-            raise RuntimeError(f"Could not start Chrome after reinstall: {e}") from e
+            raise RuntimeError(
+                f"Could not start Chrome after reinstall: {e}"
+            ) from e
+
+
+_REQUIRED_BRAND_KEYS = [
+    "name", "client_id", "client_secret", "login_url",
+    "token_url", "success_selector", "redirect_url_final", "redirect_url",
+]
 
 
 def select_region_and_brand():
-    print("Select your region:\n")
-    region_keys = list(REGIONS.keys())
-    for key in region_keys:
-        region = REGIONS[key]
-        brand_names = ", ".join(b["name"] for b in region["brands"].values())
-        print(f"  {key}) {region['name']}  ({brand_names})")
-    print()
+    region = REGIONS["1"]  # Europe (only supported region)
+    brands = region["brands"]
 
+    print("Select your brand:\n")
+    for key, brand_cfg in brands.items():
+        label = STATUS_LABELS.get(brand_cfg["status"], "")
+        print(f"  {key}) {brand_cfg['name']}{label}")
+    print()
     while True:
-        choice = input(f"Enter region (1-{len(region_keys)}): ").strip()
-        if choice in REGIONS:
+        choice = input(f"Enter brand (1-{len(brands)}): ").strip()
+        if choice in brands:
             break
         print("Invalid choice.")
+    brand = brands[choice]
+    print(f"\n-> {brand['name']} ({region['name']}) selected.\n")
 
-    region = REGIONS[choice]
-    print(f"\n-> {region['name']} selected.\n")
+    missing = [k for k in _REQUIRED_BRAND_KEYS if not brand.get(k)]
+    if missing:
+        raise RuntimeError(
+            f"Brand '{brand['name']}' is missing required config keys: "
+            + ", ".join(missing)
+        )
 
-    brands = region["brands"]
-    if len(brands) == 1:
-        brand = next(iter(brands.values()))
-        print(f"-> {brand['name']} (only available brand for this region).\n")
-    else:
-        print("Select your brand:\n")
-        for key, brand_cfg in brands.items():
-            label = STATUS_LABELS.get(brand_cfg["status"], "")
-            print(f"  {key}) {brand_cfg['name']}{label}")
-        print()
-        while True:
-            choice = input(f"Enter brand (1-{len(brands)}): ").strip()
-            if choice in brands:
-                break
-            print("Invalid choice.")
-        brand = brands[choice]
-        print(f"\n-> {brand['name']} selected.\n")
-
-    status = brand.get("status", "untested")
-    if status == "untested":
-        print("=" * 60)
-        print("WARNING: This region/brand combination has not been")
-        print("validated yet. It may or may not work. If you can confirm")
-        print("it works (or report issues), please open an issue on GitHub.")
-        print("=" * 60 + "\n")
-    elif status == "experimental":
+    if brand.get("status") == "experimental":
         print("=" * 60)
         print("NOTE: This brand is experimental. It is based on")
         print("community-provided values and has not been fully validated.")
@@ -386,7 +212,11 @@ def select_region_and_brand():
 
 
 def main():
-    region, brand = select_region_and_brand()
+    try:
+        region, brand = select_region_and_brand()
+    except (RuntimeError, KeyboardInterrupt, EOFError) as e:
+        print(f"[ERROR] {e}" if str(e) else "[ERROR] Aborted.")
+        return
 
     user_agent = brand.get("user_agent", DEFAULT_USER_AGENT)
 
@@ -401,66 +231,34 @@ def main():
         print("Please log in manually in the browser window.")
 
         # --- Step 1: wait for the user to complete login ---------------
-        if brand.get("success_selector"):
-            print("The script will detect your login automatically.")
-            print("=" * 50 + "\n")
-            try:
-                wait = WebDriverWait(driver, 300)
-                wait.until(
-                    EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, brand["success_selector"])
-                    )
-                )
-            except TimeoutException:
-                raise Exception(
-                    "Timed out after 5 minutes. Login was not completed "
-                    "or the success element was not found."
-                )
+        print("The script will detect your login automatically.")
+        print("=" * 50 + "\n")
+        try:
+            wait = WebDriverWait(driver, 300)
+            wait.until(EC.presence_of_element_located(
+                (By.CSS_SELECTOR, brand["success_selector"])
+            ))
             print("[OK] Login successful!")
-        else:
-            # Check if the redirect already happened while the user was
-            # still in the browser (code= already in the URL).
-            if "code=" in driver.current_url:
-                print("[OK] Authorization code already detected!")
-            else:
-                print("Press ENTER in this terminal after you have logged in.")
-                print("")
-                print("If the page does not show a login form, this region")
-                print("may not support browser-based login yet.")
-                print("Please open an issue on GitHub if that is the case.")
-                print("=" * 50 + "\n")
-                input(">> Press ENTER to continue after login... ")
-                print("[OK] Continuing...")
+        except TimeoutException:
+            print("[WARN] Auto-detection timed out (CSS selector not found).")
+            print("If you have already logged in, you can continue manually.")
+            input(">> Press ENTER to continue (or Ctrl+C to abort)... ")
+            print("[OK] Continuing with manual confirmation.")
 
         # --- Step 2: obtain the authorization code ---------------------
-        if brand.get("redirect_url"):
-            # EU-style: navigate to a separate authorize URL to trigger
-            # the OAuth redirect that carries the authorization code.
-            driver.get(brand["redirect_url"])
-            try:
-                wait = WebDriverWait(driver, 20)
-                wait.until(
-                    lambda d: "code=" in d.current_url or "error=" in d.current_url
-                )
-            except TimeoutException:
-                raise Exception(
-                    "Timed out waiting for OAuth redirect. "
-                    "The authorization server did not return a code."
-                )
-        elif "code=" not in driver.current_url:
-            # Standard: the login page already redirected (or will
-            # redirect) to redirect_url_final?code=...
-            # Give it a generous timeout in case the redirect is slow.
-            try:
-                wait = WebDriverWait(driver, 60)
-                wait.until(
-                    lambda d: "code=" in d.current_url or "error=" in d.current_url
-                )
-            except TimeoutException:
-                raise Exception(
-                    "Timed out waiting for redirect with authorization code. "
-                    "The login page did not redirect as expected."
-                )
+        # Navigate to the authorize URL to trigger the OAuth redirect
+        # that carries the authorization code.
+        driver.get(brand["redirect_url"])
+        try:
+            wait = WebDriverWait(driver, 20)
+            wait.until(
+                lambda d: "code=" in d.current_url or "error=" in d.current_url
+            )
+        except TimeoutException:
+            raise Exception(
+                "Timed out waiting for OAuth redirect. "
+                "The authorization server did not return a code."
+            )
 
         current_url = driver.current_url
 

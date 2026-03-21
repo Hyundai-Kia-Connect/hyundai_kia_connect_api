@@ -1,27 +1,23 @@
-# KiaHyundaiToken v2.1.0
+# KiaHyundaiToken v2.2.0
 
-Get your **Kia** or **Hyundai** OAuth2 refresh token via a one-time browser
-login — worldwide.
+Get your **Kia** or **Hyundai** (Europe) OAuth2 refresh token via a one-time
+browser login.
 
-## Supported regions
+## Supported brands
 
-| #   | Region      | Kia | Hyundai | Status                              |
-| --- | ----------- | --- | ------- | ----------------------------------- |
-| 1   | Europe      | yes | yes     | Kia confirmed, Hyundai experimental |
-| 2   | China       | yes | yes     | untested                            |
-| 3   | Australia   | yes | yes     | untested                            |
-| 4   | New Zealand | yes | —       | untested                            |
-| 5   | India       | yes | yes     | untested                            |
-| 6   | Brazil      | —   | yes     | untested                            |
+| Brand   | Status |
+|---------|--------|
+| Kia     | confirmed |
+| Hyundai | experimental |
+
+> **Europe only.** This tool uses the browser-based OAuth2 flow provided by
+> the European Kia/Hyundai identity provider (`idpconnect-eu`). Other regions
+> use different authentication methods and are not supported.
 
 > **USA / Canada:** These regions use a different authentication method
 > (direct API login, no browser required). Most integrations (e.g. Home
 > Assistant) handle authentication directly for these regions — you typically
-> do not need this tool. If you need USA/Canada support, please open an issue.
-
-> **"Untested"** means the credentials are extracted from open-source projects
-> but have not been validated with a real account yet. If you can confirm a
-> region works (or doesn't), please open an issue.
+> do not need this tool.
 
 ## Why this exists
 
@@ -74,9 +70,9 @@ In this guide you will copy a block of commands and paste it into PowerShell.
 - **Classic PowerShell (blue window):** right-click into the window to paste.
 
 After pasting, **press Enter once**. All commands run automatically from top
-to bottom. At the end the script will ask you to select your **region** and
-then your **brand** (Kia or Hyundai). A Chrome window will open — that is
-expected, do not close it.
+to bottom. At the end the script will ask you to select your **brand**
+(Kia or Hyundai). A Chrome window will open — that is expected, do not close
+it.
 
 ## Quick Start
 
@@ -122,7 +118,6 @@ which causes `ModuleNotFoundError` even though you just installed the packages.
 ### Running again later
 
 Just paste the same block again. It will:
-
 1. Reset to the latest code from `main`
 2. Rebuild the virtual environment from scratch (avoids stale packages)
 3. Run the script
@@ -131,19 +126,15 @@ Just paste the same block again. It will:
 
 1. PowerShell downloads the code and installs dependencies (takes a few
    seconds, you don't need to do anything).
-2. The script asks you to **select your region** (Europe, China, Australia,
-   etc.). Type the number and press Enter.
-3. The script asks you to **select your brand** (Kia or Hyundai). Type the
+2. The script asks you to **select your brand** (Kia or Hyundai). Type the
    number and press Enter.
-4. A **Chrome window opens automatically** — this is expected. **Do not close
+3. A **Chrome window opens automatically** — this is expected. **Do not close
    it.**
-5. The login page appears. Log in with your email and password, and solve
+4. The login page appears. Log in with your email and password, and solve
    any CAPTCHA if prompted.
-6. **For Europe:** The script detects login automatically and finishes the
-   OAuth flow. Switch back to PowerShell to see your tokens.
-   **For other regions:** After logging in, switch back to PowerShell and
-   **press Enter** to continue. The script will then extract your tokens.
-7. Chrome closes by itself. You are done.
+5. The script detects login automatically and finishes the OAuth flow.
+   Switch back to PowerShell to see your tokens.
+6. Chrome closes by itself. You are done.
 
 Copy the **Refresh Token** and store it securely (e.g. in a password manager).
 
@@ -159,28 +150,17 @@ in your integration when prompted.
 In the Kia UVO / Hyundai Bluelink integration:
 
 | Field    | Value                                    |
-| -------- | ---------------------------------------- |
-| Region   | match your selection above               |
+|----------|------------------------------------------|
+| Region   | Europe                                   |
 | Brand    | Kia **or** Hyundai (match your choice)   |
 | Username | your account email                       |
 | Password | the **refresh token** from script output |
 | PIN      | only if the integration asks for one     |
 
-## Contributing new regions
+## Contributing
 
-If you are from a region that is marked "untested" or not listed, you can
-help:
-
-1. **Try it.** Run the script, select your region, and report whether it
-   works.
-2. **Report.** Open a GitHub issue with:
-    - Your region and brand
-    - Whether the login page loaded correctly
-    - Whether tokens were returned
-    - Any error messages
-3. **CSS selectors.** If the login page works but the script does not detect
-   login automatically (you had to press Enter), inspect the page after login
-   and report a CSS selector that uniquely identifies a post-login element.
+If you have a Hyundai account (Europe) and can test the experimental Hyundai
+support, please open a GitHub issue with your results.
 
 ## Troubleshooting
 
@@ -232,14 +212,13 @@ fails, delete the cached driver folder and rerun:
 
 - Keep the Chrome window visible during the entire flow.
 - Complete login fully, including any CAPTCHA.
-- For non-EU regions: remember to **press Enter** in PowerShell after login.
 - If the script still does not detect the redirect, close everything and
   rerun from a fresh session.
 
 ### Network or access errors
 
-- Ensure outbound connections to the API endpoints for your region are
-  allowed (see the console output for the exact domain).
+- Ensure outbound connections to the API endpoints are allowed
+  (see the console output for the exact domain).
 - VPNs, proxies, and firewalls can interfere — try a different network.
 
 ### `py` is not recognized
@@ -257,7 +236,7 @@ make sure to check **"Add Python to PATH"** during installation.
 
 ### Script is disabled / execution policy error
 
-If you see _"running scripts is disabled on this system"_, run the one-time
+If you see *"running scripts is disabled on this system"*, run the one-time
 fix from the **Before you start** section above:
 
 ```powershell
