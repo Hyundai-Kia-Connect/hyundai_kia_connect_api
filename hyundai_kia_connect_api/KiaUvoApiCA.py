@@ -851,14 +851,15 @@ class KiaUvoApiCA(ApiImpl):
 
     def get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "fndmcr"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        headers["from"] = "SPA"
+        headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
-
             response = self.sessions.post(
-                url, headers=headers, data=json.dumps({"pin": token.pin})
+                url, headers=headers, json={"pin": token.pin}
             )
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
@@ -871,16 +872,14 @@ class KiaUvoApiCA(ApiImpl):
 
     def _get_pin_token(self, token: Token, vehicle: Vehicle) -> None:
         url = self.API_URL + "vrfypin"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-
         response = self.sessions.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
+            url, headers=headers, json={"pin": token.pin}
         )
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
-
         return result["pAuth"]
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
