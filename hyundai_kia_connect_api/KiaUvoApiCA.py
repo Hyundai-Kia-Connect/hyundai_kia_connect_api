@@ -858,9 +858,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
-            response = self.sessions.post(
-                url, headers=headers, json={"pin": token.pin}
-            )
+            response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
             if response["responseHeader"]["responseCode"] != 0:
@@ -875,9 +873,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        response = self.sessions.post(
-            url, headers=headers, json={"pin": token.pin}
-        )
+        response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
         return result["pAuth"]
