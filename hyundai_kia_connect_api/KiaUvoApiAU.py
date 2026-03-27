@@ -141,6 +141,17 @@ class KiaUvoApiAU(ApiImplType1):
         if is_ccs2:
             state = response["resMsg"]["state"]["Vehicle"]
             self._update_vehicle_properties_ccs2(vehicle, state)
+            # The CCS2 status response embeds a stale cached location.
+            # Override it with the more current /location/park endpoint.
+            location = self._get_location(token, vehicle)
+            if location and get_child_value(location, "coord.lat"):
+                vehicle.location = (
+                    get_child_value(location, "coord.lat"),
+                    get_child_value(location, "coord.lon"),
+                    parse_datetime(
+                        get_child_value(location, "time"), self.data_timezone
+                    ),
+                )
         else:
             location = self._get_location(token, vehicle)
             self._update_vehicle_properties(
