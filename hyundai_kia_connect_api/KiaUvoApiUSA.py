@@ -271,9 +271,9 @@ class KiaUvoApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token = None,
+        token: Token | None = None,
         pin: str | None = None,
-    ) -> Token:
+    ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token
 
         Parameters
@@ -345,20 +345,6 @@ class KiaUvoApiUSA(ApiImpl):
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
-
-    def test_token(self, token: Token) -> bool:
-        """Test if token is valid by making a lightweight API call"""
-        url = self.API_URL + "ownr/gvl"
-        headers = self.api_headers()
-        headers["sid"] = token.access_token
-        try:
-            response = self.session.get(url, headers=headers)
-            _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
-            response = response.json()
-            return True
-        except Exception as e:
-            _LOGGER.debug(f"{DOMAIN} - Token test failed with exception: {e}")
-            return False
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
@@ -614,10 +600,18 @@ class KiaUvoApiUSA(ApiImpl):
                 dc_values = [
                     x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
                 ]
-                if ac_values:
-                    vehicle.ev_charge_limits_ac = ac_values[-1]
-                if dc_values:
-                    vehicle.ev_charge_limits_dc = dc_values[-1]
+                if (
+                    ac_values
+                    and isinstance(ac_values[-1], (int, float))
+                    and not isinstance(ac_values[-1], bool)
+                ):
+                    vehicle.ev_charge_limits_ac = int(ac_values[-1])
+                if (
+                    dc_values
+                    and isinstance(dc_values[-1], (int, float))
+                    and not isinstance(dc_values[-1], bool)
+                ):
+                    vehicle.ev_charge_limits_dc = int(dc_values[-1])
             except Exception:
                 _LOGGER.debug(
                     f"{DOMAIN} - Failed to parse targetSOC from cached response. "
@@ -801,13 +795,12 @@ class KiaUvoApiUSA(ApiImpl):
         """Parse targetSOC from the rems/rvs (force refresh) response.
 
         The cmm/gvi (cached state) endpoint does not include targetSOC data
-        for some vehicles, but the rems/rvs endpoint does. This method
-        extracts charge limits from the force refresh response so they are
-        available even when the cached endpoint omits them.
+        for some vehicles, but the rems/rvs endpoint does.  When the force
+        refresh response contains valid numeric charge limits they are
+        always used (they are the freshest source).  If the force refresh
+        response lacks valid data, any existing cached values are preserved
+        so we never overwrite good data with None.
         """
-        if vehicle.ev_charge_limits_ac is not None:
-            # Already populated from the cached response, nothing to do
-            return
         charge_dict = get_child_value(
             state,
             "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
@@ -821,18 +814,46 @@ class KiaUvoApiUSA(ApiImpl):
         try:
             ac_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1]
             dc_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0]
-            if ac_values:
-                vehicle.ev_charge_limits_ac = ac_values[-1]
-            if dc_values:
-                vehicle.ev_charge_limits_dc = dc_values[-1]
+            new_ac = ac_values[-1] if ac_values else None
+            new_dc = dc_values[-1] if dc_values else None
+
+            if isinstance(new_ac, (int, float)) and not isinstance(new_ac, bool):
+                vehicle.ev_charge_limits_ac = int(new_ac)
+            elif new_ac is not None and vehicle.ev_charge_limits_ac is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_ac})"
+                )
+            elif new_ac is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}) and no cached value to preserve"
+                )
+
+            if isinstance(new_dc, (int, float)) and not isinstance(new_dc, bool):
+                vehicle.ev_charge_limits_dc = int(new_dc)
+            elif new_dc is not None and vehicle.ev_charge_limits_dc is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_dc})"
+                )
+            elif new_dc is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}) and no cached value to preserve"
+                )
+
             _LOGGER.debug(
                 f"{DOMAIN} - Charge limits from force refresh - "
                 f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
             )
-        except Exception:
-            _LOGGER.debug(
-                f"{DOMAIN} - Failed to parse targetSOC from force refresh response. "
-                f"Data: {charge_dict}"
+        except Exception as err:
+            _LOGGER.warning(
+                f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
+                f"{err}. Data: {charge_dict}",
+                exc_info=True,
             )
 
     def check_action_status(
