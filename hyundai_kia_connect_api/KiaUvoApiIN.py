@@ -220,6 +220,11 @@ class KiaUvoApiIN(ApiImplType1):
 
         self._update_vehicle_location(vehicle, state)
 
+        if vehicle.engine_type == ENGINE_TYPES.EV:
+            charge = self._get_charge_limits(token, vehicle)
+            self._update_vehicle_properties_charge(vehicle, charge)
+
+
     def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "odometer"):
             vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
@@ -253,6 +258,9 @@ class KiaUvoApiIN(ApiImplType1):
             or vehicle.engine_type == ENGINE_TYPES.PHEV
         ):
             try:
+                charge = self._get_charge_limits(token, vehicle)
+                self._update_vehicle_properties_charge(vehicle, charge)
+                
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types provide this information.
@@ -640,6 +648,19 @@ class KiaUvoApiIN(ApiImplType1):
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
+
+    def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
+        try:
+            if isinstance(state.get('targetSOClist'), list):
+                for item in state['targetSOClist']:
+                    if item["plugType"] == 0:
+                        vehicle.ev_charge_limits_dc = item["targetSOClevel"]
+                    elif item["plugType"] == 1:
+                        vehicle.ev_charge_limits_ac = item["targetSOClevel"]
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+
+
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
         # Not currently used as value is in the general get.
