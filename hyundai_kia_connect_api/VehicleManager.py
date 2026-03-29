@@ -341,6 +341,13 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         self.api.update_day_trip_info(self.token, vehicle, yyyymmdd_string)
 
+    def get_notification_history(self, vehicle_id: str) -> list:
+        """Return notification history for regions that expose it."""
+        vehicle = self.get_vehicle(vehicle_id)
+        if not hasattr(self.api, "get_notification_history"):
+            return []
+        return self.api.get_notification_history(self.token, vehicle)
+
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False
 

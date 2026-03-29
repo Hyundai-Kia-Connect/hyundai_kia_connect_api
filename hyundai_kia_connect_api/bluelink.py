@@ -389,6 +389,34 @@ def cmd_info(vm, args):
     return 0
 
 
+def cmd_debug_login(vm, args):
+    summary = {
+        "region": args.region,
+        "brand": args.brand,
+        "login": "pending",
+        "vehicles": [],
+        "state_checks": {},
+    }
+
+    try:
+        vm.check_and_refresh_token()
+        summary["login"] = "ok"
+        summary["vehicles"] = list(vm.vehicles.keys())
+
+        if not args.skip_state:
+            for vehicle_id in vm.vehicles.keys():
+                vm.update_vehicle_with_cached_state(vehicle_id)
+                summary["state_checks"][vehicle_id] = "ok"
+
+        print(json.dumps(summary, cls=DateTimeEncoder, indent=4))
+        return 0
+    except Exception as exc:
+        summary["login"] = "error"
+        summary["error"] = str(exc)
+        print(json.dumps(summary, cls=DateTimeEncoder, indent=4), file=sys.stderr)
+        return 1
+
+
 def main():
     default_username = os.environ.get("BLUELINK_USERNAME", "")
     default_password = os.environ.get("BLUELINK_PASSWORD", "")
@@ -443,6 +471,17 @@ def main():
         type=argparse.FileType("w", encoding="UTF-8"),
         help="Save data to file as JSON",
     )
+    parser_debug_login = subparsers.add_parser(
+        "debug-login",
+        help="Run login, vehicle listing and optional state fetch with sanitized errors",
+    )
+    parser_debug_login.set_defaults(func=cmd_debug_login)
+    parser_debug_login.add_argument(
+        "--skip-state",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Skip vehicle state fetch after login",
+    )
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.ERROR)
@@ -457,12 +496,13 @@ def main():
         username=args.username,
         password=args.password,
         pin=args.pin,
-        geocode_api_enable=True,
-        geocode_api_use_email=True,
+        geocode_api_enable=args.func == cmd_info,
+        geocode_api_use_email=args.func == cmd_info,
     )
-    # TODO: Cache token.
-    vm.check_and_refresh_token()
-    vm.update_all_vehicles_with_cached_state()
+    if args.func == cmd_info:
+        # TODO: Cache token.
+        vm.check_and_refresh_token()
+        vm.update_all_vehicles_with_cached_state()
     return args.func(vm, args)
 
 

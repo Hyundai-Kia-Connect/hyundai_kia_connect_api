@@ -198,6 +198,12 @@ class Vehicle:
     remote_ignition: bool = None
     transmission_condition: str = None
     sleep_mode_check: bool = None
+    engine_oil_warning_is_on: bool = None
+    tail_lamps_are_on: bool = None
+    hazard_lights_are_on: bool = None
+    remote_control_available: bool = None
+    remote_control_waiting_time: int = None
+    notification_history: list = None
 
     # Lamp status fields (KiaUvoApiEU and CA)
     headlamp_status: str = None

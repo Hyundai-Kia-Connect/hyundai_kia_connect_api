@@ -3,11 +3,12 @@
 # pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
 
 import datetime as dt
+import json
 import logging
 import typing as ty
 from datetime import timedelta
 from time import sleep
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import requests
 
@@ -20,12 +21,13 @@ from .const import (
     ENGINE_TYPES,
     ORDER_STATUS,
     SEAT_STATUS,
+    TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
 from .exceptions import APIError
 from .Token import Token
-from .utils import get_index_into_hex_temp, parse_date_br
+from .utils import get_hex_temp_into_index, get_index_into_hex_temp, parse_date_br
 from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,6 +37,27 @@ class HyundaiBlueLinkApiBR(ApiImpl):
     """Brazilian Hyundai BlueLink API implementation."""
 
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+    _sensitive_debug_keys = {
+        "access_token",
+        "authorization",
+        "code",
+        "controltoken",
+        "cookie",
+        "email",
+        "password",
+        "pin",
+        "refresh_token",
+        "set-cookie",
+        "username",
+    }
+    _signin_step_messages = {
+        4: "agreement acceptance required",
+        5: "password change required",
+        8: "identity verification required",
+        10: "email authorization required",
+        11: "change user email required",
+        13: "email authorization required",
+    }
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
         if BRANDS[brand] != BRAND_HYUNDAI:
@@ -69,6 +92,196 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         self.session = requests.Session()
         self.temperature_range = range(62, 82)
 
+    def _mask_secret(self, value: str) -> str:
+        """Mask secrets before logging or raising errors."""
+        if not value:
+            return value
+        if len(value) <= 8:
+            return "***"
+        return f"{value[:4]}...{value[-4:]}"
+
+    def _mask_email(self, value: str) -> str:
+        """Mask account e-mail addresses in debug output."""
+        if "@" not in value:
+            return self._mask_secret(value)
+        local, domain = value.split("@", 1)
+        if len(local) <= 2:
+            return f"***@{domain}"
+        return f"{local[:2]}***@{domain}"
+
+    def _sanitize_url(self, value: str) -> str:
+        """Mask sensitive query-string values in URLs."""
+        parsed = urlparse(value)
+        if not parsed.scheme or not parsed.netloc:
+            return value
+
+        query = []
+        for key, item in parse_qsl(parsed.query, keep_blank_values=True):
+            lowered_key = key.lower()
+            if lowered_key in self._sensitive_debug_keys:
+                item = self._mask_secret(item)
+            elif "@" in item:
+                item = self._mask_email(item)
+            query.append((key, item))
+
+        return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+
+    def _sanitize_debug_data(self, value: ty.Any, key: str | None = None) -> ty.Any:
+        """Recursively sanitize debug payloads."""
+        lowered_key = key.lower() if key else None
+
+        if isinstance(value, dict):
+            return {
+                item_key: self._sanitize_debug_data(item_value, item_key)
+                for item_key, item_value in value.items()
+            }
+        if isinstance(value, list):
+            return [self._sanitize_debug_data(item, key) for item in value]
+        if isinstance(value, tuple):
+            return tuple(self._sanitize_debug_data(item, key) for item in value)
+        if isinstance(value, str):
+            if lowered_key in self._sensitive_debug_keys:
+                if lowered_key in {"email", "username"}:
+                    return self._mask_email(value)
+                return self._mask_secret(value)
+            if value.startswith("Bearer "):
+                return "Bearer " + self._mask_secret(value[7:])
+            if "@" in value:
+                return self._mask_email(value)
+            if value.startswith("http://") or value.startswith("https://"):
+                return self._sanitize_url(value)
+            return value
+
+        return value
+
+    def _response_debug_payload(self, response: requests.Response) -> dict:
+        """Build a sanitized debug view of an HTTP response."""
+        headers = {
+            key: self._sanitize_debug_data(value, key)
+            for key, value in response.headers.items()
+            if key.lower()
+            in {
+                "ccsp-request-id",
+                "content-type",
+                "location",
+                "set-cookie",
+                "x-ratelimit-limit",
+                "x-ratelimit-remaining",
+                "x-ratelimit-reset",
+            }
+        }
+        cookies = {
+            key: self._sanitize_debug_data(value, key)
+            for key, value in response.cookies.get_dict().items()
+        }
+
+        try:
+            body = self._sanitize_debug_data(response.json())
+        except ValueError:
+            body = self._sanitize_debug_data(response.text[:500], "body")
+
+        return {
+            "status_code": response.status_code,
+            "headers": headers,
+            "cookies": cookies,
+            "body": body,
+        }
+
+    def _log_response_debug(self, label: str, response: requests.Response) -> None:
+        """Log a sanitized HTTP response at debug level."""
+        _LOGGER.debug(
+            "%s - %s response %s",
+            DOMAIN,
+            label,
+            json.dumps(self._response_debug_payload(response), sort_keys=True),
+        )
+
+    def _parse_json_response(
+        self, response: requests.Response, label: str
+    ) -> dict[str, ty.Any]:
+        """Parse a JSON API response and raise a descriptive error if invalid."""
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            sanitized_text = self._sanitize_debug_data(response.text[:500], "body")
+            raise APIError(
+                f"{label} returned non-JSON response: {sanitized_text}"
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise APIError(
+                f"{label} returned unexpected JSON payload type: {type(payload).__name__}"
+            )
+
+        return payload
+
+    def _raise_for_status_with_context(
+        self, response: requests.Response, label: str
+    ) -> None:
+        """Translate HTTP errors into descriptive APIError exceptions."""
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            payload = None
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = response.text[:500]
+
+            sanitized_payload = self._sanitize_debug_data(payload, "body")
+            if isinstance(sanitized_payload, dict):
+                err_code = sanitized_payload.get("errCode")
+                err_msg = sanitized_payload.get("errMsg")
+                details = []
+                if err_code is not None:
+                    details.append(f"errCode={err_code}")
+                if err_msg:
+                    details.append(f"errMsg={err_msg}")
+                if not details:
+                    details.append(f"response={sanitized_payload}")
+                detail_text = ", ".join(details)
+            else:
+                detail_text = str(sanitized_payload)
+
+            raise APIError(
+                f"{label} failed with HTTP {response.status_code}: {detail_text}"
+            ) from exc
+
+    def _extract_authorization_code(self, response_data: dict[str, ty.Any]) -> str:
+        """Extract the authorization code or raise a descriptive APIError."""
+        redirect_url = response_data.get("redirectUrl")
+        if isinstance(redirect_url, str) and redirect_url:
+            parsed_url = urlparse(redirect_url)
+            query_params = dict(parse_qsl(parsed_url.query, keep_blank_values=True))
+            authorization_code = query_params.get("code")
+            if authorization_code:
+                return authorization_code
+
+            sanitized_redirect = self._sanitize_debug_data(redirect_url, "redirectUrl")
+            raise APIError(
+                "Brazil sign-in returned redirectUrl without authorization code: "
+                f"{sanitized_redirect}"
+            )
+
+        step = response_data.get("step")
+        err_code = response_data.get("errCode")
+        err_msg = response_data.get("errMsg")
+
+        details = ["Brazil sign-in returned no redirectUrl"]
+        if step is not None:
+            step_message = self._signin_step_messages.get(step, "unexpected step")
+            details.append(f"step={step} ({step_message})")
+        if err_code is not None:
+            details.append(f"errCode={err_code}")
+        if err_msg:
+            details.append(f"errMsg={err_msg}")
+        if "captcha" in response_data:
+            details.append("captcha required")
+
+        sanitized_payload = self._sanitize_debug_data(response_data)
+        details.append(f"response={sanitized_payload}")
+        raise APIError(", ".join(details))
+
     def _build_api_url(self, path: str) -> str:
         """Build full API URL from path."""
         return urljoin(self.api_url, path.lstrip("/"))
@@ -97,9 +310,14 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         url = self._build_api_url("/user/oauth2/authorize")
         _LOGGER.debug(f"{DOMAIN} - Requesting cookies from {url}")
         response = self.session.get(url, params=params)
-        response.raise_for_status()
+        self._log_response_debug("BR authorize", response)
+        self._raise_for_status_with_context(response, "Brazil authorize")
         cookies = response.cookies.get_dict()
-        _LOGGER.debug(f"{DOMAIN} - Got cookies: {cookies}")
+        _LOGGER.debug(
+            "%s - Got cookies: %s",
+            DOMAIN,
+            self._sanitize_debug_data(cookies),
+        )
         return cookies
 
     def _get_authorization_code(
@@ -125,13 +343,12 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         }
 
         response = self.session.post(url, json=data, cookies=cookies, headers=headers)
-        response.raise_for_status()
-        response_data = response.json()
+        self._log_response_debug("BR signin", response)
+        self._raise_for_status_with_context(response, "Brazil sign-in")
+        response_data = self._parse_json_response(response, "Brazil sign-in")
 
-        _LOGGER.debug(f"{DOMAIN} - Got redirect URL")
-        parsed_url = urlparse(response_data["redirectUrl"])
-        authorization_code = parsed_url.query.split("=")[1]
-        return authorization_code
+        _LOGGER.debug(f"{DOMAIN} - Got redirect URL or sign-in flow response")
+        return self._extract_authorization_code(response_data)
 
     def _get_auth_response(self, authorization_code: str) -> dict:
         """Request access token from the API."""
@@ -149,8 +366,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         }
 
         response = requests.post(url, data=body, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        self._log_response_debug("BR token", response)
+        self._raise_for_status_with_context(response, "Brazil token exchange")
+        return self._parse_json_response(response, "Brazil token exchange")
 
     def login(
         self,
@@ -278,16 +496,18 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         if air_temp := state.get("airTemp"):
             temp_value = air_temp.get("value")
             temp_unit = air_temp.get("unit")
-            # Handle special values: "00H" means off, or hex temperature values
-            # For now, only set if it's a valid numeric value
             if temp_value and temp_value != "00H":
                 try:
-                    # Try to parse as hex if it contains 'H'
-                    if "H" in str(temp_value):
-                        # Will be handled in future if needed
-                        pass
+                    if isinstance(temp_value, str) and temp_value.endswith("H"):
+                        vehicle.air_temperature = (
+                            get_hex_temp_into_index(temp_value),
+                            TEMPERATURE_UNITS.get(temp_unit),
+                        )
                     else:
-                        vehicle.air_temperature = (temp_value, temp_unit)
+                        vehicle.air_temperature = (
+                            temp_value,
+                            TEMPERATURE_UNITS.get(temp_unit),
+                        )
                 except (ValueError, TypeError, KeyError):
                     pass
 
@@ -345,6 +565,58 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         vehicle.rear_right_seat_status = SEAT_STATUS.get(
             seat_state.get("rrSeatHeatState")
         )
+
+        # Additional diagnostics already present in the BR payload.
+        if "acc" in state:
+            vehicle.accessory_on = bool(state.get("acc"))
+        if "transCond" in state:
+            vehicle.transmission_condition = bool(state.get("transCond"))
+        if "sleepModeCheck" in state:
+            vehicle.sleep_mode_check = bool(state.get("sleepModeCheck"))
+        if "engineOilStatus" in state:
+            vehicle.engine_oil_warning_is_on = bool(state.get("engineOilStatus"))
+        if "tailLampStatus" in state:
+            vehicle.tail_lamps_are_on = bool(state.get("tailLampStatus"))
+        if "hazardStatus" in state:
+            vehicle.hazard_lights_are_on = bool(state.get("hazardStatus"))
+
+        remote_waiting = state.get("remoteWaitingTimeAlert")
+        if isinstance(remote_waiting, dict):
+            if "remoteControlAvailable" in remote_waiting:
+                vehicle.remote_control_available = bool(
+                    remote_waiting.get("remoteControlAvailable")
+                )
+            if "remoteControlWaitingTime" in remote_waiting:
+                vehicle.remote_control_waiting_time = remote_waiting.get(
+                    "remoteControlWaitingTime"
+                )
+
+        lamp_wire_status = state.get("lampWireStatus")
+        if isinstance(lamp_wire_status, dict):
+            head_lamp = lamp_wire_status.get("headLamp", {})
+            stop_lamp = lamp_wire_status.get("stopLamp", {})
+            turn_signal = lamp_wire_status.get("turnSignalLamp", {})
+
+            if "headLampStatus" in head_lamp:
+                vehicle.headlamp_status = bool(head_lamp.get("headLampStatus"))
+            if "leftLowLamp" in head_lamp:
+                vehicle.headlamp_left_low = bool(head_lamp.get("leftLowLamp"))
+            if "rightLowLamp" in head_lamp:
+                vehicle.headlamp_right_low = bool(head_lamp.get("rightLowLamp"))
+            if "leftLamp" in stop_lamp:
+                vehicle.stop_lamp_left = bool(stop_lamp.get("leftLamp"))
+            if "rightLamp" in stop_lamp:
+                vehicle.stop_lamp_right = bool(stop_lamp.get("rightLamp"))
+            if "leftFrontLamp" in turn_signal:
+                vehicle.turn_signal_left_front = bool(turn_signal.get("leftFrontLamp"))
+            if "rightFrontLamp" in turn_signal:
+                vehicle.turn_signal_right_front = bool(
+                    turn_signal.get("rightFrontLamp")
+                )
+            if "leftRearLamp" in turn_signal:
+                vehicle.turn_signal_left_rear = bool(turn_signal.get("leftRearLamp"))
+            if "rightRearLamp" in turn_signal:
+                vehicle.turn_signal_right_rear = bool(turn_signal.get("rightRearLamp"))
 
         # Tire pressure warnings
         # Note: Brazilian Creta only has "all" indicator, not individual sensors
