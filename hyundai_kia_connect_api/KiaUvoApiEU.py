@@ -1349,6 +1349,33 @@ class KiaUvoApiEU(ApiImplType1):
         return authorization_code
 
     def _get_access_token(self, stamp, authorization_code):
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            url = self.USER_API_URL + "oauth2/token"
+            headers = {
+                "Authorization": self.BASIC_AUTHORIZATION,
+                "Stamp": stamp,
+                "Content-type": "application/x-www-form-urlencoded",
+                "Host": self.BASE_URL,
+                "Connection": "close",
+                "Accept-Encoding": "gzip, deflate",
+                "User-Agent": USER_AGENT_OK_HTTP,
+            }
+            data = (
+                "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
+                + authorization_code
+            )
+            response = requests.post(url, data=data, headers=headers)
+            response_json = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
+            _check_response_for_errors(response_json)
+
+            token_type = response_json["token_type"]
+            access_token = token_type + " " + response_json["access_token"]
+            # Genesis doesn't issue a new refresh_token in this response, so we keep the old one
+            expires_in = response_json["expires_in"]
+            return token_type, access_token, authorization_code, expires_in
+
+        # Default for Kia and Hyundai
         url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
         data = {
             "grant_type": "refresh_token",
@@ -1359,14 +1386,14 @@ class KiaUvoApiEU(ApiImplType1):
 
         response = requests.post(url, data=data, allow_redirects=False)
 
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
-        _check_response_for_errors(response)
+        response_json = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
+        _check_response_for_errors(response_json)
 
-        token_type = response["token_type"]
-        access_token = token_type + " " + response["access_token"]
-        authorization_code = response["refresh_token"]
-        expires_in = response["expires_in"]
+        token_type = response_json["token_type"]
+        access_token = token_type + " " + response_json["access_token"]
+        authorization_code = response_json.get("refresh_token", authorization_code)
+        expires_in = response_json["expires_in"]
         return token_type, access_token, authorization_code, expires_in
 
     def _get_refresh_token(self, stamp, authorization_code):
