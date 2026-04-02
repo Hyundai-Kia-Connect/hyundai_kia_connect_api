@@ -335,3 +335,29 @@ class ApiImpl:
         return self.login(
             username=token.username, password=token.password, pin=token.pin
         )
+
+    def get_authorize_url(self) -> str:
+        """Return the OAuth authorize URL for the user to open in a browser.
+
+        Only implemented for regions that require browser-based authentication
+        (currently New Zealand). Raises NotImplementedError for all others.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support browser-based authentication"
+        )
+
+    def login_with_auth_code(
+        self,
+        auth_code: str,
+        username: str,
+        password: str,
+        pin: str | None = None,
+    ) -> Token:
+        """Exchange a browser-obtained OAuth auth code for tokens.
+
+        Only implemented for regions that require browser-based authentication
+        (currently New Zealand). Raises NotImplementedError for all others.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support browser-based authentication"
+        )
