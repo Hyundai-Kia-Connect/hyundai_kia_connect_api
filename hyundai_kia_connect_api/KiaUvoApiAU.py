@@ -105,7 +105,9 @@ class KiaUvoApiAU(ApiImplType1):
                 username, password, cookies, referer=cookies_referer
             )
         except Exception as ex:
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed: {ex}")
+            _LOGGER.debug(
+                f"{DOMAIN} - get_authorization_code_with_redirect_url failed: {ex}"
+            )
 
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
