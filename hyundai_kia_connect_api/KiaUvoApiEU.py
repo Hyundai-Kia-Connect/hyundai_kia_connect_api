@@ -1366,7 +1366,6 @@ class KiaUvoApiEU(ApiImplType1):
             )
             response = requests.post(url, data=data, headers=headers)
             response_json = response.json()
-            _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
             _check_response_for_errors(response_json)
 
             token_type = response_json["token_type"]
@@ -1387,7 +1386,6 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(url, data=data, allow_redirects=False)
 
         response_json = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
         _check_response_for_errors(response_json)
 
         token_type = response_json["token_type"]
