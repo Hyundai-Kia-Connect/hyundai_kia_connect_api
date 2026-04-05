@@ -4,7 +4,7 @@
 name: Test Builds
 
 on:
-    pull_request_target:
+    pull_request:
         branches:
             - master
 
@@ -37,12 +37,3 @@ jobs:
                   flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
                   # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
                   flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-            - name: Test with pytest
-              env:
-                  KIA_CA_CDNNINJA_USERNAME: ${{ secrets.KIA_CA_CDNNINJA_USERNAME }}
-                  KIA_CA_CDNNINJA_PASSWORD: ${{ secrets.KIA_CA_CDNNINJA_PASSWORD }}
-                  KIA_CA_CDNNINJA_PIN: ${{ secrets.KIA_CA_CDNNINJA_PIN }}
-                  KIA_EU_FUATAKGUN_USERNAME: ${{ secrets.KIA_EU_FUATAKGUN_USERNAME }}
-                  KIA_EU_FUATAKGUN_PASSWORD: ${{ secrets.KIA_EU_FUATAKGUN_PASSWORD }}
-              run: |
-                  pytest
