@@ -1014,7 +1014,6 @@ class KiaUvoApiIN(ApiImplType1):
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
         authorization_code = response["refresh_token"]
-        _LOGGER.debug(f"{DOMAIN} - Access Token Value {access_token}")
         return token_type, access_token, authorization_code
 
     def get_last_updated_at(self, value) -> dt.datetime:
