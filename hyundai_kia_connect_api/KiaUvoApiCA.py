@@ -461,15 +461,24 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(state, "status.lastStatusDate"), dt.timezone.utc
         )
         ref_date = dt.datetime.now(tz=dt.timezone.utc)
-        tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
-        if tz:
-            _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
-            vehicle.timezone = tz
-        else:
-            delta = (ref_date - last_updated_at).total_seconds() / 3600
-            _LOGGER.warning(
-                f"{DOMAIN} - could not guess Canadian timezone! delta is {delta} hours"
+        raw_delta_seconds = (ref_date - last_updated_at).total_seconds()
+        if abs(raw_delta_seconds) < 20 * 60:
+            # Timestamp is already in UTC (e.g. fresh forced-refresh response);
+            # reinterpreting it as a Canadian local time would always fail — skip silently.
+            _LOGGER.debug(
+                f"{DOMAIN} - lastStatusDate delta is {raw_delta_seconds:.1f}s; "
+                "skipping Canadian timezone guess (timestamp appears to be UTC)"
             )
+        else:
+            tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
+            if tz:
+                _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
+                vehicle.timezone = tz
+            else:
+                _LOGGER.warning(
+                    f"{DOMAIN} - could not guess Canadian timezone! "
+                    f"delta is {raw_delta_seconds / 3600} hours"
+                )
 
         self._update_vehicle_properties_base(vehicle, state)
 
