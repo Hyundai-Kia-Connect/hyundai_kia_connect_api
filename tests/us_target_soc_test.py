@@ -661,7 +661,12 @@ def test_evc_gts_error_response_preserves_cached():
 def test_evc_gts_empty_list_preserves_cached():
     """Empty targetSOClist from /evc/gts preserves cached values."""
     empty_response = {
-        "status": {"statusCode": 0, "errorType": 0, "errorCode": 0, "errorMessage": "Success with response body"},
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
         "payload": {"targetSOClist": []},
     }
     api = _make_api_with_fake_get(empty_response)
@@ -678,7 +683,12 @@ def test_evc_gts_empty_list_preserves_cached():
 def test_evc_gts_zero_values_ignored():
     """Zero targetSOClevel from /evc/gts should be ignored (pre-refresh state)."""
     zero_response = {
-        "status": {"statusCode": 0, "errorType": 0, "errorCode": 0, "errorMessage": "Success with response body"},
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
         "payload": {
             "targetSOClist": [
                 {"plugType": 0, "targetSOClevel": 0},
@@ -721,7 +731,12 @@ def test_evc_gts_exception_preserves_cached(caplog):
 def test_evc_gts_bool_values_rejected():
     """Bool targetSOClevel from /evc/gts should be rejected."""
     bool_response = {
-        "status": {"statusCode": 0, "errorType": 0, "errorCode": 0, "errorMessage": "Success with response body"},
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
         "payload": {
             "targetSOClist": [
                 {"plugType": 0, "targetSOClevel": True},

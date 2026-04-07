@@ -876,9 +876,7 @@ class KiaUvoApiUSA(ApiImpl):
                     f"{response_json['status']['errorMessage']}"
                 )
                 return
-            target_soc_list = response_json.get("payload", {}).get(
-                "targetSOClist"
-            )
+            target_soc_list = response_json.get("payload", {}).get("targetSOClist")
             if not target_soc_list:
                 _LOGGER.debug(f"{DOMAIN} - /evc/gts returned empty targetSOClist")
                 return
