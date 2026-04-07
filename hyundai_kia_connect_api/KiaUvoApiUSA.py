@@ -416,6 +416,7 @@ class KiaUvoApiUSA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -853,6 +854,53 @@ class KiaUvoApiUSA(ApiImpl):
             _LOGGER.warning(
                 f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
                 f"{err}. Data: {charge_dict}",
+                exc_info=True,
+            )
+
+    def _get_charge_targets(self, token: Token, vehicle: Vehicle) -> None:
+        """Read current charge targets via the dedicated /evc/gts endpoint.
+
+        The cmm/gvi and rems/rvs endpoints do not return targetSOC for some
+        vehicles (e.g. 2020 Kia Niro EV).  The /evc/gts endpoint reliably
+        returns the current AC and DC charge target percentages.
+        """
+        url = self.API_URL + "evc/gts"
+        try:
+            response = self.get_request_with_logging_and_active_session(
+                token=token, url=url, vehicle=vehicle
+            )
+            response_json = response.json()
+            if response_json["status"]["statusCode"] != 0:
+                _LOGGER.debug(
+                    f"{DOMAIN} - /evc/gts returned error: "
+                    f"{response_json['status']['errorMessage']}"
+                )
+                return
+            target_soc_list = response_json.get("payload", {}).get(
+                "targetSOClist"
+            )
+            if not target_soc_list:
+                _LOGGER.debug(f"{DOMAIN} - /evc/gts returned empty targetSOClist")
+                return
+            for entry in target_soc_list:
+                plug_type = entry.get("plugType")
+                level = entry.get("targetSOClevel")
+                if not isinstance(level, (int, float)) or isinstance(level, bool):
+                    continue
+                level = int(level)
+                if level <= 0:
+                    continue
+                if plug_type == 1:
+                    vehicle.ev_charge_limits_ac = level
+                elif plug_type == 0:
+                    vehicle.ev_charge_limits_dc = level
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge targets from /evc/gts - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to get charge targets from /evc/gts",
                 exc_info=True,
             )
 
