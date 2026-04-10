@@ -751,3 +751,55 @@ def test_evc_gts_bool_values_rejected():
 
     assert vehicle.ev_charge_limits_ac is None
     assert vehicle.ev_charge_limits_dc is None
+
+
+def test_update_cached_state_skips_evc_gts_for_ice_vehicle():
+    """Verify /evc/gts is NOT called for ICE vehicles (no ev_battery_percentage)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+    api._update_vehicle_properties = lambda vehicle, state: None
+
+    vehicle = _make_vehicle()
+    assert vehicle.ev_battery_percentage is None  # ICE vehicle
+
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 0
+    assert vehicle.ev_charge_limits_ac is None
+    assert vehicle.ev_charge_limits_dc is None
+
+
+def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
+    """Verify /evc/gts IS called for EV vehicles (ev_battery_percentage set)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+
+    def fake_update_props(vehicle, state):
+        vehicle.ev_battery_percentage = 67  # simulate EV
+
+    api._update_vehicle_properties = fake_update_props
+
+    vehicle = _make_vehicle()
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 1
+    assert vehicle.ev_charge_limits_dc == 100
+    assert vehicle.ev_charge_limits_ac == 80

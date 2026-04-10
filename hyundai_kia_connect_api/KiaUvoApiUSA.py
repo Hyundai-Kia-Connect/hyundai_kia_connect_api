@@ -416,7 +416,12 @@ class KiaUvoApiUSA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
-        self._get_charge_targets(token, vehicle)
+        # Only EV/PHEV vehicles have charge targets; skip the /evc/gts call
+        # for ICE vehicles. ev_battery_percentage is set by
+        # _update_vehicle_properties when the cached response includes
+        # evStatus.batteryStatus, which is EV/PHEV-only.
+        if vehicle.ev_battery_percentage is not None:
+            self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -863,6 +868,15 @@ class KiaUvoApiUSA(ApiImpl):
         The cmm/gvi and rems/rvs endpoints do not return targetSOC for some
         vehicles (e.g. 2020 Kia Niro EV).  The /evc/gts endpoint reliably
         returns the current AC and DC charge target percentages.
+
+        Note: On a freshly authenticated session, the first call to this
+        endpoint may return targetSOClevel=0 for both plug types until the
+        server populates the cache (a force refresh or a few minutes of
+        session activity is usually enough). We treat 0 as "no data" and
+        preserve any previously cached values rather than overwriting with
+        a bogus 0.  Valid charge limits are 50-100 per the chargeFeature
+        metadata (minTargetSOC=50, maxTargetSOC=100), so 0 is never a
+        legitimate value.
         """
         url = self.API_URL + "evc/gts"
         try:
@@ -887,6 +901,13 @@ class KiaUvoApiUSA(ApiImpl):
                     continue
                 level = int(level)
                 if level <= 0:
+                    # Skip zero/negative values - typically returned on fresh
+                    # sessions before server-side cache populates. Preserve
+                    # any existing cached values instead.
+                    _LOGGER.debug(
+                        f"{DOMAIN} - /evc/gts returned level={level} for "
+                        f"plugType={plug_type}, preserving cached value"
+                    )
                     continue
                 if plug_type == 1:
                     vehicle.ev_charge_limits_ac = level
