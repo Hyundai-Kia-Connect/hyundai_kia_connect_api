@@ -3,26 +3,38 @@
 # pylint:disable=invalid-name
 
 import datetime as dt
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 
 @dataclass
 class Token:
-    """Token"""
+    """Token
+
+    Security note: password and pin are excluded from to_dict() serialization
+    to prevent credential leakage through HA backups, debug logs, and diagnostics.
+    """
 
     username: str = None
-    password: str = None
+    password: str = field(default=None, repr=False)
     access_token: str = None
     refresh_token: str = None
     device_id: str = None
     # Access Token expiry:
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
-    pin: str = None
+    pin: str = field(default=None, repr=False)
 
     def to_dict(self) -> dict:
-        """Convert Token to a JSON‑serializable dict."""
+        """Convert Token to a JSON-serializable dict.
+
+        Password and PIN are deliberately excluded to prevent
+        credential leakage through serialized state.
+        """
         data = asdict(self)
+
+        # Security fix: remove plaintext credentials from serialized output
+        data.pop("password", None)
+        data.pop("pin", None)
 
         # Convert datetime to ISO string
         data["valid_until"] = self.valid_until.isoformat()
@@ -39,11 +51,11 @@ class Token:
 
         return cls(
             username=data.get("username"),
-            password=data.get("password"),
+            # password intentionally not loaded from serialized state
             access_token=data.get("access_token"),
             refresh_token=data.get("refresh_token"),
             device_id=data.get("device_id"),
             valid_until=valid_until,
             stamp=data.get("stamp"),
-            pin=data.get("pin"),
+            # pin intentionally not loaded from serialized state
         )
