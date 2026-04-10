@@ -416,6 +416,12 @@ class KiaUvoApiUSA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        # Only EV/PHEV vehicles have charge targets; skip the /evc/gts call
+        # for ICE vehicles. ev_battery_percentage is set by
+        # _update_vehicle_properties when the cached response includes
+        # evStatus.batteryStatus, which is EV/PHEV-only.
+        if vehicle.ev_battery_percentage is not None:
+            self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -853,6 +859,67 @@ class KiaUvoApiUSA(ApiImpl):
             _LOGGER.warning(
                 f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
                 f"{err}. Data: {charge_dict}",
+                exc_info=True,
+            )
+
+    def _get_charge_targets(self, token: Token, vehicle: Vehicle) -> None:
+        """Read current charge targets via the dedicated /evc/gts endpoint.
+
+        The cmm/gvi and rems/rvs endpoints do not return targetSOC for some
+        vehicles (e.g. 2020 Kia Niro EV).  The /evc/gts endpoint reliably
+        returns the current AC and DC charge target percentages.
+
+        Note: On a freshly authenticated session, the first call to this
+        endpoint may return targetSOClevel=0 for both plug types until the
+        server populates the cache (a force refresh or a few minutes of
+        session activity is usually enough). We treat 0 as "no data" and
+        preserve any previously cached values rather than overwriting with
+        a bogus 0.  Valid charge limits are 50-100 per the chargeFeature
+        metadata (minTargetSOC=50, maxTargetSOC=100), so 0 is never a
+        legitimate value.
+        """
+        url = self.API_URL + "evc/gts"
+        try:
+            response = self.get_request_with_logging_and_active_session(
+                token=token, url=url, vehicle=vehicle
+            )
+            response_json = response.json()
+            if response_json["status"]["statusCode"] != 0:
+                _LOGGER.debug(
+                    f"{DOMAIN} - /evc/gts returned error: "
+                    f"{response_json['status']['errorMessage']}"
+                )
+                return
+            target_soc_list = response_json.get("payload", {}).get("targetSOClist")
+            if not target_soc_list:
+                _LOGGER.debug(f"{DOMAIN} - /evc/gts returned empty targetSOClist")
+                return
+            for entry in target_soc_list:
+                plug_type = entry.get("plugType")
+                level = entry.get("targetSOClevel")
+                if not isinstance(level, (int, float)) or isinstance(level, bool):
+                    continue
+                level = int(level)
+                if level <= 0:
+                    # Skip zero/negative values - typically returned on fresh
+                    # sessions before server-side cache populates. Preserve
+                    # any existing cached values instead.
+                    _LOGGER.debug(
+                        f"{DOMAIN} - /evc/gts returned level={level} for "
+                        f"plugType={plug_type}, preserving cached value"
+                    )
+                    continue
+                if plug_type == 1:
+                    vehicle.ev_charge_limits_ac = level
+                elif plug_type == 0:
+                    vehicle.ev_charge_limits_dc = level
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge targets from /evc/gts - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to get charge targets from /evc/gts",
                 exc_info=True,
             )
 
