@@ -136,7 +136,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         data = {"username": username, "password": password}
 
         response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response = response.json()
         if response.get("access_token") is None:
             raise AuthenticationError(
