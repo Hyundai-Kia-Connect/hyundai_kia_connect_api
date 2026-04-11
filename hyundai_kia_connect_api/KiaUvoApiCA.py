@@ -209,7 +209,6 @@ class KiaUvoApiCA(ApiImpl):
 
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response_json = response.json()
 
         # Check if OTP is required (error code 7110)
