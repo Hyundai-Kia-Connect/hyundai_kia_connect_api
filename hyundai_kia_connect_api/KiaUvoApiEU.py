@@ -802,7 +802,7 @@ class KiaUvoApiEU(ApiImplType1):
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
             response = requests.get(
@@ -813,7 +813,7 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except Exception as e:
             _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
