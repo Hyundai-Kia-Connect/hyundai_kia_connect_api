@@ -99,7 +99,6 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response = self.session.get(url, params=params)
         response.raise_for_status()
         cookies = response.cookies.get_dict()
-        _LOGGER.debug(f"{DOMAIN} - Got cookies: {cookies}")
         return cookies
 
     def _get_authorization_code(
