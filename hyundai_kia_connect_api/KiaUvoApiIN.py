@@ -969,9 +969,7 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = requests.Session()
         _ = session.get(url)
-        _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
-        # return session
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
@@ -1006,10 +1004,8 @@ class KiaUvoApiIN(ApiImplType1):
             + "%3A8080%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Data: {headers}{data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response}")
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
@@ -1052,10 +1048,8 @@ class KiaUvoApiIN(ApiImplType1):
             "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
             + authorization_code
         )
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Data: {data}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Refresh Token Response: {response}")
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
@@ -1071,10 +1065,8 @@ class KiaUvoApiIN(ApiImplType1):
         }
 
         data = {"deviceId": token.device_id, "pin": token.pin}
-        _LOGGER.debug(f"{DOMAIN} - Get Control Token Data: {data}")
         response = requests.put(url, json=data, headers=headers)
         response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
         control_token = "Bearer " + response["controlToken"]
         control_token_expire_at = math.floor(
             dt.datetime.now().timestamp() + response["expiresTime"]
