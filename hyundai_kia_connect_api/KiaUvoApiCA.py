@@ -209,7 +209,6 @@ class KiaUvoApiCA(ApiImpl):
 
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
         response_json = response.json()
 
         # Check if OTP is required (error code 7110)
@@ -245,14 +244,15 @@ class KiaUvoApiCA(ApiImpl):
             result = selverifmeth_json.get("result", {})
             user_info_uuid = result.get("userInfoUuid")
             email_list = result.get("emailList", [])
+            phone = result.get("userPhone")
 
             return OTPRequest(
                 request_id=user_info_uuid,
                 otp_key=None,
-                has_email=len(email_list) > 0,
-                has_sms=False,
+                has_email=True,
+                has_sms=bool(phone),
                 email=email_list[0] if email_list else username,
-                sms=None,
+                sms=phone,
             )
 
         # Check for other errors
@@ -282,13 +282,24 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "mfa/sendotp"
         headers = self.API_HEADERS.copy()
         headers["Deviceid"] = self._get_device_id()
-        data = {
-            "otpMethod": "E",
-            "mfaApiCode": "0107",
-            "userAccount": otp_request.email,
-            "userPhone": "",
-            "userInfoUuid": otp_request.request_id,
-        }
+        if notify_type == OTP_NOTIFY_TYPE.EMAIL:
+            data = {
+                "otpMethod": "E",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": "",
+                "userInfoUuid": otp_request.request_id,
+            }
+        elif notify_type == OTP_NOTIFY_TYPE.SMS:
+            data = {
+                "otpMethod": "S",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": otp_request.sms,
+                "userInfoUuid": otp_request.request_id,
+            }
+        else:  # Should never happen due to enum, but just in case
+            raise ValueError("Invalid notify type")
 
         response = self.sessions.post(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
@@ -461,15 +472,24 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(state, "status.lastStatusDate"), dt.timezone.utc
         )
         ref_date = dt.datetime.now(tz=dt.timezone.utc)
-        tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
-        if tz:
-            _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
-            vehicle.timezone = tz
-        else:
-            delta = (ref_date - last_updated_at).total_seconds() / 3600
-            _LOGGER.warning(
-                f"{DOMAIN} - could not guess Canadian timezone! delta is {delta} hours"
+        raw_delta_seconds = (ref_date - last_updated_at).total_seconds()
+        if abs(raw_delta_seconds) < 20 * 60:
+            # Timestamp is already in UTC (e.g. fresh forced-refresh response);
+            # reinterpreting it as a Canadian local time would always fail — skip silently.
+            _LOGGER.debug(
+                f"{DOMAIN} - lastStatusDate delta is {raw_delta_seconds:.1f}s; "
+                "skipping Canadian timezone guess (timestamp appears to be UTC)"
             )
+        else:
+            tz = detect_timezone_for_date(last_updated_at, ref_date, CA_TIMEZONES)
+            if tz:
+                _LOGGER.debug(f"{DOMAIN} - Set vehicle.timezone to {tz} (guessed)")
+                vehicle.timezone = tz
+            else:
+                _LOGGER.warning(
+                    f"{DOMAIN} - could not guess Canadian timezone! "
+                    f"delta is {raw_delta_seconds / 3600} hours"
+                )
 
         self._update_vehicle_properties_base(vehicle, state)
 

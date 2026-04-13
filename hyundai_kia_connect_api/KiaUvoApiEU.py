@@ -802,7 +802,7 @@ class KiaUvoApiEU(ApiImplType1):
         return response
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
             response = requests.get(
@@ -813,7 +813,7 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]["gpsDetail"]
+            return response["resMsg"]
         except Exception as e:
             _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
@@ -1126,9 +1126,7 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = requests.Session()
         _ = session.get(url)
-        _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
         return session.cookies.get_dict()
-        # return session
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
@@ -1366,7 +1364,6 @@ class KiaUvoApiEU(ApiImplType1):
             )
             response = requests.post(url, data=data, headers=headers)
             response_json = response.json()
-            _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
             _check_response_for_errors(response_json)
 
             token_type = response_json["token_type"]
@@ -1387,7 +1384,6 @@ class KiaUvoApiEU(ApiImplType1):
         response = requests.post(url, data=data, allow_redirects=False)
 
         response_json = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Get Access Token Response: {response_json}")
         _check_response_for_errors(response_json)
 
         token_type = response_json["token_type"]
