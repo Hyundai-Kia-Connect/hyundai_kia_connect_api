@@ -284,21 +284,21 @@ class KiaUvoApiCA(ApiImpl):
         headers["Deviceid"] = self._get_device_id()
         if notify_type == OTP_NOTIFY_TYPE.EMAIL:
             data = {
-            "otpMethod": "E",
-            "mfaApiCode": "0107",
-            "userAccount": otp_request.email,
-            "userPhone": "",
-            "userInfoUuid": otp_request.request_id,
+                "otpMethod": "E",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": "",
+                "userInfoUuid": otp_request.request_id,
             }
         elif notify_type == OTP_NOTIFY_TYPE.SMS:
             data = {
-            "otpMethod": "S",
-            "mfaApiCode": "0107",
-            "userAccount": otp_request.email,
-            "userPhone": otp_request.sms,
-            "userInfoUuid": otp_request.request_id,
+                "otpMethod": "S",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": otp_request.sms,
+                "userInfoUuid": otp_request.request_id,
             }
-        else: # Should never happen due to enum, but just in case
+        else:  # Should never happen due to enum, but just in case
             raise ValueError("Invalid notify type")
 
         response = self.sessions.post(url, headers=headers, json=data)
