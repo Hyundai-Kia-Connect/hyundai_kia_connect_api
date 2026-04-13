@@ -21,6 +21,7 @@ from .Vehicle import Vehicle
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
+    ENGINE_TYPES,
     LOGIN_TOKEN_LIFETIME,
     ORDER_STATUS,
     TEMPERATURE_UNITS,
@@ -363,10 +364,21 @@ class KiaUvoApiUSA(ApiImpl):
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
+                engine_type=self._engine_type_from_fuel_type(entry.get("fuelType")),
                 timezone=self.data_timezone,
             )
             result.append(vehicle)
         return result
+
+    @staticmethod
+    def _engine_type_from_fuel_type(fuel_type) -> ty.Optional[ENGINE_TYPES]:
+        # Only fuelType=4 (EV) is confirmed against a live Kia USA account
+        # (2020 Niro EV). Mappings for ICE/PHEV/HEV are unknown, so leave
+        # engine_type as None for those and let _update_vehicle_properties
+        # refine it from the cached state's evStatus presence.
+        if fuel_type == 4:
+            return ENGINE_TYPES.EV
+        return None
 
     def refresh_vehicles(
         self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
@@ -417,10 +429,10 @@ class KiaUvoApiUSA(ApiImpl):
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
         # Only EV/PHEV vehicles have charge targets; skip the /evc/gts call
-        # for ICE vehicles. ev_battery_percentage is set by
-        # _update_vehicle_properties when the cached response includes
-        # evStatus.batteryStatus, which is EV/PHEV-only.
-        if vehicle.ev_battery_percentage is not None:
+        # for ICE vehicles. engine_type is set in get_vehicles from the
+        # fuelType hint and refined in _update_vehicle_properties from the
+        # cached state (evStatus presence => EV/PHEV, gasModeRange => PHEV).
+        if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
             self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -748,6 +760,27 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.dtc_descriptions = get_child_value(
             state, "lastVehicleInfo.activeDTC.dtcCategory"
         )
+
+        if vehicle.engine_type is None:
+            # fuelType in ownr/gvl only reliably maps 4 -> EV; for anything
+            # else we infer from the cached state. Presence of an evStatus
+            # block means a high-voltage battery (EV or PHEV); absence
+            # means ICE. PHEVs additionally report a gasModeRange block,
+            # which pure EVs never do.
+            ev_status = get_child_value(
+                state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus"
+            )
+            if ev_status:
+                gas_mode_range = get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                )
+                if gas_mode_range is not None:
+                    vehicle.engine_type = ENGINE_TYPES.PHEV
+                else:
+                    vehicle.engine_type = ENGINE_TYPES.EV
+            else:
+                vehicle.engine_type = ENGINE_TYPES.ICE
 
         vehicle.data = state
 

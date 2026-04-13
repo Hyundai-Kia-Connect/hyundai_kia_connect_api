@@ -12,6 +12,7 @@ preserved across subsequent cached updates.
 import datetime as dt
 import logging
 
+from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -754,32 +755,7 @@ def test_evc_gts_bool_values_rejected():
 
 
 def test_update_cached_state_skips_evc_gts_for_ice_vehicle():
-    """Verify /evc/gts is NOT called for ICE vehicles (no ev_battery_percentage)."""
-    api = _make_api()
-    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
-
-    call_count = {"n": 0}
-
-    def fake_get(token, url, vehicle):
-        call_count["n"] += 1
-        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
-
-    api.get_request_with_logging_and_active_session = fake_get
-    api._get_cached_vehicle_state = lambda token, vehicle: {}
-    api._update_vehicle_properties = lambda vehicle, state: None
-
-    vehicle = _make_vehicle()
-    assert vehicle.ev_battery_percentage is None  # ICE vehicle
-
-    api.update_vehicle_with_cached_state(None, vehicle)
-
-    assert call_count["n"] == 0
-    assert vehicle.ev_charge_limits_ac is None
-    assert vehicle.ev_charge_limits_dc is None
-
-
-def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
-    """Verify /evc/gts IS called for EV vehicles (ev_battery_percentage set)."""
+    """Verify /evc/gts is NOT called for ICE vehicles (engine_type=ICE)."""
     api = _make_api()
     api.API_URL = "https://api.owners.kia.com/apigw/v1/"
 
@@ -793,7 +769,34 @@ def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
     api._get_cached_vehicle_state = lambda token, vehicle: {}
 
     def fake_update_props(vehicle, state):
-        vehicle.ev_battery_percentage = 67  # simulate EV
+        vehicle.engine_type = ENGINE_TYPES.ICE
+
+    api._update_vehicle_properties = fake_update_props
+
+    vehicle = _make_vehicle()
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 0
+    assert vehicle.ev_charge_limits_ac is None
+    assert vehicle.ev_charge_limits_dc is None
+
+
+def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
+    """Verify /evc/gts IS called for EV vehicles (engine_type=EV)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+
+    def fake_update_props(vehicle, state):
+        vehicle.engine_type = ENGINE_TYPES.EV
 
     api._update_vehicle_properties = fake_update_props
 
@@ -803,3 +806,109 @@ def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
     assert call_count["n"] == 1
     assert vehicle.ev_charge_limits_dc == 100
     assert vehicle.ev_charge_limits_ac == 80
+
+
+def test_update_cached_state_calls_evc_gts_for_phev_vehicle():
+    """Verify /evc/gts IS called for PHEV vehicles (engine_type=PHEV)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+
+    def fake_update_props(vehicle, state):
+        vehicle.engine_type = ENGINE_TYPES.PHEV
+
+    api._update_vehicle_properties = fake_update_props
+
+    vehicle = _make_vehicle()
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 1
+
+
+def test_engine_type_from_fuel_type_ev():
+    """fuelType=4 in ownr/gvl maps to ENGINE_TYPES.EV."""
+    assert KiaUvoApiUSA._engine_type_from_fuel_type(4) == ENGINE_TYPES.EV
+
+
+def test_engine_type_from_fuel_type_unknown():
+    """Unknown fuelType values return None (refined later from cached state)."""
+    assert KiaUvoApiUSA._engine_type_from_fuel_type(1) is None
+    assert KiaUvoApiUSA._engine_type_from_fuel_type(None) is None
+    assert KiaUvoApiUSA._engine_type_from_fuel_type("4") is None
+
+
+def test_update_vehicle_properties_infers_ev_from_ev_status():
+    """Presence of evStatus without gasModeRange => ENGINE_TYPES.EV."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    api._update_vehicle_properties(vehicle, CACHED_RESPONSE_PAYLOAD)
+    assert vehicle.engine_type == ENGINE_TYPES.EV
+
+
+def test_update_vehicle_properties_infers_ice_without_ev_status():
+    """Missing evStatus => ENGINE_TYPES.ICE."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    ice_state = {
+        "lastVehicleInfo": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "syncDate": {"utc": "20260131002545"},
+                },
+            },
+        },
+    }
+    api._update_vehicle_properties(vehicle, ice_state)
+    assert vehicle.engine_type == ENGINE_TYPES.ICE
+
+
+def test_update_vehicle_properties_infers_phev_from_gas_mode_range():
+    """evStatus + gasModeRange => ENGINE_TYPES.PHEV."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    phev_state = {
+        "lastVehicleInfo": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "syncDate": {"utc": "20260131002545"},
+                    "evStatus": {
+                        "batteryStatus": 55,
+                        "drvDistance": [
+                            {
+                                "rangeByFuel": {
+                                    "gasModeRange": {"value": 300, "unit": 3},
+                                    "evModeRange": {"value": 20, "unit": 3},
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    }
+    api._update_vehicle_properties(vehicle, phev_state)
+    assert vehicle.engine_type == ENGINE_TYPES.PHEV
+
+
+def test_update_vehicle_properties_preserves_preset_engine_type():
+    """If engine_type is already set (e.g. from get_vehicles), don't overwrite."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.engine_type = ENGINE_TYPES.EV
+    ice_looking_state = {
+        "lastVehicleInfo": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {"syncDate": {"utc": "20260131002545"}},
+            },
+        },
+    }
+    api._update_vehicle_properties(vehicle, ice_looking_state)
+    assert vehicle.engine_type == ENGINE_TYPES.EV
