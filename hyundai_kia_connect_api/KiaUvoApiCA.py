@@ -244,14 +244,15 @@ class KiaUvoApiCA(ApiImpl):
             result = selverifmeth_json.get("result", {})
             user_info_uuid = result.get("userInfoUuid")
             email_list = result.get("emailList", [])
+            phone = result.get("userPhone")
 
             return OTPRequest(
                 request_id=user_info_uuid,
                 otp_key=None,
-                has_email=len(email_list) > 0,
-                has_sms=False,
+                has_email=True,
+                has_sms=bool(phone),
                 email=email_list[0] if email_list else username,
-                sms=None,
+                sms=phone,
             )
 
         # Check for other errors
