@@ -18,7 +18,7 @@ class Token:
     # Access Token expiry:
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
-    pin: str = None
+    pin: str | None = None
 
     def to_dict(self) -> dict:
         """Convert Token to a JSON‑serializable dict."""
