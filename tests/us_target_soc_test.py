@@ -569,3 +569,237 @@ def test_force_refresh_bool_values_rejected():
     # bool values rejected, cached values preserved
     assert vehicle.ev_charge_limits_ac == 90
     assert vehicle.ev_charge_limits_dc == 70
+
+
+# --- /evc/gts (Get Target SOC) endpoint tests ---
+
+EVC_GTS_RESPONSE_SUCCESS = {
+    "status": {
+        "statusCode": 0,
+        "errorType": 0,
+        "errorCode": 0,
+        "errorMessage": "Success with response body",
+    },
+    "payload": {
+        "targetSOClist": [
+            {"plugType": 0, "targetSOClevel": 100},
+            {"plugType": 1, "targetSOClevel": 80},
+        ]
+    },
+}
+
+
+class _FakeResponse:
+    """Minimal fake for requests.Response."""
+
+    def __init__(self, json_data, status_code=200):
+        self._json = json_data
+        self.status_code = status_code
+        self.headers = {}
+
+    def json(self):
+        return self._json
+
+
+def _make_api_with_fake_get(response_json):
+    """Create a KiaUvoApiUSA with a fake GET that returns the given JSON."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    def fake_get(token, url, vehicle):
+        return _FakeResponse(response_json)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    return api
+
+
+def test_evc_gts_sets_charge_limits():
+    """Verify /evc/gts response correctly sets AC and DC charge limits."""
+    api = _make_api_with_fake_get(EVC_GTS_RESPONSE_SUCCESS)
+    vehicle = _make_vehicle()
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_dc == 100
+    assert vehicle.ev_charge_limits_ac == 80
+
+
+def test_evc_gts_overwrites_stale_values():
+    """Verify /evc/gts overwrites previously cached charge limits."""
+    api = _make_api_with_fake_get(EVC_GTS_RESPONSE_SUCCESS)
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 60
+    vehicle.ev_charge_limits_dc = 60
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_dc == 100
+    assert vehicle.ev_charge_limits_ac == 80
+
+
+def test_evc_gts_error_response_preserves_cached():
+    """Verify error response from /evc/gts doesn't clear cached values."""
+    error_response = {
+        "status": {
+            "statusCode": 1,
+            "errorType": 1,
+            "errorCode": 1043,
+            "errorMessage": "This feature is not supported by vehicle",
+        }
+    }
+    api = _make_api_with_fake_get(error_response)
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_evc_gts_empty_list_preserves_cached():
+    """Empty targetSOClist from /evc/gts preserves cached values."""
+    empty_response = {
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
+        "payload": {"targetSOClist": []},
+    }
+    api = _make_api_with_fake_get(empty_response)
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_evc_gts_zero_values_ignored():
+    """Zero targetSOClevel from /evc/gts should be ignored (pre-refresh state)."""
+    zero_response = {
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
+        "payload": {
+            "targetSOClist": [
+                {"plugType": 0, "targetSOClevel": 0},
+                {"plugType": 1, "targetSOClevel": 0},
+            ]
+        },
+    }
+    api = _make_api_with_fake_get(zero_response)
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+
+
+def test_evc_gts_exception_preserves_cached(caplog):
+    """Network exception during /evc/gts should be caught, cached values preserved."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    def fake_get_raises(token, url, vehicle):
+        raise ConnectionError("network down")
+
+    api.get_request_with_logging_and_active_session = fake_get_raises
+    vehicle = _make_vehicle()
+    vehicle.ev_charge_limits_ac = 90
+    vehicle.ev_charge_limits_dc = 70
+
+    with caplog.at_level(logging.DEBUG):
+        api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_ac == 90
+    assert vehicle.ev_charge_limits_dc == 70
+    assert "Failed to get charge targets" in caplog.text
+
+
+def test_evc_gts_bool_values_rejected():
+    """Bool targetSOClevel from /evc/gts should be rejected."""
+    bool_response = {
+        "status": {
+            "statusCode": 0,
+            "errorType": 0,
+            "errorCode": 0,
+            "errorMessage": "Success with response body",
+        },
+        "payload": {
+            "targetSOClist": [
+                {"plugType": 0, "targetSOClevel": True},
+                {"plugType": 1, "targetSOClevel": False},
+            ]
+        },
+    }
+    api = _make_api_with_fake_get(bool_response)
+    vehicle = _make_vehicle()
+
+    api._get_charge_targets(None, vehicle)
+
+    assert vehicle.ev_charge_limits_ac is None
+    assert vehicle.ev_charge_limits_dc is None
+
+
+def test_update_cached_state_skips_evc_gts_for_ice_vehicle():
+    """Verify /evc/gts is NOT called for ICE vehicles (no ev_battery_percentage)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+    api._update_vehicle_properties = lambda vehicle, state: None
+
+    vehicle = _make_vehicle()
+    assert vehicle.ev_battery_percentage is None  # ICE vehicle
+
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 0
+    assert vehicle.ev_charge_limits_ac is None
+    assert vehicle.ev_charge_limits_dc is None
+
+
+def test_update_cached_state_calls_evc_gts_for_ev_vehicle():
+    """Verify /evc/gts IS called for EV vehicles (ev_battery_percentage set)."""
+    api = _make_api()
+    api.API_URL = "https://api.owners.kia.com/apigw/v1/"
+
+    call_count = {"n": 0}
+
+    def fake_get(token, url, vehicle):
+        call_count["n"] += 1
+        return _FakeResponse(EVC_GTS_RESPONSE_SUCCESS)
+
+    api.get_request_with_logging_and_active_session = fake_get
+    api._get_cached_vehicle_state = lambda token, vehicle: {}
+
+    def fake_update_props(vehicle, state):
+        vehicle.ev_battery_percentage = 67  # simulate EV
+
+    api._update_vehicle_properties = fake_update_props
+
+    vehicle = _make_vehicle()
+    api.update_vehicle_with_cached_state(None, vehicle)
+
+    assert call_count["n"] == 1
+    assert vehicle.ev_charge_limits_dc == 100
+    assert vehicle.ev_charge_limits_ac == 80
