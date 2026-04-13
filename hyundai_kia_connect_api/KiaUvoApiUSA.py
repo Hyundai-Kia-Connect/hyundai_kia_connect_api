@@ -21,6 +21,7 @@ from .Vehicle import Vehicle
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
+    ENGINE_TYPES,
     LOGIN_TOKEN_LIFETIME,
     ORDER_STATUS,
     TEMPERATURE_UNITS,
@@ -363,10 +364,21 @@ class KiaUvoApiUSA(ApiImpl):
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
+                engine_type=self._engine_type_from_fuel_type(entry.get("fuelType")),
                 timezone=self.data_timezone,
             )
             result.append(vehicle)
         return result
+
+    @staticmethod
+    def _engine_type_from_fuel_type(fuel_type) -> ty.Optional[ENGINE_TYPES]:
+        # Only fuelType=4 (EV) is confirmed against a live Kia USA account
+        # (2020 Niro EV). Mappings for ICE/PHEV/HEV are unknown, so leave
+        # engine_type as None for those and let _update_vehicle_properties
+        # refine it from the cached state's evStatus presence.
+        if fuel_type == 4:
+            return ENGINE_TYPES.EV
+        return None
 
     def refresh_vehicles(
         self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
@@ -416,6 +428,12 @@ class KiaUvoApiUSA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        # Only EV/PHEV vehicles have charge targets; skip the /evc/gts call
+        # for ICE vehicles. engine_type is set in get_vehicles from the
+        # fuelType hint and refined in _update_vehicle_properties from the
+        # cached state (evStatus presence => EV/PHEV, gasModeRange => PHEV).
+        if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
+            self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -743,6 +761,27 @@ class KiaUvoApiUSA(ApiImpl):
             state, "lastVehicleInfo.activeDTC.dtcCategory"
         )
 
+        if vehicle.engine_type is None:
+            # fuelType in ownr/gvl only reliably maps 4 -> EV; for anything
+            # else we infer from the cached state. Presence of an evStatus
+            # block means a high-voltage battery (EV or PHEV); absence
+            # means ICE. PHEVs additionally report a gasModeRange block,
+            # which pure EVs never do.
+            ev_status = get_child_value(
+                state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus"
+            )
+            if ev_status:
+                gas_mode_range = get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                )
+                if gas_mode_range is not None:
+                    vehicle.engine_type = ENGINE_TYPES.PHEV
+                else:
+                    vehicle.engine_type = ENGINE_TYPES.EV
+            else:
+                vehicle.engine_type = ENGINE_TYPES.ICE
+
         vehicle.data = state
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -853,6 +892,67 @@ class KiaUvoApiUSA(ApiImpl):
             _LOGGER.warning(
                 f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
                 f"{err}. Data: {charge_dict}",
+                exc_info=True,
+            )
+
+    def _get_charge_targets(self, token: Token, vehicle: Vehicle) -> None:
+        """Read current charge targets via the dedicated /evc/gts endpoint.
+
+        The cmm/gvi and rems/rvs endpoints do not return targetSOC for some
+        vehicles (e.g. 2020 Kia Niro EV).  The /evc/gts endpoint reliably
+        returns the current AC and DC charge target percentages.
+
+        Note: On a freshly authenticated session, the first call to this
+        endpoint may return targetSOClevel=0 for both plug types until the
+        server populates the cache (a force refresh or a few minutes of
+        session activity is usually enough). We treat 0 as "no data" and
+        preserve any previously cached values rather than overwriting with
+        a bogus 0.  Valid charge limits are 50-100 per the chargeFeature
+        metadata (minTargetSOC=50, maxTargetSOC=100), so 0 is never a
+        legitimate value.
+        """
+        url = self.API_URL + "evc/gts"
+        try:
+            response = self.get_request_with_logging_and_active_session(
+                token=token, url=url, vehicle=vehicle
+            )
+            response_json = response.json()
+            if response_json["status"]["statusCode"] != 0:
+                _LOGGER.debug(
+                    f"{DOMAIN} - /evc/gts returned error: "
+                    f"{response_json['status']['errorMessage']}"
+                )
+                return
+            target_soc_list = response_json.get("payload", {}).get("targetSOClist")
+            if not target_soc_list:
+                _LOGGER.debug(f"{DOMAIN} - /evc/gts returned empty targetSOClist")
+                return
+            for entry in target_soc_list:
+                plug_type = entry.get("plugType")
+                level = entry.get("targetSOClevel")
+                if not isinstance(level, (int, float)) or isinstance(level, bool):
+                    continue
+                level = int(level)
+                if level <= 0:
+                    # Skip zero/negative values - typically returned on fresh
+                    # sessions before server-side cache populates. Preserve
+                    # any existing cached values instead.
+                    _LOGGER.debug(
+                        f"{DOMAIN} - /evc/gts returned level={level} for "
+                        f"plugType={plug_type}, preserving cached value"
+                    )
+                    continue
+                if plug_type == 1:
+                    vehicle.ev_charge_limits_ac = level
+                elif plug_type == 0:
+                    vehicle.ev_charge_limits_dc = level
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge targets from /evc/gts - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to get charge targets from /evc/gts",
                 exc_info=True,
             )
 

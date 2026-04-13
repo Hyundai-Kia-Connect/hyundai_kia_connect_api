@@ -244,14 +244,15 @@ class KiaUvoApiCA(ApiImpl):
             result = selverifmeth_json.get("result", {})
             user_info_uuid = result.get("userInfoUuid")
             email_list = result.get("emailList", [])
+            phone = result.get("userPhone")
 
             return OTPRequest(
                 request_id=user_info_uuid,
                 otp_key=None,
-                has_email=len(email_list) > 0,
-                has_sms=False,
+                has_email=True,
+                has_sms=bool(phone),
                 email=email_list[0] if email_list else username,
-                sms=None,
+                sms=phone,
             )
 
         # Check for other errors
@@ -281,13 +282,24 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "mfa/sendotp"
         headers = self.API_HEADERS.copy()
         headers["Deviceid"] = self._get_device_id()
-        data = {
-            "otpMethod": "E",
-            "mfaApiCode": "0107",
-            "userAccount": otp_request.email,
-            "userPhone": "",
-            "userInfoUuid": otp_request.request_id,
-        }
+        if notify_type == OTP_NOTIFY_TYPE.EMAIL:
+            data = {
+                "otpMethod": "E",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": "",
+                "userInfoUuid": otp_request.request_id,
+            }
+        elif notify_type == OTP_NOTIFY_TYPE.SMS:
+            data = {
+                "otpMethod": "S",
+                "mfaApiCode": "0107",
+                "userAccount": otp_request.email,
+                "userPhone": otp_request.sms,
+                "userInfoUuid": otp_request.request_id,
+            }
+        else:  # Should never happen due to enum, but just in case
+            raise ValueError("Invalid notify type")
 
         response = self.sessions.post(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
