@@ -120,6 +120,19 @@ class VehicleManager:
         )
         self.initialize_vehicles()
 
+    def get_authorize_url(self) -> str:
+        return self.api.get_authorize_url()
+
+    def login_with_auth_code(self, auth_code: str) -> bool:
+        self.token = self.api.login_with_auth_code(
+            auth_code=auth_code,
+            username=self.username,
+            password=self.password,
+            pin=self.pin,
+        )
+        self.initialize_vehicles()
+        return True
+
     def initialize_vehicles(self):
         if len(self.vehicles) > 0:
             _LOGGER.warning(

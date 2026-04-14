@@ -77,6 +77,7 @@ class KiaUvoApiAU(ApiImplType1):
                 "SGGCDRvrzmRa2WTNFQPUaC1OsnAhQgPgcQETEfbY8abEjR/ICXK0p+Rayw5tHCGyiUA="
             )
 
+        self._region = REGIONS[region]
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
@@ -89,17 +90,24 @@ class KiaUvoApiAU(ApiImplType1):
         otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
+        if self._region == REGION_NZ:
+            raise AuthenticationError(
+                "New Zealand requires browser-based authentication. "
+                "Use get_authorize_url() and login_with_auth_code() instead."
+            )
         stamp = self._get_stamp()
         device_id = self._get_device_id(stamp)
-        cookies = self._get_cookies()
+        cookies, cookies_referer = self._get_cookies()
         # self._set_session_language(cookies)
         authorization_code = None
         try:
             authorization_code = self._get_authorization_code_with_redirect_url(
-                username, password, cookies
+                username, password, cookies, referer=cookies_referer
             )
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
+        except Exception as ex:
+            _LOGGER.debug(
+                f"{DOMAIN} - get_authorization_code_with_redirect_url failed: {ex}"
+            )
 
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
@@ -118,6 +126,63 @@ class KiaUvoApiAU(ApiImplType1):
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
+        )
+
+    def get_authorize_url(self) -> str:
+        """Return the OAuth authorize URL for the user to open in a browser."""
+        return (
+            self.USER_API_URL
+            + "oauth2/authorize?response_type=code&client_id="
+            + self.CLIENT_ID
+            + "&redirect_uri=https://"
+            + self.BASE_URL
+            + "/api/v1/user/oauth2/redirect&lang=en"
+        )
+
+    def login_with_auth_code(
+        self,
+        auth_code: str,
+        username: str,
+        password: str,
+        pin: str | None = None,
+    ) -> Token:
+        """Exchange a browser-obtained auth code for tokens (NZ browser-auth workaround).
+
+        Stores the raw OAuth refresh token so refresh_access_token() can renew
+        without requiring browser re-authentication.
+        """
+        stamp = self._get_stamp()
+        device_id = self._get_device_id(stamp)
+        _, access_token, raw_refresh_token = self._get_access_token(auth_code, stamp)
+        # Store the raw OAuth refresh token directly (no secondary exchange).
+        # refresh_access_token() will use it with grant_type=refresh_token.
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
+        return Token(
+            username=username,
+            password=password,
+            access_token=access_token,
+            refresh_token=raw_refresh_token,
+            device_id=device_id,
+            valid_until=valid_until,
+            pin=pin,
+        )
+
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh the access token. For NZ, use the stored OAuth refresh token
+        instead of re-running the full login (which is TLS fingerprinted)."""
+        if self._region != REGION_NZ:
+            return super().refresh_access_token(token)
+        stamp = self._get_stamp()
+        _, new_access_token = self._get_refresh_token(token.refresh_token, stamp)
+        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
+        return Token(
+            username=token.username,
+            password=token.password,
+            access_token=new_access_token,
+            refresh_token=token.refresh_token,
+            device_id=token.device_id,
+            valid_until=valid_until,
+            pin=token.pin,
         )
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -837,7 +902,6 @@ class KiaUvoApiAU(ApiImplType1):
         response = requests.post(url, headers=headers, json=payload)
         response = response.json()
         _check_response_for_errors(response)
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
         return device_id
@@ -856,18 +920,22 @@ class KiaUvoApiAU(ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = requests.Session()
-        _ = session.get(url)
-        return session.cookies.get_dict()
+        response = session.get(url)
+        _LOGGER.debug(f"{DOMAIN} - Get cookies response: {session.cookies.get_dict()}")
+        return session.cookies.get_dict(), response.url
 
     def _get_authorization_code_with_redirect_url(
-        self, username, password, cookies
+        self, username, password, cookies, referer=None
     ) -> str:
         url = self.USER_API_URL + "signin"
         headers = {"Content-type": "application/json"}
-        data = {"email": username, "password": password}
-        response = requests.post(
-            url, json=data, headers=headers, cookies=cookies
-        ).json()
+        if referer:
+            headers["Origin"] = "https://" + self.BASE_URL
+            headers["Referer"] = referer
+        data = {"email": username, "password": password, "mobileNum": ""}
+        _LOGGER.debug(f"{DOMAIN} - Signin url={url}")
+        raw = requests.post(url, json=data, headers=headers, cookies=cookies)
+        response = raw.json()
         parsed_url = urlparse(response["redirectUrl"])
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
@@ -891,6 +959,7 @@ class KiaUvoApiAU(ApiImplType1):
             + "%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
             + authorization_code
         )
+        _LOGGER.debug(f"{DOMAIN} - Get access token url={url}")
         response = requests.post(url, data=data, headers=headers)
         response = response.json()
 
