@@ -244,7 +244,15 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             state = response["resMsg"]["state"]["Vehicle"]
             self._update_vehicle_properties_ccs2(vehicle, state)
-
+            location = self._get_location(token, vehicle)
+            if location and get_child_value(location, "coord.lat"):
+                vehicle.location = (
+                    get_child_value(location, "coord.lat"),
+                    get_child_value(location, "coord.lon"),
+                    parse_datetime(
+                        get_child_value(location, "time"), self.data_timezone
+                    ),
+                )
         if (
             vehicle.engine_type == ENGINE_TYPES.EV
             or vehicle.engine_type == ENGINE_TYPES.PHEV
