@@ -808,14 +808,14 @@ class KiaUvoApiEU(ApiImplType1):
 
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
-        
+
         try:
             response = requests.get(
                 url, headers=self._get_authenticated_headers(token)
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            
+
             location = response["resMsg"]
             if location and get_child_value(location, "coord.lat"):
                 vehicle.location = (
