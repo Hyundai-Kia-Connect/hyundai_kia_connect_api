@@ -245,6 +245,11 @@ class KiaUvoApiEU(ApiImplType1):
             state = response["resMsg"]["state"]["Vehicle"]
             self._update_vehicle_properties_ccs2(vehicle, state)
 
+        # The status response embeds a stale cached location.
+        # Override it with the more current /location/park endpoint.
+        # this is not a force endpoint so car will not wake up
+        self._set_cached_location_park(token, vehicle)
+
         if (
             vehicle.engine_type == ENGINE_TYPES.EV
             or vehicle.engine_type == ENGINE_TYPES.PHEV
@@ -801,8 +806,31 @@ class KiaUvoApiEU(ApiImplType1):
             response = response["resMsg"]["state"]["Vehicle"]
         return response
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
+        
+        try:
+            response = requests.get(
+                url, headers=self._get_authenticated_headers(token)
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
+            _check_response_for_errors(response)
+            
+            location = response["resMsg"]
+            if location and get_child_value(location, "coord.lat"):
+                vehicle.location = (
+                    get_child_value(location, "coord.lat"),
+                    get_child_value(location, "coord.lon"),
+                    parse_datetime(
+                        get_child_value(location, "time"), self.data_timezone
+                    ),
+                )
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - _get_location failed")
+            return None
+
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
             response = requests.get(
@@ -813,7 +841,7 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return response["resMsg"]["gpsDetail"]
         except Exception as e:
             _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
