@@ -5,7 +5,6 @@
 import datetime as dt
 import logging
 import time
-import typing as ty
 
 import certifi
 import requests
@@ -40,15 +39,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _check_response_for_errors(response: dict) -> None:
-        """
+    """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
 
     :param response: the API's JSON response
     """
 
-
-        pass
+    pass
 
 
 class cipherAdapter(HTTPAdapter):
