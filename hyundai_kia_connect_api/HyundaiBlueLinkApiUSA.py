@@ -42,11 +42,21 @@ def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
+    Known values:
+    502: AuthenticationError - Incorrect username or password
 
     :param response: the API's JSON response
     """
-
-    pass
+    error_code_mapping = {
+        "502": AuthenticationError,
+    }
+    if "errorCode" in response:
+        if response["errorCode"] in error_code_mapping:
+            raise error_code_mapping[response["errorCode"]](response["errorMessage"])
+        else:
+            raise APIError(
+                f"API Error {response['errorCode']}: {response['errorMessage']}"
+            )
 
 
 class cipherAdapter(HTTPAdapter):
