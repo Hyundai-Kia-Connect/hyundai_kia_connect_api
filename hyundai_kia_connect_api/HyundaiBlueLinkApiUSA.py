@@ -5,7 +5,6 @@
 import datetime as dt
 import logging
 import time
-import typing as ty
 
 import certifi
 import requests
@@ -37,6 +36,27 @@ from .Vehicle import (
 CIPHERS = "DEFAULT@SECLEVEL=1"
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _check_response_for_errors(response: dict) -> None:
+    """
+    Checks for errors in the API response.
+    If an error is found, an exception is raised.
+    Known values:
+    502: AuthenticationError - Incorrect username or password
+
+    :param response: the API's JSON response
+    """
+    error_code_mapping = {
+        "502": AuthenticationError,
+    }
+    if "errorCode" in response:
+        if response["errorCode"] in error_code_mapping:
+            raise error_code_mapping[response["errorCode"]](response["errorMessage"])
+        else:
+            raise APIError(
+                f"API Error {response['errorCode']}: {response['errorMessage']}"
+            )
 
 
 class cipherAdapter(HTTPAdapter):
@@ -128,7 +148,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         # Sign In with Email and Password and Get Authorization Code
@@ -137,9 +156,13 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
         response = response.json()
+        _check_response_for_errors(response)
         if response.get("access_token") is None:
-            raise AuthenticationError(
-                "Login failed: " + response.get("errorMessage", "")
+            raise APIError(
+                "Error Code: "
+                + response.get("errorCode", "")
+                + " - Login failed: "
+                + response.get("errorMessage", "")
             )
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
@@ -164,6 +187,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        _check_response_for_errors(response)
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
             if entry["regid"] == vehicle.id:
@@ -180,6 +204,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         response = self.sessions.get(url, headers=headers)
         response = response.json()
+        _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_vehicle_status response {response}")
 
         status = dict(response["vehicleStatus"])
@@ -206,6 +231,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         response = self.sessions.get(url, headers=headers)
         response = response.json()
+        _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
 
         return response
@@ -225,6 +251,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         try:
             response = self.sessions.get(url, headers=headers)
             response_json = response.json()
+            _check_response_for_errors(response_json)
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
             if response_json.get("coord") is not None:
                 return response_json
@@ -762,6 +789,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        _check_response_for_errors(response)
         if "enrolledVehicleDetails" not in response:
             raise AuthenticationError("Missing enrolledVehicleDetails in response")
         result = []
@@ -804,6 +832,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         data = {"userName": token.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         # response_headers = response.headers
         # response = response.json()
         # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])  # noqa
@@ -881,6 +911,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Start engine response status code: {response.status_code}"
         )
@@ -899,6 +931,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Stop engine response status code: {response.status_code}"
         )
@@ -915,6 +949,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Start charge response status code: {response.status_code}"
         )
@@ -931,6 +967,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Stop charge response status code: {response.status_code}"
         )
@@ -963,6 +1001,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
         )
