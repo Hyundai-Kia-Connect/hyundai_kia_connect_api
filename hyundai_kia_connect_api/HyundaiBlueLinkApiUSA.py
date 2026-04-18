@@ -158,8 +158,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = response.json()
         _check_response_for_errors(response)
         if response.get("access_token") is None:
-            raise AuthenticationError(
-                "Login failed: " + response.get("errorMessage", "")
+            raise APIError(
+                "Error Code: " + response.get("errorCode", "") + " - Login failed: " + response.get("errorMessage", "")
             )
         access_token = response["access_token"]
         refresh_token = response["refresh_token"]
