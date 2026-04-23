@@ -296,6 +296,9 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+        # Forced update response is incomplete (SOC levels aren't included). Instead update
+        # from cached state.
+        self.update_vehicle_with_cached_state(token, vehicle)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
