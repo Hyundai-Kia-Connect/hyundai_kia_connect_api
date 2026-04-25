@@ -471,7 +471,7 @@ class ApiImplType1(ApiImpl):
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
@@ -479,7 +479,7 @@ class ApiImplType1(ApiImpl):
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
             "m",
         )
         vehicle.ev_charge_limits_ac = get_child_value(
