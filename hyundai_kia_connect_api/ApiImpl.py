@@ -100,11 +100,11 @@ class ApiImpl:
         pin: str | None = None,
     ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token or OTP Details if OTP is triggered"""
-        pass
+        raise NotImplementedError("login is not implemented for this region")
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Sends OTP to the user via selected destination and via"""
-        pass
+        raise NotImplementedError("send_otp is not implemented for this region")
 
     def verify_otp_and_complete_login(
         self,
@@ -115,11 +115,13 @@ class ApiImpl:
         pin: str | None = None,
     ) -> Token:
         """Confirms OTP code sent to the user"""
-        pass
+        raise NotImplementedError(
+            "verify_otp_and_complete_login is not implemented for this region"
+        )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
-        pass
+        raise NotImplementedError("get_vehicles is not implemented for this region")
 
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles.
@@ -128,7 +130,9 @@ class ApiImpl:
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
-        pass
+        raise NotImplementedError(
+            "update_vehicle_with_cached_state is not implemented for this region"
+        )
 
     def test_token(self, token: Token) -> bool:
         """Test if token is valid
@@ -147,7 +151,9 @@ class ApiImpl:
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Triggers the system to contact the car and get fresh data"""
-        pass
+        raise NotImplementedError(
+            "force_refresh_vehicle_state is not implemented for this region"
+        )
 
     def update_geocoded_location(
         self,
@@ -217,50 +223,58 @@ class ApiImpl:
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("lock_action is not implemented for this region")
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
         """Starts climate or remote start.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("start_climate is not implemented for this region")
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         """Stops climate or remote start.  Returns the tracking ID"""
-        pass
+        raise NotImplementedError("stop_climate is not implemented for this region")
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         """Starts charge. Returns the tracking ID"""
-        pass
+        raise NotImplementedError("start_charge is not implemented for this region")
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         """Stops charge. Returns the tracking ID"""
-        pass
+        raise NotImplementedError("stop_charge is not implemented for this region")
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
         """Sets charge limits. Returns the tracking ID"""
-        pass
+        raise NotImplementedError(
+            "set_charge_limits is not implemented for this region"
+        )
 
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
         """
         feature only available for some regions.
         Sets charge current level (1=100%, 2=90%, 3=60%). Returns the tracking ID
         """
-        pass
+        raise NotImplementedError(
+            "set_charging_current is not implemented for this region"
+        )
 
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
     ) -> str:
         """Opens or closes a particular window. Returns the tracking ID"""
-        pass
+        raise NotImplementedError(
+            "set_windows_state is not implemented for this region"
+        )
 
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
         """Opens or closes the charging port of the car. Returns the tracking ID"""
-        pass
+        raise NotImplementedError(
+            "charge_port_action is not implemented for this region"
+        )
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str
@@ -273,7 +287,9 @@ class ApiImpl:
 
         month_trip_info: MonthTripInfo = None
         """
-        pass
+        raise NotImplementedError(
+            "update_month_trip_info is not implemented for this region"
+        )
 
     def update_day_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
@@ -286,7 +302,9 @@ class ApiImpl:
 
         day_trip_info: DayTripInfo = None
         """
-        pass
+        raise NotImplementedError(
+            "update_day_trip_info is not implemented for this region"
+        )
 
     def schedule_charging_and_climate(
         self,
@@ -298,15 +316,21 @@ class ApiImpl:
         feature only available for some regions.
         Schedule charging and climate control. Returns the tracking ID
         """
-        pass
+        raise NotImplementedError(
+            "schedule_charging_and_climate is not implemented for this region"
+        )
 
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         """Turns on the hazard lights for 30 seconds"""
-        pass
+        raise NotImplementedError(
+            "start_hazard_lights is not implemented for this region"
+        )
 
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         """Turns on the hazard lights and horn for 30 seconds"""
-        pass
+        raise NotImplementedError(
+            "start_hazard_lights_and_horn is not implemented for this region"
+        )
 
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
@@ -315,7 +339,9 @@ class ApiImpl:
         feature only available for some regions.
         Activate or Deactivate valet mode. Returns the tracking ID
         """
-        pass
+        raise NotImplementedError(
+            "valet_mode_action is not implemented for this region"
+        )
 
     def set_vehicle_to_load_discharge_limit(
         self, token: Token, vehicle: Vehicle, limit: int
@@ -324,7 +350,9 @@ class ApiImpl:
         feature only available for some regions.
         Set the vehicle to load limit. Returns the tracking ID
         """
-        pass
+        raise NotImplementedError(
+            "set_vehicle_to_load_discharge_limit is not implemented for this region"
+        )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
