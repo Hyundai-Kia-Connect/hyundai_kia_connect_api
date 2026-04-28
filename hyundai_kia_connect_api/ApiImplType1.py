@@ -40,6 +40,7 @@ from .exceptions import (
     InvalidAPIResponseError,
     RateLimitingError,
     DeviceIDError,
+    UnsupportedControlError,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -71,6 +72,7 @@ def _check_response_for_errors(response: dict) -> None:
         "7501": AuthenticationError,
         "4002": DeviceIDError,
         "4004": DuplicateRequestError,
+        "4005": UnsupportedControlError,
         "4081": RequestTimeoutError,
         "5031": ServiceTemporaryUnavailable,
         "5091": RateLimitingError,
