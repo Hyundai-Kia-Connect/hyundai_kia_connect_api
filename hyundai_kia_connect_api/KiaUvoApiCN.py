@@ -39,6 +39,7 @@ from .exceptions import (
     RateLimitingError,
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
+    UnsupportedControlError,
 )
 from .Token import Token
 from .utils import (
@@ -83,6 +84,7 @@ def _check_response_for_errors(response: dict) -> None:
 
     error_code_mapping = {
         "4004": DuplicateRequestError,
+        "4005": UnsupportedControlError,
         "4081": RequestTimeoutError,
         "5031": ServiceTemporaryUnavailable,
         "5091": RateLimitingError,
