@@ -12,6 +12,7 @@ import typing as ty
 from urllib.parse import parse_qs, urlparse
 
 import requests
+from bluelink_token import get_token
 from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 
@@ -181,7 +182,6 @@ class KiaUvoApiEU(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
@@ -197,8 +197,10 @@ class KiaUvoApiEU(ApiImplType1):
             raise AuthenticationError(
                 "Passwords are no longer supported, provide a refresh_token instead"
             )
-
-        _, access_token, authorization_code, expires_in = self._get_access_token(
+        if self.brand == BRANDS[BRAND_KIA] or self.brand == BRANDS[BRAND_HYUNDAI]:
+            bluelink_token = get_token(username=username, password=password, brand=self.brand) 
+        else: 
+            _, access_token, authorization_code, expires_in = self._get_access_token(
             stamp, refresh_token
         )
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
@@ -208,8 +210,8 @@ class KiaUvoApiEU(ApiImplType1):
         return Token(
             username=username,
             password=password,
-            access_token=access_token,
-            refresh_token=refresh_token,
+            access_token=bluelink_token.access_token,
+            refresh_token=bluelink_token.refresh_token,
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
