@@ -200,6 +200,9 @@ class KiaUvoApiEU(ApiImplType1):
             bluelink_token = get_token(
                 username=username, password=password, brand=self.brand
             )
+            access_token = bluelink_token.access_token
+            refresh_token = bluelink_token.refresh_token
+            expires_in = bluelink_token.expires_in
         else:
             _, access_token, authorization_code, expires_in = self._get_access_token(
                 stamp, refresh_token
@@ -211,8 +214,8 @@ class KiaUvoApiEU(ApiImplType1):
         return Token(
             username=username,
             password=password,
-            access_token=bluelink_token.access_token,
-            refresh_token=bluelink_token.refresh_token,
+            access_token=access_token,
+            refresh_token=refresh_token,
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
