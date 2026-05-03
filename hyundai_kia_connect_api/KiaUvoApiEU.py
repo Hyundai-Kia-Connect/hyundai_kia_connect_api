@@ -8,7 +8,6 @@ import datetime as dt
 import logging
 import uuid
 import re
-import typing as ty
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -198,11 +197,13 @@ class KiaUvoApiEU(ApiImplType1):
                 "Passwords are no longer supported, provide a refresh_token instead"
             )
         if self.brand == BRANDS[BRAND_KIA] or self.brand == BRANDS[BRAND_HYUNDAI]:
-            bluelink_token = get_token(username=username, password=password, brand=self.brand) 
-        else: 
+            bluelink_token = get_token(
+                username=username, password=password, brand=self.brand
+            )
+        else:
             _, access_token, authorization_code, expires_in = self._get_access_token(
-            stamp, refresh_token
-        )
+                stamp, refresh_token
+            )
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             seconds=expires_in
         )
