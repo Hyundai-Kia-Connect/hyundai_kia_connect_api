@@ -10,31 +10,21 @@ Validates:
 """
 
 import datetime as dt
-from time import sleep
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1, _check_response_for_errors
-from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
+from hyundai_kia_connect_api.ApiImplType1 import _check_response_for_errors
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.const import (
-    BRAND_KIA,
-    BRAND_HYUNDAI,
-    REGION_EUROPE,
-    REGION_CANADA,
-    REGION_CHINA,
-)
 from hyundai_kia_connect_api.exceptions import (
     DuplicateRequestError,
-    APIError,
-    InvalidAPIResponseError,
 )
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
 
 # --- Helpers ---
+
 
 def _make_eu_api():
     """Create an EU API instance for testing."""
@@ -105,6 +95,7 @@ def _duplicate_request_response():
 
 # --- Tests: _check_response_for_errors still raises DuplicateRequestError ---
 
+
 class TestCheckResponseForErrors:
     """Verify that _check_response_for_errors raises DuplicateRequestError for 4004."""
 
@@ -118,6 +109,7 @@ class TestCheckResponseForErrors:
 
 
 # --- Tests: check_action_status non-synchronous mode ---
+
 
 class TestCheckActionStatusNonSynchronous:
     """Non-synchronous mode should still raise DuplicateRequestError."""
