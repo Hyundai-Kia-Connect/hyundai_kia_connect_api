@@ -5,7 +5,6 @@ https://github.com/TMA84/bluelink-refresh-token
 """
 
 import base64
-import logging
 from dataclasses import dataclass
 from urllib.parse import urlparse, parse_qs
 
@@ -15,8 +14,6 @@ from Crypto.Cipher import PKCS1_v1_5
 
 from .const import BRANDS
 from .exceptions import AuthenticationError
-
-_LOGGER = logging.getLogger(__name__)
 
 _MOBILE_UA = (
     "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) "
@@ -78,24 +75,6 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
             f"Supported brands: Kia (1), Hyundai (2)"
         )
 
-    # Suppress HTTP-level debug logging from curl_cffi/urllib3 to avoid
-    # leaking sensitive data (username, encrypted password) in request bodies.
-    _http_loggers = [
-        logging.getLogger("curl_cffi"),
-        logging.getLogger("urllib3"),
-    ]
-    _saved_levels = {lg: lg.level for lg in _http_loggers}
-    for lg in _http_loggers:
-        lg.setLevel(logging.WARNING)
-
-    try:
-        return _get_token_inner(username, password, brand)
-    finally:
-        for lg, level in _saved_levels.items():
-            lg.setLevel(level)
-
-
-def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
     config = _BRAND_OAUTH[brand]
     host = config["host"]
     client_id = config["client_id"]
@@ -106,7 +85,6 @@ def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
     s.headers.update({"User-Agent": _MOBILE_UA})
 
     # Step 1: Load authorize page to get session cookies
-    _LOGGER.debug("Headless login: loading authorize page (%s)", host)
     auth_url = (
         f"{host}/auth/api/v2/user/oauth2/authorize"
         f"?response_type=code&client_id={client_id}"
@@ -115,13 +93,11 @@ def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
     s.get(auth_url, allow_redirects=True)
 
     # Step 2: Get RSA public key for password encryption
-    _LOGGER.debug("Headless login: fetching RSA public key")
     resp = s.get(f"{host}/auth/api/v1/accounts/certs")
     if resp.status_code != 200:
         raise AuthenticationError(f"Failed to fetch RSA certs: HTTP {resp.status_code}")
     jwk = resp.json().get("retValue", {})
     kid = jwk.get("kid", "")
-    _LOGGER.debug("Headless login: RSA key loaded (kid: %s)", kid)
 
     # Convert JWK to RSA key
     n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
@@ -133,10 +109,6 @@ def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
     encrypted_pw = cipher.encrypt(password.encode("utf-8")).hex()
 
     # Step 3: POST signin with encrypted password
-    _LOGGER.debug(
-        "Headless login: signing in as %s***",
-        username[:3] + "@" + username.split("@")[-1] if "@" in username else "***",
-    )
     resp = s.post(
         f"{host}/auth/account/signin",
         data={
@@ -161,7 +133,6 @@ def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
         )
 
     location = resp.headers.get("location", "")
-    _LOGGER.debug("Headless login: redirect -> %s", location)
     code_list = parse_qs(urlparse(location).query).get("code")
     if not code_list:
         if "error" in location.lower():
@@ -185,10 +156,8 @@ def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
         )
 
     code = code_list[0]
-    _LOGGER.debug("Headless login: authorization code received")
 
     # Step 4: Exchange authorization code for tokens
-    _LOGGER.debug("Headless login: exchanging code for tokens")
     resp = curl_requests.post(
         f"{host}/auth/api/v2/user/oauth2/token",
         data={
