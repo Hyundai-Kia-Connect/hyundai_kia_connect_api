@@ -13,7 +13,7 @@ from curl_cffi import requests as curl_requests
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 
-from .const import BRAND_HYUNDAI, BRAND_KIA, BRANDS
+from .const import BRANDS
 from .exceptions import AuthenticationError
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,7 +25,8 @@ _MOBILE_UA = (
 )
 
 _BRAND_OAUTH = {
-    BRAND_KIA: {
+    # Keys are brand int constants: 1=Kia, 2=Hyundai (see BRANDS in const.py)
+    1: {
         "client_id": "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a",
         "client_secret": "secret",
         "host": "https://idpconnect-eu.kia.com",
@@ -33,7 +34,7 @@ _BRAND_OAUTH = {
             "https://prd.eu-ccapi.kia.com:8080/api/v1/user/oauth2/redirect"
         ),
     },
-    BRAND_HYUNDAI: {
+    2: {
         "client_id": "6d477c38-3ca4-4cf3-9557-2a1929a94654",
         "client_secret": "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV",
         "host": "https://idpconnect-eu.hyundai.com",
@@ -74,7 +75,7 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
     if brand not in _BRAND_OAUTH:
         raise ValueError(
             f"Brand {BRANDS.get(brand, brand)} not supported for headless login. "
-            f"Supported: Kia, Hyundai (EU)"
+            f"Supported brands: Kia (1), Hyundai (2)"
         )
 
     config = _BRAND_OAUTH[brand]

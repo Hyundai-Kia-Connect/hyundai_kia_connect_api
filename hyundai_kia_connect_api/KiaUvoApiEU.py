@@ -196,7 +196,7 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, _, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-        elif BRANDS[self.brand] in (BRAND_KIA, BRAND_HYUNDAI):
+        elif self.brand in (1, 2):  # Kia=1, Hyundai=2
             # Headless login for Kia/Hyundai EU: username + plaintext password
             from .headless_login import get_token
 

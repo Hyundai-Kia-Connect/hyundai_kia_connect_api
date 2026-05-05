@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
-from hyundai_kia_connect_api.const import BRAND_HYUNDAI, BRAND_KIA
 from hyundai_kia_connect_api.exceptions import AuthenticationError
 
 
@@ -47,7 +46,7 @@ def test_get_token_unsupported_brand():
     from hyundai_kia_connect_api.headless_login import get_token
 
     with pytest.raises(ValueError, match="not supported for headless login"):
-        get_token("user@test.com", "password", "SomeUnsupportedBrand")
+        get_token("user@test.com", "password", 99)
 
 
 def test_get_token_certs_endpoint_fails():
@@ -65,7 +64,7 @@ def test_get_token_certs_endpoint_fails():
         return_value=mock_session,
     ):
         with pytest.raises(AuthenticationError, match="Failed to fetch RSA certs"):
-            get_token("user@test.com", "password", BRAND_KIA)
+            get_token("user@test.com", "password", 1)
 
 
 def test_get_token_signin_returns_non_302():
@@ -100,7 +99,7 @@ def test_get_token_signin_returns_non_302():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin failed"):
-            get_token("user@test.com", "password", BRAND_KIA)
+            get_token("user@test.com", "password", 1)
 
 
 def test_get_token_signin_no_code_in_redirect():
@@ -135,7 +134,7 @@ def test_get_token_signin_no_code_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="No authorization code"):
-            get_token("user@test.com", "password", BRAND_KIA)
+            get_token("user@test.com", "password", 1)
 
 
 def test_get_token_signin_error_in_redirect():
@@ -175,7 +174,7 @@ def test_get_token_signin_error_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin rejected"):
-            get_token("user@test.com", "wrong-password", BRAND_KIA)
+            get_token("user@test.com", "wrong-password", 1)
 
 
 def test_get_token_signin_redirect_to_login_page():
@@ -214,7 +213,7 @@ def test_get_token_signin_redirect_to_login_page():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="redirected back to login page"):
-            get_token("user@test.com", "password", BRAND_KIA)
+            get_token("user@test.com", "password", 1)
 
 
 def test_get_token_token_exchange_fails():
@@ -259,7 +258,7 @@ def test_get_token_token_exchange_fails():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Token exchange failed"):
-            get_token("user@test.com", "password", BRAND_KIA)
+            get_token("user@test.com", "password", 1)
 
 
 def test_get_token_success():
@@ -307,7 +306,7 @@ def test_get_token_success():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        result = get_token("user@test.com", "password", BRAND_HYUNDAI)
+        result = get_token("user@test.com", "password", 2)
 
     assert isinstance(result, BluelinkToken)
     assert result.access_token == "Bearer test-access-token"
