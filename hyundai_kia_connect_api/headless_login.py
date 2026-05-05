@@ -22,7 +22,7 @@ _MOBILE_UA = (
 )
 
 _BRAND_OAUTH = {
-    # Keys are brand int constants: 1=Kia, 2=Hyundai (see BRANDS in const.py)
+    # Keys are brand int constants: 1=Kia, 2=Hyundai, 3=Genesis (see BRANDS in const.py)
     1: {
         "client_id": "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a",
         "client_secret": "secret",
@@ -37,6 +37,14 @@ _BRAND_OAUTH = {
         "host": "https://idpconnect-eu.hyundai.com",
         "redirect_uri": (
             "https://prd.eu-ccapi.hyundai.com:8080/api/v1/user/oauth2/token"
+        ),
+    },
+    3: {
+        "client_id": "3020afa2-30ff-412a-aa51-d28fbe901e10",
+        "client_secret": "secret",
+        "host": "https://idpconnect-eu.genesis.com",
+        "redirect_uri": (
+            "https://prd-eu-ccapi.genesis.com/api/v1/user/oauth2/redirect"
         ),
     },
 }
@@ -55,12 +63,12 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
     """Generate access/refresh tokens from username and password.
 
     Uses curl_cffi to impersonate an Android Chrome TLS fingerprint,
-    matching the official Kia/Hyundai app's authentication flow.
+    matching the official Kia/Hyundai/Genesis app's authentication flow.
 
     Args:
         username: Account email.
         password: Account password.
-        brand: Brand constant (BRAND_KIA or BRAND_HYUNDAI).
+        brand: Brand constant (BRAND_KIA, BRAND_HYUNDAI, or BRAND_GENESIS).
 
     Returns:
         BluelinkToken with access_token, refresh_token, and expires_in.
@@ -72,7 +80,7 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
     if brand not in _BRAND_OAUTH:
         raise ValueError(
             f"Brand {BRANDS.get(brand, brand)} not supported for headless login. "
-            f"Supported brands: Kia (1), Hyundai (2)"
+            f"Supported brands: Kia (1), Hyundai (2), Genesis (3)"
         )
 
     config = _BRAND_OAUTH[brand]

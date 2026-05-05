@@ -196,8 +196,8 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, _, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-        elif self.brand in (1, 2):  # Kia=1, Hyundai=2
-            # Headless login for Kia/Hyundai EU: username + plaintext password
+        elif self.brand in (1, 2, 3):  # Kia=1, Hyundai=2, Genesis=3
+            # Headless login for Kia/Hyundai/Genesis EU: username + plaintext password
             from .headless_login import get_token
 
             bluelink_token = get_token(
@@ -207,10 +207,9 @@ class KiaUvoApiEU(ApiImplType1):
             refresh_token = bluelink_token.refresh_token
             expires_in = bluelink_token.expires_in
         else:
-            # Genesis and other brands: only refresh_token supported
             raise AuthenticationError(
                 "Username/password login is only supported for "
-                "Kia and Hyundai (EU). Provide a refresh_token instead."
+                "Kia, Hyundai, and Genesis (EU). Provide a refresh_token instead."
             )
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(

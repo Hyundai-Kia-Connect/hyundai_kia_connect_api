@@ -409,8 +409,34 @@ def test_login_plaintext_password_calls_headless_login():
     assert token.pin == "1234"
 
 
-def test_login_plaintext_password_genesis_raises():
-    """Plaintext password for Genesis raises AuthenticationError."""
+def test_login_plaintext_password_genesis_calls_headless_login():
+    """Plaintext password for Genesis invokes get_token() from headless_login."""
+    api = _make_eu_api(brand=3)  # Genesis
+
+    mock_bluelink_token = MagicMock()
+    mock_bluelink_token.access_token = "Bearer genesis-access-token"
+    mock_bluelink_token.refresh_token = "GENESISREFRESHTOKEN12345678901234567"
+    mock_bluelink_token.expires_in = 3600
+
+    with (
+        patch.object(api, "_get_stamp", return_value="stamp"),
+        patch.object(api, "_get_device_id", return_value="device-123"),
+        patch.object(api, "_get_cookies", return_value={}),
+        patch.object(api, "_set_session_language"),
+        patch(
+            "hyundai_kia_connect_api.headless_login.get_token",
+            return_value=mock_bluelink_token,
+        ),
+    ):
+        token = api.login("user@test.com", "MyPassword123!", pin="1234")
+
+    assert token.access_token == "Bearer genesis-access-token"
+    assert token.refresh_token == "GENESISREFRESHTOKEN12345678901234567"
+    assert token.pin == "1234"
+
+
+def test_login_genesis_headless_fails_falls_back_to_error():
+    """If headless login fails for Genesis, raise AuthenticationError with hint."""
     api = _make_eu_api(brand=3)  # Genesis
 
     with (
@@ -418,11 +444,12 @@ def test_login_plaintext_password_genesis_raises():
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
+        patch(
+            "hyundai_kia_connect_api.headless_login.get_token",
+            side_effect=AuthenticationError("Signin failed: HTTP 404"),
+        ),
     ):
-        with pytest.raises(
-            AuthenticationError,
-            match="Username/password login is only supported",
-        ):
+        with pytest.raises(AuthenticationError, match="Signin failed"):
             api.login("user@test.com", "MyPassword123!")
 
 
