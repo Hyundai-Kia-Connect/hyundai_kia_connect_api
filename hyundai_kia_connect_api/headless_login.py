@@ -177,7 +177,7 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
     tokens = resp.json()
 
     return BluelinkToken(
-        access_token=tokens["access_token"],
+        access_token=tokens["token_type"] + " " + tokens["access_token"],
         refresh_token=tokens["refresh_token"],
         expires_in=int(tokens.get("expires_in", 86400)),
     )

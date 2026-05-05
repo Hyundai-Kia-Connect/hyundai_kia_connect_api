@@ -318,7 +318,8 @@ def test_get_token_success():
     token_resp = MagicMock()
     token_resp.status_code = 200
     token_resp.json.return_value = {
-        "access_token": "Bearer test-access-token",
+        "token_type": "Bearer",
+        "access_token": "test-access-token",
         "refresh_token": "TESTRFTOKEN12345678901234567890123456789012345678",
         "expires_in": 86400,
     }
@@ -387,7 +388,7 @@ def test_login_plaintext_password_calls_headless_login():
     api = _make_eu_api(brand=1)  # Kia
 
     mock_bluelink_token = MagicMock()
-    mock_bluelink_token.access_token = "headless-access-token"
+    mock_bluelink_token.access_token = "Bearer headless-access-token"
     mock_bluelink_token.refresh_token = "HEADLESSREFRESHTOKEN123456789012345678"
     mock_bluelink_token.expires_in = 3600
 
@@ -403,7 +404,7 @@ def test_login_plaintext_password_calls_headless_login():
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
 
-    assert token.access_token == "headless-access-token"
+    assert token.access_token == "Bearer headless-access-token"
     assert token.refresh_token == "HEADLESSREFRESHTOKEN123456789012345678"
     assert token.pin == "1234"
 
@@ -423,3 +424,60 @@ def test_login_plaintext_password_genesis_raises():
             match="Username/password login is only supported",
         ):
             api.login("user@test.com", "MyPassword123!")
+
+
+# ── Integration: token format flows into Authorization headers ──
+
+
+def test_login_headless_token_flows_to_authenticated_headers():
+    """End-to-end: headless login token produces correct Authorization header."""
+    from hyundai_kia_connect_api.headless_login import BluelinkToken
+
+    api = _make_eu_api(brand=2)  # Hyundai
+
+    bluelink_token = BluelinkToken(
+        access_token="Bearer raw-access-token",
+        refresh_token="HEADLESSREFRESHTOKEN123456789012345678",
+        expires_in=86400,
+    )
+
+    with (
+        patch.object(api, "_get_stamp", return_value="stamp"),
+        patch.object(api, "_get_device_id", return_value="device-123"),
+        patch.object(api, "_get_cookies", return_value={}),
+        patch.object(api, "_set_session_language"),
+        patch(
+            "hyundai_kia_connect_api.headless_login.get_token",
+            return_value=bluelink_token,
+        ),
+    ):
+        token = api.login("user@test.com", "MyPassword123!", pin="1234")
+
+    # Token must have Bearer prefix for _get_authenticated_headers
+    assert token.access_token == "Bearer raw-access-token"
+    headers = api._get_authenticated_headers(token)
+    assert headers["Authorization"] == "Bearer raw-access-token"
+
+
+def test_login_refresh_token_flows_to_authenticated_headers():
+    """End-to-end: refresh_token login also produces correct Authorization header."""
+    api = _make_eu_api(brand=1)  # Kia
+    refresh_token = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"
+
+    with (
+        patch.object(api, "_get_stamp", return_value="stamp"),
+        patch.object(api, "_get_device_id", return_value="device-123"),
+        patch.object(api, "_get_cookies", return_value={}),
+        patch.object(api, "_set_session_language"),
+        patch.object(
+            api,
+            "_get_access_token",
+            return_value=("Bearer", "Bearer access-token", "auth-code", 86400),
+        ),
+    ):
+        token = api.login("user@test.com", refresh_token, pin="1234")
+
+    # Token must have Bearer prefix for _get_authenticated_headers
+    assert token.access_token == "Bearer access-token"
+    headers = api._get_authenticated_headers(token)
+    assert headers["Authorization"] == "Bearer access-token"
