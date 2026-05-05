@@ -78,6 +78,24 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
             f"Supported brands: Kia (1), Hyundai (2)"
         )
 
+    # Suppress HTTP-level debug logging from curl_cffi/urllib3 to avoid
+    # leaking sensitive data (username, encrypted password) in request bodies.
+    _http_loggers = [
+        logging.getLogger("curl_cffi"),
+        logging.getLogger("urllib3"),
+    ]
+    _saved_levels = {lg: lg.level for lg in _http_loggers}
+    for lg in _http_loggers:
+        lg.setLevel(logging.WARNING)
+
+    try:
+        return _get_token_inner(username, password, brand)
+    finally:
+        for lg, level in _saved_levels.items():
+            lg.setLevel(level)
+
+
+def _get_token_inner(username: str, password: str, brand: int) -> BluelinkToken:
     config = _BRAND_OAUTH[brand]
     host = config["host"]
     client_id = config["client_id"]
