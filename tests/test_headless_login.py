@@ -216,6 +216,43 @@ def test_get_token_signin_redirect_to_login_page():
             get_token("user@test.com", "password", 1)
 
 
+def test_get_token_signin_consent_spa_redirect():
+    """Kia EU redirects to /web/v1/user/authorization SPA (consent page)."""
+    from hyundai_kia_connect_api.headless_login import get_token
+
+    certs_resp = MagicMock()
+    certs_resp.status_code = 200
+    certs_resp.json.return_value = {
+        "retValue": {
+            "kid": "test-kid",
+            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
+            "e": "AQAB",
+        }
+    }
+
+    signin_resp = MagicMock()
+    signin_resp.status_code = 302
+    signin_resp.headers = {
+        "location": ("https://prd.eu-ccapi.kia.com:8080/web/v1/user/authorization")
+    }
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = certs_resp
+    mock_session.post.return_value = signin_resp
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                return_value=mock_session,
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        with pytest.raises(AuthenticationError, match="consent page"):
+            get_token("user@test.com", "password", 1)
+
+
 def test_get_token_token_exchange_fails():
     """Token exchange returns non-200 -> AuthenticationError."""
     from hyundai_kia_connect_api.headless_login import get_token

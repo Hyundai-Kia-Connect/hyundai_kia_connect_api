@@ -151,6 +151,12 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
                 "error_description", ["unknown"]
             )[0]
             raise AuthenticationError(f"Signin rejected: {error_desc}")
+        if "/web/v1/user/authorization" in location:
+            raise AuthenticationError(
+                "Signin succeeded but Kia/Hyundai requires a consent page "
+                "(SPA redirect). This may indicate a changed auth flow — "
+                "try using a refresh token instead."
+            )
         if "authorize" in location:
             raise AuthenticationError(
                 "Signin failed — redirected back to login page. "
