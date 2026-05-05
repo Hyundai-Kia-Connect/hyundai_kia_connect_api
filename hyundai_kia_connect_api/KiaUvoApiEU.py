@@ -11,7 +11,6 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 import requests
-from bluelink_token import get_token
 from bs4 import BeautifulSoup
 from zoneinfo import ZoneInfo
 
@@ -187,16 +186,20 @@ class KiaUvoApiEU(ApiImplType1):
         device_id = self._get_device_id(stamp)
         cookies = self._get_cookies()
         self._set_session_language(cookies)
-        refresh_token = password
 
-        # Plaintext passwords can no longer be used due to reCaptcha
-        # requirements on the log in page. Users must provide a valid
-        # "refresh_token" to avoid "Received unexpected statusCode" errors.
-        if not re.match(r"^[A-Z0-9]{48}$", refresh_token):
-            raise AuthenticationError(
-                "Passwords are no longer supported, provide a refresh_token instead"
+        # Determine if password is a refresh_token or plaintext credentials
+        is_refresh_token = bool(re.match(r"^[A-Z0-9]{48}$", password))
+
+        if is_refresh_token:
+            # Existing flow: use the 48-char refresh_token directly
+            refresh_token = password
+            _, access_token, _, expires_in = self._get_access_token(
+                stamp, refresh_token
             )
-        if self.brand == BRANDS[BRAND_KIA] or self.brand == BRANDS[BRAND_HYUNDAI]:
+        elif BRANDS[self.brand] in (BRAND_KIA, BRAND_HYUNDAI):
+            # Headless login for Kia/Hyundai EU: username + plaintext password
+            from .headless_login import get_token
+
             bluelink_token = get_token(
                 username=username, password=password, brand=self.brand
             )
@@ -204,9 +207,12 @@ class KiaUvoApiEU(ApiImplType1):
             refresh_token = bluelink_token.refresh_token
             expires_in = bluelink_token.expires_in
         else:
-            _, access_token, authorization_code, expires_in = self._get_access_token(
-                stamp, refresh_token
+            # Genesis and other brands: only refresh_token supported
+            raise AuthenticationError(
+                "Username/password login is only supported for "
+                "Kia and Hyundai (EU). Provide a refresh_token instead."
             )
+
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
             seconds=expires_in
         )
