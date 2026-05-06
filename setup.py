@@ -35,7 +35,6 @@ setup(
     description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
     install_requires=requirements,
     extras_require={
-        "EU": [],
         "google": ["geopy>=2.2.0"],
     },
     license="MIT license",
