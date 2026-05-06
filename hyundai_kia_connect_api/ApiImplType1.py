@@ -154,7 +154,7 @@ class ApiImplType1(ApiImpl):
                             "This appears to be corrupted data from Hyundai's API."
                         )
                         dte["ICE"] = None
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError):  # fmt: skip
             # If the structure doesn't exist or is malformed, silently continue
             # This is defensive programming in case the API structure changes
             pass
@@ -756,16 +756,9 @@ class ApiImplType1(ApiImpl):
             end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
             while end_time > dt.datetime.now():
                 # recursive call with Synchronous set to False
-                try:
-                    state = self.check_action_status(
-                        token, vehicle, action_id, synchronous=False
-                    )
-                except DuplicateRequestError:
-                    _LOGGER.debug(
-                        "Duplicate request while checking action status, "
-                        "treating as pending"
-                    )
-                    state = ORDER_STATUS.PENDING
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
                 if state == ORDER_STATUS.PENDING:
                     # state pending: recheck regularly
                     # (until we get a final state or exceed the timeout)

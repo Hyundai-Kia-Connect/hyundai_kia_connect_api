@@ -1150,16 +1150,9 @@ class KiaUvoApiCN(ApiImplType1):
             end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
             while end_time > dt.datetime.now():
                 # recursive call with Synchronous set to False
-                try:
-                    state = self.check_action_status(
-                        token, vehicle, action_id, synchronous=False
-                    )
-                except DuplicateRequestError:
-                    _LOGGER.debug(
-                        "Duplicate request while checking action status, "
-                        "treating as pending"
-                    )
-                    state = ORDER_STATUS.PENDING
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
                 if state == ORDER_STATUS.PENDING:
                     # state pending: recheck regularly
                     # (until we get a final state or exceed the timeout)

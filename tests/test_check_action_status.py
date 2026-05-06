@@ -1,12 +1,9 @@
-"""Test check_action_status polling loop handles DuplicateRequestError correctly.
+"""Test check_action_status polling loop behavior.
 
 Validates:
-1. Before fix: check_action_status(synchronous=True) crashes with
-   DuplicateRequestError when the API returns resCode 4004 during polling.
-2. After fix: DuplicateRequestError during polling is treated as PENDING,
-   and the loop continues polling until a final state is reached.
-3. Non-synchronous mode still raises DuplicateRequestError (not caught there).
-4. Normal polling still works (SUCCESS, FAILED, TIMEOUT states).
+1. _check_response_for_errors maps resCode 4004 to DuplicateRequestError
+2. Non-synchronous mode propagates DuplicateRequestError (not caught there)
+3. Normal polling works correctly (SUCCESS, FAILED, TIMEOUT states)
 """
 
 import datetime as dt
@@ -134,34 +131,6 @@ class TestCheckActionStatusSynchronousEU:
 
     @patch("hyundai_kia_connect_api.ApiImplType1.requests.get")
     @patch("hyundai_kia_connect_api.ApiImplType1.sleep", return_value=None)
-    def test_polling_treats_duplicate_request_as_pending(self, mock_sleep, mock_get):
-        """DuplicateRequestError during polling is treated as PENDING.
-
-        When the API returns resCode 4004 during a status check, it means
-        there's still a pending request. The polling loop should treat this
-        as PENDING and continue polling instead of crashing.
-        """
-        # First two calls return 4004 (pending), third returns success
-        mock_get.return_value.json.side_effect = [
-            _duplicate_request_response(),
-            _duplicate_request_response(),
-            _final_response("action-123", "success"),
-        ]
-        api = _make_eu_api()
-        token = _make_token()
-        vehicle = _make_vehicle()
-
-        from hyundai_kia_connect_api.const import ORDER_STATUS
-
-        result = api.check_action_status(
-            token, vehicle, "action-123", synchronous=True, timeout=60
-        )
-        assert result == ORDER_STATUS.SUCCESS
-        # Should have slept between polls (once per PENDING/4004 response)
-        assert mock_sleep.call_count >= 2
-
-    @patch("hyundai_kia_connect_api.ApiImplType1.requests.get")
-    @patch("hyundai_kia_connect_api.ApiImplType1.sleep", return_value=None)
     def test_normal_polling_success(self, mock_sleep, mock_get):
         """Normal polling: action goes from PENDING to SUCCESS."""
         mock_get.return_value.json.side_effect = [
@@ -230,26 +199,3 @@ class TestCheckActionStatusSynchronousEU:
                 token, vehicle, "action-123", synchronous=True, timeout=15
             )
         assert result == ORDER_STATUS.TIMEOUT
-
-
-class TestCheckActionStatusSynchronousCN:
-    """Test the synchronous polling loop in KiaUvoApiCN (CN)."""
-
-    @patch("hyundai_kia_connect_api.KiaUvoApiCN.requests.get")
-    @patch("hyundai_kia_connect_api.KiaUvoApiCN.sleep", return_value=None)
-    def test_polling_treats_duplicate_request_as_pending(self, mock_sleep, mock_get):
-        """DuplicateRequestError during CN polling is treated as PENDING."""
-        mock_get.return_value.json.side_effect = [
-            _duplicate_request_response(),
-            _final_response("action-123", "success"),
-        ]
-        api = _make_cn_api()
-        token = _make_token()
-        vehicle = _make_vehicle()
-
-        from hyundai_kia_connect_api.const import ORDER_STATUS
-
-        result = api.check_action_status(
-            token, vehicle, "action-123", synchronous=True, timeout=60
-        )
-        assert result == ORDER_STATUS.SUCCESS
