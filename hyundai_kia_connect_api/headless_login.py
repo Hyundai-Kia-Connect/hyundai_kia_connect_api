@@ -8,9 +8,17 @@ import base64
 from dataclasses import dataclass
 from urllib.parse import urlparse, parse_qs
 
-from curl_cffi import requests as curl_requests
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_v1_5
+try:
+    from curl_cffi import requests as curl_requests
+except ImportError:
+    curl_requests = None
+
+try:
+    from Crypto.PublicKey import RSA
+    from Crypto.Cipher import PKCS1_v1_5
+except ImportError:
+    RSA = None
+    PKCS1_v1_5 = None
 
 from .const import BRANDS
 from .exceptions import AuthenticationError
@@ -77,6 +85,12 @@ def get_token(username: str, password: str, brand: int) -> BluelinkToken:
         AuthenticationError: If login fails.
         ValueError: If brand is not supported.
     """
+    if curl_requests is None:
+        raise AuthenticationError(
+            "Headless login requires the 'EU' extra. "
+            "Install with: pip install hyundai_kia_connect_api[EU]"
+        )
+
     if brand not in _BRAND_OAUTH:
         raise ValueError(
             f"Brand {BRANDS.get(brand, brand)} not supported for headless login. "

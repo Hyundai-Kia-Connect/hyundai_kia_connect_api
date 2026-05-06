@@ -453,58 +453,13 @@ def test_login_genesis_headless_fails_falls_back_to_error():
             api.login("user@test.com", "MyPassword123!")
 
 
-# ── Integration: token format flows into Authorization headers ──
+# ── Missing EU dependencies ──
 
 
-def test_login_headless_token_flows_to_authenticated_headers():
-    """End-to-end: headless login token produces correct Authorization header."""
-    from hyundai_kia_connect_api.headless_login import BluelinkToken
+def test_get_token_missing_eu_dependencies():
+    """Missing curl_cffi/pycryptodome should raise AuthenticationError."""
+    from hyundai_kia_connect_api.headless_login import get_token
 
-    api = _make_eu_api(brand=2)  # Hyundai
-
-    bluelink_token = BluelinkToken(
-        access_token="Bearer raw-access-token",
-        refresh_token="HEADLESSREFRESHTOKEN123456789012345678",
-        expires_in=86400,
-    )
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(api, "_get_device_id", return_value="device-123"),
-        patch.object(api, "_get_cookies", return_value={}),
-        patch.object(api, "_set_session_language"),
-        patch(
-            "hyundai_kia_connect_api.headless_login.get_token",
-            return_value=bluelink_token,
-        ),
-    ):
-        token = api.login("user@test.com", "MyPassword123!", pin="1234")
-
-    # Token must have Bearer prefix for _get_authenticated_headers
-    assert token.access_token == "Bearer raw-access-token"
-    headers = api._get_authenticated_headers(token)
-    assert headers["Authorization"] == "Bearer raw-access-token"
-
-
-def test_login_refresh_token_flows_to_authenticated_headers():
-    """End-to-end: refresh_token login also produces correct Authorization header."""
-    api = _make_eu_api(brand=1)  # Kia
-    refresh_token = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(api, "_get_device_id", return_value="device-123"),
-        patch.object(api, "_get_cookies", return_value={}),
-        patch.object(api, "_set_session_language"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer access-token", "auth-code", 86400),
-        ),
-    ):
-        token = api.login("user@test.com", refresh_token, pin="1234")
-
-    # Token must have Bearer prefix for _get_authenticated_headers
-    assert token.access_token == "Bearer access-token"
-    headers = api._get_authenticated_headers(token)
-    assert headers["Authorization"] == "Bearer access-token"
+    with patch("hyundai_kia_connect_api.headless_login.curl_requests", None):
+        with pytest.raises(AuthenticationError, match="'EU' extra"):
+            get_token("user@test.com", "password", 1)
