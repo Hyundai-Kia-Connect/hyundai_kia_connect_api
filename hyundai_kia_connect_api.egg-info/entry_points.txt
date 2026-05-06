@@ -1,0 +1,2 @@
+[console_scripts]
+bluelink = hyundai_kia_connect_api.bluelink:main
