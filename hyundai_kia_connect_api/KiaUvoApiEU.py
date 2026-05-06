@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_v1_5
 from zoneinfo import ZoneInfo
 
 
@@ -198,14 +200,9 @@ class KiaUvoApiEU(ApiImplType1):
             )
         elif self.brand in (1, 2, 3):  # Kia=1, Hyundai=2, Genesis=3
             # Headless login for Kia/Hyundai/Genesis EU: username + plaintext password
-            from .headless_login import get_token
-
-            bluelink_token = get_token(
-                username=username, password=password, brand=self.brand
+            access_token, refresh_token, expires_in = self._login_with_password(
+                username, password
             )
-            access_token = bluelink_token.access_token
-            refresh_token = bluelink_token.refresh_token
-            expires_in = bluelink_token.expires_in
         else:
             raise AuthenticationError(
                 "Username/password login is only supported for "
@@ -225,6 +222,132 @@ class KiaUvoApiEU(ApiImplType1):
             valid_until=valid_until,
             pin=pin,
         )
+
+    def _login_with_password(self, username, password):
+        """Headless login using username + plaintext password.
+
+        Performs the IDPConnect OAuth2 flow with RSA-encrypted password,
+        using standard HTTP requests. No browser needed.
+
+        Returns:
+            (access_token, refresh_token, expires_in)
+
+        Raises:
+            AuthenticationError: If login fails.
+        """
+        host = self.LOGIN_FORM_HOST
+        client_id = self.CCSP_SERVICE_ID
+        client_secret = self.CCS_SERVICE_SECRET
+
+        if BRANDS[self.brand] == BRAND_HYUNDAI:
+            redirect_uri = self.USER_API_URL + "oauth2/token"
+        elif self.PORT == 443:
+            redirect_uri = f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/redirect"
+        else:
+            redirect_uri = self.USER_API_URL + "oauth2/redirect"
+
+        mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
+
+        s = requests.Session()
+        s.headers.update({"User-Agent": mobile_ua})
+
+        # Step 1: Load authorize page to get session cookies
+        auth_url = (
+            f"{host}/auth/api/v2/user/oauth2/authorize"
+            f"?response_type=code&client_id={client_id}"
+            f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
+        )
+        s.get(auth_url, allow_redirects=True)
+
+        # Step 2: Get RSA public key for password encryption
+        resp = s.get(f"{host}/auth/api/v1/accounts/certs")
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"Failed to fetch RSA certs: HTTP {resp.status_code}"
+            )
+        jwk = resp.json().get("retValue", {})
+        kid = jwk.get("kid", "")
+
+        # Convert JWK to RSA key
+        n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
+        e_bytes = base64.urlsafe_b64decode(jwk["e"] + "==")
+        n = int.from_bytes(n_bytes, "big")
+        e = int.from_bytes(e_bytes, "big")
+        key = RSA.construct((n, e))
+        cipher = PKCS1_v1_5.new(key)
+        encrypted_pw = cipher.encrypt(password.encode("utf-8")).hex()
+
+        # Step 3: POST signin with encrypted password
+        resp = s.post(
+            f"{host}/auth/account/signin",
+            data={
+                "client_id": client_id,
+                "encryptedPassword": "true",
+                "password": encrypted_pw,
+                "redirect_uri": redirect_uri,
+                "scope": "",
+                "nonce": "",
+                "state": "ccsp",
+                "username": username,
+                "connector_session_key": "",
+                "kid": kid,
+                "_csrf": "",
+            },
+            allow_redirects=False,
+        )
+
+        if resp.status_code != 302:
+            raise AuthenticationError(
+                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}"
+            )
+
+        location = resp.headers.get("location", "")
+        code_list = parse_qs(urlparse(location).query).get("code")
+        if not code_list:
+            if "error" in location.lower():
+                error_desc = parse_qs(urlparse(location).query).get(
+                    "error_description", ["unknown"]
+                )[0]
+                raise AuthenticationError(f"Signin rejected: {error_desc}")
+            if "/web/v1/user/authorization" in location:
+                raise AuthenticationError(
+                    "Signin succeeded but requires a consent page "
+                    "(SPA redirect). Try using a refresh token instead."
+                )
+            if "authorize" in location:
+                raise AuthenticationError(
+                    "Signin failed — redirected back to login page. "
+                    "Check username and password."
+                )
+            raise AuthenticationError(
+                f"No authorization code in redirect: {location[:250]}"
+            )
+
+        code = code_list[0]
+
+        # Step 4: Exchange authorization code for tokens
+        resp = requests.post(
+            f"{host}/auth/api/v2/user/oauth2/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
+        )
+
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"Token exchange failed: HTTP {resp.status_code} — {resp.text[:200]}"
+            )
+
+        tokens = resp.json()
+        access_token = tokens["token_type"] + " " + tokens["access_token"]
+        refresh_token = tokens["refresh_token"]
+        expires_in = int(tokens.get("expires_in", 86400))
+
+        return access_token, refresh_token, expires_in
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id

@@ -1,4 +1,4 @@
-"""Tests for headless EU login (headless_login.py) and KiaUvoApiEU.login() flow."""
+"""Tests for KiaUvoApiEU._login_with_password() and login() flow routing."""
 
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
@@ -9,19 +9,7 @@ from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.exceptions import AuthenticationError
 
 
-# ── BluelinkToken dataclass ──────────────────────────────────
-
-
-def test_bluelink_token_dataclass():
-    from hyundai_kia_connect_api.headless_login import BluelinkToken
-
-    token = BluelinkToken(access_token="at", refresh_token="rt", expires_in=3600)
-    assert token.access_token == "at"
-    assert token.refresh_token == "rt"
-    assert token.expires_in == 3600
-
-
-# ── Helper: patches for get_token() tests ─────────────────────
+# ── Helper: patches for _login_with_password() tests ─────────────
 # RSA/PKCS1v15 crypto is not under test, so we mock it out.
 
 
@@ -30,27 +18,25 @@ def _mock_crypto():
     mock_cipher = MagicMock()
     mock_cipher.encrypt.return_value = b"\x00" * 256  # fake encrypted password
     return [
-        patch("hyundai_kia_connect_api.headless_login.RSA.construct"),
+        patch("hyundai_kia_connect_api.KiaUvoApiEU.RSA.construct"),
         patch(
-            "hyundai_kia_connect_api.headless_login.PKCS1_v1_5.new",
+            "hyundai_kia_connect_api.KiaUvoApiEU.PKCS1_v1_5.new",
             return_value=mock_cipher,
         ),
     ]
 
 
-# ── get_token() error paths ──────────────────────────────────
+def _make_eu_api(brand: int = 1) -> KiaUvoApiEU:
+    """Create a KiaUvoApiEU instance for testing."""
+    return KiaUvoApiEU(region=1, brand=brand, language="en")
 
 
-def test_get_token_unsupported_brand():
-    from hyundai_kia_connect_api.headless_login import get_token
-
-    with pytest.raises(ValueError, match="not supported for headless login"):
-        get_token("user@test.com", "password", 99)
+# ── _login_with_password() error paths ──────────────────────────
 
 
-def test_get_token_certs_endpoint_fails():
+def test_login_with_password_certs_endpoint_fails():
     """Certs endpoint returns non-200 -> AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     mock_response = MagicMock()
     mock_response.status_code = 500
@@ -58,17 +44,22 @@ def test_get_token_certs_endpoint_fails():
     mock_session = MagicMock()
     mock_session.get.return_value = mock_response
 
-    with patch(
-        "hyundai_kia_connect_api.headless_login.curl_requests.Session",
-        return_value=mock_session,
-    ):
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                return_value=mock_session,
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Failed to fetch RSA certs"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_signin_returns_non_302():
+def test_login_with_password_signin_returns_non_302():
     """Signin endpoint returns 200 instead of 302 -> AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -91,19 +82,19 @@ def test_get_token_signin_returns_non_302():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin failed"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_signin_no_code_in_redirect():
+def test_login_with_password_signin_no_code_in_redirect():
     """Signin redirect has no code parameter -> AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -126,19 +117,19 @@ def test_get_token_signin_no_code_in_redirect():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="No authorization code"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_signin_error_in_redirect():
+def test_login_with_password_signin_error_in_redirect():
     """Signin redirect contains error parameter -> AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -166,19 +157,19 @@ def test_get_token_signin_error_in_redirect():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin rejected"):
-            get_token("user@test.com", "wrong-password", 1)
+            api._login_with_password("user@test.com", "wrong-password")
 
 
-def test_get_token_signin_redirect_to_login_page():
-    """Signin redirects back to authorize page -> AuthenticationError with helpful message."""
-    from hyundai_kia_connect_api.headless_login import get_token
+def test_login_with_password_signin_redirect_to_login_page():
+    """Signin redirects back to authorize page -> AuthenticationError."""
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -192,10 +183,10 @@ def test_get_token_signin_redirect_to_login_page():
 
     signin_resp = MagicMock()
     signin_resp.status_code = 302
-    # The real API redirects back to the authorize URL when login fails
-    # (no "error" param, no "code" param — just redirects back to authorize)
     signin_resp.headers = {
-        "location": "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+        "location": (
+            "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+        )
     }
 
     mock_session = MagicMock()
@@ -205,19 +196,19 @@ def test_get_token_signin_redirect_to_login_page():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="redirected back to login page"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_signin_consent_spa_redirect():
+def test_login_with_password_signin_consent_spa_redirect():
     """Kia EU redirects to /web/v1/user/authorization SPA (consent page)."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -232,7 +223,7 @@ def test_get_token_signin_consent_spa_redirect():
     signin_resp = MagicMock()
     signin_resp.status_code = 302
     signin_resp.headers = {
-        "location": ("https://prd.eu-ccapi.kia.com:8080/web/v1/user/authorization")
+        "location": "https://prd.eu-ccapi.kia.com:8080/web/v1/user/authorization"
     }
 
     mock_session = MagicMock()
@@ -242,19 +233,19 @@ def test_get_token_signin_consent_spa_redirect():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="consent page"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_token_exchange_fails():
+def test_login_with_password_token_exchange_fails():
     """Token exchange returns non-200 -> AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
+    api = _make_eu_api(brand=1)
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -281,25 +272,25 @@ def test_get_token_token_exchange_fails():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.post",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
                 return_value=token_resp,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Token exchange failed"):
-            get_token("user@test.com", "password", 1)
+            api._login_with_password("user@test.com", "password")
 
 
-def test_get_token_success():
-    """Full successful headless login flow returns BluelinkToken."""
-    from hyundai_kia_connect_api.headless_login import BluelinkToken, get_token
+def test_login_with_password_success():
+    """Full successful _login_with_password flow returns correct tokens."""
+    api = _make_eu_api(brand=2)  # Hyundai
 
     certs_resp = MagicMock()
     certs_resp.status_code = 200
@@ -331,32 +322,28 @@ def test_get_token_success():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
                 return_value=mock_session,
             )
         )
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.headless_login.curl_requests.post",
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
                 return_value=token_resp,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        result = get_token("user@test.com", "password", 2)
+        access_token, refresh_token, expires_in = api._login_with_password(
+            "user@test.com", "password"
+        )
 
-    assert isinstance(result, BluelinkToken)
-    assert result.access_token == "Bearer test-access-token"
-    assert result.refresh_token == "TESTRFTOKEN12345678901234567890123456789012345678"
-    assert result.expires_in == 86400
+    assert access_token == "Bearer test-access-token"
+    assert refresh_token == "TESTRFTOKEN12345678901234567890123456789012345678"
+    assert expires_in == 86400
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
-
-
-def _make_eu_api(brand: int = 1) -> KiaUvoApiEU:
-    """Create a KiaUvoApiEU instance for testing."""
-    return KiaUvoApiEU(region=1, brand=brand, language="en")
 
 
 def test_login_refresh_token_flow():
@@ -383,23 +370,23 @@ def test_login_refresh_token_flow():
     assert token.pin == "1234"
 
 
-def test_login_plaintext_password_calls_headless_login():
-    """Plaintext password for Kia/Hyundai invokes get_token() from headless_login."""
+def test_login_plaintext_password_calls_login_with_password():
+    """Plaintext password for Kia invokes _login_with_password()."""
     api = _make_eu_api(brand=1)  # Kia
-
-    mock_bluelink_token = MagicMock()
-    mock_bluelink_token.access_token = "Bearer headless-access-token"
-    mock_bluelink_token.refresh_token = "HEADLESSREFRESHTOKEN123456789012345678"
-    mock_bluelink_token.expires_in = 3600
 
     with (
         patch.object(api, "_get_stamp", return_value="stamp"),
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
-        patch(
-            "hyundai_kia_connect_api.headless_login.get_token",
-            return_value=mock_bluelink_token,
+        patch.object(
+            api,
+            "_login_with_password",
+            return_value=(
+                "Bearer headless-access-token",
+                "HEADLESSREFRESHTOKEN123456789012345678",
+                3600,
+            ),
         ),
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
@@ -409,23 +396,23 @@ def test_login_plaintext_password_calls_headless_login():
     assert token.pin == "1234"
 
 
-def test_login_plaintext_password_genesis_calls_headless_login():
-    """Plaintext password for Genesis invokes get_token() from headless_login."""
+def test_login_plaintext_password_genesis_calls_login_with_password():
+    """Plaintext password for Genesis invokes _login_with_password()."""
     api = _make_eu_api(brand=3)  # Genesis
-
-    mock_bluelink_token = MagicMock()
-    mock_bluelink_token.access_token = "Bearer genesis-access-token"
-    mock_bluelink_token.refresh_token = "GENESISREFRESHTOKEN12345678901234567"
-    mock_bluelink_token.expires_in = 3600
 
     with (
         patch.object(api, "_get_stamp", return_value="stamp"),
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
-        patch(
-            "hyundai_kia_connect_api.headless_login.get_token",
-            return_value=mock_bluelink_token,
+        patch.object(
+            api,
+            "_login_with_password",
+            return_value=(
+                "Bearer genesis-access-token",
+                "GENESISREFRESHTOKEN12345678901234567",
+                3600,
+            ),
         ),
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
@@ -435,8 +422,8 @@ def test_login_plaintext_password_genesis_calls_headless_login():
     assert token.pin == "1234"
 
 
-def test_login_genesis_headless_fails_falls_back_to_error():
-    """If headless login fails for Genesis, raise AuthenticationError with hint."""
+def test_login_genesis_password_fails_falls_back_to_error():
+    """If _login_with_password fails for Genesis, error propagates."""
     api = _make_eu_api(brand=3)  # Genesis
 
     with (
@@ -444,22 +431,11 @@ def test_login_genesis_headless_fails_falls_back_to_error():
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
-        patch(
-            "hyundai_kia_connect_api.headless_login.get_token",
+        patch.object(
+            api,
+            "_login_with_password",
             side_effect=AuthenticationError("Signin failed: HTTP 404"),
         ),
     ):
         with pytest.raises(AuthenticationError, match="Signin failed"):
             api.login("user@test.com", "MyPassword123!")
-
-
-# ── Missing EU dependencies ──
-
-
-def test_get_token_missing_eu_dependencies():
-    """Missing curl_cffi/pycryptodome should raise AuthenticationError."""
-    from hyundai_kia_connect_api.headless_login import get_token
-
-    with patch("hyundai_kia_connect_api.headless_login.curl_requests", None):
-        with pytest.raises(AuthenticationError, match="'EU' extra"):
-            get_token("user@test.com", "password", 1)

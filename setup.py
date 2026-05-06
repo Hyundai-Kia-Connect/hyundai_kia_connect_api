@@ -35,7 +35,7 @@ setup(
     description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
     install_requires=requirements,
     extras_require={
-        "EU": ["curl_cffi>=0.7.0", "pycryptodome>=3.19.0"],
+        "EU": [],
         "google": ["geopy>=2.2.0"],
     },
     license="MIT license",
