@@ -123,7 +123,9 @@ class KiaUvoApiEU(ApiImplType1):
             self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
             self.PORT: int = 443
             self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.CCS_SERVICE_SECRET: str = "secret"
+            self.CCS_SERVICE_SECRET: str = (
+                "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
+            )
             self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
             self.CFB: str = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
@@ -241,6 +243,10 @@ class KiaUvoApiEU(ApiImplType1):
 
         if BRANDS[self.brand] == BRAND_HYUNDAI:
             redirect_uri = self.USER_API_URL + "oauth2/token"
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            redirect_uri = (
+                "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
+            )
         elif self.PORT == 443:
             redirect_uri = f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/redirect"
         else:
