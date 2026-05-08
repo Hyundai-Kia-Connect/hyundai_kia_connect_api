@@ -208,8 +208,8 @@ class KiaUvoApiEU(ApiImplType1):
             )
         else:
             raise AuthenticationError(
-                "Username/password login is only supported for "
-                "Kia, Hyundai, and Genesis (EU). Provide a refresh_token instead."
+                "Username/password login is not supported for this region. "
+                "Provide a refresh_token instead."
             )
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
