@@ -44,6 +44,7 @@ from .const import (
 )
 from .exceptions import (
     AuthenticationError,
+    ConsentRequiredError,
 )
 from .utils import (
     get_child_value,
@@ -200,7 +201,7 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, _, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-        elif self.brand in (1, 2, 3):  # Kia=1, Hyundai=2, Genesis=3
+        elif BRANDS[self.brand] in (BRAND_KIA, BRAND_HYUNDAI, BRAND_GENESIS):
             # Headless login for Kia/Hyundai/Genesis EU: username + plaintext password
             access_token, refresh_token, expires_in = self._login_with_password(
                 username, password
@@ -225,7 +226,9 @@ class KiaUvoApiEU(ApiImplType1):
             pin=pin,
         )
 
-    def _login_with_password(self, username, password):
+    def _login_with_password(
+        self, username: str, password: str
+    ) -> tuple[str, str, int]:
         """Headless login using username + plaintext password.
 
         Performs the IDPConnect OAuth2 flow with RSA-encrypted password,
@@ -241,6 +244,9 @@ class KiaUvoApiEU(ApiImplType1):
         client_id = self.CCSP_SERVICE_ID
         client_secret = self.CCS_SERVICE_SECRET
 
+        # Brand-specific redirect URIs for the IDPConnect OAuth flow.
+        # All three EU brands (Kia, Hyundai, Genesis) are supported.
+        # Kia EU falls through to the BASE_DOMAIN/USER_API_URL path.
         if BRANDS[self.brand] == BRAND_HYUNDAI:
             redirect_uri = self.USER_API_URL + "oauth2/token"
         elif BRANDS[self.brand] == BRAND_GENESIS:
@@ -316,13 +322,13 @@ class KiaUvoApiEU(ApiImplType1):
                 )[0]
                 raise AuthenticationError(f"Signin rejected: {error_desc}")
             if "/web/v1/user/authorization" in location:
-                raise AuthenticationError(
-                    "Signin succeeded but requires a consent page "
-                    "(SPA redirect). Try using a refresh token instead."
+                raise ConsentRequiredError(
+                    "Account consent is required. Please log in via a browser "
+                    "once to accept the terms, then use the refresh token."
                 )
             if "authorize" in location:
                 raise AuthenticationError(
-                    "Signin failed — redirected back to login page. "
+                    "Signin failed — returned to login page. "
                     "Check username and password."
                 )
             raise AuthenticationError(

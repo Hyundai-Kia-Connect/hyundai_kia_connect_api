@@ -108,3 +108,14 @@ class InvalidAPIResponseError(APIError):
     """
 
     pass
+
+
+class ConsentRequiredError(AuthenticationError):
+    """
+    Raised when the OAuth signin succeeds but the user must accept
+    a consent/authorization page before tokens can be issued.
+    This typically means the user needs to log in via a browser once
+    to accept terms, then use the refresh token going forward.
+    """
+
+    pass

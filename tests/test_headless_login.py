@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
-from hyundai_kia_connect_api.exceptions import AuthenticationError
+from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequiredError
 
 
 # ── Helper: patches for _login_with_password() tests ─────────────
@@ -202,7 +202,7 @@ def test_login_with_password_signin_redirect_to_login_page():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="redirected back to login page"):
+        with pytest.raises(AuthenticationError, match="returned to login page"):
             api._login_with_password("user@test.com", "password")
 
 
@@ -239,7 +239,7 @@ def test_login_with_password_signin_consent_spa_redirect():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="consent page"):
+        with pytest.raises(ConsentRequiredError, match="consent is required"):
             api._login_with_password("user@test.com", "password")
 
 
