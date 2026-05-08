@@ -201,15 +201,10 @@ class KiaUvoApiEU(ApiImplType1):
             _, access_token, _, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-        elif BRANDS[self.brand] in (BRAND_KIA, BRAND_HYUNDAI, BRAND_GENESIS):
-            # Headless login for Kia/Hyundai/Genesis EU: username + plaintext password
+        else:
+            # Headless login: username + plaintext password
             access_token, refresh_token, expires_in = self._login_with_password(
                 username, password
-            )
-        else:
-            raise AuthenticationError(
-                "Username/password login is not supported for this region. "
-                "Provide a refresh_token instead."
             )
 
         valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
