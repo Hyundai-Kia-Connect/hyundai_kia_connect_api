@@ -1,0 +1,8 @@
+beautifulsoup4>=4.14.3
+requests
+certifi>=2026.4.22
+tzdata>=2026.2
+pycryptodome>=3.19.0
+
+[google]
+geopy>=2.2.0
