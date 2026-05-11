@@ -9,10 +9,6 @@ import time
 import certifi
 import requests
 from requests.adapters import HTTPAdapter
-
-# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
-
-
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
