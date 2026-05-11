@@ -234,7 +234,8 @@ class KiaUvoApiEU(ApiImplType1):
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
             raise AuthenticationError(
-                f"Failed to fetch RSA certs: HTTP {resp.status_code}"
+                f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
+                "This may indicate a Hyundai API change."
             )
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
@@ -269,7 +270,8 @@ class KiaUvoApiEU(ApiImplType1):
 
         if resp.status_code != 302:
             raise AuthenticationError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}"
+                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
+                "Check username and password."
             )
 
         location = resp.headers.get("location", "")
@@ -279,7 +281,10 @@ class KiaUvoApiEU(ApiImplType1):
                 error_desc = parse_qs(urlparse(location).query).get(
                     "error_description", ["unknown"]
                 )[0]
-                raise AuthenticationError(f"Signin rejected: {error_desc}")
+                raise AuthenticationError(
+                    f"Authentication rejected: {error_desc}. "
+                    "Check username and password."
+                )
             if "/web/v1/user/authorization" in location:
                 raise ConsentRequiredError(
                     "Account consent is required. Please log in via a browser "
@@ -287,11 +292,11 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             if "authorize" in location:
                 raise AuthenticationError(
-                    "Signin failed — returned to login page. "
+                    "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
             raise AuthenticationError(
-                f"No authorization code in redirect: {location[:250]}"
+                f"API error: unexpected redirect after signin: {location[:250]}"
             )
 
         code = code_list[0]
@@ -310,7 +315,8 @@ class KiaUvoApiEU(ApiImplType1):
 
         if resp.status_code != 200:
             raise AuthenticationError(
-                f"Token exchange failed: HTTP {resp.status_code} — {resp.text[:200]}"
+                f"API error: token exchange failed: HTTP {resp.status_code} — "
+                f"{resp.text[:200]}. This may indicate a Hyundai API change."
             )
 
         tokens = resp.json()
