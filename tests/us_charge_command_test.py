@@ -9,7 +9,6 @@ import datetime as dt
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
@@ -21,6 +20,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class _FakeResponse:
     """Minimal fake for requests.Response."""
 
@@ -30,6 +30,7 @@ class _FakeResponse:
 
     def json(self):
         import json
+
         return json.loads(self.text)
 
 
@@ -61,8 +62,8 @@ def _make_api():
 # start_charge tests
 # ---------------------------------------------------------------------------
 
-class TestStartCharge:
 
+class TestStartCharge:
     def test_start_charge_normal_json_response(self):
         """start_charge succeeds when API returns valid JSON."""
         api = _make_api()
@@ -100,7 +101,10 @@ class TestStartCharge:
         with caplog.at_level(logging.DEBUG):
             api.start_charge(token, vehicle)
 
-        assert "empty body" in caplog.text.lower() or "treating as success" in caplog.text.lower()
+        assert (
+            "empty body" in caplog.text.lower()
+            or "treating as success" in caplog.text.lower()
+        )
 
     def test_start_charge_skipped_for_non_ev(self):
         """start_charge is a no-op for non-EV vehicles."""
@@ -131,8 +135,8 @@ class TestStartCharge:
 # stop_charge tests
 # ---------------------------------------------------------------------------
 
-class TestStopCharge:
 
+class TestStopCharge:
     def test_stop_charge_normal_json_response(self):
         """stop_charge succeeds when API returns valid JSON."""
         api = _make_api()
@@ -170,7 +174,10 @@ class TestStopCharge:
         with caplog.at_level(logging.DEBUG):
             api.stop_charge(token, vehicle)
 
-        assert "empty body" in caplog.text.lower() or "treating as success" in caplog.text.lower()
+        assert (
+            "empty body" in caplog.text.lower()
+            or "treating as success" in caplog.text.lower()
+        )
 
     def test_stop_charge_skipped_for_non_ev(self):
         """stop_charge is a no-op for non-EV vehicles."""
