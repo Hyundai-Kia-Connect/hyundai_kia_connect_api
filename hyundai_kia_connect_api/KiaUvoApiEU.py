@@ -142,6 +142,20 @@ class KiaUvoApiEU(ApiImplType1):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.GCM_SENDER_ID = 199360397125
 
+        # Brand-specific OAuth2 redirect URI for the IDPConnect flow.
+        if BRANDS[self.brand] == BRAND_HYUNDAI:
+            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/token"
+        elif BRANDS[self.brand] == BRAND_GENESIS:
+            self._oauth_redirect_uri: str = (
+                "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
+            )
+        elif self.PORT == 443:
+            self._oauth_redirect_uri: str = (
+                f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/redirect"
+            )
+        else:
+            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/redirect"
+
     def login(
         self,
         username: str,
@@ -199,20 +213,7 @@ class KiaUvoApiEU(ApiImplType1):
         host = self.LOGIN_FORM_HOST
         client_id = self.CCSP_SERVICE_ID
         client_secret = self.CCS_SERVICE_SECRET
-
-        # Brand-specific redirect URIs for the IDPConnect OAuth flow.
-        # All three EU brands (Kia, Hyundai, Genesis) are supported.
-        # Kia EU falls through to the BASE_DOMAIN/USER_API_URL path.
-        if BRANDS[self.brand] == BRAND_HYUNDAI:
-            redirect_uri = self.USER_API_URL + "oauth2/token"
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            redirect_uri = (
-                "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
-            )
-        elif self.PORT == 443:
-            redirect_uri = f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/redirect"
-        else:
-            redirect_uri = self.USER_API_URL + "oauth2/redirect"
+        redirect_uri = self._oauth_redirect_uri
 
         mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
 
