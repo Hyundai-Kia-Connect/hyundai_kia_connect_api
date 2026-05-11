@@ -9,6 +9,16 @@ import time
 import certifi
 import requests
 from requests.adapters import HTTPAdapter
+
+# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
+
+import datetime as dt
+import logging
+import time
+
+import certifi
+import requests
+from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
@@ -949,6 +959,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        if not response.text:
+            _LOGGER.debug(
+                f"{DOMAIN} - Start charge response: empty body with status "
+                f"{response.status_code}, treating as success"
+            )
+            return
         response_json = response.json()
         _check_response_for_errors(response_json)
         _LOGGER.debug(
@@ -967,6 +983,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        if not response.text:
+            _LOGGER.debug(
+                f"{DOMAIN} - Stop charge response: empty body with status "
+                f"{response.status_code}, treating as success"
+            )
+            return
         response_json = response.json()
         _check_response_for_errors(response_json)
         _LOGGER.debug(
