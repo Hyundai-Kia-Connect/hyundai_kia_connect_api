@@ -215,6 +215,8 @@ class KiaUvoApiEU(ApiImplType1):
         client_secret = self.CCS_SERVICE_SECRET
         redirect_uri = self._oauth_redirect_uri
 
+        # The _CCS_APP_AOS suffix is required — without it, the IDPConnect
+        # authorize endpoint returns "400 Bad Request".
         mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
 
         s = requests.Session()
