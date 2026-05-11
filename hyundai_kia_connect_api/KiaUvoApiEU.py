@@ -356,6 +356,37 @@ class KiaUvoApiEU(ApiImplType1):
 
         return access_token, refresh_token, expires_in
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh access token using the stored refresh token.
+
+        Uses the OAuth2 refresh_token grant to get a new access token
+        without repeating the full login flow. Falls back to full login
+        if the refresh token is missing or the exchange fails.
+        """
+        if token.refresh_token:
+            try:
+                stamp = self._get_stamp()
+                _, access_token, new_refresh_token, expires_in = self._get_access_token(
+                    stamp, token.refresh_token
+                )
+                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                    seconds=expires_in
+                )
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    device_id=token.device_id,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    "Refresh token exchange failed, falling back to full login"
+                )
+        return self.login(token.username, token.password, token.pin)
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
