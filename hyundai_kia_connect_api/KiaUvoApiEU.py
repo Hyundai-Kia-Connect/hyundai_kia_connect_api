@@ -346,7 +346,7 @@ class KiaUvoApiEU(ApiImplType1):
                     username=token.username,
                     password=token.password,
                     access_token=access_token,
-                    refresh_token=new_refresh_token,
+                    refresh_token=new_refresh_token or token.refresh_token,
                     device_id=token.device_id,
                     valid_until=valid_until,
                     pin=token.pin,
