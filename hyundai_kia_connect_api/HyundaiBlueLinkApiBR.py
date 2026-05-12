@@ -288,7 +288,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                         pass
                     else:
                         vehicle.air_temperature = (temp_value, temp_unit)
-                except ValueError, TypeError, KeyError:  # fmt skip
+                except (ValueError, TypeError, KeyError):  # fmt: skip
                     pass
 
         # Fuel information
