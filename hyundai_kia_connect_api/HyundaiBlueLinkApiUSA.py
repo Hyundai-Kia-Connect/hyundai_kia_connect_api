@@ -949,6 +949,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        if not response.text:
+            _LOGGER.debug(
+                f"{DOMAIN} - Start charge response: empty body with status "
+                f"{response.status_code}, treating as success"
+            )
+            return
         response_json = response.json()
         _check_response_for_errors(response_json)
         _LOGGER.debug(
@@ -967,6 +973,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
+        if not response.text:
+            _LOGGER.debug(
+                f"{DOMAIN} - Stop charge response: empty body with status "
+                f"{response.status_code}, treating as success"
+            )
+            return
         response_json = response.json()
         _check_response_for_errors(response_json)
         _LOGGER.debug(
