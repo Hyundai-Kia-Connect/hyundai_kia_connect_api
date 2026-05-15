@@ -19,8 +19,7 @@ API Usage
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
-Europe Kia must follow unique steps: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/wiki/Kia-Europe-Login-Flow
-Hyundai steps are here: https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/tree/master/Hyundai%20Token%20Solution
+Europe Hyundai and Kia login logic is based on the `bluelink-refresh-token <https://github.com/TMA84/bluelink-refresh-token>`_ project.  Username/password login is supported directly for Kia, Hyundai, and Genesis (EU) — no browser or manual token extraction needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
 Python 3.10 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 

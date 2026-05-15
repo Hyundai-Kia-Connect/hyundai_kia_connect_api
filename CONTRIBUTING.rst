@@ -76,14 +76,14 @@ Ready to contribute? Here's how to set up `hyundai_kia_connect_api` for local de
 
    Now you can make your changes locally.
 
-5. When you're done making changes, check that your changes pass flake8. Most
-   tests require environment variables to supply the username and password and
-   they will run as part of the PR pre-requisites:
+5. When you're done making changes, check that your changes pass linting and tests.
+   Pre-commit hooks use ruff for linting and formatting. Most tests require
+   environment variables to supply the username and password and they will run
+   as part of the PR pre-requisites:
 
-    $ flake8 hyundai_kia_connect_api tests
-    $ python setup.py test or pytest
-
-   To get flake8, pip install them into your virtualenv.
+    $ pip install pre-commit
+    $ pre-commit run --all-files
+    $ pytest
 
 6. Commit your changes and push your branch to GitHub::
 
@@ -111,17 +111,3 @@ Tips
 To run a subset of tests::
 
 $ pytest tests.test_hyundai_kia_connect_api
-
-
-Deploying
----------
-
-A reminder for the maintainers on how to deploy.
-Make sure all your changes are committed (including an entry in HISTORY.rst).
-Then run::
-
-$ bump2version patch # possible: major / minor / patch
-$ git push
-$ git push --tags
-
-Travis will then deploy to PyPI if tests pass.

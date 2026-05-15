@@ -460,7 +460,6 @@ def main():
         geocode_api_enable=True,
         geocode_api_use_email=True,
     )
-    # TODO: Cache token.
     vm.check_and_refresh_token()
     vm.update_all_vehicles_with_cached_state()
     return args.func(vm, args)
