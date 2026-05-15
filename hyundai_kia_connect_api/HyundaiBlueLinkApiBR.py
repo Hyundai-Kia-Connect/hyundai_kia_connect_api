@@ -34,6 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 class HyundaiBlueLinkApiBR(ApiImpl):
     """Brazilian Hyundai BlueLink API implementation."""
 
+    supports_window_control: bool = True
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
@@ -287,7 +288,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
                         pass
                     else:
                         vehicle.air_temperature = (temp_value, temp_unit)
-                except (ValueError, TypeError, KeyError):
+                except (ValueError, TypeError, KeyError):  # fmt: skip
                     pass
 
         # Fuel information

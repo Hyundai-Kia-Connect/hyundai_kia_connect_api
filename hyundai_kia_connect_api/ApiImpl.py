@@ -89,6 +89,7 @@ class ApiImpl:
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
+    supports_window_control: bool = False
 
     def __init__(self) -> None:
         """Initialize."""

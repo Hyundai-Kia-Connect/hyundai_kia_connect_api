@@ -113,6 +113,8 @@ def _check_response_for_errors(response: dict) -> None:
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
+    supports_window_control: bool = True
+
     def __init__(self) -> None:
         """Initialize."""
 
@@ -154,7 +156,7 @@ class ApiImplType1(ApiImpl):
                             "This appears to be corrupted data from Hyundai's API."
                         )
                         dte["ICE"] = None
-        except (KeyError, TypeError, AttributeError):
+        except (KeyError, TypeError, AttributeError):  # fmt: skip
             # If the structure doesn't exist or is malformed, silently continue
             # This is defensive programming in case the API structure changes
             pass
