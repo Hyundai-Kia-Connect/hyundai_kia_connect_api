@@ -186,35 +186,7 @@ class KiaUvoApiAU(ApiImplType1):
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
         if is_ccs2:
-            # CCS2 vehicles: the legacy /status endpoint returns empty
-            # metadata for CCS2 cars (no vehicle data), so we must use
-            # the CCS2 cached status endpoint instead.
-            # See: https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/1617
-            # See: https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/1654
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
-            response = requests.get(
-                url,
-                headers=self._get_authenticated_headers(
-                    token, vehicle.ccu_ccs2_protocol_support
-                ),
-            ).json()
-            _LOGGER.debug(
-                f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
-            )
-            _check_response_for_errors(response)
-            state = response["resMsg"]["state"]["Vehicle"]
-            self._update_vehicle_properties_ccs2(vehicle, state)
-            # The CCS2 status response embeds a stale cached location.
-            # Override it with the more current /location/park endpoint.
-            location = self._get_location(token, vehicle)
-            if location and get_child_value(location, "coord.lat"):
-                vehicle.location = (
-                    get_child_value(location, "coord.lat"),
-                    get_child_value(location, "coord.lon"),
-                    parse_datetime(
-                        get_child_value(location, "time"), self.data_timezone
-                    ),
-                )
+            self._force_refresh_vehicle_state_ccs2(token, vehicle)
         else:
             status = self._get_forced_vehicle_state(token, vehicle)
             location = self._get_location(token, vehicle)
@@ -247,6 +219,28 @@ class KiaUvoApiAU(ApiImplType1):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
+        response = requests.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(
+            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
+        )
+        _check_response_for_errors(response)
+        state = response["resMsg"]["state"]["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
+        location = self._get_location(token, vehicle)
+        if location and get_child_value(location, "coord.lat"):
+            vehicle.location = (
+                get_child_value(location, "coord.lat"),
+                get_child_value(location, "coord.lon"),
+                parse_datetime(get_child_value(location, "time"), self.data_timezone),
+            )
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
