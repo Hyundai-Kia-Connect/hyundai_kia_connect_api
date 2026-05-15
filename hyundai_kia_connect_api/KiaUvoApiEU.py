@@ -143,18 +143,14 @@ class KiaUvoApiEU(ApiImplType1):
         self.GCM_SENDER_ID = 199360397125
 
         # Brand-specific OAuth2 redirect URI for the IDPConnect flow.
-        if BRANDS[self.brand] == BRAND_HYUNDAI:
+        if BRANDS[self.brand] == BRAND_KIA:
+            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/redirect"
+        elif BRANDS[self.brand] == BRAND_HYUNDAI:
             self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/token"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self._oauth_redirect_uri: str = (
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
-        elif self.PORT == 443:
-            self._oauth_redirect_uri: str = (
-                f"https://{self.BASE_DOMAIN}/api/v1/user/oauth2/redirect"
-            )
-        else:
-            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/redirect"
 
     def login(
         self,
