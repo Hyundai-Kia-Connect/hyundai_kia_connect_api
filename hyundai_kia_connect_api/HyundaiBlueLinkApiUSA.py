@@ -59,6 +59,42 @@ def _check_response_for_errors(response: dict) -> None:
             )
 
 
+def _safe_parse_json(response, action_name: str):
+    """
+    Safely parse JSON response from Hyundai USA API.
+
+    Control commands (lock, unlock, climate, charge, etc.) return
+    HTTP 200 with an empty body on success. Calling response.json()
+    on an empty body raises JSONDecodeError even though the command
+    succeeded.
+
+    Args:
+        response: the HTTP response object
+        action_name: name of the action for logging purposes
+
+    Returns:
+        dict: parsed JSON if body exists
+        None: if body is empty (command succeeded, nothing to return)
+
+    Raises:
+        APIError: if HTTP status is not 200
+    """
+    if response.status_code != 200:
+        raise APIError(
+            f"{action_name} failed with "
+            f"HTTP {response.status_code}: '{response.text[:200]}'"
+        )
+
+    if not response.text.strip():
+        _LOGGER.debug(
+            f"{DOMAIN} - Empty response body for {action_name} "
+            f"(HTTP 200). Command succeeded."
+        )
+        return None
+
+    return response.json()
+
+
 class cipherAdapter(HTTPAdapter):
     """
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
@@ -832,8 +868,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         data = {"userName": token.username, "vin": vehicle.VIN}
         response = self.sessions.post(url, headers=headers, json=data)
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "lock_action")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         # response_headers = response.headers
         # response = response.json()
         # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])  # noqa
@@ -911,8 +948,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "start_climate")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Start engine response status code: {response.status_code}"
         )
@@ -931,8 +969,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "stop_climate")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Stop engine response status code: {response.status_code}"
         )
@@ -949,14 +988,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
-        if not response.text:
-            _LOGGER.debug(
-                f"{DOMAIN} - Start charge response: empty body with status "
-                f"{response.status_code}, treating as success"
-            )
-            return
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "start_charge")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Start charge response status code: {response.status_code}"
         )
@@ -973,14 +1007,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
         response = self.sessions.post(url, headers=headers)
-        if not response.text:
-            _LOGGER.debug(
-                f"{DOMAIN} - Stop charge response: empty body with status "
-                f"{response.status_code}, treating as success"
-            )
-            return
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "stop_charge")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Stop charge response status code: {response.status_code}"
         )
@@ -1013,8 +1042,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
 
         response = self.sessions.post(url, json=data, headers=headers)
-        response_json = response.json()
-        _check_response_for_errors(response_json)
+        response_json = _safe_parse_json(response, "set_charge_limits")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
         _LOGGER.debug(
             f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
         )
