@@ -263,15 +263,16 @@ class ApiImplType1(ApiImpl):
             "Cabin.HVAC.Row1.Driver.Temperature.Value",
         )
 
-        if air_temp != "OFF":
-            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+        if air_temp is not None and air_temp != "OFF":
+            vehicle.air_temperature = (float(air_temp), TEMPERATURE_UNITS[1])
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
-        vehicle.outside_temperature = (
-            outside_temp,
-            TEMPERATURE_UNITS[outside_temp_unit],
-        )
+        if outside_temp is not None and outside_temp_unit is not None:
+            vehicle.outside_temperature = (
+                float(outside_temp),
+                TEMPERATURE_UNITS[outside_temp_unit],
+            )
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
