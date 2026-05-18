@@ -268,9 +268,17 @@ class Vehicle:
     ev_battery_pack_voltage: int = None
     ev_battery_chiller_rpm: int = None
     ev_battery_heating_state: bool = None
-    ev_battery_water_temperature: int = None
-    ev_battery_temperature_min: int = None
-    ev_battery_temperature_max: int = None
+    _ev_battery_water_temperature: int = None
+    _ev_battery_water_temperature_value: int = None
+    _ev_battery_water_temperature_unit: str = None
+
+    _ev_battery_temperature_min: int = None
+    _ev_battery_temperature_min_value: int = None
+    _ev_battery_temperature_min_unit: str = None
+
+    _ev_battery_temperature_max: int = None
+    _ev_battery_temperature_max_value: int = None
+    _ev_battery_temperature_max_unit: str = None
     ev_battery_winter_mode: bool = None
     ev_battery_soh_percentage: int = None
     ev_battery_remain: int = None
@@ -483,6 +491,48 @@ class Vehicle:
         self._air_temperature_value = value[0]
         self._air_temperature_unit = value[1]
         self._air_temperature = value[0] if value[0] != "OFF" else None
+
+    @property
+    def ev_battery_water_temperature(self):
+        return self._ev_battery_water_temperature
+
+    @property
+    def ev_battery_water_temperature_unit(self):
+        return self._ev_battery_water_temperature_unit
+
+    @ev_battery_water_temperature.setter
+    def ev_battery_water_temperature(self, value):
+        self._ev_battery_water_temperature_value = value[0]
+        self._ev_battery_water_temperature_unit = value[1]
+        self._ev_battery_water_temperature = value[0]
+
+    @property
+    def ev_battery_temperature_min(self):
+        return self._ev_battery_temperature_min
+
+    @property
+    def ev_battery_temperature_min_unit(self):
+        return self._ev_battery_temperature_min_unit
+
+    @ev_battery_temperature_min.setter
+    def ev_battery_temperature_min(self, value):
+        self._ev_battery_temperature_min_value = value[0]
+        self._ev_battery_temperature_min_unit = value[1]
+        self._ev_battery_temperature_min = value[0]
+
+    @property
+    def ev_battery_temperature_max(self):
+        return self._ev_battery_temperature_max
+
+    @property
+    def ev_battery_temperature_max_unit(self):
+        return self._ev_battery_temperature_max_unit
+
+    @ev_battery_temperature_max.setter
+    def ev_battery_temperature_max(self, value):
+        self._ev_battery_temperature_max_value = value[0]
+        self._ev_battery_temperature_max_unit = value[1]
+        self._ev_battery_temperature_max = value[0]
 
     @property
     def ev_driving_range(self):

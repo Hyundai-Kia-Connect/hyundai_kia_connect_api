@@ -403,14 +403,19 @@ class ApiImplType1(ApiImpl):
         if battery_heating_state is not None:
             vehicle.ev_battery_heating_state = bool(battery_heating_state)
 
-        vehicle.ev_battery_water_temperature = get_child_value(
-            state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+        vehicle.ev_battery_water_temperature = (
+            get_child_value(
+                state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+            ),
+            TEMPERATURE_UNITS[0],
         )
-        vehicle.ev_battery_temperature_min = get_child_value(
-            state, "Green.BatteryManagement.Temperature.Min.Raw"
+        vehicle.ev_battery_temperature_min = (
+            get_child_value(state, "Green.BatteryManagement.Temperature.Min.Raw"),
+            TEMPERATURE_UNITS[0],
         )
-        vehicle.ev_battery_temperature_max = get_child_value(
-            state, "Green.BatteryManagement.Temperature.Max.Raw"
+        vehicle.ev_battery_temperature_max = (
+            get_child_value(state, "Green.BatteryManagement.Temperature.Max.Raw"),
+            TEMPERATURE_UNITS[0],
         )
 
         battery_winter_mode = get_child_value(
