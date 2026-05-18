@@ -999,7 +999,13 @@ class KiaUvoApiEU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"].get("gpsDetail")
+            gps_detail = response["resMsg"].get("gpsDetail")
+            if gps_detail is None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - gpsDetail not found in location response, "
+                    "vehicle may be offline or returning partial status"
+                )
+            return gps_detail
         except Exception as e:
             _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
             return None
