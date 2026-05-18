@@ -18,6 +18,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    ORDER_STATUS,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -851,7 +852,53 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return result
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> None:
+    def _get_transaction_id(self, response) -> str | None:
+        for key in ("tmsTid", "transactionId", "Xid"):
+            if key in response.headers:
+                return response.headers[key]
+        _LOGGER.warning(
+            f"{DOMAIN} - No transaction ID found in response headers: "
+            f"{dict(response.headers)}"
+        )
+        return None
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 120,
+    ) -> ORDER_STATUS:
+        url = self.API_URL + "rmt/getRunningStatus"
+        headers = self._get_vehicle_headers(token, vehicle)
+        headers["tid"] = action_id
+        headers["login_id"] = token.username
+        headers["service_type"] = "REMOTE_POLL"
+
+        max_attempts = 1 if not synchronous else max(1, timeout // 2)
+
+        for _ in range(max_attempts):
+            response = self.sessions.post(url, headers=headers)
+            response_json = _safe_parse_json(response, "check_action_status")
+            if response_json is None:
+                if not synchronous:
+                    return ORDER_STATUS.UNKNOWN
+                time.sleep(2)
+                continue
+            status = response_json.get("status", "")
+            if status == "SUCCESS":
+                return ORDER_STATUS.SUCCESS
+            elif status == "ERROR":
+                return ORDER_STATUS.FAILED
+            if synchronous:
+                time.sleep(2)
+
+        if synchronous:
+            return ORDER_STATUS.TIMEOUT
+        return ORDER_STATUS.PENDING
+
+    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
         if action == VEHICLE_LOCK_ACTION.LOCK:
@@ -871,15 +918,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response_json = _safe_parse_json(response, "lock_action")
         if response_json is not None:
             _check_response_for_errors(response_json)
-        # response_headers = response.headers
-        # response = response.json()
-        # action_status = self.check_action_status(token, headers["pAuth"], response_headers["transactionId"])  # noqa
-
-        # _LOGGER.debug(f"{DOMAIN} - Received lock_action response {action_status}")
         _LOGGER.debug(
             f"{DOMAIN} - Received lock_action response status code: {response.status_code}"  # noqa
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
+
+        return self._get_transaction_id(response)
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -956,7 +1000,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start engine response: {response.text}")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> None:
+        return self._get_transaction_id(response)
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -977,7 +1023,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Stop engine response: {response.text}")
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> None:
+        return self._get_transaction_id(response)
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type != ENGINE_TYPES.EV:
             return {}
 
@@ -996,7 +1044,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         )
         _LOGGER.debug(f"{DOMAIN} - Start charge response: {response.text}")
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> None:
+        return self._get_transaction_id(response)
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type != ENGINE_TYPES.EV:
             return {}
 
@@ -1014,6 +1064,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{DOMAIN} - Stop charge response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Stop charge response: {response.text}")
+
+        return self._get_transaction_id(response)
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -1049,3 +1101,5 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
         )
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
+
+        return self._get_transaction_id(response)
