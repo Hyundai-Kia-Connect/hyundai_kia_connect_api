@@ -17,9 +17,10 @@ from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
 class _FakeResponse:
     """Minimal fake for requests.Response."""
 
-    def __init__(self, text="", status_code=200):
+    def __init__(self, text="", status_code=200, headers=None):
         self.text = text
         self.status_code = status_code
+        self.headers = headers or {"tmsTid": "test-transaction-id"}
 
     def json(self):
         import json

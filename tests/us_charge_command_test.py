@@ -24,9 +24,10 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 class _FakeResponse:
     """Minimal fake for requests.Response."""
 
-    def __init__(self, text="", status_code=200):
+    def __init__(self, text="", status_code=200, headers=None):
         self.text = text
         self.status_code = status_code
+        self.headers = headers or {"tmsTid": "test-transaction-id"}
 
     def json(self):
         import json
@@ -73,7 +74,8 @@ class TestStartCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        api.start_charge(token, vehicle)
+        with patch.object(api, "_get_vehicle_headers", return_value={}):
+            api.start_charge(token, vehicle)
         api.sessions.post.assert_called_once()
 
     def test_start_charge_empty_body_no_exception(self):
@@ -88,7 +90,8 @@ class TestStartCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        api.start_charge(token, vehicle)
+        with patch.object(api, "_get_vehicle_headers", return_value={}):
+            api.start_charge(token, vehicle)
         api.sessions.post.assert_called_once()
 
     def test_start_charge_empty_body_logs_debug(self, caplog):
@@ -99,10 +102,11 @@ class TestStartCharge:
         token = _make_token()
 
         with caplog.at_level(logging.DEBUG):
-            api.start_charge(token, vehicle)
+            with patch.object(api, "_get_vehicle_headers", return_value={}):
+                api.start_charge(token, vehicle)
 
         assert (
-            "empty body" in caplog.text.lower()
+            "empty response body" in caplog.text.lower()
             or "treating as success" in caplog.text.lower()
         )
 
@@ -146,7 +150,8 @@ class TestStopCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        api.stop_charge(token, vehicle)
+        with patch.object(api, "_get_vehicle_headers", return_value={}):
+            api.stop_charge(token, vehicle)
         api.sessions.post.assert_called_once()
 
     def test_stop_charge_empty_body_no_exception(self):
@@ -161,7 +166,8 @@ class TestStopCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        api.stop_charge(token, vehicle)
+        with patch.object(api, "_get_vehicle_headers", return_value={}):
+            api.stop_charge(token, vehicle)
         api.sessions.post.assert_called_once()
 
     def test_stop_charge_empty_body_logs_debug(self, caplog):
@@ -172,10 +178,11 @@ class TestStopCharge:
         token = _make_token()
 
         with caplog.at_level(logging.DEBUG):
-            api.stop_charge(token, vehicle)
+            with patch.object(api, "_get_vehicle_headers", return_value={}):
+                api.stop_charge(token, vehicle)
 
         assert (
-            "empty body" in caplog.text.lower()
+            "empty response body" in caplog.text.lower()
             or "treating as success" in caplog.text.lower()
         )
 
