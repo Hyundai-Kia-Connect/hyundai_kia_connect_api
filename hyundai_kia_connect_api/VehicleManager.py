@@ -12,6 +12,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
     OTPRequest,
+    POIInfo,
 )
 from .const import (
     BRAND_GENESIS,
@@ -368,6 +369,11 @@ class VehicleManager:
     def set_vehicle_to_load_discharge_limit(self, vehicle_id: str, limit: int) -> str:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
+        )
+
+    def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
+        return self.api.set_navigation(
+            self.token, self.get_vehicle(vehicle_id), poi_list
         )
 
     @staticmethod
