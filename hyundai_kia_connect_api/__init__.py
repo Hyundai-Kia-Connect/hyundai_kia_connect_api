@@ -5,6 +5,8 @@ from .ApiImpl import (
     ClimateRequestOptions,
     WindowRequestOptions,
     ScheduleChargingClimateRequestOptions,
+    POIInfo,
+    POICoord,
 )
 
 from .Token import Token

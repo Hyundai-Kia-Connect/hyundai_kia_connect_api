@@ -84,6 +84,45 @@ class ScheduleChargingClimateRequestOptions:
     defrost: bool = None
 
 
+@dataclass
+class POICoord:
+    lat: float = None
+    lon: float = None
+    alt: int = 0
+    type: int = 0
+
+
+@dataclass
+class POIInfo:
+    phone: str = ""
+    waypoint_id: int = 1
+    lang: int = 1
+    src: str = "HERE"
+    coord: POICoord = None
+    addr: str = ""
+    zip: str = ""
+    place_id: str = ""
+    name: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "phone": self.phone,
+            "waypointID": self.waypoint_id,
+            "lang": self.lang,
+            "src": self.src,
+            "coord": {
+                "lat": self.coord.lat,
+                "alt": self.coord.alt,
+                "lon": self.coord.lon,
+                "type": self.coord.type,
+            },
+            "addr": self.addr,
+            "zip": self.zip,
+            "placeid": self.place_id,
+            "name": self.name,
+        }
+
+
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
@@ -354,6 +393,12 @@ class ApiImpl:
         raise NotImplementedError(
             "set_vehicle_to_load_discharge_limit is not implemented for this region"
         )
+
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        """Send navigation destinations to the vehicle. Returns the tracking ID."""
+        raise NotImplementedError("set_navigation is not implemented for this region")
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""

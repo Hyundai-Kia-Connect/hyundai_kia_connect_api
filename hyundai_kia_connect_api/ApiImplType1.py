@@ -14,6 +14,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     ClimateRequestOptions,
     WindowRequestOptions,
+    POIInfo,
 )
 from .Token import Token
 from .Vehicle import Vehicle
@@ -1086,6 +1087,23 @@ class ApiImplType1(ApiImpl):
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
+        _check_response_for_errors(response)
+        token.device_id = self._get_device_id(self._get_stamp())
+        return response["msgId"]
+
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/location/routes"
+        payload = {
+            "deviceID": token.device_id,
+            "poiInfoList": [poi.to_dict() for poi in poi_list],
+        }
+        _LOGGER.debug(f"{DOMAIN} - Set Navigation Request: {payload}")
+        response = requests.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
