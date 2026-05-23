@@ -328,18 +328,18 @@ class KiaUvoApiIN(ApiImplType1):
             vehicle.steering_wheel_heater_is_on = True
 
         vehicle.back_window_heater_is_on = get_child_value(state, "sideBackWindowHeat")
-        vehicle.front_left_seat_status = SEAT_STATUS[
+        vehicle.front_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "seatHeaterVentState.astSeatHeatState")
-        ]
-        vehicle.front_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.front_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "seatHeaterVentState.drvSeatHeatState")
-        ]
-        vehicle.rear_left_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "seatHeaterVentState.rlSeatHeatState")
-        ]
-        vehicle.rear_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "seatHeaterVentState.rrSeatHeatState")
-        ]
+        )
         vehicle.is_locked = get_child_value(state, "doorLock")
         vehicle.front_left_door_is_open = get_child_value(state, "doorOpen.frontLeft")
         vehicle.front_right_door_is_open = get_child_value(state, "doorOpen.frontRight")
