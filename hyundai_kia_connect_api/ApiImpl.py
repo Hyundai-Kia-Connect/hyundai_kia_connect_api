@@ -13,7 +13,7 @@ try:
 except ImportError:
     GoogleV3 = None
 
-from .utils import get_child_value
+from .utils import get_child_value, to_int_enum
 from .Token import Token
 from .Vehicle import Vehicle
 from .const import (
@@ -52,6 +52,13 @@ class WindowRequestOptions:
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
+
+    def __post_init__(self):
+        """Convert string/int values to WINDOW_STATE enums."""
+        self.back_left = to_int_enum(WINDOW_STATE, self.back_left)
+        self.back_right = to_int_enum(WINDOW_STATE, self.back_right)
+        self.front_left = to_int_enum(WINDOW_STATE, self.front_left)
+        self.front_right = to_int_enum(WINDOW_STATE, self.front_right)
 
 
 @dataclass
