@@ -593,18 +593,18 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "status.sideMirrorHeat"
         )
-        vehicle.front_left_seat_status = SEAT_STATUS[
+        vehicle.front_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "status.seatHeaterVentState.flSeatHeatState")
-        ]
-        vehicle.front_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.front_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "status.seatHeaterVentState.frSeatHeatState")
-        ]
-        vehicle.rear_left_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "status.seatHeaterVentState.rlSeatHeatState")
-        ]
-        vehicle.rear_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
-        ]
+        )
         # Additional status fields observed in logs (exposed as binary sensors)
         vehicle.accessory_on = get_child_value(state, "status.acc")
         vehicle.ign3 = get_child_value(state, "status.ign3")
