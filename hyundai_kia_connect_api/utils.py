@@ -3,7 +3,29 @@
 
 import datetime
 import re
-from typing import Optional
+from enum import IntEnum
+from typing import Optional, TypeVar
+
+
+T = TypeVar('T', bound=IntEnum)
+
+
+def to_int_enum(enum_class: type[T], value: str | int | T | None) -> T | None:
+    """Convert string, int, or existing IntEnum to the specified IntEnum type.
+    
+    Handles "1" -> 1 -> WINDOW_STATE.OPEN conversions.
+    Returns None if value is None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, enum_class):
+        return value
+    try:
+        # Convert string to int if needed
+        int_value = int(value) if isinstance(value, str) else value
+        return enum_class(int_value)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid {enum_class.__name__} value: {value}") from e
 
 
 def get_child_value(data, key):
