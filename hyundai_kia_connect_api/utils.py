@@ -7,12 +7,12 @@ from enum import IntEnum
 from typing import Optional, TypeVar
 
 
-T = TypeVar('T', bound=IntEnum)
+T = TypeVar("T", bound=IntEnum)
 
 
 def to_int_enum(enum_class: type[T], value: str | int | T | None) -> T | None:
     """Convert string, int, or existing IntEnum to the specified IntEnum type.
-    
+
     Handles "1" -> 1 -> WINDOW_STATE.OPEN conversions.
     Returns None if value is None.
     """
