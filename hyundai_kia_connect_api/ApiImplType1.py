@@ -5,7 +5,6 @@ import requests
 import logging
 import math
 from typing import Optional
-from datetime import timedelta, timezone
 
 from time import sleep
 
@@ -238,11 +237,7 @@ class ApiImplType1(ApiImpl):
         }
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "Offset"):
-            offset = float(get_child_value(state, "Offset"))
-            hours = int(offset)
-            minutes = int((offset - hours) * 60)
-            vehicle.timezone = timezone(timedelta(hours=hours, minutes=minutes))
+        vehicle.timezone = self.data_timezone
         if get_child_value(state, "Date"):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "Date"), self.data_timezone

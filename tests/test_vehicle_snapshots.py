@@ -76,7 +76,7 @@ def eu_api() -> KiaUvoApiEU:
 @pytest.fixture
 def ccs2_api() -> ApiImplType1:
     api = ApiImplType1.__new__(ApiImplType1)
-    api.data_timezone = None
+    api.data_timezone = KiaUvoApiEU.data_timezone  # Europe/Berlin with DST
     api.temperature_range = [x * 0.5 for x in range(28, 60)]
     return api
 

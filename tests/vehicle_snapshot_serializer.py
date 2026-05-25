@@ -7,6 +7,7 @@ is deterministic and human-readable.
 
 import dataclasses
 import datetime
+from zoneinfo import ZoneInfo
 
 
 def vehicle_to_dict(vehicle) -> dict:
@@ -71,6 +72,8 @@ def _serialize_value(value):
     if isinstance(value, datetime.time):
         return value.isoformat()
     if isinstance(value, datetime.timezone):
+        return str(value)
+    if isinstance(value, ZoneInfo):
         return str(value)
     if isinstance(value, (list, tuple)):
         return [_serialize_value(v) for v in value]
