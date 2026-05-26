@@ -133,6 +133,7 @@ class VehicleManager:
             vehicle.supports_window_control = self.api.supports_window_control
             self.vehicles[vehicle.id] = vehicle
         self.account = self.api.get_user_profile(self.token)
+        self.api._detect_user_timezone(self.token)
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]

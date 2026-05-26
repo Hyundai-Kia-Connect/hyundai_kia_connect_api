@@ -39,6 +39,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    EU_COUNTRY_TIMEZONES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
@@ -79,7 +80,6 @@ SUPPORTED_LANGUAGES_LIST = [
 
 
 class KiaUvoApiEU(ApiImplType1):
-    data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -92,6 +92,7 @@ class KiaUvoApiEU(ApiImplType1):
             language = "en"  # fallback to English
         self.LANGUAGE: str = language
         self.brand: int = brand
+        self.data_timezone: ZoneInfo = ZoneInfo("Europe/Berlin")
 
         if BRANDS[self.brand] == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
@@ -291,6 +292,21 @@ class KiaUvoApiEU(ApiImplType1):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - User profile fetch failed")
             return None
+
+    def _detect_user_timezone(self, token: Token) -> None:
+        try:
+            url = self.USER_API_URL + "language"
+            headers = self._get_authenticated_headers(token)
+            response = requests.get(url, headers=headers, timeout=30)
+            data = response.json()
+            country = data.get("country", "").lower()
+            tz_name = EU_COUNTRY_TIMEZONES.get(country, "Europe/Berlin")
+            self.data_timezone = ZoneInfo(tz_name)
+            _LOGGER.debug(f"{DOMAIN} - Timezone set to {tz_name} for country {country}")
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Timezone detection failed, using default Europe/Berlin"
+            )
 
     def login(
         self,

@@ -121,3 +121,39 @@ class VALET_MODE_ACTION(Enum):
 class OTP_NOTIFY_TYPE(Enum):
     EMAIL = "EMAIL"
     SMS = "SMS"
+
+
+EU_COUNTRY_TIMEZONES = {
+    "at": "Europe/Vienna",
+    "be": "Europe/Brussels",
+    "bg": "Europe/Sofia",
+    "hr": "Europe/Zagreb",
+    "cy": "Asia/Nicosia",
+    "cz": "Europe/Prague",
+    "dk": "Europe/Copenhagen",
+    "ee": "Europe/Tallinn",
+    "fi": "Europe/Helsinki",
+    "fr": "Europe/Paris",
+    "de": "Europe/Berlin",
+    "gr": "Europe/Athens",
+    "hu": "Europe/Budapest",
+    "ie": "Europe/Dublin",
+    "it": "Europe/Rome",
+    "lv": "Europe/Riga",
+    "lt": "Europe/Vilnius",
+    "lu": "Europe/Luxembourg",
+    "mt": "Europe/Malta",
+    "nl": "Europe/Amsterdam",
+    "no": "Europe/Oslo",
+    "pl": "Europe/Warsaw",
+    "pt": "Europe/Lisbon",
+    "ro": "Europe/Bucharest",
+    "sk": "Europe/Bratislava",
+    "si": "Europe/Ljubljana",
+    "es": "Europe/Madrid",
+    "se": "Europe/Stockholm",
+    "ch": "Europe/Zurich",
+    "gb": "Europe/London",
+    "is": "Atlantic/Reykjavik",
+    "tr": "Europe/Istanbul",
+}

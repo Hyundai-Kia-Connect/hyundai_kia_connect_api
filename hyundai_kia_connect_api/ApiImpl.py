@@ -147,6 +147,9 @@ class ApiImpl:
         """Fetch user profile data. Override in region subclasses."""
         return None
 
+    def _detect_user_timezone(self, token: Token) -> None:
+        """Detect and set timezone from user account. Override in region subclasses."""
+
     def login(
         self,
         username: str,
