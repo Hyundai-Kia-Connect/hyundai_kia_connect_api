@@ -286,8 +286,8 @@ class KiaUvoApiEU(ApiImplType1):
             url = self.USER_API_URL + "profile"
             headers = self._get_authenticated_headers(token)
             response = requests.get(url, headers=headers, timeout=30)
-            _check_response_for_errors(response.json())
-            return self._map_user_account(response.json())
+            data = response.json()
+            return self._map_user_account(data)
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - User profile fetch failed")
             return None
