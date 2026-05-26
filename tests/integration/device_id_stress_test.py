@@ -21,7 +21,7 @@ import requests as requests_lib
 from dotenv import load_dotenv
 
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
-from hyundai_kia_connect_api.const import VEHICLE_LOCK_ACTION
+from hyundai_kia_connect_api.const import ORDER_STATUS, VEHICLE_LOCK_ACTION
 from hyundai_kia_connect_api.exceptions import (
     DeviceIDError,
     DuplicateRequestError,
@@ -78,17 +78,34 @@ def poll_action_status(api, token, vehicle, action_id, stats, start_time):
             result, ms = timed_call(api.check_action_status, token, vehicle, action_id)
             poll_device_id = token.device_id[:8]
 
-            if result:
+            if result == ORDER_STATUS.SUCCESS:
                 log(
-                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: COMPLETE {ms}ms "
+                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: SUCCESS {ms}ms "
                     f"(device_id={poll_device_id}...)"
                 )
                 return True
-            else:
+            elif result == ORDER_STATUS.PENDING:
                 log(
-                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: pending {ms}ms "
+                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: PENDING {ms}ms "
                     f"(device_id={poll_device_id}...)"
                 )
+            elif result == ORDER_STATUS.UNKNOWN:
+                log(
+                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: UNKNOWN {ms}ms "
+                    f"(device_id={poll_device_id}...)"
+                )
+            elif result == ORDER_STATUS.FAILED:
+                log(
+                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: FAILED {ms}ms "
+                    f"(device_id={poll_device_id}...)"
+                )
+                return False
+            elif result == ORDER_STATUS.TIMEOUT:
+                log(
+                    f"  Poll {i + 1}/{ACTION_POLL_MAX}: TIMEOUT {ms}ms "
+                    f"(device_id={poll_device_id}...)"
+                )
+                return False
         except DeviceIDError:
             stats["device_id_errors"] += 1
             stats["action_poll_errors"] += 1
