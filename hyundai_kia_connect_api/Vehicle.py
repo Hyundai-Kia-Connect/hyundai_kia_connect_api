@@ -142,6 +142,19 @@ class VehicleProfile:
 
 
 @dataclass
+class UserAccount:
+    user_id: str | None = None
+    email: str | None = None
+    name: str | None = None
+    mobile_number: str | None = None
+    language: str | None = None
+    country: str | None = None
+    status: int | None = None
+    sign_up_date: str | None = None
+    pin_date: str | None = None
+
+
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None

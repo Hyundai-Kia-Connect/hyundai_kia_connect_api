@@ -143,6 +143,10 @@ class ApiImpl:
     def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """No-op base. Override in region subclasses with profile endpoint."""
 
+    def get_user_profile(self, token: Token):
+        """Fetch user profile data. Override in region subclasses."""
+        return None
+
     def login(
         self,
         username: str,

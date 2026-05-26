@@ -23,6 +23,7 @@ from .Token import Token
 from .Vehicle import (
     Vehicle,
     VehicleProfile,
+    UserAccount,
     DailyDrivingStats,
     MonthTripInfo,
     DayTripInfo,
@@ -265,6 +266,31 @@ class KiaUvoApiEU(ApiImplType1):
                 _LOGGER.debug(
                     f"{DOMAIN} - Vehicle profile fetch failed for {vehicle.id}"
                 )
+
+    @staticmethod
+    def _map_user_account(data: dict) -> UserAccount:
+        return UserAccount(
+            user_id=data.get("id"),
+            email=data.get("email"),
+            name=data.get("name"),
+            mobile_number=data.get("mobileNum"),
+            language=data.get("lang"),
+            country=data.get("country"),
+            status=data.get("status"),
+            sign_up_date=data.get("signUpDate"),
+            pin_date=data.get("pinDate"),
+        )
+
+    def get_user_profile(self, token: Token) -> UserAccount | None:
+        try:
+            url = self.USER_API_URL + "profile"
+            headers = self._get_authenticated_headers(token)
+            response = requests.get(url, headers=headers, timeout=30)
+            _check_response_for_errors(response.json())
+            return self._map_user_account(response.json())
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - User profile fetch failed")
+            return None
 
     def login(
         self,
