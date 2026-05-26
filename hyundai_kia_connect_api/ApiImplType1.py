@@ -188,6 +188,7 @@ class ApiImplType1(ApiImpl):
             # This is defensive programming in case the API structure changes
             pass
 
+    @_retry_on_device_id_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = requests.get(

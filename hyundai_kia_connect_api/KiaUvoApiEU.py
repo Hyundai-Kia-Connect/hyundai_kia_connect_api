@@ -354,6 +354,7 @@ class KiaUvoApiEU(ApiImplType1):
                 )
         return self.login(token.username, token.password, token.pin)
 
+    @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -410,6 +411,7 @@ class KiaUvoApiEU(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
+    @_retry_on_device_id_error
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
         if is_ccs2:
