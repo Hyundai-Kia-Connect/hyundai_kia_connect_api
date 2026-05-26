@@ -17,7 +17,7 @@ from .ApiImpl import (
     POIInfo,
 )
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleProfile
 
 from .utils import get_child_value, parse_datetime, get_index_into_hex_temp
 
@@ -196,6 +196,13 @@ class ApiImplType1(ApiImpl):
             )
             result.append(vehicle)
         return result
+
+    def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
+        """No-op base. Override in region subclasses with profile endpoint."""
+
+    def _map_vehicle_profile(self, profile_data: dict) -> VehicleProfile:
+        """Map API profile response dict to VehicleProfile dataclass."""
+        return VehicleProfile()
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:
