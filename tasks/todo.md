@@ -2,10 +2,20 @@
 
 ## Device ID / DeviceIDError
 
-- [ ] **Run stress test v2 with check_action_status polling** — extended stress test now polls action status after each lock command; should trigger DeviceIDError mid-polling (community reports: 2-4 polls in)
+- [x] **Run stress test v2 with check_action_status polling** — DONE. 40 min total testing, 0 DeviceIDErrors. Server may have changed behavior.
 - [ ] **Fix check_action_status device_id mismatch** — current code regenerates device_id after commands, but new device_id doesn't match the one that sent the command → empty resMsg / "No action found". Need: either skip polling (sleep+refresh), or refresh device_id mid-poll, or keep original device_id for the polling session
-- [ ] **Add timeout to all requests calls in ApiImplType1.py** — ~20 requests.get/post calls have no `timeout` parameter; causes CLOSE_WAIT hangs (discovered during stress test v1)
 - [ ] **Thread safety for Token.device_id** — concurrent HA calls read/write device_id without lock (plan Phase 4, deferred)
+
+## HTTP timeout — Issue #1151
+
+- [ ] **Add timeout constants to ApiImpl base class** — `HTTP_CONNECT_TIMEOUT=30`, `HTTP_READ_TIMEOUT=120`, region-overridable
+- [ ] **Add timeout to all 139 requests calls** — across 10 files (see issue #1151 for per-file checklist)
+- [ ] **Remove `pylint:disable=missing-timeout`** from 8 files after fix
+- [ ] **Handle `requests.exceptions.Timeout`** → `RequestTimeoutError` in VehicleManager
+- [ ] **Nominatim geocoding in ApiImpl** — shorter timeout (10s/30s), third-party service
+- [ ] **Unit tests** — mock requests, assert timeout kwarg
+- [ ] **Integration tests** — mock server with delayed response, confirm Timeout raised
+- [ ] **Verify CA RetrySession + USA/BR SSLAdapter** compatibility with timeout
 
 ## check_action_status / action polling
 
