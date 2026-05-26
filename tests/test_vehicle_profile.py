@@ -1,4 +1,4 @@
-"""Tests for VehicleProfile dataclass and capability properties."""
+"""Tests for VehicleProfile, UserAccount, and capability properties."""
 
 import json
 import pathlib
@@ -6,7 +6,7 @@ import pathlib
 import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
-from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleProfile
+from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleProfile, UserAccount
 from zoneinfo import ZoneInfo
 
 FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
@@ -186,3 +186,54 @@ class TestMapVehicleProfile:
         assert v.air_purifier_supported is False
         assert v.is_left_hand_drive is True
         assert v.ev_alarm_supported is False
+
+
+class TestUserAccount:
+    def test_user_account_is_dataclass(self):
+        a = UserAccount()
+        assert a.user_id is None
+        assert a.email is None
+        assert a.country is None
+
+    def test_user_account_populated(self):
+        a = UserAccount(
+            user_id="uuid-123",
+            email="user@example.com",
+            name="Test User",
+            mobile_number="+48123456789",
+            language="en",
+            country="pl",
+            status=3,
+            sign_up_date="20260128T213114.001",
+            pin_date="20260224T134126.314",
+        )
+        assert a.user_id == "uuid-123"
+        assert a.country == "pl"
+        assert a.language == "en"
+
+    def test_map_user_account(self):
+        api = KiaUvoApiEU.__new__(KiaUvoApiEU)
+        api.data_timezone = ZoneInfo("Europe/Berlin")
+        api.temperature_range = KiaUvoApiEU.temperature_range
+        fixture_path = FIXTURES_DIR / "eu_user_profile.json"
+        data = json.loads(fixture_path.read_text())
+        account = api._map_user_account(data)
+
+        assert account.user_id == "4d9129de-414c-4ea2-9c7b-d316a76f6626"
+        assert account.email == "user@example.com"
+        assert account.name == "Test User"
+        assert account.mobile_number == "+48123456789"
+        assert account.language == "en"
+        assert account.country == "pl"
+        assert account.status == 3
+        assert account.sign_up_date == "20260128T213114.001"
+        assert account.pin_date == "20260224T134126.314"
+
+    def test_map_user_account_missing_fields(self):
+        api = KiaUvoApiEU.__new__(KiaUvoApiEU)
+        api.data_timezone = ZoneInfo("Europe/Berlin")
+        api.temperature_range = KiaUvoApiEU.temperature_range
+        account = api._map_user_account({})
+        assert account.user_id is None
+        assert account.email is None
+        assert account.country is None
