@@ -55,7 +55,7 @@ def _make_api():
     """Create a HyundaiBlueLinkApiUSA without calling __init__."""
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
-    api.sessions = MagicMock()
+    api.session = MagicMock()
     return api
 
 
@@ -68,7 +68,7 @@ class TestStartCharge:
     def test_start_charge_normal_json_response(self):
         """start_charge succeeds when API returns valid JSON."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -76,7 +76,7 @@ class TestStartCharge:
 
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.start_charge(token, vehicle)
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_start_charge_empty_body_no_exception(self):
         """start_charge must NOT raise JSONDecodeError when API returns empty body.
@@ -86,18 +86,18 @@ class TestStartCharge:
         but API returns HTTP 200 with no response body.
         """
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.start_charge(token, vehicle)
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_start_charge_empty_body_logs_debug(self, caplog):
         """start_charge logs a debug message when response body is empty."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -117,12 +117,12 @@ class TestStartCharge:
         token = _make_token()
 
         api.start_charge(token, vehicle)
-        api.sessions.post.assert_not_called()
+        api.session.post.assert_not_called()
 
     def test_start_charge_calls_correct_url(self):
         """start_charge POSTs to the evc/charge/start endpoint."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -131,7 +131,7 @@ class TestStartCharge:
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.start_charge(token, vehicle)
 
-        call_url = api.sessions.post.call_args[0][0]
+        call_url = api.session.post.call_args[0][0]
         assert "evc/charge/start" in call_url
 
 
@@ -144,7 +144,7 @@ class TestStopCharge:
     def test_stop_charge_normal_json_response(self):
         """stop_charge succeeds when API returns valid JSON."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -152,7 +152,7 @@ class TestStopCharge:
 
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.stop_charge(token, vehicle)
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_stop_charge_empty_body_no_exception(self):
         """stop_charge must NOT raise JSONDecodeError when API returns empty body.
@@ -162,18 +162,18 @@ class TestStopCharge:
         but API returns HTTP 200 with no response body.
         """
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.stop_charge(token, vehicle)
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_stop_charge_empty_body_logs_debug(self, caplog):
         """stop_charge logs a debug message when response body is empty."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -193,12 +193,12 @@ class TestStopCharge:
         token = _make_token()
 
         api.stop_charge(token, vehicle)
-        api.sessions.post.assert_not_called()
+        api.session.post.assert_not_called()
 
     def test_stop_charge_calls_correct_url(self):
         """stop_charge POSTs to the evc/charge/stop endpoint."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -207,5 +207,5 @@ class TestStopCharge:
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.stop_charge(token, vehicle)
 
-        call_url = api.sessions.post.call_args[0][0]
+        call_url = api.session.post.call_args[0][0]
         assert "evc/charge/stop" in call_url

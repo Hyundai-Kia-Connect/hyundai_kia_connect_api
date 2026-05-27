@@ -1,7 +1,6 @@
 """ApiImplType1.py"""
 
 import datetime as dt
-import requests
 import logging
 import math
 from typing import Optional
@@ -11,6 +10,7 @@ from time import sleep
 
 from .ApiImpl import (
     ApiImpl,
+    ApiImplSession,
     ScheduleChargingClimateRequestOptions,
     ClimateRequestOptions,
     WindowRequestOptions,
@@ -119,6 +119,7 @@ class ApiImplType1(ApiImpl):
 
     def __init__(self) -> None:
         """Initialize."""
+        self.session = ApiImplSession()
 
     def _sanitize_ice_value(self, state: dict) -> None:
         """
@@ -165,7 +166,7 @@ class ApiImplType1(ApiImpl):
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
-        response = requests.get(
+        response = self.session.get(
             url,
             headers=self._get_authenticated_headers(token),
         ).json()
@@ -626,7 +627,7 @@ class ApiImplType1(ApiImpl):
             headers = self._get_control_headers(token, vehicle)
 
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
@@ -650,7 +651,7 @@ class ApiImplType1(ApiImpl):
             headers = self._get_control_headers(token, vehicle)
 
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
@@ -662,7 +663,7 @@ class ApiImplType1(ApiImpl):
         )
 
         body = {"chargingCurrent": level}
-        response = requests.post(
+        response = self.session.post(
             url,
             json=body,
             headers=self._get_authenticated_headers(
@@ -692,7 +693,7 @@ class ApiImplType1(ApiImpl):
             ]
         }
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Body: {body}")
-        response = requests.post(
+        response = self.session.post(
             url,
             json=body,
             headers=self._get_authenticated_headers(
@@ -712,7 +713,7 @@ class ApiImplType1(ApiImpl):
         )
 
         body = {"dischargingLimit": int(limit)}
-        response = requests.post(
+        response = self.session.post(
             url,
             json=body,
             headers=self._get_authenticated_headers(
@@ -743,7 +744,7 @@ class ApiImplType1(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
 
-        response = requests.post(url, json=payload, headers=headers).json()
+        response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
@@ -781,7 +782,7 @@ class ApiImplType1(ApiImpl):
             return ORDER_STATUS.TIMEOUT
 
         else:
-            response = requests.get(
+            response = self.session.get(
                 url,
                 headers=self._get_authenticated_headers(
                     token, vehicle.ccu_ccs2_protocol_support
@@ -915,7 +916,7 @@ class ApiImplType1(ApiImpl):
         }
 
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
-        response = requests.post(
+        response = self.session.post(
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
@@ -957,7 +958,7 @@ class ApiImplType1(ApiImpl):
                 "unit": "C",
             }
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 headers=self._get_authenticated_headers(
@@ -989,7 +990,7 @@ class ApiImplType1(ApiImpl):
                 "windshieldFrontDefogState": options.defrost,
             }
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 headers=self._get_control_headers(token, vehicle),
@@ -1013,7 +1014,7 @@ class ApiImplType1(ApiImpl):
                 "unit": "C",
             }
             _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 headers=self._get_authenticated_headers(
@@ -1031,7 +1032,7 @@ class ApiImplType1(ApiImpl):
                 "command": "stop",
             }
             _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 headers=self._get_control_headers(token, vehicle),
@@ -1046,7 +1047,7 @@ class ApiImplType1(ApiImpl):
 
         payload = {"command": "on"}
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
-        response = requests.post(
+        response = self.session.post(
             url,
             json=payload,
             headers=self._get_control_headers(token, vehicle),
@@ -1061,7 +1062,7 @@ class ApiImplType1(ApiImpl):
 
         payload = {"command": "on"}
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
-        response = requests.post(
+        response = self.session.post(
             url,
             json=payload,
             headers=self._get_control_headers(token, vehicle),
@@ -1083,7 +1084,7 @@ class ApiImplType1(ApiImpl):
             "frontRight": options.front_right,
         }
         _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
-        response = requests.post(
+        response = self.session.post(
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
@@ -1100,7 +1101,7 @@ class ApiImplType1(ApiImpl):
             "poiInfoList": [poi.to_dict() for poi in poi_list],
         }
         _LOGGER.debug(f"{DOMAIN} - Set Navigation Request: {payload}")
-        response = requests.post(
+        response = self.session.post(
             url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
@@ -1119,7 +1120,7 @@ class ApiImplType1(ApiImpl):
         }
 
         data = {"deviceId": token.device_id, "pin": token.pin}
-        response = requests.put(url, json=data, headers=headers)
+        response = self.session.put(url, json=data, headers=headers)
         response = response.json()
         if response.get("controlToken") is None:
             _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
@@ -1135,4 +1136,4 @@ class ApiImplType1(ApiImpl):
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
         payload = {"lang": self.LANGUAGE}
-        _ = requests.post(url, json=payload, headers=headers, cookies=cookies)
+        _ = self.session.post(url, json=payload, headers=headers, cookies=cookies)
