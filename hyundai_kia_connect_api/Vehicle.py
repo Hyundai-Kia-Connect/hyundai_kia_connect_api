@@ -386,9 +386,11 @@ class Vehicle:
 
     @total_driving_range.setter
     def total_driving_range(self, value):
-        self._total_driving_range_value = value[0]
-        self._total_driving_range_unit = value[1]
-        self._total_driving_range = value[0]
+        if value[0] is not None:
+            self._total_driving_range_value = value[0]
+            self._total_driving_range = value[0]
+        if value[1] is not None:
+            self._total_driving_range_unit = value[1]
 
     @property
     def next_service_distance(self):
@@ -396,9 +398,11 @@ class Vehicle:
 
     @next_service_distance.setter
     def next_service_distance(self, value):
-        self._next_service_distance_value = value[0]
-        self._next_service_distance_unit = value[1]
-        self._next_service_distance = value[0]
+        if value[0] is not None:
+            self._next_service_distance_value = value[0]
+            self._next_service_distance = value[0]
+        if value[1] is not None:
+            self._next_service_distance_unit = value[1]
 
     @property
     def last_service_distance(self):
@@ -406,9 +410,11 @@ class Vehicle:
 
     @last_service_distance.setter
     def last_service_distance(self, value):
-        self._last_service_distance_value = value[0]
-        self._last_service_distance_unit = value[1]
-        self._last_service_distance = value[0]
+        if value[0] is not None:
+            self._last_service_distance_value = value[0]
+            self._last_service_distance = value[0]
+        if value[1] is not None:
+            self._last_service_distance_unit = value[1]
 
     @property
     def last_updated_at(self):
@@ -468,9 +474,11 @@ class Vehicle:
     @odometer.setter
     def odometer(self, value):
         float_value = get_float(value[0])
-        self._odometer_value = float_value
-        self._odometer_unit = value[1]
-        self._odometer = float_value
+        if float_value is not None:
+            self._odometer_value = float_value
+            self._odometer = float_value
+        if value[1] is not None:
+            self._odometer_unit = value[1]
 
     @property
     def outside_temperature(self):
@@ -478,9 +486,11 @@ class Vehicle:
 
     @outside_temperature.setter
     def outside_temperature(self, value):
-        self._outside_temperature_value = value[0]
-        self._outside_temperature_unit = value[1]
-        self._outside_temperature = value[0]
+        if value[0] is not None:
+            self._outside_temperature_value = value[0]
+            self._outside_temperature = value[0]
+        if value[1] is not None:
+            self._outside_temperature_unit = value[1]
 
     @property
     def air_temperature(self):
@@ -488,9 +498,11 @@ class Vehicle:
 
     @air_temperature.setter
     def air_temperature(self, value):
-        self._air_temperature_value = value[0]
-        self._air_temperature_unit = value[1]
-        self._air_temperature = value[0] if value[0] != "OFF" else None
+        if value[0] is not None:
+            self._air_temperature_value = value[0]
+            self._air_temperature = value[0] if value[0] != "OFF" else None
+        if value[1] is not None:
+            self._air_temperature_unit = value[1]
 
     @property
     def ev_battery_water_temperature(self):
@@ -502,9 +514,11 @@ class Vehicle:
 
     @ev_battery_water_temperature.setter
     def ev_battery_water_temperature(self, value):
-        self._ev_battery_water_temperature_value = value[0]
-        self._ev_battery_water_temperature_unit = value[1]
-        self._ev_battery_water_temperature = value[0]
+        if value[0] is not None:
+            self._ev_battery_water_temperature_value = value[0]
+            self._ev_battery_water_temperature = value[0]
+        if value[1] is not None:
+            self._ev_battery_water_temperature_unit = value[1]
 
     @property
     def ev_battery_temperature_min(self):
@@ -516,9 +530,11 @@ class Vehicle:
 
     @ev_battery_temperature_min.setter
     def ev_battery_temperature_min(self, value):
-        self._ev_battery_temperature_min_value = value[0]
-        self._ev_battery_temperature_min_unit = value[1]
-        self._ev_battery_temperature_min = value[0]
+        if value[0] is not None:
+            self._ev_battery_temperature_min_value = value[0]
+            self._ev_battery_temperature_min = value[0]
+        if value[1] is not None:
+            self._ev_battery_temperature_min_unit = value[1]
 
     @property
     def ev_battery_temperature_max(self):
@@ -530,9 +546,11 @@ class Vehicle:
 
     @ev_battery_temperature_max.setter
     def ev_battery_temperature_max(self, value):
-        self._ev_battery_temperature_max_value = value[0]
-        self._ev_battery_temperature_max_unit = value[1]
-        self._ev_battery_temperature_max = value[0]
+        if value[0] is not None:
+            self._ev_battery_temperature_max_value = value[0]
+            self._ev_battery_temperature_max = value[0]
+        if value[1] is not None:
+            self._ev_battery_temperature_max_unit = value[1]
 
     @property
     def ev_driving_range(self):
@@ -544,9 +562,11 @@ class Vehicle:
 
     @ev_driving_range.setter
     def ev_driving_range(self, value):
-        self._ev_driving_range_value = value[0]
-        self._ev_driving_range_unit = value[1]
-        self._ev_driving_range = value[0]
+        if value[0] is not None:
+            self._ev_driving_range_value = value[0]
+            self._ev_driving_range = value[0]
+        if value[1] is not None:
+            self._ev_driving_range_unit = value[1]
 
     @property
     def ev_estimated_current_charge_duration(self):
@@ -554,9 +574,11 @@ class Vehicle:
 
     @ev_estimated_current_charge_duration.setter
     def ev_estimated_current_charge_duration(self, value):
-        self._ev_estimated_current_charge_duration_value = value[0]
-        self._ev_estimated_current_charge_duration_unit = value[1]
-        self._ev_estimated_current_charge_duration = value[0]
+        if value[0] is not None:
+            self._ev_estimated_current_charge_duration_value = value[0]
+            self._ev_estimated_current_charge_duration = value[0]
+        if value[1] is not None:
+            self._ev_estimated_current_charge_duration_unit = value[1]
 
     @property
     def ev_estimated_fast_charge_duration(self):
@@ -564,9 +586,11 @@ class Vehicle:
 
     @ev_estimated_fast_charge_duration.setter
     def ev_estimated_fast_charge_duration(self, value):
-        self._ev_estimated_fast_charge_duration_value = value[0]
-        self._ev_estimated_fast_charge_duration_unit = value[1]
-        self._ev_estimated_fast_charge_duration = value[0]
+        if value[0] is not None:
+            self._ev_estimated_fast_charge_duration_value = value[0]
+            self._ev_estimated_fast_charge_duration = value[0]
+        if value[1] is not None:
+            self._ev_estimated_fast_charge_duration_unit = value[1]
 
     @property
     def ev_estimated_portable_charge_duration(self):
@@ -574,9 +598,11 @@ class Vehicle:
 
     @ev_estimated_portable_charge_duration.setter
     def ev_estimated_portable_charge_duration(self, value):
-        self._ev_estimated_portable_charge_duration_value = value[0]
-        self._ev_estimated_portable_charge_duration_unit = value[1]
-        self._ev_estimated_portable_charge_duration = value[0]
+        if value[0] is not None:
+            self._ev_estimated_portable_charge_duration_value = value[0]
+            self._ev_estimated_portable_charge_duration = value[0]
+        if value[1] is not None:
+            self._ev_estimated_portable_charge_duration_unit = value[1]
 
     @property
     def ev_estimated_station_charge_duration(self):
@@ -584,9 +610,11 @@ class Vehicle:
 
     @ev_estimated_station_charge_duration.setter
     def ev_estimated_station_charge_duration(self, value):
-        self._ev_estimated_station_charge_duration_value = value[0]
-        self._ev_estimated_station_charge_duration_unit = value[1]
-        self._ev_estimated_station_charge_duration = value[0]
+        if value[0] is not None:
+            self._ev_estimated_station_charge_duration_value = value[0]
+            self._ev_estimated_station_charge_duration = value[0]
+        if value[1] is not None:
+            self._ev_estimated_station_charge_duration_unit = value[1]
 
     @property
     def ev_target_range_charge_AC(self):
@@ -598,9 +626,11 @@ class Vehicle:
 
     @ev_target_range_charge_AC.setter
     def ev_target_range_charge_AC(self, value):
-        self._ev_target_range_charge_AC_value = value[0]
-        self._ev_target_range_charge_AC_unit = value[1]
-        self._ev_target_range_charge_AC = value[0]
+        if value[0] is not None:
+            self._ev_target_range_charge_AC_value = value[0]
+            self._ev_target_range_charge_AC = value[0]
+        if value[1] is not None:
+            self._ev_target_range_charge_AC_unit = value[1]
 
     @property
     def ev_target_range_charge_DC(self):
@@ -612,9 +642,11 @@ class Vehicle:
 
     @ev_target_range_charge_DC.setter
     def ev_target_range_charge_DC(self, value):
-        self._ev_target_range_charge_DC_value = value[0]
-        self._ev_target_range_charge_DC_unit = value[1]
-        self._ev_target_range_charge_DC = value[0]
+        if value[0] is not None:
+            self._ev_target_range_charge_DC_value = value[0]
+            self._ev_target_range_charge_DC = value[0]
+        if value[1] is not None:
+            self._ev_target_range_charge_DC_unit = value[1]
 
     @property
     def ev_first_departure_climate_temperature(self):
@@ -626,9 +658,11 @@ class Vehicle:
 
     @ev_first_departure_climate_temperature.setter
     def ev_first_departure_climate_temperature(self, value):
-        self._ev_first_departure_climate_temperature_value = value[0]
-        self._ev_first_departure_climate_temperature_unit = value[1]
-        self._ev_first_departure_climate_temperature = value[0]
+        if value[0] is not None:
+            self._ev_first_departure_climate_temperature_value = value[0]
+            self._ev_first_departure_climate_temperature = value[0]
+        if value[1] is not None:
+            self._ev_first_departure_climate_temperature_unit = value[1]
 
     @property
     def ev_second_departure_climate_temperature(self):
@@ -640,9 +674,11 @@ class Vehicle:
 
     @ev_second_departure_climate_temperature.setter
     def ev_second_departure_climate_temperature(self, value):
-        self._ev_second_departure_climate_temperature_value = value[0]
-        self._ev_second_departure_climate_temperature_unit = value[1]
-        self._ev_second_departure_climate_temperature = value[0]
+        if value[0] is not None:
+            self._ev_second_departure_climate_temperature_value = value[0]
+            self._ev_second_departure_climate_temperature = value[0]
+        if value[1] is not None:
+            self._ev_second_departure_climate_temperature_unit = value[1]
 
     @property
     def fuel_driving_range(self):
@@ -650,6 +686,8 @@ class Vehicle:
 
     @fuel_driving_range.setter
     def fuel_driving_range(self, value):
-        self._fuel_driving_range_value = value[0]
-        self._fuel_driving_range_unit = value[1]
-        self._fuel_driving_range = value[0]
+        if value[0] is not None:
+            self._fuel_driving_range_value = value[0]
+            self._fuel_driving_range = value[0]
+        if value[1] is not None:
+            self._fuel_driving_range_unit = value[1]
