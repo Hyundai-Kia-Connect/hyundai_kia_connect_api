@@ -9,9 +9,12 @@ from datetime import timedelta
 from time import sleep
 from urllib.parse import urljoin, urlparse
 
-import requests
-
-from .ApiImpl import ApiImpl, ClimateRequestOptions, WindowRequestOptions
+from .ApiImpl import (
+    ApiImpl,
+    ApiImplSession,
+    ClimateRequestOptions,
+    WindowRequestOptions,
+)
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
@@ -67,7 +70,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             "ccuCCS2ProtocolSupport": "0",
         }
 
-        self.session = requests.Session()
+        self.session = ApiImplSession()
         self.temperature_range = range(62, 82)
 
     def _build_api_url(self, path: str) -> str:
@@ -148,7 +151,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             "Authorization": self.basic_authorization_header,
         }
 
-        response = requests.post(url, data=body, headers=headers)
+        response = self.session.post(url, data=body, headers=headers)
         response.raise_for_status()
         return response.json()
 

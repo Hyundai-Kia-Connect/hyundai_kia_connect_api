@@ -1,6 +1,6 @@
 """ApiImpl.py"""
 
-# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
+# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,logging-fstring-interpolation
 import datetime as dt
 import logging
 from dataclasses import dataclass
@@ -130,6 +130,33 @@ class POIInfo:
         }
 
 
+class ApiImplSession(requests.Session):
+    """Shared HTTP session with default timeout and connection pooling.
+
+    All regions should use this session (or a subclass) for HTTP calls.
+    Override class attributes per region in __init__ if needed.
+
+    Retry is intentionally NOT configured here. Pre-PR behavior retried only
+    CA connection errors (#857, login error 104), and not all requests are
+    safe to replay (e.g. non-idempotent control POSTs). If connection-reset
+    issues reappear, re-add a login-only connection retry. See PR #1160.
+    """
+
+    HTTP_CONNECT_TIMEOUT = 10
+    HTTP_READ_TIMEOUT = 30
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault(
+            "timeout", (self.HTTP_CONNECT_TIMEOUT, self.HTTP_READ_TIMEOUT)
+        )
+        try:
+            return super().request(method, url, **kwargs)
+        except requests.exceptions.Timeout as exc:
+            from .exceptions import RequestTimeoutError
+
+            raise RequestTimeoutError(str(exc)) from exc
+
+
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
@@ -231,7 +258,7 @@ class ApiImpl:
                     + email_parameter
                 )
                 headers = {"user-agent": "curl/7.81.0"}
-                response = requests.get(url, headers=headers)
+                response = requests.get(url, headers=headers, timeout=(5, 15))
                 try:
                     response = response.json()
                 except JSONDecodeError:

@@ -49,7 +49,7 @@ def test_login_with_password_certs_endpoint_fails():
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -78,13 +78,14 @@ def test_login_with_password_signin_returns_non_302():
     signin_resp.text = "Login page"
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
+    # _login_with_password calls s.get() twice (authorize, certs) then s.post() (signin)
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
     mock_session.post.return_value = signin_resp
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -113,13 +114,13 @@ def test_login_with_password_signin_no_code_in_redirect():
     signin_resp.headers = {"location": "https://example.com/login?no_code=true"}
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
     mock_session.post.return_value = signin_resp
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -155,13 +156,13 @@ def test_login_with_password_signin_error_in_redirect():
     }
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
     mock_session.post.return_value = signin_resp
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -194,13 +195,13 @@ def test_login_with_password_signin_redirect_to_login_page():
     }
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
     mock_session.post.return_value = signin_resp
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -231,13 +232,13 @@ def test_login_with_password_signin_consent_spa_redirect():
     }
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
     mock_session.post.return_value = signin_resp
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
             )
         )
@@ -270,20 +271,14 @@ def test_login_with_password_token_exchange_fails():
     token_resp.text = "Bad request"
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
-    mock_session.post.return_value = signin_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
+    mock_session.post.side_effect = [signin_resp, token_resp]
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
-            )
-        )
-        stack.enter_context(
-            patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
-                return_value=token_resp,
             )
         )
         for p in _mock_crypto():
@@ -320,20 +315,14 @@ def test_login_with_password_success():
     }
 
     mock_session = MagicMock()
-    mock_session.get.return_value = certs_resp
-    mock_session.post.return_value = signin_resp
+    mock_session.get.side_effect = [MagicMock(), certs_resp]
+    mock_session.post.side_effect = [signin_resp, token_resp]
 
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.Session",
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
                 return_value=mock_session,
-            )
-        )
-        stack.enter_context(
-            patch(
-                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
-                return_value=token_resp,
             )
         )
         for p in _mock_crypto():

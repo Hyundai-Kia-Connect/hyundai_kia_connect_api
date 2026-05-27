@@ -1,7 +1,7 @@
 """Tests for set_navigation method in ApiImplType1 and POIInfo dataclass."""
 
 import datetime as dt
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from hyundai_kia_connect_api.ApiImpl import POICoord, POIInfo
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
@@ -51,6 +51,7 @@ def _make_api():
     api._get_control_headers = MagicMock(return_value={})
     api._get_device_id = MagicMock(return_value="new-device-id")
     api._get_stamp = MagicMock(return_value="test-stamp")
+    api.session = MagicMock()
     return api
 
 
@@ -144,11 +145,10 @@ class TestSetNavigation:
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405), name="Berlin")
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-1"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, [poi])
 
-        call_url = mock_post.call_args[0][0]
+        call_url = api.session.post.call_args[0][0]
         assert "vehicles/test-vehicle-id/location/routes" in call_url
 
     def test_sends_deviceID_in_body(self):
@@ -158,11 +158,10 @@ class TestSetNavigation:
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405), name="Berlin")
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-1"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, [poi])
 
-        call_payload = mock_post.call_args[1]["json"]
+        call_payload = api.session.post.call_args[1]["json"]
         assert call_payload["deviceID"] == "test-device-id"
 
     def test_sends_poiInfoList_in_body(self):
@@ -172,11 +171,10 @@ class TestSetNavigation:
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405), name="Berlin")
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-1"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, [poi])
 
-        call_payload = mock_post.call_args[1]["json"]
+        call_payload = api.session.post.call_args[1]["json"]
         assert len(call_payload["poiInfoList"]) == 1
         assert call_payload["poiInfoList"][0]["name"] == "Berlin"
 
@@ -187,9 +185,8 @@ class TestSetNavigation:
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405))
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-42"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            result = api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        result = api.set_navigation(token, vehicle, [poi])
 
         assert result == "nav-msg-42"
 
@@ -207,11 +204,10 @@ class TestSetNavigation:
         mock_response = _FakeResponse(
             json_data={"retCode": "S", "msgId": "nav-msg-multi"}
         )
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, pois)
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, pois)
 
-        call_payload = mock_post.call_args[1]["json"]
+        call_payload = api.session.post.call_args[1]["json"]
         assert len(call_payload["poiInfoList"]) == 2
         assert call_payload["poiInfoList"][0]["waypointID"] == 1
         assert call_payload["poiInfoList"][1]["waypointID"] == 2
@@ -223,22 +219,21 @@ class TestSetNavigation:
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405))
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-1"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, [poi])
 
         api._get_control_headers.assert_called_once_with(token, vehicle)
 
     def test_regenerates_device_id_after_call(self):
+        """Device ID is regenerated after set_navigation (proactive rotation)."""
         api = _make_api()
         vehicle = _make_vehicle()
         token = _make_token()
         poi = POIInfo(coord=POICoord(lat=52.52, lon=13.405))
 
         mock_response = _FakeResponse(json_data={"retCode": "S", "msgId": "nav-msg-1"})
-        with patch("hyundai_kia_connect_api.ApiImplType1.requests.post") as mock_post:
-            mock_post.return_value = mock_response
-            api.set_navigation(token, vehicle, [poi])
+        api.session.post.return_value = mock_response
+        api.set_navigation(token, vehicle, [poi])
 
         api._get_device_id.assert_called_once()
 
