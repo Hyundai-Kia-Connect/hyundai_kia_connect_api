@@ -41,6 +41,12 @@ def get_child_value(data, key):
     return value
 
 
+def str_or_none(value):
+    if value is None:
+        return None
+    return str(value)
+
+
 def get_float(value):
     if value is None:
         return None

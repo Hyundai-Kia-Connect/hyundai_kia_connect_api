@@ -151,6 +151,46 @@ class TestMapVehicleProfile:
         assert profile.seat_heater_vent_front_left == 6
         assert profile.seat_heater_vent_rear_left == 2
 
+    def test_map_profile_option_int_fields_coerced_to_str(self, eu_api):
+        """EU API returns some option fields as int; str_or_none must coerce to str."""
+        vin_info = self._load_vin_info()
+        # Fixture has these as integers (1, 0, 3) — verify they land as strings
+        raw_option = vin_info["option"]
+        assert isinstance(raw_option["lightOnlyAvailable"], int)
+        assert isinstance(raw_option["hornLightAvailable"], int)
+        assert isinstance(raw_option["sunRoofOption"], int)
+        assert isinstance(raw_option["digitalKey2"], int)
+        assert isinstance(raw_option["airPurifierOption"], int)
+        assert isinstance(raw_option["ignCtrlOption"], int)
+        assert isinstance(raw_option["evAlarmOptionInfo"], int)
+
+        profile = eu_api._map_vehicle_profile(vin_info)
+        # All str_or_none fields must be strings (or None), never raw int
+        assert profile.light_only_available == "1"
+        assert profile.horn_light_available == "1"
+        assert profile.sunroof_option == "1"
+        assert profile.digital_key2 == "3"
+        assert profile.air_purifier_option == "0"
+        assert profile.ignition_control_option == "0"
+        assert profile.ev_alarm_option_info == "0"
+        assert isinstance(profile.light_only_available, str)
+        assert isinstance(profile.sunroof_option, str)
+
+    def test_map_profile_option_none_fields(self, eu_api):
+        """When API omits str_or_none fields, profile gets None (not 'None')."""
+        vin_info = self._load_vin_info()
+        # Remove fields that go through str_or_none
+        vin_info["option"].pop("lightOnlyAvailable", None)
+        vin_info["option"].pop("sunRoofOption", None)
+        vin_info["option"].pop("digitalKey2", None)
+
+        profile = eu_api._map_vehicle_profile(vin_info)
+        assert profile.light_only_available is None
+        assert profile.sunroof_option is None
+        assert profile.digital_key2 is None
+        # Not the string "None"
+        assert profile.light_only_available != "None"
+
     def test_map_profile_service_fields(self, eu_api):
         vin_info = self._load_vin_info()
         profile = eu_api._map_vehicle_profile(vin_info)

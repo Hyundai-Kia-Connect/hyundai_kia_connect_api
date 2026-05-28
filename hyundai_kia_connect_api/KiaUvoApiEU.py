@@ -51,6 +51,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     parse_datetime,
+    str_or_none,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -154,13 +155,6 @@ class KiaUvoApiEU(ApiImplType1):
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
-    @staticmethod
-    def _str(v):
-        """Coerce int-or-string option values to strings for capability comparisons."""
-        if v is None:
-            return None
-        return str(v)
-
     def _map_vehicle_profile(self, profile_data: dict) -> VehicleProfile:
         basic = profile_data.get("basic", {})
         device = profile_data.get("device", {})
@@ -201,22 +195,22 @@ class KiaUvoApiEU(ApiImplType1):
             heating_steering_wheel=option.get("heatingSteeringWheel"),
             heating_side_mirror=option.get("heatingSideMirror"),
             heating_rear_window=option.get("heatingRearWindow"),
-            light_only_available=self._str(option.get("lightOnlyAvailable")),
-            horn_light_available=self._str(option.get("hornLightAvailable")),
+            light_only_available=str_or_none(option.get("lightOnlyAvailable")),
+            horn_light_available=str_or_none(option.get("hornLightAvailable")),
             hvac_temp_type=option.get("hvacTempType"),
             remote_control_waiting_time=option.get("remoteControlWaitingTime"),
             window_safety_option2=option.get("windowSafetyOption2"),
-            sunroof_option=self._str(option.get("sunRoofOption")),
-            digital_key2=self._str(option.get("digitalKey2")),
+            sunroof_option=str_or_none(option.get("sunRoofOption")),
+            digital_key2=str_or_none(option.get("digitalKey2")),
             remote_heat_control=option.get("remoteHeatControl"),
-            air_purifier_option=self._str(option.get("airPurifierOption")),
+            air_purifier_option=str_or_none(option.get("airPurifierOption")),
             dvrs_option=option.get("dvrsOption"),
-            ignition_control_option=self._str(option.get("ignCtrlOption")),
+            ignition_control_option=str_or_none(option.get("ignCtrlOption")),
             seat_heater_vent_front_left=seat_heater_vent.get("flSeatHeat"),
             seat_heater_vent_front_right=seat_heater_vent.get("frSeatHeat"),
             seat_heater_vent_rear_left=seat_heater_vent.get("rlSeatHeat"),
             seat_heater_vent_rear_right=seat_heater_vent.get("rrSeatHeat"),
-            ev_alarm_option_info=self._str(option.get("evAlarmOptionInfo")),
+            ev_alarm_option_info=str_or_none(option.get("evAlarmOptionInfo")),
             remote_air_ctrl_control_option=option.get("remoteAirCtrlControlOption"),
             # serviceOption
             battery_warning_service=service_option.get("batteryWarningService") == 1,
