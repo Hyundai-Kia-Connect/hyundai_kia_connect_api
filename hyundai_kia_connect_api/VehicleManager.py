@@ -175,7 +175,8 @@ class VehicleManager:
             else:
                 self.update_vehicle_with_cached_state(vehicle_id)
         else:
-            self.update_vehicle_with_cached_state(vehicle_id)
+            # No data yet — force refresh to get initial vehicle state
+            self.force_refresh_vehicle_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles.keys():
