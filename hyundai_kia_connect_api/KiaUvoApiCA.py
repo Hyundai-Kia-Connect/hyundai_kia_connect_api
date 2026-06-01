@@ -622,6 +622,18 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.headlamp_right_low = get_child_value(
             state, "status.lampWireStatus.headLamp.rightLowLamp"
         )
+        vehicle.headlamp_left_high = get_child_value(
+            state, "status.lampWireStatus.headLamp.leftHighLamp"
+        )
+        vehicle.headlamp_right_high = get_child_value(
+            state, "status.lampWireStatus.headLamp.rightHighLamp"
+        )
+        vehicle.headlamp_left_bifunc = get_child_value(
+            state, "status.lampWireStatus.headLamp.leftBifuncLamp"
+        )
+        vehicle.headlamp_right_bifunc = get_child_value(
+            state, "status.lampWireStatus.headLamp.rightBifuncLamp"
+        )
         vehicle.stop_lamp_left = get_child_value(
             state, "status.lampWireStatus.stopLamp.leftLamp"
         )

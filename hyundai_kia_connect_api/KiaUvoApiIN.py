@@ -398,6 +398,18 @@ class KiaUvoApiIN(ApiImplType1):
         vehicle.headlamp_right_low = bool(
             get_child_value(state, "lampWireStatus.headLamp.rightLowLamp")
         )
+        vehicle.headlamp_left_high = bool(
+            get_child_value(state, "lampWireStatus.headLamp.leftHighLamp")
+        )
+        vehicle.headlamp_right_high = bool(
+            get_child_value(state, "lampWireStatus.headLamp.rightHighLamp")
+        )
+        vehicle.headlamp_left_bifunc = bool(
+            get_child_value(state, "lampWireStatus.headLamp.leftBifuncLamp")
+        )
+        vehicle.headlamp_right_bifunc = bool(
+            get_child_value(state, "lampWireStatus.headLamp.rightBifuncLamp")
+        )
         vehicle.stop_lamp_left = bool(
             get_child_value(state, "lampWireStatus.stopLamp.leftLamp")
         )

@@ -312,6 +312,40 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
         )
 
+        vehicle.headlamp_status = get_child_value(
+            state, "Body.Lights.Front.HeadLamp.SystemWarning"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "Body.Lights.Front.Left.Low.Warning"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "Body.Lights.Front.Right.Low.Warning"
+        )
+        vehicle.headlamp_left_high = get_child_value(
+            state, "Body.Lights.Front.Left.High.Warning"
+        )
+        vehicle.headlamp_right_high = get_child_value(
+            state, "Body.Lights.Front.Right.High.Warning"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "Body.Lights.Rear.Left.StopLamp.Warning"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "Body.Lights.Rear.Right.StopLamp.Warning"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "Body.Lights.Front.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "Body.Lights.Front.Right.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "Body.Lights.Rear.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "Body.Lights.Rear.Right.TurnSignal.Warning"
+        )
+
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
         )

@@ -204,6 +204,10 @@ class Vehicle:
     headlamp_status: str = None
     headlamp_left_low: bool = None
     headlamp_right_low: bool = None
+    headlamp_left_high: bool = None
+    headlamp_right_high: bool = None
+    headlamp_left_bifunc: bool = None
+    headlamp_right_bifunc: bool = None
     stop_lamp_left: bool = None
     stop_lamp_right: bool = None
     turn_signal_left_front: bool = None
