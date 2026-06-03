@@ -691,6 +691,10 @@ class ApiImplType1(ApiImpl):
         return response["msgId"]
 
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "set_charging_current requires CCS2 protocol support"
+            )
         url = (
             self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
         )
