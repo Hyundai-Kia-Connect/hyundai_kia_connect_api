@@ -5,7 +5,6 @@ import requests
 import logging
 import math
 from typing import Optional
-from datetime import timedelta, timezone
 
 from time import sleep
 
@@ -238,15 +237,14 @@ class ApiImplType1(ApiImpl):
         }
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "Offset"):
-            offset = float(get_child_value(state, "Offset"))
-            hours = int(offset)
-            minutes = int((offset - hours) * 60)
-            vehicle.timezone = timezone(timedelta(hours=hours, minutes=minutes))
         if get_child_value(state, "Date"):
+            # CCS2 'Date' is always in UTC, convert to the region timezone.
+            # Always use a named timezone to ensure DST adjustment.
+            # In EU, CCS2 'Offset' is always 1 (CET), but CEST is UTC+0100.
+            # In AU, CCS2 'Offset' is 10 (AEST), but AEDT is UTC+1100.
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), vehicle.timezone
-            )
+                get_child_value(state, "Date"), dt.timezone.utc
+            ).astimezone(self.data_timezone)
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
