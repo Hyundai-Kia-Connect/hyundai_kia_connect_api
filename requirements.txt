@@ -1,4 +1,4 @@
-beautifulsoup4>=4.14.3
+beautifulsoup4>=4.15.0
 requests
 certifi>=2026.5.20
 tzdata>=2026.2
