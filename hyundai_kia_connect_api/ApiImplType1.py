@@ -267,7 +267,7 @@ class ApiImplType1(ApiImpl):
             "Cabin.HVAC.Row1.Driver.Temperature.Unit",
         )
 
-        if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:            
+        if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:
             vehicle.air_temperature = (float(air_temp), TEMPERATURE_UNITS[unit])
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
