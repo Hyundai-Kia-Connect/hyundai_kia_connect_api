@@ -83,3 +83,6 @@ dist: clean ## builds source and wheel package
 
 install: clean ## install the package to the active Python's site-packages
 	python setup.py install
+
+test-integration: ## run integration tests (requires .env with real credentials)
+	pytest -m integration tests/integration/ -v --tb=short

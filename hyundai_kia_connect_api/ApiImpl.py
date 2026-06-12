@@ -1,12 +1,14 @@
 """ApiImpl.py"""
 
-# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,missing-timeout,logging-fstring-interpolation
+# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,logging-fstring-interpolation
 import datetime as dt
 import logging
 from dataclasses import dataclass
 
 import requests
+from requests.adapters import HTTPAdapter
 from requests.exceptions import JSONDecodeError
+from urllib3.util.retry import Retry
 
 try:
     from geopy.geocoders import GoogleV3
@@ -130,6 +132,41 @@ class POIInfo:
         }
 
 
+class ApiImplSession(requests.Session):
+    """Shared HTTP session with timeout, retry, and connection pooling.
+
+    All regions should use this session (or a subclass) for HTTP calls.
+    Override class attributes per region in __init__ if needed.
+    """
+
+    HTTP_CONNECT_TIMEOUT = 10
+    HTTP_READ_TIMEOUT = 30
+    MAX_RETRIES = 2
+    RETRY_BACKOFF = 1
+
+    def __init__(self):
+        super().__init__()
+        retry = Retry(
+            total=self.MAX_RETRIES,
+            backoff_factor=self.RETRY_BACKOFF,
+            status_forcelist=[502, 503, 504],
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self.mount("https://", adapter)
+        self.mount("http://", adapter)
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault(
+            "timeout", (self.HTTP_CONNECT_TIMEOUT, self.HTTP_READ_TIMEOUT)
+        )
+        try:
+            return super().request(method, url, **kwargs)
+        except requests.exceptions.Timeout as exc:
+            from .exceptions import RequestTimeoutError
+
+            raise RequestTimeoutError(str(exc)) from exc
+
+
 class ApiImpl:
     data_timezone = dt.timezone.utc
     temperature_range = None
@@ -231,7 +268,7 @@ class ApiImpl:
                     + email_parameter
                 )
                 headers = {"user-agent": "curl/7.81.0"}
-                response = requests.get(url, headers=headers)
+                response = requests.get(url, headers=headers, timeout=(5, 15))
                 try:
                     response = response.json()
                 except JSONDecodeError:
