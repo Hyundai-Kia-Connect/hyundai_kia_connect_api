@@ -196,7 +196,7 @@ class ApiImplType1(ApiImpl):
             result.append(vehicle)
         return result
 
-    def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """No-op base. Override in region subclasses with profile endpoint."""
 
     def _map_vehicle_profile(self, profile_data: dict) -> VehicleProfile:

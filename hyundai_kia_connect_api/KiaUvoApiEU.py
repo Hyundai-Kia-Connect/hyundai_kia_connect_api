@@ -246,7 +246,7 @@ class KiaUvoApiEU(ApiImplType1):
             dtc_categories=dtc_category if dtc_category else None,
         )
 
-    def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
         for vehicle in vehicles:
             try:
                 url = self.SPA_API_URL + f"vehicles/{vehicle.id}/profile"

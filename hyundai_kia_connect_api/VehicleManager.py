@@ -128,7 +128,7 @@ class VehicleManager:
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
         vehicles = self.api.get_vehicles(self.token)
-        self.api._fetch_vehicle_profiles(self.token, vehicles)
+        self.api.fetch_vehicle_profiles(self.token, vehicles)
         for vehicle in vehicles:
             vehicle.supports_window_control = self.api.supports_window_control
             self.vehicles[vehicle.id] = vehicle

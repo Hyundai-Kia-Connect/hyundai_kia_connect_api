@@ -140,7 +140,7 @@ class ApiImpl:
     def __init__(self) -> None:
         """Initialize."""
 
-    def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """No-op base. Override in region subclasses with profile endpoint."""
 
     def get_user_profile(self, token: Token):
