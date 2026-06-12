@@ -83,6 +83,7 @@ class VehicleManager:
         self.token: Token = token
         self.vehicles: dict = {}
         self.otp_request: OTPRequest = None
+        self.account = None
 
     @DeprecationWarning
     def initialize(self) -> None:
@@ -127,9 +128,11 @@ class VehicleManager:
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
         vehicles = self.api.get_vehicles(self.token)
+        self.api.fetch_vehicle_profiles(self.token, vehicles)
         for vehicle in vehicles:
             vehicle.supports_window_control = self.api.supports_window_control
             self.vehicles[vehicle.id] = vehicle
+        self.account = self.api.get_user_profile(self.token)
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]

@@ -1,6 +1,6 @@
 import datetime
 from zoneinfo import ZoneInfo
-from hyundai_kia_connect_api.utils import detect_timezone_for_date
+from hyundai_kia_connect_api.utils import detect_timezone_for_date, str_or_none
 
 
 def test_detect_timezone_for_date():
@@ -24,3 +24,23 @@ def test_detect_timezone_for_date_newfoundland():
     after = datetime.datetime(2025, 9, 21, 20, 34, 59)
     assert detect_timezone_for_date(early, now_utc, [tz]) == tz
     assert detect_timezone_for_date(after, now_utc, [tz]) == tz
+
+
+def test_str_or_none_none():
+    assert str_or_none(None) is None
+
+
+def test_str_or_none_int():
+    assert str_or_none(1) == "1"
+
+
+def test_str_or_none_zero():
+    assert str_or_none(0) == "0"
+
+
+def test_str_or_none_string():
+    assert str_or_none("1") == "1"
+
+
+def test_str_or_none_empty_string():
+    assert str_or_none("") == ""

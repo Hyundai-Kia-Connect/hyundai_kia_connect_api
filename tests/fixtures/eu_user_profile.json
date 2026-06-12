@@ -1,0 +1,21 @@
+{
+    "id": "4d9129de-414c-4ea2-9c7b-d316a76f6626",
+    "masterId": "4d9129de-414c-4ea2-9c7b-d316a76f6626",
+    "primary_user_id": "56e1eead-6a2b-4882-a890-758e9515847f",
+    "email": "user@example.com",
+    "name": "Test User",
+    "mobileNum": "+48123456789",
+    "birthdate": "",
+    "status": 3,
+    "lang": "en",
+    "country": "pl",
+    "dialect": "",
+    "social": false,
+    "password": false,
+    "passwordDate": "",
+    "pinDate": "20260224T134126.314",
+    "signUpDate": "20260128T213114.001",
+    "customFields": {
+        "int_user_id": "65c92e6a-3829-4fc5-8be4-b3892fd12d76"
+    }
+}

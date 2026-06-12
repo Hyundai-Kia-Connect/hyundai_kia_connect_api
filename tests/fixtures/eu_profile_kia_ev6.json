@@ -1,0 +1,106 @@
+{
+    "_fixture_meta": {
+        "description": "EU vehicle profile response from GET /api/v1/spa/vehicles/{id}/profile",
+        "source": "Sanitized from real API response"
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "vinInfo": [
+            {
+                "basic": {
+                    "vin": "XXXXXXXXXXXXXXXXX",
+                    "modelName": "EV6",
+                    "modelYear": "2023",
+                    "modelType": "EV",
+                    "brand": "K",
+                    "country": "de",
+                    "protocolType": 1,
+                    "ccuCCS2ProtocolSupport": 1,
+                    "ecuOtaUpdateSupport": 1,
+                    "ecuRemoteOTAUpdateSupport": 0
+                },
+                "device": {
+                    "simStatus": "A",
+                    "simStartDate": "15012023",
+                    "simEndDate": "15012033",
+                    "headUnitType": "04",
+                    "headUnitModelName": "XX5AH.SCBMC.EU",
+                    "currentHeadUnitVersion": "XX5.EUR.ccNC.001.002.250601",
+                    "platform": "ccNC",
+                    "privacySettingSupport": 1,
+                    "naviApplied": 1,
+                    "webManualUrl": "http://webmanual.hyundai.com/ccNC/AVNT/EUR/German/index.html",
+                    "compPeriodEndYn": "N"
+                },
+                "option": {
+                    "airControlType": "1",
+                    "drvSeatLoc": "L",
+                    "remoteControl": "0",
+                    "heating1": "1",
+                    "heatingFrontWindow": "0",
+                    "strgWhlHeatOption": 2,
+                    "heatingSteeringWheel": "1",
+                    "heatingSideMirror": "1",
+                    "heatingRearWindow": "1",
+                    "lightOnlyAvailable": 1,
+                    "hornLightAvailable": 1,
+                    "hvacTempType": "1",
+                    "remoteControlWaitingTime": 336,
+                    "windowSafetyOption2": 3,
+                    "svmOptionInfo": 1,
+                    "remoteAirCtrlControlOption": 1,
+                    "seatHeaterVent": {
+                        "flSeatHeat": 6,
+                        "frSeatHeat": 6,
+                        "rlSeatHeat": 2,
+                        "rrSeatHeat": 2
+                    },
+                    "evAlarmOptionInfo": 0,
+                    "sunRoofOption": 1,
+                    "digitalKey2": 3,
+                    "remoteHeatControl": "2",
+                    "airPurifierOption": 0,
+                    "dvrsOption": 0,
+                    "ignCtrlOption": 0
+                },
+                "serviceOption": {
+                    "batteryWarningService": 1,
+                    "scheduleLinkService": 1,
+                    "centerUserProfileOption": 4,
+                    "finalDestinationNoti": 1,
+                    "valetServiceOption": 1,
+                    "notificationSupport": 1,
+                    "nTrackDataSupport": 0,
+                    "remoteValetActOption": 1,
+                    "alertServiceOption": 1,
+                    "mediaStreamingService": [4, 6],
+                    "mediaStreamingSelectionOption": 1,
+                    "idleAlertSettingService": 1,
+                    "engineIdleTimeNotification": 1,
+                    "dvrsOption": 0,
+                    "send2CarOptionInfo": 10,
+                    "speedEventSupport": 1
+                },
+                "batteryType": {
+                    "mainbatteryType": 0,
+                    "auxbatteryType": 2
+                },
+                "detailInfo": {
+                    "saleCarmdlCd": "HK",
+                    "bodyType": "3",
+                    "inColor": "XXX",
+                    "outColor": "A2B",
+                    "saleCarmdlEnNm": "EV6"
+                },
+                "dtcCategory": [
+                    { "ecuIdx": "ABS", "factoryValue": 1 },
+                    { "ecuIdx": "ACU", "factoryValue": 1 },
+                    { "ecuIdx": "CCU", "factoryValue": 1 },
+                    { "ecuIdx": "EPB", "factoryValue": 1 },
+                    { "ecuIdx": "TPMS", "factoryValue": 1 }
+                ]
+            }
+        ]
+    }
+}
