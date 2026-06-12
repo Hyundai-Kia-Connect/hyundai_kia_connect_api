@@ -7,7 +7,6 @@ import logging
 import math
 import threading
 from typing import Optional
-from datetime import timedelta, timezone
 
 from time import sleep
 
@@ -264,15 +263,14 @@ class ApiImplType1(ApiImpl):
         }
 
     def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "Offset"):
-            offset = float(get_child_value(state, "Offset"))
-            hours = int(offset)
-            minutes = int((offset - hours) * 60)
-            vehicle.timezone = timezone(timedelta(hours=hours, minutes=minutes))
         if get_child_value(state, "Date"):
+            # CCS2 'Date' is always in UTC, convert to the region timezone.
+            # Always use a named timezone to ensure DST adjustment.
+            # In EU, CCS2 'Offset' is always 1 (CET), but CEST is UTC+0100.
+            # In AU, CCS2 'Offset' is 10 (AEST), but AEDT is UTC+1100.
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), vehicle.timezone
-            )
+                get_child_value(state, "Date"), dt.timezone.utc
+            ).astimezone(self.data_timezone)
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
@@ -290,9 +288,13 @@ class ApiImplType1(ApiImpl):
             state,
             "Cabin.HVAC.Row1.Driver.Temperature.Value",
         )
+        unit = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Unit",
+        )
 
-        if air_temp is not None and air_temp != "OFF":
-            vehicle.air_temperature = (float(air_temp), TEMPERATURE_UNITS[1])
+        if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:
+            vehicle.air_temperature = (float(air_temp), TEMPERATURE_UNITS[unit])
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
@@ -336,6 +338,40 @@ class ApiImplType1(ApiImpl):
 
         vehicle.rear_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
+        )
+
+        vehicle.headlamp_status = get_child_value(
+            state, "Body.Lights.Front.HeadLamp.SystemWarning"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "Body.Lights.Front.Left.Low.Warning"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "Body.Lights.Front.Right.Low.Warning"
+        )
+        vehicle.headlamp_left_high = get_child_value(
+            state, "Body.Lights.Front.Left.High.Warning"
+        )
+        vehicle.headlamp_right_high = get_child_value(
+            state, "Body.Lights.Front.Right.High.Warning"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "Body.Lights.Rear.Left.StopLamp.Warning"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "Body.Lights.Rear.Right.StopLamp.Warning"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "Body.Lights.Front.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "Body.Lights.Front.Right.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "Body.Lights.Rear.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "Body.Lights.Rear.Right.TurnSignal.Warning"
         )
 
         vehicle.front_left_door_is_open = get_child_value(
@@ -684,6 +720,10 @@ class ApiImplType1(ApiImpl):
 
     @_retry_on_device_id_error
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "set_charging_current requires CCS2 protocol support"
+            )
         url = (
             self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
         )
