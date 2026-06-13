@@ -172,6 +172,8 @@ class KiaUvoApiCA(ApiImpl):
         - 7549: OTP verification failed (Genesis CA)
         - 7602: Access token deleted
         - 7710: Device ID is not valid
+
+        :param response: the API's JSON response
         """
 
         error_code_mapping = {
