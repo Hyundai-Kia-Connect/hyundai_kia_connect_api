@@ -156,28 +156,23 @@ class KiaUvoApiCA(ApiImpl):
         return self._sessions
 
     def _check_response_for_errors(self, response: dict) -> None:
-        """
-        Checks for errors in the API response.
-        If an error is found, an exception is raised.
-        retCode known values:
-        - S: success
-        - F: failure
-        resCode / resMsg known values:
-        - 0000: no error
-        - 7110: "OTP Required" (MFA verification needed)
-        - 7402: "Account Locked Out"
-        - 7403: "Your authentication has expired"
-        - 7404: "Wrong Username and password"
-        - 7445: "Your request could not be processed"
-        - 7602: "Access token is deleted"
-        - 7710 : "Device ID is not valid"
-        :param response: the API's JSON response
+        """Checks for errors in the API response.
+
+        Error codes:
+            - 7110: OTP Required (MFA verification needed)
+            - 7402: Account Locked Out
+            - 7403: Authentication expired
+            - 7404: Wrong username/password
+            - 7549: OTP verification failed (Genesis CA)
+            - 7602: Access token deleted
+            - 7710: Device ID is not valid
         """
 
         error_code_mapping = {
             "7404": AuthenticationError,
             "7402": AuthenticationError,
             "7403": AuthenticationError,  # Auth expired - triggers re-login
+            "7549": AuthenticationError,  # OTP verification failed (Genesis CA)
             "7602": AuthenticationError,  # Access token deleted - triggers re-login
         }
         if response["responseHeader"]["responseCode"] == 1:
@@ -186,10 +181,12 @@ class KiaUvoApiCA(ApiImpl):
                 return
             if response["error"]["errorCode"] in error_code_mapping:
                 raise error_code_mapping[response["error"]["errorCode"]](
-                    response["error"]["errorDesc"]
+                    response["error"].get("errorDesc", response["error"]["errorCode"])
                 )
             else:
-                raise APIError(f"Server returned: '{response['error']['errorDesc']}'")
+                raise APIError(
+                    f"Server returned: '{response['error'].get('errorDesc', response['error'].get('errorCode', 'unknown'))}'"
+                )
 
     def login(
         self,
