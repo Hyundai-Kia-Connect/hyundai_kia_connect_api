@@ -158,14 +158,20 @@ class KiaUvoApiCA(ApiImpl):
     def _check_response_for_errors(self, response: dict) -> None:
         """Checks for errors in the API response.
 
-        Error codes:
-            - 7110: OTP Required (MFA verification needed)
-            - 7402: Account Locked Out
-            - 7403: Authentication expired
-            - 7404: Wrong username/password
-            - 7549: OTP verification failed (Genesis CA)
-            - 7602: Access token deleted
-            - 7710: Device ID is not valid
+        If an error is found, an exception is raised.
+        retCode known values:
+        - S: success
+        - F: failure
+        resCode / resMsg known values:
+        - 0000: no error
+        - 7110: OTP Required (MFA verification needed)
+        - 7402: Account Locked Out
+        - 7403: Authentication expired
+        - 7404: Wrong username/password
+        - 7445: Request could not be processed
+        - 7549: OTP verification failed (Genesis CA)
+        - 7602: Access token deleted
+        - 7710: Device ID is not valid
         """
 
         error_code_mapping = {
