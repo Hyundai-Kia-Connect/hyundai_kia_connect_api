@@ -141,6 +141,7 @@ class VehicleManager:
     def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
+            vehicle.last_scanned_at = dt.datetime.now(dt.timezone.utc)
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
@@ -184,6 +185,7 @@ class VehicleManager:
     def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
+            vehicle.last_scanned_at = dt.datetime.now(dt.timezone.utc)
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")

@@ -97,6 +97,7 @@ class Vehicle:
     engine_is_running: bool = None
 
     _last_updated_at: datetime.datetime = None
+    _last_scanned_at: datetime.datetime = None
     timezone: datetime.timezone = datetime.timezone.utc  # default UTC
 
     dtc_count: typing.Union[int, None] = None
@@ -433,6 +434,19 @@ class Vehicle:
                 if newest_updated_at < previous_updated_at:
                     newest_updated_at = previous_updated_at  # keep old because newer
         self._last_updated_at = newest_updated_at
+
+    @property
+    def last_scanned_at(self):
+        """When the integration last polled the server for this vehicle.
+
+        Unlike last_updated_at (which comes from the car's syncDate),
+        this is the local timestamp of when the API call was made.
+        """
+        return self._last_scanned_at
+
+    @last_scanned_at.setter
+    def last_scanned_at(self, value):
+        self._last_scanned_at = value
 
     @property
     def location_latitude(self):
