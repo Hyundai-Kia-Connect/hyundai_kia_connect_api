@@ -937,6 +937,39 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
         return response_headers["transactionId"]
 
+    def _build_ev_climate_payload(
+        self,
+        token: Token,
+        options: ClimateRequestOptions,
+        hex_set_temp: str,
+        use_remote_control: bool = False,
+    ) -> dict:
+        """Build EV climate start payload.
+
+        Args:
+            use_remote_control: If True, use 'remoteControl' key instead of 'hvacInfo'.
+        """
+        payload = {"pin": token.pin}
+        payload_key = "remoteControl" if use_remote_control else "hvacInfo"
+        payload[payload_key] = {
+            "airCtrl": int(options.climate),
+            "defrost": options.defrost,
+            "heating1": options.heating,
+            "airTemp": {
+                "value": hex_set_temp,
+                "unit": 0,
+                "hvacTempType": 1,
+            },
+            "igniOnDuration": options.duration,
+            "seatHeaterVentCMD": {
+                "drvSeatOptCmd": options.front_left_seat,
+                "astSeatOptCmd": options.front_right_seat,
+                "rlSeatOptCmd": options.rear_left_seat,
+                "rrSeatOptCmd": options.rear_right_seat,
+            },
+        }
+        return payload
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
@@ -977,73 +1010,40 @@ class KiaUvoApiCA(ApiImpl):
                 self.temperature_range_c_old.index(options.set_temp)
             )
         if vehicle.engine_type == ENGINE_TYPES.EV:
-            payload = {
-                "pin": token.pin,
-            }
-            climate_settings = {
-                "airCtrl": int(options.climate),
-                "defrost": options.defrost,
-                "heating1": options.heating,
-                "airTemp": {
-                    "value": hex_set_temp,
-                    "unit": 0,
-                    "hvacTempType": 1,
-                },
-            }
-            if BRANDS[self.brand] == BRAND_KIA:
-                if vehicle.name == "EV9":
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-            else:
-                if vehicle.model == "IONIQ 9":
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
+            # Try hvacInfo first, retry with remoteControl on failure
+            payload = self._build_ev_climate_payload(
+                token, options, hex_set_temp, use_remote_control=False
+            )
+            _LOGGER.debug(
+                f"{DOMAIN} - Planned start_climate payload {self._mask_sensitive_data(payload)}"
+            )
+
+            response = self.sessions.post(
+                url, headers=headers, data=json.dumps(payload)
+            )
+            response_json = response.json()
+
+            if response_json.get("responseHeader", {}).get("responseCode") != 0:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Climate start with hvacInfo failed "
+                    f"(responseCode={response_json.get('responseHeader', {}).get('responseCode')}), "
+                    f"retrying with remoteControl payload"
+                )
+                payload = self._build_ev_climate_payload(
+                    token, options, hex_set_temp, use_remote_control=True
+                )
+                _LOGGER.debug(
+                    f"{DOMAIN} - Retry start_climate payload {self._mask_sensitive_data(payload)}"
+                )
+                response = self.sessions.post(
+                    url, headers=headers, data=json.dumps(payload)
+                )
+                response_json = response.json()
+
+            self._check_response_for_errors(response_json)
+            response_headers = response.headers
+            _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response_json}")
+            return response_headers["transactionId"]
         else:
             payload = {
                 "setting": {

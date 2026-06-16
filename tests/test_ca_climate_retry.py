@@ -122,15 +122,15 @@ class TestClimateRetry:
     def test_raises_error_when_both_fail(
         self, ca_api_kia, token, ev_vehicle, climate_options
     ):
-        """Should raise APIError when both hvacInfo and remoteControl fail."""
+        """Should raise error when both hvacInfo and remoteControl fail."""
 
         def mock_post(url, **kwargs):
             resp = MagicMock()
             resp.json.return_value = {
                 "responseHeader": {"responseCode": 1},
                 "error": {
-                    "errorCode": "7404",
-                    "errorDesc": "Authentication failed",
+                    "errorCode": "7445",
+                    "errorDesc": "Request could not be processed",
                 },
             }
             resp.status_code = 200
