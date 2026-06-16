@@ -1018,7 +1018,9 @@ class ApiImplType1(ApiImpl):
                 "hvacTempType": 1,
                 "hvacTemp": options.set_temp,
                 "sideRearMirrorHeating": 1,
-                "drvSeatLoc": "R",
+                "drvSeatLoc": "R"
+                if vehicle.distance_unit == DISTANCE_UNITS[2]
+                else "L",
                 "seatClimateInfo": {
                     "drvSeatClimateState": options.front_left_seat,
                     "psgSeatClimateState": options.front_right_seat,
