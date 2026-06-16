@@ -1103,6 +1103,9 @@ class KiaUvoApiUSA(ApiImpl):
             response = self.post_request_with_logging_and_active_session(
                 token=token, url=url, json_body=body, vehicle=vehicle
             )
+        except AuthenticationError:
+            # Auth errors should not trigger seat-setting retry
+            raise
         except RequestException:
             if "heatVentSeat" in body.get("remoteClimate", {}):
                 _LOGGER.warning(
