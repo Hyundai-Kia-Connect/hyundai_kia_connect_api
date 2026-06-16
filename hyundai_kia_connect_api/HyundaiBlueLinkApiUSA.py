@@ -994,7 +994,21 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response = self.sessions.post(url, json=data, headers=headers)
         response_json = _safe_parse_json(response, "start_climate")
         if response_json is not None:
-            _check_response_for_errors(response_json)
+            try:
+                _check_response_for_errors(response_json)
+            except APIError:
+                # If seat settings caused the failure, retry without them
+                if "seatHeaterVentInfo" in data:
+                    _LOGGER.warning(
+                        f"{DOMAIN} - Climate start with seat settings failed, retrying without seat settings"
+                    )
+                    del data["seatHeaterVentInfo"]
+                    response = self.sessions.post(url, json=data, headers=headers)
+                    response_json = _safe_parse_json(response, "start_climate")
+                    if response_json is not None:
+                        _check_response_for_errors(response_json)
+                else:
+                    raise
         _LOGGER.debug(
             f"{DOMAIN} - Start engine response status code: {response.status_code}"
         )
