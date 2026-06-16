@@ -137,6 +137,8 @@ class KiaUvoApiCA(ApiImpl):
             "client_secret": "CLISCR01AHSPA",
         }
         self._sessions = None
+        self._cloudflare_cookie: str = ""
+        self._cloudflare_cookie_fetched_at: dt.datetime | None = None
 
     def _get_device_id(self) -> str:
         """Generate a deterministic device ID based on MAC address and hostname.
@@ -145,6 +147,32 @@ class KiaUvoApiCA(ApiImpl):
             uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
         )
         return base64.b64encode(device_uuid.hex.encode()).decode()
+
+    def _get_cloudflare_cookie(self) -> str:
+        """Fetch Cloudflare __cf_bm cookie from the login page.
+
+        The Canadian API is behind Cloudflare bot management.
+        Fetching the __cf_bm cookie from the login page allows
+        subsequent requests to pass Cloudflare validation.
+        """
+        try:
+            url = f"https://{self.BASE_URL}/login"
+            response = requests.get(url, timeout=10)
+            for cookie_name, cookie_value in response.cookies.items():
+                if cookie_name.lower() == "__cf_bm":
+                    self._cloudflare_cookie = f"__cf_bm={cookie_value}"
+                    self._cloudflare_cookie_fetched_at = dt.datetime.now(
+                        dt.timezone.utc
+                    )
+                    _LOGGER.debug(f"{DOMAIN} - Got Cloudflare __cf_bm cookie")
+                    return self._cloudflare_cookie
+            _LOGGER.debug(f"{DOMAIN} - No __cf_bm cookie in response")
+            self._cloudflare_cookie = ""
+            return ""
+        except Exception as e:
+            _LOGGER.debug(f"{DOMAIN} - Failed to fetch Cloudflare cookie: {e}")
+            self._cloudflare_cookie = ""
+            return ""
 
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
