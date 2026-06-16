@@ -65,10 +65,12 @@ class TestHyundaiUSAClimateRetry:
             resp = MagicMock()
             if call_count == 1:
                 resp.status_code = 200
-                resp.text = '{"errorCode":"502","errorMessage":"Invalid parameter"}'
+                resp.text = (
+                    '{"errorCode":"400","errorMessage":"Invalid seat parameter"}'
+                )
                 resp.json.return_value = {
-                    "errorCode": "502",
-                    "errorMessage": "Invalid parameter",
+                    "errorCode": "400",
+                    "errorMessage": "Invalid seat parameter",
                 }
             else:
                 resp.status_code = 200
@@ -121,9 +123,9 @@ class TestHyundaiUSAClimateRetry:
         def mock_post(url, **kwargs):
             resp = MagicMock()
             resp.status_code = 200
-            resp.text = '{"errorCode":"502","errorMessage":"Invalid parameter"}'
+            resp.text = '{"errorCode":"400","errorMessage":"Invalid parameter"}'
             resp.json.return_value = {
-                "errorCode": "502",
+                "errorCode": "400",
                 "errorMessage": "Invalid parameter",
             }
             return resp
@@ -142,7 +144,9 @@ class TestHyundaiUSAClimateRetry:
     def test_no_retry_on_auth_error(
         self, usa_api, token, ev_vehicle_gen3, climate_options_with_seats
     ):
-        """Should not retry on authentication errors."""
+        """Should not retry on authentication errors (errorCode 502)."""
+        from hyundai_kia_connect_api.exceptions import AuthenticationError
+
         call_count = 0
 
         def mock_post(url, **kwargs):
@@ -150,9 +154,9 @@ class TestHyundaiUSAClimateRetry:
             call_count += 1
             resp = MagicMock()
             resp.status_code = 200
-            resp.text = '{"errorCode":"1003","errorMessage":"Authentication invalid"}'
+            resp.text = '{"errorCode":"502","errorMessage":"Authentication invalid"}'
             resp.json.return_value = {
-                "errorCode": "1003",
+                "errorCode": "502",
                 "errorMessage": "Authentication invalid",
             }
             return resp
@@ -163,7 +167,7 @@ class TestHyundaiUSAClimateRetry:
             ),
             patch.object(usa_api.sessions, "post", side_effect=mock_post),
         ):
-            with pytest.raises(APIError):
+            with pytest.raises(AuthenticationError):
                 usa_api.start_climate(
                     token, ev_vehicle_gen3, climate_options_with_seats
                 )
