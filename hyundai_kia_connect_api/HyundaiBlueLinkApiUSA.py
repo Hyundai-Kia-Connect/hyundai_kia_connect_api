@@ -1103,3 +1103,43 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
 
         return self._get_transaction_id(response)
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.API_URL + "rcs/rhl/light"
+        headers = self._get_vehicle_headers(token, vehicle)
+        headers["APPCLOUD-VIN"] = vehicle.VIN
+
+        data = {"userName": token.username, "vin": vehicle.VIN}
+        response = self.sessions.post(url, headers=headers, json=data)
+        response_json = _safe_parse_json(response, "start_hazard_lights")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
+        _LOGGER.debug(
+            f"{DOMAIN} - Received start_hazard_lights response status code: "
+            f"{response.status_code}"
+        )
+        _LOGGER.debug(
+            f"{DOMAIN} - Received start_hazard_lights response: {response.text}"
+        )
+
+        return self._get_transaction_id(response)
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.API_URL + "rcs/rhl/hnl"
+        headers = self._get_vehicle_headers(token, vehicle)
+        headers["APPCLOUD-VIN"] = vehicle.VIN
+
+        data = {"userName": token.username, "vin": vehicle.VIN}
+        response = self.sessions.post(url, headers=headers, json=data)
+        response_json = _safe_parse_json(response, "start_hazard_lights_and_horn")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
+        _LOGGER.debug(
+            f"{DOMAIN} - Received start_hazard_lights_and_horn response status code: "
+            f"{response.status_code}"
+        )
+        _LOGGER.debug(
+            f"{DOMAIN} - Received start_hazard_lights_and_horn response: {response.text}"
+        )
+
+        return self._get_transaction_id(response)
