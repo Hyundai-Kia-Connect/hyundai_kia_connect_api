@@ -1011,6 +1011,8 @@ class ApiImplType1(ApiImpl):
                 + vehicle.id
                 + "/ccs2/control/temperature"
             )
+            # drvSeatLoc: "L" for LHD (km), "R" for RHD (miles)
+            drv_seat_loc = "L" if vehicle.distance_unit == DISTANCE_UNITS[1] else "R"
             payload = {
                 "command": "start",
                 "ignitionDuration": options.duration,
@@ -1018,7 +1020,7 @@ class ApiImplType1(ApiImpl):
                 "hvacTempType": 1,
                 "hvacTemp": options.set_temp,
                 "sideRearMirrorHeating": 1,
-                "drvSeatLoc": "R",
+                "drvSeatLoc": drv_seat_loc,
                 "seatClimateInfo": {
                     "drvSeatClimateState": options.front_left_seat,
                     "psgSeatClimateState": options.front_right_seat,
@@ -1034,6 +1036,19 @@ class ApiImplType1(ApiImpl):
                 json=payload,
                 headers=self._get_control_headers(token, vehicle),
             ).json()
+            # CCS2 retry: if seat settings caused a failure, retry without them
+            if response.get("retCode") == "F" and "seatClimateInfo" in payload:
+                _LOGGER.warning(
+                    f"{DOMAIN} - CCS2 climate start with seat settings failed "
+                    f"(resCode={response.get('resCode')}), "
+                    f"retrying without seat settings"
+                )
+                del payload["seatClimateInfo"]
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=self._get_control_headers(token, vehicle),
+                ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
         token.device_id = self._get_device_id(self._get_stamp())
