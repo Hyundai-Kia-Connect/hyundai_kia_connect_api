@@ -258,11 +258,7 @@ class KiaUvoApiCA(ApiImpl):
         device_id = self._get_device_id()
         _LOGGER.debug(f"{DOMAIN} - Using deterministic device ID")
 
-        # Fetch Cloudflare cookie before login
-        cf_cookie = self._get_cloudflare_cookie()
-        if cf_cookie:
-            headers["Cookie"] = cf_cookie
-
+        self._add_cloudflare_cookie(headers)
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
         response_json = response.json()
@@ -279,6 +275,7 @@ class KiaUvoApiCA(ApiImpl):
             selverifmeth_headers = self.API_HEADERS.copy()
             selverifmeth_headers.pop("accessToken", None)
             selverifmeth_headers["Deviceid"] = self._get_device_id()
+            self._add_cloudflare_cookie(selverifmeth_headers)
             selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
 
             selverifmeth_response = self.sessions.post(
@@ -338,6 +335,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "mfa/sendotp"
         headers = self.API_HEADERS.copy()
         headers["Deviceid"] = self._get_device_id()
+        self._add_cloudflare_cookie(headers)
         if notify_type == OTP_NOTIFY_TYPE.EMAIL:
             data = {
                 "otpMethod": "E",
@@ -382,6 +380,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "mfa/validateotp"
         headers = self.API_HEADERS.copy()
         headers["Deviceid"] = self._get_device_id()
+        self._add_cloudflare_cookie(headers)
         data = {
             "otpNo": otp_code,
             "userAccount": username,
@@ -407,6 +406,7 @@ class KiaUvoApiCA(ApiImpl):
         # Call mfa/genmfatkn to get the access token and refresh token
         genmfatkn_url = self.API_URL + "mfa/genmfatkn"
         genmfatkn_headers = self.API_HEADERS.copy()
+        self._add_cloudflare_cookie(genmfatkn_headers)
         genmfatkn_headers["Deviceid"] = self._get_device_id()
         genmfatkn_data = {
             "userAccount": username,
@@ -451,6 +451,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "vhcllst"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
+        self._add_cloudflare_cookie(headers)
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
         response = response.json()
@@ -466,6 +467,7 @@ class KiaUvoApiCA(ApiImpl):
         url = self.API_URL + "vhcllst"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
+        self._add_cloudflare_cookie(headers)
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
@@ -841,6 +843,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(url, headers=headers)
         if response.ok:
@@ -887,6 +890,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
@@ -907,6 +911,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
@@ -926,6 +931,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
         url = self.API_URL + "nxtsvc"
         response = self.sessions.post(url, headers=headers)
         response = response.json()
@@ -944,6 +950,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         headers["from"] = "SPA"
         headers["Referer"] = f"https://{self.BASE_URL}/remote/"
+        self._add_cloudflare_cookie(headers)
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
             response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
@@ -961,6 +968,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
@@ -974,10 +982,11 @@ class KiaUvoApiCA(ApiImpl):
         elif action == VEHICLE_LOCK_ACTION.UNLOCK:
             url = self.API_URL + "drulck"
             _LOGGER.debug(f"{DOMAIN} - Calling unlock")
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -995,10 +1004,11 @@ class KiaUvoApiCA(ApiImpl):
             url = self.API_URL + "evc/rfon"
         else:
             url = self.API_URL + "rmtstrt"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
 
         if options.climate is None:
             options.climate = True
@@ -1129,10 +1139,11 @@ class KiaUvoApiCA(ApiImpl):
             url = self.API_URL + "evc/rfoff"
         else:
             url = self.API_URL + "rmtstp"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -1156,11 +1167,12 @@ class KiaUvoApiCA(ApiImpl):
         start_time = dt.datetime.now()
 
         url = self.API_URL + "rmtsts"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["transactionId"] = action_id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
         response = self.sessions.post(url, headers=headers)
         response = response.json()
 
@@ -1191,10 +1203,11 @@ class KiaUvoApiCA(ApiImpl):
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstrt"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
         data = json.dumps({"pin": token.pin})
         _LOGGER.debug(
             f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
@@ -1210,10 +1223,11 @@ class KiaUvoApiCA(ApiImpl):
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -1242,6 +1256,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        self._add_cloudflare_cookie(headers)
 
         response = self.sessions.post(url, headers=headers)
         response = response.json()
@@ -1256,7 +1271,7 @@ class KiaUvoApiCA(ApiImpl):
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
         url = self.API_URL + "evc/setsoc"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
@@ -1264,6 +1279,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["offset"] = "-8"
         headers["priority"] = "u=1, i"
         headers["Referer"] = "https://kiaconnect.ca/remote/"
+        self._add_cloudflare_cookie(headers)
 
         payload = {
             "tsoc": [
