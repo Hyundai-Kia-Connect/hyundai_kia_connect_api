@@ -34,3 +34,36 @@ class TestGetCloudflareCookie:
         with patch("requests.get", side_effect=Exception("connection error")):
             result = ca_api._get_cloudflare_cookie()
         assert result == ""
+
+
+class TestCloudflareCookieInLogin:
+    def test_login_includes_cloudflare_cookie(self, ca_api):
+        """Login request should include Cookie header with __cf_bm."""
+        mock_cf_response = MagicMock()
+        mock_cf_response.cookies = {"__cf_bm": "test_cookie_value"}
+
+        mock_login_response = MagicMock()
+        mock_login_response.json.return_value = {
+            "responseHeader": {"responseCode": 0},
+            "result": {
+                "token": {
+                    "accessToken": "test_at",
+                    "refreshToken": "test_rt",
+                    "expireIn": 3600,
+                }
+            },
+        }
+
+        with (
+            patch("requests.get", return_value=mock_cf_response),
+            patch.object(
+                ca_api.sessions, "post", return_value=mock_login_response
+            ) as mock_post,
+        ):
+            ca_api.login("user@test.com", "password123")
+            call_kwargs = mock_post.call_args
+            headers = call_kwargs.kwargs.get(
+                "headers", call_kwargs[1].get("headers", {})
+            )
+            assert "Cookie" in headers
+            assert "__cf_bm=test_cookie_value" in headers["Cookie"]

@@ -240,6 +240,11 @@ class KiaUvoApiCA(ApiImpl):
         device_id = self._get_device_id()
         _LOGGER.debug(f"{DOMAIN} - Using deterministic device ID")
 
+        # Fetch Cloudflare cookie before login
+        cf_cookie = self._get_cloudflare_cookie()
+        if cf_cookie:
+            headers["Cookie"] = cf_cookie
+
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
         response_json = response.json()
