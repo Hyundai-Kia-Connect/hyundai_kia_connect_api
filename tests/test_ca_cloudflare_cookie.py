@@ -130,3 +130,118 @@ class TestAddCloudflareCookie:
         with patch("requests.get", return_value=MagicMock()):
             result = ca_api._add_cloudflare_cookie(headers)
         assert "Cookie" not in result
+
+
+class TestIsCloudflareBlock:
+    def test_403_html_is_cloudflare(self, ca_api):
+        """403 with HTML content type is a Cloudflare block."""
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.headers = {"Content-Type": "text/html"}
+        mock_response.text = "<html>Attention Required</html>"
+        assert ca_api._is_cloudflare_block(mock_response) is True
+
+    def test_403_with_cloudflare_in_body(self, ca_api):
+        """403 with 'cloudflare' in body is a Cloudflare block."""
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.headers = {"Content-Type": "text/plain"}
+        mock_response.text = "Cloudflare attention required"
+        assert ca_api._is_cloudflare_block(mock_response) is True
+
+    def test_403_json_not_cloudflare(self, ca_api):
+        """403 with JSON content type is NOT a Cloudflare block."""
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.headers = {"Content-Type": "application/json"}
+        mock_response.text = '{"error": "auth failed"}'
+        assert ca_api._is_cloudflare_block(mock_response) is False
+
+    def test_200_not_cloudflare(self, ca_api):
+        """200 response is never a Cloudflare block."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        assert ca_api._is_cloudflare_block(mock_response) is False
+
+
+class TestPostWithCloudflareRetry:
+    def test_retries_on_cloudflare_403(self, ca_api):
+        """Should refresh cookie and retry on Cloudflare 403."""
+        ca_api._cloudflare_cookie = "__cf_bm=old_cookie"
+        ca_api._cloudflare_cookie_fetched_at = dt.datetime.now(dt.timezone.utc)
+
+        mock_cf_response = MagicMock()
+        mock_cf_response.cookies = {"__cf_bm": "new_cookie"}
+
+        call_count = 0
+
+        def mock_post(url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                resp = MagicMock()
+                resp.status_code = 403
+                resp.headers = {"Content-Type": "text/html"}
+                resp.text = "<html>Cloudflare Attention Required</html>"
+                return resp
+            else:
+                resp = MagicMock()
+                resp.status_code = 200
+                resp.json.return_value = {
+                    "responseHeader": {"responseCode": 0},
+                    "result": {},
+                }
+                return resp
+
+        headers = {"accessToken": "test"}
+        with (
+            patch("requests.get", return_value=mock_cf_response),
+            patch.object(ca_api.sessions, "post", side_effect=mock_post),
+        ):
+            response = ca_api._post_with_cloudflare_retry(
+                "https://test.ca/api", headers=headers, json={"pin": "1234"}
+            )
+
+        assert call_count == 2
+        assert response.status_code == 200
+        assert headers["Cookie"] == "__cf_bm=new_cookie"
+
+    def test_no_retry_on_success(self, ca_api):
+        """Should not retry when response is 200."""
+        call_count = 0
+
+        def mock_post(url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"responseHeader": {"responseCode": 0}}
+            return resp
+
+        headers = {"accessToken": "test"}
+        with patch.object(ca_api.sessions, "post", side_effect=mock_post):
+            ca_api._post_with_cloudflare_retry("https://test.ca/api", headers=headers)
+
+        assert call_count == 1
+
+    def test_no_retry_on_non_cloudflare_403(self, ca_api):
+        """Should not retry on 403 that is not Cloudflare."""
+        call_count = 0
+
+        def mock_post(url, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            resp = MagicMock()
+            resp.status_code = 403
+            resp.headers = {"Content-Type": "application/json"}
+            resp.text = '{"error": "unauthorized"}'
+            return resp
+
+        headers = {"accessToken": "test"}
+        with patch.object(ca_api.sessions, "post", side_effect=mock_post):
+            result = ca_api._post_with_cloudflare_retry(
+                "https://test.ca/api", headers=headers
+            )
+
+        assert call_count == 1
+        assert result.status_code == 403

@@ -192,6 +192,27 @@ class KiaUvoApiCA(ApiImpl):
             headers["Cookie"] = cf_cookie
         return headers
 
+    def _is_cloudflare_block(self, response) -> bool:
+        """Check if response is a Cloudflare block page."""
+        if response.status_code == 403:
+            content_type = response.headers.get("Content-Type", "")
+            if "text/html" in content_type or "cloudflare" in response.text.lower():
+                return True
+        return False
+
+    def _post_with_cloudflare_retry(self, url, **kwargs):
+        """POST with automatic Cloudflare cookie refresh on 403."""
+        response = self.sessions.post(url, **kwargs)
+        if self._is_cloudflare_block(response):
+            _LOGGER.debug(
+                f"{DOMAIN} - Cloudflare block detected, refreshing cookie and retrying"
+            )
+            self._get_cloudflare_cookie()
+            if "headers" in kwargs and self._cloudflare_cookie:
+                kwargs["headers"]["Cookie"] = self._cloudflare_cookie
+            response = self.sessions.post(url, **kwargs)
+        return response
+
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
 
@@ -260,7 +281,7 @@ class KiaUvoApiCA(ApiImpl):
 
         self._add_cloudflare_cookie(headers)
         headers["Deviceid"] = device_id
-        response = self.sessions.post(url, json=data, headers=headers)
+        response = self._post_with_cloudflare_retry(url, json=data, headers=headers)
         response_json = response.json()
 
         # Check if OTP is required (error code 7110)
@@ -278,7 +299,7 @@ class KiaUvoApiCA(ApiImpl):
             self._add_cloudflare_cookie(selverifmeth_headers)
             selverifmeth_data = {"mfaApiCode": "0107", "userAccount": username}
 
-            selverifmeth_response = self.sessions.post(
+            selverifmeth_response = self._post_with_cloudflare_retry(
                 selverifmeth_url, json=selverifmeth_data, headers=selverifmeth_headers
             )
             _LOGGER.debug(
@@ -355,7 +376,7 @@ class KiaUvoApiCA(ApiImpl):
         else:  # Should never happen due to enum, but just in case
             raise ValueError("Invalid notify type")
 
-        response = self.sessions.post(url, headers=headers, json=data)
+        response = self._post_with_cloudflare_retry(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
         response_json = response.json()
 
@@ -388,7 +409,7 @@ class KiaUvoApiCA(ApiImpl):
             "mfaApiCode": "0107",
         }
 
-        response = self.sessions.post(url, headers=headers, json=data)
+        response = self._post_with_cloudflare_retry(url, headers=headers, json=data)
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
         response_json = response.json()
 
@@ -416,7 +437,7 @@ class KiaUvoApiCA(ApiImpl):
             "mfaYn": "Y",
         }
 
-        genmfatkn_response = self.sessions.post(
+        genmfatkn_response = self._post_with_cloudflare_retry(
             genmfatkn_url, json=genmfatkn_data, headers=genmfatkn_headers
         )
         genmfatkn_json = genmfatkn_response.json()
@@ -452,7 +473,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         self._add_cloudflare_cookie(headers)
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
         response = response.json()
         token_errors = ["7403", "7602"]
@@ -468,7 +489,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         self._add_cloudflare_cookie(headers)
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
 
@@ -845,7 +866,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         if response.ok:
             response = response.json()
             _LOGGER.debug(
@@ -892,7 +913,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response {response}")
 
@@ -913,7 +934,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data {response}")
@@ -933,7 +954,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
         url = self.API_URL + "nxtsvc"
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Get Service status data {response}")
 
@@ -953,7 +974,9 @@ class KiaUvoApiCA(ApiImpl):
         self._add_cloudflare_cookie(headers)
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
-            response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
+            response = self._post_with_cloudflare_retry(
+                url, headers=headers, json={"pin": token.pin}
+            )
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
             if response["responseHeader"]["responseCode"] != 0:
@@ -969,7 +992,9 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
-        response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
+        response = self._post_with_cloudflare_retry(
+            url, headers=headers, json={"pin": token.pin}
+        )
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
         return result["pAuth"]
@@ -988,7 +1013,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(
+        response = self._post_with_cloudflare_retry(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
         response_headers = response.headers
@@ -1127,7 +1152,9 @@ class KiaUvoApiCA(ApiImpl):
             f"{DOMAIN} - Planned start_climate payload {self._mask_sensitive_data(payload)}"
         )
 
-        response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
+        response = self._post_with_cloudflare_retry(
+            url, headers=headers, data=json.dumps(payload)
+        )
         response_headers = response.headers
         response = response.json()
 
@@ -1145,7 +1172,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(
+        response = self._post_with_cloudflare_retry(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
         response_headers = response.headers
@@ -1173,7 +1200,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["transactionId"] = action_id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         self._add_cloudflare_cookie(headers)
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         response = response.json()
 
         last_action_completed = (
@@ -1212,7 +1239,7 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
         )
-        response = self.sessions.post(
+        response = self._post_with_cloudflare_retry(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
         response_headers = response.headers
@@ -1229,7 +1256,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["pAuth"] = self._get_pin_token(token, vehicle)
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(
+        response = self._post_with_cloudflare_retry(
             url, headers=headers, data=json.dumps({"pin": token.pin})
         )
         response_headers = response.headers
@@ -1258,7 +1285,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         self._add_cloudflare_cookie(headers)
 
-        response = self.sessions.post(url, headers=headers)
+        response = self._post_with_cloudflare_retry(url, headers=headers)
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received get_charge_limits: {response}")
 
@@ -1298,7 +1325,9 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - Planned set_charge_limits payload {self._mask_sensitive_data(payload)}"
         )
-        response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
+        response = self._post_with_cloudflare_retry(
+            url, headers=headers, data=json.dumps(payload)
+        )
         response_headers = response.headers
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
