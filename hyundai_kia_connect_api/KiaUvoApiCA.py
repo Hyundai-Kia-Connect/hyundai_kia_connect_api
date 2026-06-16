@@ -174,6 +174,24 @@ class KiaUvoApiCA(ApiImpl):
             self._cloudflare_cookie = ""
             return ""
 
+    def _ensure_cloudflare_cookie(self) -> str:
+        """Return the Cloudflare cookie, refreshing if expired or older than 25 min."""
+        if self._cloudflare_cookie and self._cloudflare_cookie_fetched_at:
+            age = (
+                dt.datetime.now(dt.timezone.utc) - self._cloudflare_cookie_fetched_at
+            ).total_seconds()
+            if age < 1500:  # 25 minutes
+                return self._cloudflare_cookie
+        # Cookie missing or stale — fetch fresh
+        return self._get_cloudflare_cookie()
+
+    def _add_cloudflare_cookie(self, headers: dict) -> dict:
+        """Add Cloudflare cookie to request headers if available."""
+        cf_cookie = self._ensure_cloudflare_cookie()
+        if cf_cookie:
+            headers["Cookie"] = cf_cookie
+        return headers
+
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
 
