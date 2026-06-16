@@ -19,6 +19,9 @@ class Token:
     valid_until: dt.datetime = dt.datetime.min
     stamp: str = None
     pin: str | None = None
+    # Control token (EU/AU/IN PIN verification) — cached with expiry:
+    control_token: str | None = None
+    control_token_expiry: float = 0
 
     def to_dict(self) -> dict:
         """Convert Token to a JSON‑serializable dict."""
@@ -46,4 +49,6 @@ class Token:
             valid_until=valid_until,
             stamp=data.get("stamp"),
             pin=data.get("pin"),
+            control_token=data.get("control_token"),
+            control_token_expiry=data.get("control_token_expiry", 0),
         )

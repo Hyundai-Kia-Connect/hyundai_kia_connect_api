@@ -8,6 +8,7 @@ import logging
 import math
 import random
 import re
+import time
 import typing as ty
 import uuid
 from typing import Optional
@@ -1106,6 +1107,10 @@ class KiaUvoApiIN(ApiImplType1):
         return token_type, refresh_token
 
     def _get_control_token(self, token: Token) -> Token:
+        # Return cached control token if still valid
+        if token.control_token is not None and token.control_token_expiry > time.time():
+            return token.control_token, token.control_token_expiry
+
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
@@ -1122,4 +1127,7 @@ class KiaUvoApiIN(ApiImplType1):
         control_token_expire_at = math.floor(
             dt.datetime.now().timestamp() + response["expiresTime"]
         )
+        # Cache control token and expiry for reuse
+        token.control_token = control_token
+        token.control_token_expiry = control_token_expire_at
         return control_token, control_token_expire_at
