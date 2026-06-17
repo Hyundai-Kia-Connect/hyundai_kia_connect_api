@@ -1,8 +1,10 @@
 """ApiImplType1.py"""
 
 import datetime as dt
+import functools
 import logging
 import math
+import threading
 from typing import Optional
 
 import time
@@ -47,6 +49,29 @@ from .exceptions import (
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _retry_on_device_id_error(func):
+    """On DeviceIDError, re-register device_id and retry once.
+
+    EU server invalidates device_id when push delivery fails. Instead of
+    proactively rotating device_id after every control command (which causes
+    race conditions), we retry only when the error actually occurs.
+    """
+    _device_id_lock = threading.Lock()
+
+    @functools.wraps(func)
+    def wrapper(self, token, *args, **kwargs):
+        try:
+            return func(self, token, *args, **kwargs)
+        except DeviceIDError:
+            with _device_id_lock:
+                _LOGGER.debug(f"{DOMAIN} - DeviceIDError, re-registering device_id")
+                stamp = self._get_stamp()
+                token.device_id = self._get_device_id(stamp)
+            return func(self, token, *args, **kwargs)
+
+    return wrapper
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -164,6 +189,7 @@ class ApiImplType1(ApiImpl):
             # This is defensive programming in case the API structure changes
             pass
 
+    @_retry_on_device_id_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = self.session.get(
@@ -647,6 +673,7 @@ class ApiImplType1(ApiImpl):
 
         vehicle.data = state
 
+    @_retry_on_device_id_error
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
             url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -668,9 +695,9 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
             url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -692,9 +719,9 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
             raise UnsupportedControlError(
@@ -714,9 +741,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
@@ -744,9 +771,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def set_vehicle_to_load_discharge_limit(
         self, token: Token, vehicle: Vehicle, limit: int
     ) -> str:
@@ -764,9 +791,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
@@ -789,7 +816,6 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def check_action_status(
@@ -852,6 +878,7 @@ class ApiImplType1(ApiImpl):
             # Old code: raise APIError(f"No action found with ID {action_id}")
             return ORDER_STATUS.UNKNOWN
 
+    @_retry_on_device_id_error
     def schedule_charging_and_climate(
         self,
         token: Token,
@@ -963,7 +990,6 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
@@ -985,6 +1011,7 @@ class ApiImplType1(ApiImpl):
             return "R"
         return "L"
 
+    @_retry_on_device_id_error
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
@@ -1058,9 +1085,9 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if not vehicle.ccu_ccs2_protocol_support:
             url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
@@ -1100,9 +1127,9 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
 
@@ -1115,9 +1142,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
 
@@ -1130,9 +1157,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
     ) -> str:
@@ -1150,9 +1177,9 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def set_navigation(
         self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
     ) -> str:
@@ -1167,7 +1194,6 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def refresh_access_token(self, token: Token) -> Token:
