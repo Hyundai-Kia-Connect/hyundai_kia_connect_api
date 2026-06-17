@@ -944,3 +944,58 @@ class KiaUvoApiAU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh access token using OAuth2 refresh_token grant for AU region.
+
+        AU requires the Stamp header in oauth2/token requests.
+        """
+        if token.refresh_token:
+            try:
+                stamp = self._get_stamp()
+                url = self.USER_API_URL + "oauth2/token"
+                headers = {
+                    "Authorization": self.BASIC_AUTHORIZATION,
+                    "Stamp": stamp,
+                    "Content-type": "application/x-www-form-urlencoded",
+                    "Host": self.BASE_URL,
+                    "Connection": "close",
+                    "Accept-Encoding": "gzip, deflate",
+                    "User-Agent": USER_AGENT_OK_HTTP,
+                }
+                data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
+                response = requests.post(url, data=data, headers=headers)
+                response_json = response.json()
+                _check_response_for_errors(response_json)
+
+                token_type = response_json["token_type"]
+                access_token = token_type + " " + response_json["access_token"]
+                new_refresh_token = response_json.get(
+                    "refresh_token", token.refresh_token
+                )
+                expires_in = int(response_json.get("expires_in", 86400))
+
+                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                    seconds=expires_in
+                )
+
+                _LOGGER.debug(
+                    f"{DOMAIN} - Access token refreshed successfully (AU), "
+                    f"expires in {expires_in}s"
+                )
+
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    device_id=token.device_id,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - AU refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, token.pin)

@@ -1149,6 +1149,69 @@ class ApiImplType1(ApiImpl):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh access token using the stored refresh token.
+
+        Uses the OAuth2 refresh_token grant to get a new access token
+        without repeating the full login flow. Falls back to full login
+        if the refresh token is missing or the exchange fails.
+
+        This implementation calls the v1 oauth2/token endpoint with
+        grant_type=refresh_token. Works for AU, IN, CN — all share
+        the same endpoint format. KiaUvoApiEU overrides this with a
+        v2 endpoint that uses JSON body instead of form-urlencoded.
+
+        No Stamp header or redirect_uri needed — the refresh_token
+        grant doesn't require authorization_code redirect.
+        """
+        if token.refresh_token:
+            try:
+                url = self.USER_API_URL + "oauth2/token"
+                headers = {
+                    "Authorization": self.BASIC_AUTHORIZATION,
+                    "Content-type": "application/x-www-form-urlencoded",
+                    "Host": self.BASE_URL,
+                    "Connection": "close",
+                    "Accept-Encoding": "gzip, deflate",
+                    "User-Agent": USER_AGENT_OK_HTTP,
+                }
+                data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
+                response = requests.post(url, data=data, headers=headers)
+                response_json = response.json()
+                _check_response_for_errors(response_json)
+
+                token_type = response_json["token_type"]
+                access_token = token_type + " " + response_json["access_token"]
+                new_refresh_token = response_json.get(
+                    "refresh_token", token.refresh_token
+                )
+                expires_in = int(response_json.get("expires_in", 86400))
+
+                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                    seconds=expires_in
+                )
+
+                _LOGGER.debug(
+                    f"{DOMAIN} - Access token refreshed successfully, "
+                    f"expires in {expires_in}s"
+                )
+
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    device_id=token.device_id,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, token.pin)
+
     def _get_control_token(self, token: Token) -> Token:
         # Return cached control token if still valid
         if token.control_token is not None and token.control_token_expiry > time.time():
