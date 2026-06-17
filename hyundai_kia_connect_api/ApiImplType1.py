@@ -462,6 +462,7 @@ class ApiImplType1(ApiImpl):
         )
         if battery_winter_mode is not None:
             vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
+            vehicle.ev_battery_precondition_enabled = bool(battery_winter_mode)
 
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
