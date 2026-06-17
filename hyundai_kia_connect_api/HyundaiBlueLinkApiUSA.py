@@ -885,7 +885,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         max_attempts = 1 if not synchronous else max(1, timeout // 2)
 
         for _ in range(max_attempts):
-            response = self.sessions.post(url, headers=headers)
+            response = self.sessions.get(url, headers=headers)
             response_json = _safe_parse_json(response, "check_action_status")
             if response_json is None:
                 if not synchronous:

@@ -50,7 +50,7 @@ def _make_api():
 class TestCheckActionStatus:
     def test_success(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data={"status": "SUCCESS"})
+        api.sessions.get.return_value = _FakeResponse(json_data={"status": "SUCCESS"})
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -61,7 +61,7 @@ class TestCheckActionStatus:
 
     def test_failed(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data={"status": "ERROR"})
+        api.sessions.get.return_value = _FakeResponse(json_data={"status": "ERROR"})
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -72,7 +72,7 @@ class TestCheckActionStatus:
 
     def test_pending(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data={"status": "PENDING"})
+        api.sessions.get.return_value = _FakeResponse(json_data={"status": "PENDING"})
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -83,7 +83,7 @@ class TestCheckActionStatus:
 
     def test_empty_response_returns_unknown(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data=None)
+        api.sessions.get.return_value = _FakeResponse(json_data=None)
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -94,7 +94,7 @@ class TestCheckActionStatus:
 
     def test_synchronous_timeout(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data={"status": "PENDING"})
+        api.sessions.get.return_value = _FakeResponse(json_data={"status": "PENDING"})
         vehicle = _make_vehicle()
         token = _make_token()
 
@@ -108,7 +108,7 @@ class TestCheckActionStatus:
 
     def test_synchronous_success(self):
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(json_data={"status": "SUCCESS"})
+        api.sessions.get.return_value = _FakeResponse(json_data={"status": "SUCCESS"})
         vehicle = _make_vehicle()
         token = _make_token()
 
