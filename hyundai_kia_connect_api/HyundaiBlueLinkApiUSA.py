@@ -124,6 +124,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)
 
+    # Maps transaction IDs to service_type values for action status polling.
+    # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
+    # the default REMOTE_POLL.
+    _action_service_types: dict[str, str] = {}
+
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
@@ -874,7 +879,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers = self._get_vehicle_headers(token, vehicle)
         headers["tid"] = action_id
         headers["login_id"] = token.username
-        headers["service_type"] = "REMOTE_POLL"
+        service_type = self._action_service_types.pop(action_id, "REMOTE_POLL")
+        headers["service_type"] = service_type
 
         max_attempts = 1 if not synchronous else max(1, timeout // 2)
 
@@ -1122,7 +1128,10 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{DOMAIN} - Received start_hazard_lights response: {response.text}"
         )
 
-        return self._get_transaction_id(response)
+        action_id = self._get_transaction_id(response)
+        if action_id:
+            self._action_service_types[action_id] = "LIGHTS_ONLY"
+        return action_id
 
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rcs/rhl/hnl"
@@ -1142,4 +1151,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{DOMAIN} - Received start_hazard_lights_and_horn response: {response.text}"
         )
 
-        return self._get_transaction_id(response)
+        action_id = self._get_transaction_id(response)
+        if action_id:
+            self._action_service_types[action_id] = "HORN_AND_LIGHTS"
+        return action_id
