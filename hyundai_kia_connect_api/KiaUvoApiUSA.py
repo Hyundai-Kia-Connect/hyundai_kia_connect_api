@@ -411,6 +411,7 @@ class KiaUvoApiUSA(ApiImpl):
             return ENGINE_TYPES.EV
         return None
 
+    @_retry_on_auth_error
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle] | Vehicle) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
@@ -424,6 +425,13 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
         response = response.json()
+        status = response.get("status") or {}
+        if (
+            status.get("statusCode") == 1
+            and status.get("errorType") == 1
+            and status.get("errorCode") in (1003, 1005)
+        ):
+            raise AuthenticationError("Session invalid")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):
