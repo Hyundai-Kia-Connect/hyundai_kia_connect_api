@@ -378,6 +378,7 @@ class KiaUvoApiUSA(ApiImpl):
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
 
+    @_retry_on_auth_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
@@ -386,6 +387,13 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        status = response.get("status") or {}
+        if (
+            status.get("statusCode") == 1
+            and status.get("errorType") == 1
+            and status.get("errorCode") in (1003, 1005)
+        ):
+            raise AuthenticationError("Session invalid")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         result = []
