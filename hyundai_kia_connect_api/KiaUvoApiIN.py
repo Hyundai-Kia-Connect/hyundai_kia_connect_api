@@ -827,6 +827,10 @@ class KiaUvoApiIN(ApiImplType1):
 
             vehicle.month_trip_info = result
 
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+        """India uses RHD vehicles regardless of the odometer unit."""
+        return "R"
+
     def update_day_trip_info(
         self,
         token,
