@@ -1156,13 +1156,21 @@ class ApiImplType1(ApiImpl):
         without repeating the full login flow. Falls back to full login
         if the refresh token is missing or the exchange fails.
 
-        This implementation calls the v1 oauth2/token endpoint with
-        grant_type=refresh_token. Works for AU, IN, CN — all share
-        the same endpoint format. KiaUvoApiEU overrides this with a
-        v2 endpoint that uses JSON body instead of form-urlencoded.
+        Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
+        Shared by AU, IN and CN (all use the same endpoint format).
+        KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
+        body instead of form-urlencoded.
 
-        No Stamp header or redirect_uri needed — the refresh_token
-        grant doesn't require authorization_code redirect.
+        No Stamp header is sent. CN's existing _get_refresh_token already
+        omits Stamp and works, which shows the refresh_token grant on this
+        endpoint family does not require it. AU and IN's existing
+        _get_refresh_token do send Stamp, but that appears to be carried
+        over from _get_access_token (authorization_code grant) rather than
+        required for the refresh_token grant. If an AU/IN server turns
+        out to require Stamp, this call fails and falls back to
+        self.login() — no worse than the pre-PR behaviour. A Stamp-adding
+        override can be re-introduced per region once confirmed with live
+        credentials.
         """
         if token.refresh_token:
             try:
