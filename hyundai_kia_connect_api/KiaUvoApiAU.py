@@ -662,6 +662,10 @@ class KiaUvoApiAU(ApiImplType1):
         if response["resMsg"] is not None:
             return response["resMsg"]
 
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+        """Australia uses RHD vehicles regardless of the odometer unit."""
+        return "R"
+
     def _get_trip_info(
         self,
         token: Token,
