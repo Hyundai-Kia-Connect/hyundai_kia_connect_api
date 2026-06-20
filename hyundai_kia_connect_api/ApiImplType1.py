@@ -1169,6 +1169,77 @@ class ApiImplType1(ApiImpl):
         token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh access token using the stored refresh token.
+
+        Uses the OAuth2 refresh_token grant to get a new access token
+        without repeating the full login flow. Falls back to full login
+        if the refresh token is missing or the exchange fails.
+
+        Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
+        Shared by AU, IN and CN (all use the same endpoint format).
+        KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
+        body instead of form-urlencoded.
+
+        No Stamp header is sent. CN's existing _get_refresh_token already
+        omits Stamp and works, which shows the refresh_token grant on this
+        endpoint family does not require it. AU and IN's existing
+        _get_refresh_token do send Stamp, but that appears to be carried
+        over from _get_access_token (authorization_code grant) rather than
+        required for the refresh_token grant. If an AU/IN server turns
+        out to require Stamp, this call fails and falls back to
+        self.login() — no worse than the pre-PR behaviour. A Stamp-adding
+        override can be re-introduced per region once confirmed with live
+        credentials.
+        """
+        if token.refresh_token:
+            try:
+                url = self.USER_API_URL + "oauth2/token"
+                headers = {
+                    "Authorization": self.BASIC_AUTHORIZATION,
+                    "Content-type": "application/x-www-form-urlencoded",
+                    "Host": self.BASE_URL,
+                    "Connection": "close",
+                    "Accept-Encoding": "gzip, deflate",
+                    "User-Agent": USER_AGENT_OK_HTTP,
+                }
+                data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
+                response = requests.post(url, data=data, headers=headers)
+                response_json = response.json()
+                _check_response_for_errors(response_json)
+
+                token_type = response_json["token_type"]
+                access_token = token_type + " " + response_json["access_token"]
+                new_refresh_token = response_json.get(
+                    "refresh_token", token.refresh_token
+                )
+                expires_in = int(response_json.get("expires_in", 86400))
+
+                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                    seconds=expires_in
+                )
+
+                _LOGGER.debug(
+                    f"{DOMAIN} - Access token refreshed successfully, "
+                    f"expires in {expires_in}s"
+                )
+
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    device_id=token.device_id,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, token.pin)
+
     def _get_control_token(self, token: Token) -> Token:
         # Return cached control token if still valid
         if token.control_token is not None and token.control_token_expiry > time.time():
