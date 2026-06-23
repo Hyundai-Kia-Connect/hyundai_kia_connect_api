@@ -1205,7 +1205,7 @@ class ApiImplType1(ApiImpl):
                     "User-Agent": USER_AGENT_OK_HTTP,
                 }
                 data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
-                response = requests.post(url, data=data, headers=headers)
+                response = self.session.post(url, data=data, headers=headers)
                 response_json = response.json()
                 _check_response_for_errors(response_json)
 
