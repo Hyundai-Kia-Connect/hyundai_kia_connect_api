@@ -4,6 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.exceptions import (
+    DuplicateRequestError,
+    RequestTimeoutError,
+    SafetyAcknowledgmentError,
+)
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -128,6 +133,7 @@ def test_api_impl_svm_stubs_raise_not_implemented():
 def _make_api():
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
+    api.API_HEADERS = {}
     api.data_timezone = dt.timezone.utc
     api.session = MagicMock()
     return api
@@ -176,3 +182,63 @@ def test_get_svm_details_calls_correct_endpoint():
     call_url = api.session.get.call_args[0][0]
     assert call_url.endswith("svm/getSVMDetails")
     assert details.image_bytes == image
+
+
+def test_request_svm_capture_requires_acknowledgment():
+    api = _make_api()
+    api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
+
+    with pytest.raises(SafetyAcknowledgmentError):
+        api.request_svm_capture(_make_token(), _make_vehicle())
+
+
+def test_request_svm_capture_maps_ht_533_to_duplicate_request():
+    api = _make_api()
+    api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
+    api.session.post.return_value = _FakeResponse(
+        {
+            "errorCode": "502",
+            "errorSubCode": "HT_533",
+            "errorMessage": "Unable to send your request because a previous request is pending...",
+            "serviceName": "FindMyCarSVM",
+        },
+        status_code=502,
+    )
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        with pytest.raises(DuplicateRequestError):
+            api.request_svm_capture(
+                _make_token(), _make_vehicle(), acknowledged_warning=True
+            )
+
+
+def test_request_svm_capture_polls_until_new_timestamp():
+    api = _make_api()
+    baseline = _make_svm_response(b"old", "2026-06-23T12:00:00Z")
+    fresh = _make_svm_response(b"new", "2026-06-23T12:05:00Z")
+    api.session.get.side_effect = [
+        _FakeResponse(baseline),
+        _FakeResponse(fresh),
+    ]
+    api.session.post.return_value = _FakeResponse({"tid": "abc-123"})
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        details = api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
+
+    assert details.image_bytes == b"new"
+    assert details.captured_at_raw == "2026-06-23T12:05:00Z"
+
+
+def test_request_svm_capture_times_out_when_timestamp_never_changes():
+    api = _make_api()
+    baseline = _make_svm_response(b"old", "2026-06-23T12:00:00Z")
+    api.session.get.return_value = _FakeResponse(baseline)
+    api.session.post.return_value = _FakeResponse({"tid": "abc-123"})
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        with pytest.raises(RequestTimeoutError):
+            api.request_svm_capture(
+                _make_token(), _make_vehicle(), acknowledged_warning=True
+            )
