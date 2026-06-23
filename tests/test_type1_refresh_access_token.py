@@ -74,7 +74,7 @@ class TestType1RefreshAccessTokenNoStamp:
             return _FakeResponse(_ok_payload())
 
         with patch(
-            "hyundai_kia_connect_api.ApiImplType1.requests.post", side_effect=fake_post
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
         ):
             self.api.refresh_access_token(_make_token())
 
@@ -94,7 +94,7 @@ class TestType1RefreshAccessTokenNoStamp:
             return _FakeResponse(_ok_payload())
 
         with patch(
-            "hyundai_kia_connect_api.ApiImplType1.requests.post", side_effect=fake_post
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
         ):
             self.api.refresh_access_token(_make_token())
 
@@ -104,7 +104,7 @@ class TestType1RefreshAccessTokenNoStamp:
 
     def test_returns_new_token_preserving_device_id(self):
         with patch(
-            "hyundai_kia_connect_api.ApiImplType1.requests.post",
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
             return_value=_FakeResponse(_ok_payload()),
         ):
             result = self.api.refresh_access_token(_make_token(device_id="keep-this"))
@@ -118,7 +118,7 @@ class TestType1RefreshAccessTokenNoStamp:
     def test_falls_back_to_login_on_exchange_failure(self):
         with (
             patch(
-                "hyundai_kia_connect_api.ApiImplType1.requests.post",
+                "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
                 return_value=_FakeResponse(
                     {"retCode": "F", "resCode": "7501", "resMsg": "auth"}
                 ),
@@ -144,7 +144,7 @@ class TestType1RefreshAccessTokenNoStamp:
         payload = _ok_payload()
         del payload["refresh_token"]
         with patch(
-            "hyundai_kia_connect_api.ApiImplType1.requests.post",
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
             return_value=_FakeResponse(payload),
         ):
             result = self.api.refresh_access_token(
@@ -175,7 +175,7 @@ class TestRegionsUseBaseRefreshAccessToken:
             return _FakeResponse(_ok_payload())
 
         with patch(
-            "hyundai_kia_connect_api.ApiImplType1.requests.post", side_effect=fake_post
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
         ):
             api.refresh_access_token(_make_token())
 
