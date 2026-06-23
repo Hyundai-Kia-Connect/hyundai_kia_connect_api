@@ -242,3 +242,20 @@ def test_request_svm_capture_times_out_when_timestamp_never_changes():
             api.request_svm_capture(
                 _make_token(), _make_vehicle(), acknowledged_warning=True
             )
+
+
+def test_get_svm_details_logs_do_not_contain_image_or_gps(caplog):
+    import logging
+
+    api = _make_api()
+    image = b"\xff\xd8\xff\xe0secretimage"
+    response = _make_svm_response(image, "2026-06-23T12:34:56Z")
+    api.session.get.return_value = _FakeResponse(response)
+
+    with caplog.at_level(logging.DEBUG):
+        with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
+            api.get_svm_details(_make_token(), _make_vehicle())
+
+    assert "secretimage" not in caplog.text
+    assert "12.345678" not in caplog.text
+    assert "-98.765432" not in caplog.text
