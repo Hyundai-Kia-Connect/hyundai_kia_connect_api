@@ -101,6 +101,10 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
     speed_value = _parse_float(get_child_value(detail, "gpsDetail.speed.value"))
     speed_unit = get_child_value(detail, "gpsDetail.speed.unit")
 
+    # Store metadata for debugging, but never persist the base64 image bytes.
+    safe_metadata = dict(detail) if detail else {}
+    safe_metadata["svmImage"] = "<redacted>"
+
     return SVMDetails(
         image_bytes=image_bytes,
         captured_at=captured_at,
@@ -112,7 +116,7 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
         image_size=image_size,
-        raw_metadata=detail,
+        raw_metadata=safe_metadata,
     )
 
 
