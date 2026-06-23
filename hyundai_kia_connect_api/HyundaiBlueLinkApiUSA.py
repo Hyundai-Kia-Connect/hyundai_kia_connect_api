@@ -958,7 +958,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             try:
                 response_json = response.json()
             except Exception:  # pylint: disable=broad-exception-caught
-                response_json = {}
+                raise APIError("SVM request failed with HTTP 502")
             if response_json.get("errorSubCode") == "HT_533":
                 raise DuplicateRequestError(
                     response_json.get(
