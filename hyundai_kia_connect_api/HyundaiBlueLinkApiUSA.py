@@ -1115,7 +1115,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["APPCLOUD-VIN"] = vehicle.VIN
 
         data = {"userName": token.username, "vin": vehicle.VIN}
-        response = self.sessions.post(url, headers=headers, json=data)
+        response = self.session.post(url, headers=headers, json=data)
         response_json = _safe_parse_json(response, "start_hazard_lights")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -1138,7 +1138,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["APPCLOUD-VIN"] = vehicle.VIN
 
         data = {"userName": token.username, "vin": vehicle.VIN}
-        response = self.sessions.post(url, headers=headers, json=data)
+        response = self.session.post(url, headers=headers, json=data)
         response_json = _safe_parse_json(response, "start_hazard_lights_and_horn")
         if response_json is not None:
             _check_response_for_errors(response_json)
