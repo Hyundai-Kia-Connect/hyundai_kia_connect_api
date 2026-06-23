@@ -966,6 +966,17 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                         "A previous SVM request is still pending.",
                     )
                 )
+            # For findMyCarSVM, a generic 502 is a transient server-side
+            # failure rather than an authentication problem. Mapping it to
+            # AuthenticationError would mislead callers, so surface it as a
+            # plain APIError using the message the server returned.
+            if response_json.get("errorCode") == "502":
+                raise APIError(
+                    response_json.get(
+                        "errorMessage",
+                        "findMyCarSVM failed with HTTP 502",
+                    )
+                )
             _check_response_for_errors(response_json)
 
         response_json = _safe_parse_json(response, "request_svm_capture")

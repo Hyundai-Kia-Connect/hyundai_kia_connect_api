@@ -212,6 +212,28 @@ def test_request_svm_capture_maps_ht_533_to_duplicate_request():
             )
 
 
+def test_request_svm_capture_non_ht_533_502_is_api_error():
+    from hyundai_kia_connect_api.exceptions import APIError
+
+    api = _make_api()
+    api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
+    api.session.post.return_value = _FakeResponse(
+        {
+            "errorCode": "502",
+            "errorSubCode": "HT_123",
+            "errorMessage": "Something else went wrong",
+            "serviceName": "FindMyCarSVM",
+        },
+        status_code=502,
+    )
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        with pytest.raises(APIError, match="Something else went wrong"):
+            api.request_svm_capture(
+                _make_token(), _make_vehicle(), acknowledged_warning=True
+            )
+
+
 def test_request_svm_capture_polls_until_new_timestamp():
     api = _make_api()
     baseline = _make_svm_response(b"old", "2026-06-23T12:00:00Z")
@@ -229,6 +251,12 @@ def test_request_svm_capture_polls_until_new_timestamp():
 
     assert details.image_bytes == b"new"
     assert details.captured_at_raw == "2026-06-23T12:05:00Z"
+
+    posted_json = api.session.post.call_args.kwargs["json"]
+    assert posted_json["vin"] == "KM8XXXX"
+    assert posted_json["username"] == "test-user"
+    assert posted_json["gen"] == "3"
+    assert posted_json["blueLinkServicePin"] == "1234"
 
 
 def test_request_svm_capture_times_out_when_timestamp_never_changes():
@@ -256,6 +284,10 @@ def test_get_svm_details_logs_do_not_contain_image_or_gps(caplog):
         with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
             api.get_svm_details(_make_token(), _make_vehicle())
 
+    # The logged image is base64-encoded, not the raw bytes.
+    image_b64 = base64.b64encode(image).decode("ascii")
+    assert image_b64 not in caplog.text
     assert "secretimage" not in caplog.text
     assert "12.345678" not in caplog.text
     assert "-98.765432" not in caplog.text
+    assert "<redacted>" in caplog.text
