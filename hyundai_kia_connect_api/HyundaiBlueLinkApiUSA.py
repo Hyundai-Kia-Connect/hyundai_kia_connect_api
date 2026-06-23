@@ -982,7 +982,10 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         response_json = _safe_parse_json(response, "request_svm_capture")
         if response_json is not None:
             _check_response_for_errors(response_json)
-            _LOGGER.debug(f"{DOMAIN} - request_svm_capture response: {response_json}")
+            _LOGGER.debug(
+                f"{DOMAIN} - request_svm_capture response: "
+                f"tid={response_json.get('tid')}"
+            )
 
         time.sleep(self._SVM_INITIAL_WAIT_SECONDS)
 
