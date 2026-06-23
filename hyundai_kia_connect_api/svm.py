@@ -101,9 +101,9 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
     speed_value = _parse_float(get_child_value(detail, "gpsDetail.speed.value"))
     speed_unit = get_child_value(detail, "gpsDetail.speed.unit")
 
-    # Store metadata for debugging, but never persist the base64 image bytes.
-    safe_metadata = dict(detail) if detail else {}
-    safe_metadata["svmImage"] = "<redacted>"
+    # Store the full response for advanced consumers, but redact the base64
+    # image so we don't duplicate the image bytes in memory.
+    raw_metadata = _redact_svm_image_in_response(response)
 
     return SVMDetails(
         image_bytes=image_bytes,
@@ -116,8 +116,33 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
         image_size=image_size,
-        raw_metadata=safe_metadata,
+        raw_metadata=raw_metadata,
     )
+
+
+def _redact_svm_image_in_response(response: dict) -> dict:
+    """Return a copy of an SVM response with the base64 image redacted.
+
+    Only the first entry's ``svmDetails[0].svmDetail.svmImage`` is replaced,
+    preserving the rest of the response structure for raw_metadata consumers.
+    """
+    if not response:
+        return {}
+    safe = dict(response)
+    svm_details = safe.get("svmDetails")
+    if isinstance(svm_details, list) and svm_details:
+        svm_details = list(svm_details)
+        safe["svmDetails"] = svm_details
+        first = svm_details[0]
+        if isinstance(first, dict):
+            first = dict(first)
+            svm_details[0] = first
+            detail = first.get("svmDetail")
+            if isinstance(detail, dict):
+                detail = dict(detail)
+                first["svmDetail"] = detail
+                detail["svmImage"] = "<redacted>"
+    return safe
 
 
 def redact_svm_response_for_log(response: dict) -> dict:
@@ -125,21 +150,20 @@ def redact_svm_response_for_log(response: dict) -> dict:
 
     Removes the base64 image and GPS coordinates.
     """
-    safe = dict(response) if response else {}
+    safe = _redact_svm_image_in_response(response)
     if "svmDetails" in safe and isinstance(safe["svmDetails"], list):
         safe["svmDetails"] = [
-            _redact_svm_detail_entry(entry) for entry in safe["svmDetails"]
+            _redact_svm_gps_in_detail_entry(entry) for entry in safe["svmDetails"]
         ]
     return safe
 
 
-def _redact_svm_detail_entry(entry: dict) -> dict:
+def _redact_svm_gps_in_detail_entry(entry: dict) -> dict:
     if not isinstance(entry, dict):
         return entry
     safe_entry = dict(entry)
     if "svmDetail" in safe_entry and isinstance(safe_entry["svmDetail"], dict):
         safe_detail = dict(safe_entry["svmDetail"])
-        safe_detail["svmImage"] = "<redacted>"
         gps = safe_detail.get("gpsDetail")
         if isinstance(gps, dict):
             safe_gps = dict(gps)

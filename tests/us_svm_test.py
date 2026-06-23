@@ -5,11 +5,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.exceptions import (
+    APIError,
     DuplicateRequestError,
     RequestTimeoutError,
     SafetyAcknowledgmentError,
 )
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from hyundai_kia_connect_api.svm import SVMDetails
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -166,6 +168,8 @@ class _FakeResponse:
         self.text = str(json_data)
 
     def json(self):
+        if isinstance(self.json_data, str):
+            raise ValueError("No JSON object could be decoded")
         return self.json_data
 
 
@@ -291,3 +295,74 @@ def test_get_svm_details_logs_do_not_contain_image_or_gps(caplog):
     assert "12.345678" not in caplog.text
     assert "-98.765432" not in caplog.text
     assert "<redacted>" in caplog.text
+
+
+def test_svm_details_exported_from_package_root():
+    from hyundai_kia_connect_api import SVMDetails as ExportedSVMDetails
+
+    assert ExportedSVMDetails is SVMDetails
+
+
+def test_parse_svm_response_raw_metadata_preserves_full_response():
+    from hyundai_kia_connect_api.svm import parse_svm_response
+
+    image = b"\xff\xd8\xff\xe0fakejpg"
+    response = _make_svm_response(image, "2026-06-23T12:34:56Z")
+    response["topLevelField"] = "preserved"
+
+    details = parse_svm_response(response, dt.timezone.utc)
+
+    assert details.raw_metadata is not None
+    assert details.raw_metadata["topLevelField"] == "preserved"
+    assert (
+        details.raw_metadata["svmDetails"][0]["svmDetail"]["svmImage"] == "<redacted>"
+    )
+    # GPS coordinates must be preserved in raw_metadata.
+    assert (
+        details.raw_metadata["svmDetails"][0]["svmDetail"]["gpsDetail"]["coord"]["lat"]
+        == "12.345678"
+    )
+
+
+def test_request_svm_capture_empty_502_is_api_error():
+    api = _make_api()
+    api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
+    api.session.post.return_value = _FakeResponse("not json", status_code=502)
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        with pytest.raises(APIError, match="SVM request failed with HTTP 502"):
+            api.request_svm_capture(
+                _make_token(), _make_vehicle(), acknowledged_warning=True
+            )
+
+
+def test_svm_is_fresh_uses_raw_string_when_parsed_time_is_none():
+    baseline = SVMDetails(
+        image_bytes=b"", captured_at=None, captured_at_raw="baseline-raw"
+    )
+    fresh = SVMDetails(
+        image_bytes=b"new", captured_at=None, captured_at_raw="fresh-raw"
+    )
+
+    assert HyundaiBlueLinkApiUSA._svm_is_fresh(fresh, None, "baseline-raw") is True
+    assert HyundaiBlueLinkApiUSA._svm_is_fresh(baseline, None, "baseline-raw") is False
+
+
+def test_request_svm_capture_detects_freshness_from_raw_string():
+    api = _make_api()
+    baseline = _make_svm_response(b"old", "not-a-parseable-date-v1")
+    fresh = _make_svm_response(b"new", "not-a-parseable-date-v2")
+    api.session.get.side_effect = [
+        _FakeResponse(baseline),
+        _FakeResponse(fresh),
+    ]
+    api.session.post.return_value = _FakeResponse({"tid": "abc-123"})
+
+    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
+        details = api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
+
+    assert details.image_bytes == b"new"
+    assert details.captured_at is None
+    assert details.captured_at_raw == "not-a-parseable-date-v2"
