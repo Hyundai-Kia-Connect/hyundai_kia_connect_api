@@ -7,13 +7,12 @@ import logging
 import time
 
 import certifi
-import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
+from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
@@ -167,8 +166,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             "client_id": "m66129Bb-em93-SPAHYN-bZ91-am4540zp19920",
             "clientSecret": "v558o935-6nne-423i-baa8",
         }
-        self.sessions = requests.Session()
-        self.sessions.mount(origin, cipherAdapter())
+        self.session = ApiImplSession()
+        self.session.mount(origin, cipherAdapter())
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
@@ -196,7 +195,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         url = self.LOGIN_API + "oauth/token"
         data = {"username": username, "password": password}
 
-        response = self.sessions.post(url, json=data, headers=self.API_HEADERS)
+        response = self.session.post(url, json=data, headers=self.API_HEADERS)
         response = response.json()
         _check_response_for_errors(response)
         if response.get("access_token") is None:
@@ -226,7 +225,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         _check_response_for_errors(response)
@@ -244,7 +243,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if refresh:
             headers["REFRESH"] = "true"
 
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         response = response.json()
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_vehicle_status response {response}")
@@ -271,7 +270,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # This header is sent by the MyHyundai app, but doesn't seem to do anything
         # headers["offset"] = "-5"
 
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         response = response.json()
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
@@ -291,7 +290,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self._get_vehicle_headers(token, vehicle)
         try:
-            response = self.sessions.get(url, headers=headers)
+            response = self.session.get(url, headers=headers)
             response_json = response.json()
             _check_response_for_errors(response_json)
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
@@ -828,7 +827,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
-        response = self.sessions.get(url, headers=headers)
+        response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
         _check_response_for_errors(response)
@@ -885,7 +884,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         max_attempts = 1 if not synchronous else max(1, timeout // 2)
 
         for _ in range(max_attempts):
-            response = self.sessions.get(url, headers=headers)
+            response = self.session.get(url, headers=headers)
             response_json = _safe_parse_json(response, "check_action_status")
             if response_json is None:
                 if not synchronous:
@@ -920,7 +919,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers["APPCLOUD-VIN"] = vehicle.VIN
 
         data = {"userName": token.username, "vin": vehicle.VIN}
-        response = self.sessions.post(url, headers=headers, json=data)
+        response = self.session.post(url, headers=headers, json=data)
         response_json = _safe_parse_json(response, "lock_action")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -997,7 +996,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             }
         _LOGGER.debug(f"{DOMAIN} - Start engine data: {data}")
 
-        response = self.sessions.post(url, json=data, headers=headers)
+        response = self.session.post(url, json=data, headers=headers)
         response_json = _safe_parse_json(response, "start_climate")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -1020,7 +1019,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
 
-        response = self.sessions.post(url, headers=headers)
+        response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "stop_climate")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -1041,7 +1040,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
-        response = self.sessions.post(url, headers=headers)
+        response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "start_charge")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -1062,7 +1061,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         headers = self._get_vehicle_headers(token, vehicle)
         _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
-        response = self.sessions.post(url, headers=headers)
+        response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "stop_charge")
         if response_json is not None:
             _check_response_for_errors(response_json)
@@ -1099,7 +1098,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits body: {data}")
 
-        response = self.sessions.post(url, json=data, headers=headers)
+        response = self.session.post(url, json=data, headers=headers)
         response_json = _safe_parse_json(response, "set_charge_limits")
         if response_json is not None:
             _check_response_for_errors(response_json)

@@ -46,7 +46,7 @@ def _make_api():
     """Create a HyundaiBlueLinkApiUSA without calling __init__."""
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
-    api.sessions = MagicMock()
+    api.session = MagicMock()
     return api
 
 
@@ -58,7 +58,7 @@ class TestStartClimate:
     def test_start_climate_empty_body_no_exception(self):
         """start_climate must NOT raise JSONDecodeError on empty body."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
         options = _make_climate_options()
@@ -66,12 +66,12 @@ class TestStartClimate:
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.start_climate(token, vehicle, options)
 
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_start_climate_normal_json_response(self):
         """start_climate succeeds when API returns valid JSON."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -81,12 +81,12 @@ class TestStartClimate:
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.start_climate(token, vehicle, options)
 
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_start_climate_empty_body_logs_debug(self, caplog):
         """start_climate logs debug message when response body is empty."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
         options = _make_climate_options()
@@ -102,19 +102,19 @@ class TestStopClimate:
     def test_stop_climate_empty_body_no_exception(self):
         """stop_climate must NOT raise JSONDecodeError on empty body."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.stop_climate(token, vehicle)
 
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_stop_climate_normal_json_response(self):
         """stop_climate succeeds when API returns valid JSON."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(
+        api.session.post.return_value = _FakeResponse(
             text='{"status": "success"}', status_code=200
         )
         vehicle = _make_vehicle()
@@ -123,12 +123,12 @@ class TestStopClimate:
         with patch.object(api, "_get_vehicle_headers", return_value={}):
             api.stop_climate(token, vehicle)
 
-        api.sessions.post.assert_called_once()
+        api.session.post.assert_called_once()
 
     def test_stop_climate_empty_body_logs_debug(self, caplog):
         """stop_climate logs debug message when response body is empty."""
         api = _make_api()
-        api.sessions.post.return_value = _FakeResponse(text="", status_code=200)
+        api.session.post.return_value = _FakeResponse(text="", status_code=200)
         vehicle = _make_vehicle()
         token = _make_token()
 
