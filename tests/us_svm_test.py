@@ -92,3 +92,12 @@ def test_redact_svm_response_for_log_strips_image_and_gps():
     assert detail["gpsDetail"]["coord"]["lat"] == "<redacted>"
     assert detail["gpsDetail"]["coord"]["lon"] == "<redacted>"
     assert detail["gpsDetail"]["head"] == "<redacted>"
+
+
+def test_safety_acknowledgment_error_is_api_error():
+    from hyundai_kia_connect_api.exceptions import (
+        APIError,
+        SafetyAcknowledgmentError,
+    )
+
+    assert issubclass(SafetyAcknowledgmentError, APIError)

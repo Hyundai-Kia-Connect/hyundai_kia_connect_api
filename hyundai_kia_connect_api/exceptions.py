@@ -65,6 +65,15 @@ class DuplicateRequestError(APIError):
     """
 
 
+class SafetyAcknowledgmentError(APIError):
+    """
+    Raised when a safety-critical command requires explicit user acknowledgment
+    before it can be executed (e.g. SVM/Find My Car capture).
+    """
+
+    pass
+
+
 class UnsupportedControlError(APIError):
     """
     Raised when the vehicle does not support the requested control action.
