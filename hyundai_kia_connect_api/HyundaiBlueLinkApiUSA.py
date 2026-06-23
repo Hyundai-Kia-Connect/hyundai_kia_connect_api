@@ -22,6 +22,7 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
+from .svm import SVMDetails, parse_svm_response, redact_svm_response_for_log
 from .Token import Token
 from .utils import get_child_value, get_float, parse_datetime
 from .Vehicle import (
@@ -883,6 +884,21 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 )
 
         self._update_vehicle_properties(vehicle, state)
+
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
+        """Return the latest SVM composite image and metadata."""
+        url = self.API_URL + "svm/getSVMDetails"
+        headers = self._get_vehicle_headers(token, vehicle)
+
+        response = self.session.get(url, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+        _LOGGER.debug(
+            f"{DOMAIN} - get_svm_details response: "
+            f"{redact_svm_response_for_log(response_json)}"
+        )
+
+        return parse_svm_response(response_json, self.data_timezone)
 
     def get_vehicles(self, token: Token):
         url = self.API_URL + "enrollment/details/" + token.username
