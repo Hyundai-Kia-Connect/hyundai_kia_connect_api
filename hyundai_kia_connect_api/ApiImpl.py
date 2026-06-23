@@ -16,6 +16,7 @@ except ImportError:
 from .utils import get_child_value, to_int_enum
 from .Token import Token
 from .Vehicle import Vehicle
+from .svm import SVMDetails
 from .const import (
     WINDOW_STATE,
     CHARGE_PORT_ACTION,
@@ -443,4 +444,19 @@ class ApiImpl:
         # login() signatures (some accept a `token` positional arg).
         return self.login(
             username=token.username, password=token.password, pin=token.pin
+        )
+
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
+        """Return the latest SVM composite image and metadata."""
+        raise NotImplementedError("get_svm_details is not implemented for this region")
+
+    def request_svm_capture(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        acknowledged_warning: bool = False,
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image."""
+        raise NotImplementedError(
+            "request_svm_capture is not implemented for this region"
         )
