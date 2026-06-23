@@ -1,6 +1,8 @@
 import base64
 import datetime as dt
 
+import pytest
+
 
 def test_svm_details_can_be_imported():
     from hyundai_kia_connect_api.svm import SVMDetails, parse_svm_response
@@ -101,3 +103,18 @@ def test_safety_acknowledgment_error_is_api_error():
     )
 
     assert issubclass(SafetyAcknowledgmentError, APIError)
+
+
+def test_api_impl_svm_stubs_raise_not_implemented():
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
+    from unittest.mock import MagicMock
+
+    api = ApiImpl()
+    token = MagicMock()
+    vehicle = MagicMock()
+
+    with pytest.raises(NotImplementedError):
+        api.get_svm_details(token, vehicle)
+
+    with pytest.raises(NotImplementedError):
+        api.request_svm_capture(token, vehicle, acknowledged_warning=True)
