@@ -222,6 +222,66 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             pin=pin,
         )
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh the access token using the stored refresh token.
+
+        Calls the same /v2/ac/oauth/token endpoint as login, but sends
+        username + password + grant_type=refresh_token + refresh_token
+        together in a JSON body. The endpoint validates username/password
+        presence before inspecting grant_type, so all four fields must be
+        sent (sending grant_type + refresh_token alone returns 400
+        "password required"). Falls back to full login if the refresh
+        token is missing or the exchange fails.
+
+        Confirmed working live (2026-06-22, issue #1186): ~0.02s refresh
+        vs ~0.74s full login, refresh_token rotates, expires_in ~1800s.
+        """
+        if token.refresh_token:
+            try:
+                url = self.LOGIN_API + "oauth/token"
+                data = {
+                    "username": token.username,
+                    "password": token.password,
+                    "grant_type": "refresh_token",
+                    "refresh_token": token.refresh_token,
+                }
+                response = self.session.post(url, json=data, headers=self.API_HEADERS)
+                response_json = response.json()
+                _check_response_for_errors(response_json)
+                if response_json.get("access_token") is None:
+                    raise APIError(
+                        f"{DOMAIN} - refresh_access_token: no access_token "
+                        f"in response {response_json}"
+                    )
+                access_token = response_json["access_token"]
+                new_refresh_token = response_json.get(
+                    "refresh_token", token.refresh_token
+                )
+                expires_in = float(response_json["expires_in"])
+                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                    seconds=expires_in
+                )
+                _LOGGER.debug(
+                    f"{DOMAIN} - Access token refreshed successfully, "
+                    f"expires in {expires_in}s"
+                )
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    f"falling back to full login"
+                )
+                return self.login(token.username, token.password, token.pin)
+        # No refresh_token available — full login.
+        return self.login(token.username, token.password, token.pin)
+
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
