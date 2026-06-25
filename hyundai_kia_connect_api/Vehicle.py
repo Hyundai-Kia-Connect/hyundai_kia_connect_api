@@ -163,6 +163,8 @@ class Vehicle:
     tire_pressure_rear_left: float = None
     tire_pressure_rear_right: float = None
     tire_pressure_unit: int = None
+    # Drive mode (CCS2 Chassis.DrivingMode.State): Eco/Sport/Comfort/Snow/Smart…
+    drive_mode: str = None
 
     # Service Data
     _next_service_distance: float = None

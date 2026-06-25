@@ -194,3 +194,8 @@ def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fie
     assert vehicle.tire_pressure_rear_left is None
     assert vehicle.tire_pressure_rear_right is None
     assert vehicle.tire_pressure_unit is None
+
+
+def test_drive_mode(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.drive_mode == "Eco"

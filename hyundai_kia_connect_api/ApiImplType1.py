@@ -488,6 +488,8 @@ class ApiImplType1(ApiImpl):
         vehicle.tire_pressure_rear_right = (
             round(_prr * 0.1, 1) if _prr is not None else None
         )
+        # Drive mode (e.g. "Eco", "Sport", "Comfort", "Snow", "Smart").
+        vehicle.drive_mode = get_child_value(state, "Chassis.DrivingMode.State")
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(
