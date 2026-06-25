@@ -137,6 +137,37 @@ def test_api_impl_svm_stubs_raise_not_implemented():
         api.request_svm_capture(token, vehicle, acknowledged_warning=True)
 
 
+def test_api_impl_supports_svm_returns_cached_true():
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
+
+    api = ApiImpl()
+    token = MagicMock()
+    vehicle = _make_vehicle()
+    vehicle.supports_svm = True
+    assert api.supports_svm(token, vehicle) is True
+
+
+def test_api_impl_supports_svm_returns_cached_false():
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
+
+    api = ApiImpl()
+    token = MagicMock()
+    vehicle = _make_vehicle()
+    vehicle.supports_svm = False
+    assert api.supports_svm(token, vehicle) is False
+
+
+def test_api_impl_supports_svm_default_false_when_not_cached():
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
+
+    api = ApiImpl()
+    token = MagicMock()
+    vehicle = _make_vehicle()
+    assert vehicle.supports_svm is None
+    assert api.supports_svm(token, vehicle) is False
+    assert vehicle.supports_svm is False
+
+
 def _make_api():
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
