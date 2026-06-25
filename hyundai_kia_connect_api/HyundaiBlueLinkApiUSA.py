@@ -1002,6 +1002,21 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             f"{self._SVM_POLL_TIMEOUT_SECONDS} seconds"
         )
 
+    def supports_svm(self, token: Token, vehicle: Vehicle) -> bool:
+        """Probe whether this USA Hyundai vehicle supports SVM.
+
+        Caches the result on the vehicle. Any API or auth failure is treated
+        as "not supported" so that consumers do not have to handle exceptions.
+        """
+        if vehicle.supports_svm is not None:
+            return vehicle.supports_svm
+        try:
+            details = self.get_svm_details(token, vehicle)
+            vehicle.supports_svm = bool(details.image_bytes)
+        except Exception:
+            vehicle.supports_svm = False
+        return vehicle.supports_svm
+
     @staticmethod
     def _svm_is_fresh(
         details: SVMDetails,

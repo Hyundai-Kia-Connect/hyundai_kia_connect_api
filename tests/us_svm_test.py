@@ -224,6 +224,53 @@ def test_get_svm_details_calls_correct_endpoint():
     assert details.image_bytes == image
 
 
+def test_usa_supports_svm_true_when_image_present():
+    api = _make_api()
+    vehicle = _make_vehicle()
+    response = _make_svm_response(b"\xff\xd8\xff\xe0fakejpg", "2026-06-23T12:34:56Z")
+    api.session.get.return_value = _FakeResponse(response)
+
+    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
+        assert api.supports_svm(_make_token(), vehicle) is True
+    assert vehicle.supports_svm is True
+
+
+def test_usa_supports_svm_false_when_image_empty():
+    api = _make_api()
+    vehicle = _make_vehicle()
+    response = _make_svm_response(b"", "2026-06-23T12:34:56Z")
+    api.session.get.return_value = _FakeResponse(response)
+
+    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
+        assert api.supports_svm(_make_token(), vehicle) is False
+    assert vehicle.supports_svm is False
+
+
+def test_usa_supports_svm_false_on_api_error():
+    api = _make_api()
+    vehicle = _make_vehicle()
+    api.session.get.return_value = _FakeResponse(
+        {"errorCode": "502", "errorMessage": "nope"}, status_code=200
+    )
+
+    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
+        assert api.supports_svm(_make_token(), vehicle) is False
+    assert vehicle.supports_svm is False
+
+
+def test_usa_supports_svm_caches_result():
+    api = _make_api()
+    vehicle = _make_vehicle()
+    response = _make_svm_response(b"\xff\xd8\xff\xe0fakejpg", "2026-06-23T12:34:56Z")
+    api.session.get.return_value = _FakeResponse(response)
+
+    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
+        assert api.supports_svm(_make_token(), vehicle) is True
+        assert api.supports_svm(_make_token(), vehicle) is True
+
+    assert api.session.get.call_count == 1
+
+
 def test_request_svm_capture_requires_acknowledgment():
     api = _make_api()
     api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
