@@ -168,6 +168,9 @@ class Vehicle:
     # Low oil level warning (HEV/ICE, CCS2 Drivetrain.InternalCombustionEngine.OilLevelWarning).
     # None when unreported so the entity is not created for vehicles without the sensor.
     oil_level_warning_is_on: bool = None
+    # 12V auxiliary battery fault warning (CCS2 Electronics.Battery.Auxiliary.FailWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    battery_auxiliary_fail_warning_is_on: bool = None
 
     # Service Data
     _next_service_distance: float = None

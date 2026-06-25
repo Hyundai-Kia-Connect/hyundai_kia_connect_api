@@ -495,6 +495,11 @@ class ApiImplType1(ApiImpl):
             state, "Drivetrain.InternalCombustionEngine.OilLevelWarning"
         )
         vehicle.oil_level_warning_is_on = bool(_oil) if _oil is not None else None
+        # 12V auxiliary battery fault warning. Preserve None when unreported.
+        _aux = get_child_value(state, "Electronics.Battery.Auxiliary.FailWarning")
+        vehicle.battery_auxiliary_fail_warning_is_on = (
+            bool(_aux) if _aux is not None else None
+        )
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(

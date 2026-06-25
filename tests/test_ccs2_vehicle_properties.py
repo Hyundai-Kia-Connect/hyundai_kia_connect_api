@@ -215,3 +215,17 @@ def test_oil_level_warning_missing_leaves_none(
     ]
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.oil_level_warning_is_on is None
+
+
+def test_battery_auxiliary_fail_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is False
+
+
+def test_battery_auxiliary_fail_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No FailWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Electronics"]["Battery"]["Auxiliary"]["FailWarning"]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is None
