@@ -465,9 +465,9 @@ class ApiImpl:
         """Return whether this vehicle supports SVM.
 
         The base implementation returns a cached value if present, otherwise
-        False. Region subclasses that support SVM should override and probe.
+        False without mutating the vehicle. Region subclasses that support SVM
+        should override and probe.
         """
         if vehicle.supports_svm is not None:
             return vehicle.supports_svm
-        vehicle.supports_svm = False
         return False

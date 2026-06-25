@@ -165,7 +165,7 @@ def test_api_impl_supports_svm_default_false_when_not_cached():
     vehicle = _make_vehicle()
     assert vehicle.supports_svm is None
     assert api.supports_svm(token, vehicle) is False
-    assert vehicle.supports_svm is False
+    assert vehicle.supports_svm is None
 
 
 def _make_api():
