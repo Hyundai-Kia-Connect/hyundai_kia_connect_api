@@ -16,6 +16,11 @@ from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
+def test_vehicle_has_supports_svm_field_default_none():
+    vehicle = _make_vehicle()
+    assert vehicle.supports_svm is None
+
+
 def test_svm_details_can_be_imported():
     from hyundai_kia_connect_api.svm import SVMDetails, parse_svm_response
 
