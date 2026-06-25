@@ -191,6 +191,20 @@ class VehicleManager:
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
+    def supports_svm(self, vehicle_id: str) -> bool:
+        """Return whether the given vehicle supports SVM.
+
+        Delegates to the region-specific API implementation. Missing vehicles
+        and any API failures are reported as False.
+        """
+        vehicle = self.vehicles.get(vehicle_id)
+        if vehicle is None:
+            return False
+        try:
+            return self.api.supports_svm(self.token, vehicle)
+        except Exception:
+            return False
+
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
             if self.login() is True:

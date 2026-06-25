@@ -449,3 +449,65 @@ def test_request_svm_capture_detects_freshness_from_raw_string():
     assert details.image_bytes == b"new"
     assert details.captured_at is None
     assert details.captured_at_raw == "not-a-parseable-date-v2"
+
+
+def test_vehicle_manager_supports_svm_delegates_to_api():
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
+    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+
+    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
+    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
+
+    manager = VehicleManager(
+        region=region_usa_id,
+        brand=brand_hyundai_id,
+        username="test-user",
+        password="test-pass",
+        pin="1234",
+    )
+    manager.token = _make_token()
+    vehicle = _make_vehicle()
+    manager.vehicles[vehicle.id] = vehicle
+
+    with patch.object(manager.api, "supports_svm", return_value=True) as mock_supports:
+        assert manager.supports_svm(vehicle.id) is True
+        mock_supports.assert_called_once_with(manager.token, vehicle)
+
+
+def test_vehicle_manager_supports_svm_returns_false_for_missing_vehicle():
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
+    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+
+    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
+    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
+
+    manager = VehicleManager(
+        region=region_usa_id,
+        brand=brand_hyundai_id,
+        username="test-user",
+        password="test-pass",
+        pin="1234",
+    )
+    assert manager.supports_svm("missing-id") is False
+
+
+def test_vehicle_manager_supports_svm_returns_false_on_exception():
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
+    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+
+    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
+    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
+
+    manager = VehicleManager(
+        region=region_usa_id,
+        brand=brand_hyundai_id,
+        username="test-user",
+        password="test-pass",
+        pin="1234",
+    )
+    manager.token = _make_token()
+    vehicle = _make_vehicle()
+    manager.vehicles[vehicle.id] = vehicle
+
+    with patch.object(manager.api, "supports_svm", side_effect=APIError("boom")):
+        assert manager.supports_svm(vehicle.id) is False
