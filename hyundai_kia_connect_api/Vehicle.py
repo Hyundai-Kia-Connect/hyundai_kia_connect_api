@@ -156,6 +156,13 @@ class Vehicle:
     tire_pressure_front_left_warning_is_on: bool = None
     tire_pressure_front_right_warning_is_on: bool = None
     tire_pressure_rear_right_warning_is_on: bool = None
+    # Tire pressure values (CCS2 Chassis.Axle.*.Tire.Pressure). Canonical bar
+    # via raw x 0.1 (model A — see const.PRESSURE_UNITS). None when unreported.
+    tire_pressure_front_left: float = None
+    tire_pressure_front_right: float = None
+    tire_pressure_rear_left: float = None
+    tire_pressure_rear_right: float = None
+    tire_pressure_unit: int = None
 
     # Service Data
     _next_service_distance: float = None

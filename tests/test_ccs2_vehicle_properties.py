@@ -145,3 +145,52 @@ class TestCCS2WindowOpenLevel:
         ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
         assert vehicle.front_left_window_is_open is None
         assert vehicle.back_right_window_is_open is None
+
+
+@pytest.fixture
+def ccs2_state_new_fields():
+    """A complete, parser-safe CCS2 state (EU EV9 2024 fixture) with the new
+    Tier 1 fields overlaid: tire Pressure values + PressureUnit, DrivingMode,
+    OilLevelWarning, Auxiliary.FailWarning. load_fixture returns a fresh dict
+    per call, so per-test mutation (e.g. popping Pressure) is safe."""
+    state = load_fixture("eu_kia_ev9_2024_ccs2.json")
+    axle = state["Chassis"]["Axle"]
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 26
+    axle["Tire"]["PressureUnit"] = 2
+    state.setdefault("Chassis", {}).setdefault("DrivingMode", {})["State"] = "Eco"
+    state.setdefault("Drivetrain", {}).setdefault("InternalCombustionEngine", {})[
+        "OilLevelWarning"
+    ] = 0
+    state.setdefault("Electronics", {}).setdefault("Battery", {}).setdefault(
+        "Auxiliary", {}
+    )["FailWarning"] = 0
+    return state
+
+
+def test_tire_pressure_values_bar(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (EU Santa Fe 2026, car display unit = bar, PressureUnit=2):
+    # raw 27/27/27/26 -> 2.7/2.7/2.7/2.6 bar (raw x 0.1).
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 2.7
+    assert vehicle.tire_pressure_front_right == 2.7
+    assert vehicle.tire_pressure_rear_left == 2.7
+    assert vehicle.tire_pressure_rear_right == 2.6
+    assert vehicle.tire_pressure_unit == 2
+
+
+def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Older CCS2 responses (e.g. EU EV9 2024) report PressureLow but no Pressure
+    # and no PressureUnit -> values stay None (entity not created downstream).
+    for row in ("Row1", "Row2"):
+        for side in ("Left", "Right"):
+            ccs2_state_new_fields["Chassis"]["Axle"][row][side]["Tire"].pop("Pressure")
+    ccs2_state_new_fields["Chassis"]["Axle"]["Tire"].pop("PressureUnit")
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_unit is None

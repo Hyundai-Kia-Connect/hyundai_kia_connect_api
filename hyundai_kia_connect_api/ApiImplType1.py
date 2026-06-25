@@ -463,6 +463,31 @@ class ApiImplType1(ApiImpl):
         vehicle.tire_pressure_all_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Tire.PressureLow")
         )
+        # Tire pressure values. Assumes raw Pressure is canonical 0.1 bar
+        # regardless of PressureUnit (model A — confirmed live for bar/unit=2:
+        # raw 27 -> 2.7 bar, matches dashboard). psi/kPa raw scale unverified;
+        # follow-up: switch the car display unit and re-test
+        # (tests/integration/test_pressure_unit_switch_live.py). If raw turns
+        # out unit-dependent (model B), replace the x0.1 with per-unit conversion.
+        vehicle.tire_pressure_unit = get_child_value(
+            state, "Chassis.Axle.Tire.PressureUnit"
+        )
+        _pfl = get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
+        _pfr = get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
+        _prl = get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
+        _prr = get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
+        vehicle.tire_pressure_front_left = (
+            round(_pfl * 0.1, 1) if _pfl is not None else None
+        )
+        vehicle.tire_pressure_front_right = (
+            round(_pfr * 0.1, 1) if _pfr is not None else None
+        )
+        vehicle.tire_pressure_rear_left = (
+            round(_prl * 0.1, 1) if _prl is not None else None
+        )
+        vehicle.tire_pressure_rear_right = (
+            round(_prr * 0.1, 1) if _prr is not None else None
+        )
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(
