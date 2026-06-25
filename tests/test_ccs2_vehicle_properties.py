@@ -199,3 +199,19 @@ def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fie
 def test_drive_mode(ccs2_api, vehicle, ccs2_state_new_fields):
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.drive_mode == "Eco"
+
+
+def test_oil_level_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is False
+
+
+def test_oil_level_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No OilLevelWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Drivetrain"]["InternalCombustionEngine"][
+        "OilLevelWarning"
+    ]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is None

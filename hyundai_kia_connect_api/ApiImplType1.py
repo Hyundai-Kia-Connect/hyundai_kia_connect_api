@@ -490,6 +490,11 @@ class ApiImplType1(ApiImpl):
         )
         # Drive mode (e.g. "Eco", "Sport", "Comfort", "Snow", "Smart").
         vehicle.drive_mode = get_child_value(state, "Chassis.DrivingMode.State")
+        # Low oil level warning (HEV/ICE). Preserve None when unreported.
+        _oil = get_child_value(
+            state, "Drivetrain.InternalCombustionEngine.OilLevelWarning"
+        )
+        vehicle.oil_level_warning_is_on = bool(_oil) if _oil is not None else None
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(

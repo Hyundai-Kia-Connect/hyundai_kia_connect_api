@@ -165,6 +165,9 @@ class Vehicle:
     tire_pressure_unit: int = None
     # Drive mode (CCS2 Chassis.DrivingMode.State): Eco/Sport/Comfort/Snow/Smart…
     drive_mode: str = None
+    # Low oil level warning (HEV/ICE, CCS2 Drivetrain.InternalCombustionEngine.OilLevelWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    oil_level_warning_is_on: bool = None
 
     # Service Data
     _next_service_distance: float = None
