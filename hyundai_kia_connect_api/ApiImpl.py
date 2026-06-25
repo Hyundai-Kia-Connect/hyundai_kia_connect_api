@@ -460,3 +460,14 @@ class ApiImpl:
         raise NotImplementedError(
             "request_svm_capture is not implemented for this region"
         )
+
+    def supports_svm(self, token: Token, vehicle: Vehicle) -> bool:
+        """Return whether this vehicle supports SVM.
+
+        The base implementation returns a cached value if present, otherwise
+        False. Region subclasses that support SVM should override and probe.
+        """
+        if vehicle.supports_svm is not None:
+            return vehicle.supports_svm
+        vehicle.supports_svm = False
+        return False
