@@ -146,6 +146,10 @@ class Vehicle:
     back_right_window_is_open: bool = None
     sunroof_is_open: bool = None
     supports_window_control: bool = None
+    supports_valet_mode: bool = None
+
+    # Valet Status
+    valet_mode_active: bool = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None

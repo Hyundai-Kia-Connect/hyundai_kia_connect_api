@@ -116,6 +116,7 @@ class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
     supports_window_control: bool = True
+    supports_valet_mode: bool = True
 
     def __init__(self) -> None:
         """Initialize."""

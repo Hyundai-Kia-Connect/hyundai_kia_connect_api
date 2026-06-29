@@ -163,6 +163,7 @@ class ApiImpl:
     previous_latitude: float = None
     previous_longitude: float = None
     supports_window_control: bool = False
+    supports_valet_mode: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
