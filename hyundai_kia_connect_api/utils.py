@@ -56,6 +56,16 @@ def get_float(value):
     return value  # original fallback
 
 
+def float_or_none(value: str | int | float | None) -> float | None:
+    """Coerce to float; return None for missing or non-numeric values."""
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):  # fmt: skip
+        return None
+
+
 def get_hex_temp_into_index(value):
     if value is not None:
         value = value.replace("H", "")

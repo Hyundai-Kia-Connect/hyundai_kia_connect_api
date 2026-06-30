@@ -105,3 +105,37 @@ class TestUpdateVehicleProperties:
         data = load_fixture(fixture_file)
         usa_api._update_vehicle_properties(vehicle, data)
         assert vehicle.data is data
+
+
+# ---------------------------------------------------------------------------
+# Regression: kia_uvo #1755 — USA backend must yield a numeric air_temperature
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def us_kia_status_with_air_temp():
+    """Minimal USA cached-status payload with a string airTemp.value."""
+    return {
+        "lastVehicleInfo": {
+            "vehicleStatusRpt": {
+                "vehicleStatus": {
+                    "climate": {
+                        "airTemp": {"value": "72"},
+                    },
+                },
+            },
+        },
+    }
+
+
+def test_usa_air_temperature_string_becomes_float(us_kia_status_with_air_temp):
+    """Regression for kia_uvo #1755: USA backend must not leave air_temperature
+    as a string. The Vehicle setter coerces to float; verify end-to-end."""
+    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
+    api.data_timezone = None
+    api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
+    vehicle = Vehicle()
+    api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp)
+    assert vehicle.air_temperature is not None
+    assert isinstance(vehicle.air_temperature, float)
+    assert vehicle.air_temperature == 72.0
