@@ -6,7 +6,7 @@ import datetime
 import typing
 from dataclasses import dataclass, field
 
-from .utils import get_float, get_safe_local_datetime
+from .utils import float_or_none, get_float, get_safe_local_datetime
 from .const import DISTANCE_UNITS
 
 _LOGGER = logging.getLogger(__name__)
@@ -505,7 +505,7 @@ class Vehicle:
     @outside_temperature.setter
     def outside_temperature(self, value):
         self._outside_temperature_value = value[0]
-        self._outside_temperature = value[0]
+        self._outside_temperature = float_or_none(value[0])
         if value[1] is not None:
             self._outside_temperature_unit = value[1]
 
@@ -516,7 +516,7 @@ class Vehicle:
     @air_temperature.setter
     def air_temperature(self, value):
         self._air_temperature_value = value[0]
-        self._air_temperature = value[0] if value[0] != "OFF" else None
+        self._air_temperature = float_or_none(value[0])
         if value[1] is not None:
             self._air_temperature_unit = value[1]
 
