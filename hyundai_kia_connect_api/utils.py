@@ -56,7 +56,7 @@ def get_float(value):
     return value  # original fallback
 
 
-def float_or_none(value):
+def float_or_none(value: str | int | float | None) -> float | None:
     """Coerce to float; return None for missing or non-numeric values."""
     if value is None:
         return None
