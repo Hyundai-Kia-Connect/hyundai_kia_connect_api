@@ -8,6 +8,7 @@ from hyundai_kia_connect_api.utils import (
     float_or_none,
     parse_datetime,
     pressure_or_none,
+    str_or_none,
 )
 
 
@@ -124,3 +125,19 @@ def test_parse_datetime_old_iso_format_with_separators():
 def test_parse_datetime_invalid_raises():
     with pytest.raises(ValueError):
         parse_datetime("garbage", datetime.UTC)
+
+
+def test_str_or_none_none():
+    assert str_or_none(None) is None
+
+
+def test_str_or_none_string():
+    assert str_or_none("1") == "1"
+
+
+def test_str_or_none_int():
+    assert str_or_none(1) == "1"
+
+
+def test_str_or_none_zero():
+    assert str_or_none(0) == "0"
