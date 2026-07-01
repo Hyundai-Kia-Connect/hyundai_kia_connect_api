@@ -11,8 +11,9 @@ persists it.
 
 import base64
 import uuid
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from hyundai_kia_connect_api.ApiImpl import OTPRequest
 from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA
 
 
@@ -56,3 +57,52 @@ def test_get_device_id_caches_first_computation():
     assert first == second
     assert mock_uuid5.call_count == 1
     assert first == base64.b64encode(sentinel.hex.encode()).decode()
+
+
+def test_login_persists_device_id_in_token():
+    api = KiaUvoApiCA(region=2, brand=1, language="en")
+    api._sessions = MagicMock()
+    api._sessions.post.return_value = _FakeResponse(_login_ok_payload())
+    token = api.login(username="user@test.com", password="pw", pin="1234")
+    assert token.device_id is not None
+    assert token.device_id == api._device_id
+
+
+def test_verify_otp_and_complete_login_persists_device_id_in_token():
+    api = KiaUvoApiCA(region=2, brand=1, language="en")
+    validate_resp = {
+        "responseHeader": {"responseCode": 0},
+        "result": {"verifiedOtp": True, "otpValidationKey": "OVK"},
+    }
+    genmfatkn_resp = {
+        "responseHeader": {"responseCode": 0},
+        "result": {
+            "token": {
+                "expireIn": 86400,
+                "accessToken": "AT",
+                "refreshToken": "RT",
+            }
+        },
+    }
+    api._sessions = MagicMock()
+    api._sessions.post.side_effect = [
+        _FakeResponse(validate_resp),
+        _FakeResponse(genmfatkn_resp),
+    ]
+    otp_request = OTPRequest(
+        request_id="user-info-uuid",
+        otp_key="OTPKEY",
+        has_email=True,
+        has_sms=False,
+        email="user@test.com",
+        sms=None,
+    )
+    token = api.verify_otp_and_complete_login(
+        username="user@test.com",
+        password="pw",
+        otp_code="9999",
+        otp_request=otp_request,
+        pin="1234",
+    )
+    assert token.device_id is not None
+    assert token.device_id == api._device_id

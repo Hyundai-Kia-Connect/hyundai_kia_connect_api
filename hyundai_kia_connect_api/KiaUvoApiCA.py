@@ -289,6 +289,7 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
+            device_id=self._device_id,
             valid_until=valid_until,
             pin=pin,
         )
@@ -401,6 +402,7 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
+            device_id=self._device_id,
             valid_until=valid_until,
             pin=pin,
         )
