@@ -53,3 +53,29 @@ class TestGetTypeFromStringBase:
     )
     def test_parse(self, type1_api, value, timesection, expected):
         assert type1_api._get_time_from_string(value, timesection) == expected
+
+
+class TestGetTypeFromStringCN:
+    """CN uses the %I%M %p format with an AM/PM suffix derived from timesection."""
+
+    @pytest.mark.parametrize(
+        "value,timesection,expected",
+        [
+            # unset-timer values -> None (issue #1206)
+            ("0000", 0, None),
+            ("0", 0, None),
+            ("", 1, None),
+            (None, 0, None),
+            ("0000", None, None),
+            # real timers (AM/PM suffix)
+            ("0800", 0, dt.time(8, 0)),  # AM
+            ("0800", 1, dt.time(20, 0)),  # PM
+            ("2200", 0, dt.time(22, 0)),  # >1260 -> %H%M path
+            # timesection=None falls to else -> " AM" suffix (guard rejects 0000 first)
+            ("0800", None, dt.time(8, 0)),
+            # defense-in-depth
+            ("ABCD", 0, None),
+        ],
+    )
+    def test_parse_cn(self, cn_api, value, timesection, expected):
+        assert cn_api._get_time_from_string(value, timesection) == expected

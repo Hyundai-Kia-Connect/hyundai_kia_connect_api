@@ -220,20 +220,30 @@ class KiaUvoApiCN(ApiImplType1):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
+    def _get_time_from_string(self, value, timesection) -> dt.datetime.time | None:
+        if value is None:
+            return None
+        try:
+            if not str(value).strip() or int(value) == 0:
+                return None  # "0000" / "0" / "" = unset EV timer (issue #1206)
             lastTwo = int(value[-2:])
             if lastTwo > 60:
                 value = int(value) + 40
             if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
+                return dt.datetime.strptime(str(value), "%H%M").time()
+            if timesection == 1:
+                value = str(value) + " PM"
             else:
-                if timesection == 0:
-                    value = str(value) + " AM"
-                elif timesection == 1:
-                    value = str(value) + " PM"
-                value = dt.datetime.strptime(value, "%I%M %p").time()
-        return value
+                value = str(value) + " AM"
+            return dt.datetime.strptime(value, "%I%M %p").time()
+        except (ValueError, TypeError) as e:  # fmt: skip
+            _LOGGER.warning(
+                "Could not parse EV timer value %r (timesection=%r): %s",
+                value,
+                timesection,
+                e,
+            )
+            return None
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
