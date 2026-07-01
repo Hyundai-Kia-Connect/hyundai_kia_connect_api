@@ -196,20 +196,6 @@ class KiaUvoApiIN(ApiImplType1):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
-            lastTwo = int(value[-2:])
-            if lastTwo > 60:
-                value = int(value) + 40
-            if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
-            else:
-                d = dt.datetime.strptime(str(value), "%I%M")
-                if timesection > 0:
-                    d += dt.timedelta(hours=12)
-                value = d.time()
-        return value
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
 

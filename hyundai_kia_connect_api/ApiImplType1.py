@@ -225,19 +225,29 @@ class ApiImplType1(ApiImpl):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
+    def _get_time_from_string(self, value, timesection) -> dt.datetime.time | None:
+        if value is None:
+            return None
+        try:
+            if not str(value).strip() or int(value) == 0:
+                return None  # "0000" / "0" / "" = unset EV timer (issue #1206)
             lastTwo = int(value[-2:])
             if lastTwo > 60:
                 value = int(value) + 40
             if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
-            else:
-                d = dt.datetime.strptime(str(value), "%I%M")
-                if timesection > 0:
-                    d += dt.timedelta(hours=12)
-                value = d.time()
-        return value
+                return dt.datetime.strptime(str(value), "%H%M").time()
+            d = dt.datetime.strptime(str(value), "%I%M")
+            if timesection and timesection > 0:
+                d += dt.timedelta(hours=12)
+            return d.time()
+        except (ValueError, TypeError) as e:  # fmt: skip
+            _LOGGER.warning(
+                "Could not parse EV timer value %r (timesection=%r): %s",
+                value,
+                timesection,
+                e,
+            )
+            return None
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: Optional[int] = None
