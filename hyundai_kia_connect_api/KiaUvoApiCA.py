@@ -294,6 +294,20 @@ class KiaUvoApiCA(ApiImpl):
             pin=pin,
         )
 
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token. CA has no refresh endpoint, so this re-logs-in.
+
+        Carry forward the persisted device_id so the server still recognizes
+        the device and does not trigger OTP (kia_uvo#1715). When the Token has
+        no device_id (first run after upgrade from a pre-fix install), fall back
+        to the deterministic uuid5(MAC+hostname) computed inside login().
+        """
+        if token.device_id:
+            self._device_id = token.device_id
+        return self.login(
+            username=token.username, password=token.password, pin=token.pin
+        )
+
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Sends OTP to the user via selected destination"""
         url = self.API_URL + "mfa/sendotp"
