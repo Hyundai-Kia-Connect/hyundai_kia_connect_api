@@ -42,21 +42,17 @@ def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
-    Known values:
-    502: AuthenticationError - Incorrect username or password
+
+    The HATA backend returns errorCode as int (e.g. 502) in the
+    response body.  HTTP 502 from HATA is a server-side error
+    ("HATA remoteVehicleStatus service failed"), NOT an
+    authentication failure.  There are no known errorCodes that
+    should map to AuthenticationError.
 
     :param response: the API's JSON response
     """
-    error_code_mapping = {
-        "502": AuthenticationError,
-    }
     if "errorCode" in response:
-        if response["errorCode"] in error_code_mapping:
-            raise error_code_mapping[response["errorCode"]](response["errorMessage"])
-        else:
-            raise APIError(
-                f"API Error {response['errorCode']}: {response['errorMessage']}"
-            )
+        raise APIError(f"API Error {response['errorCode']}: {response['errorMessage']}")
 
 
 def _safe_parse_json(response, action_name: str):
@@ -840,7 +836,18 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = {}
         state["vehicleDetails"] = self._get_vehicle_details(token, vehicle)
-        state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
+        try:
+            state["vehicleStatus"] = self._get_vehicle_status(token, vehicle, False)
+        except APIError as e:
+            # HATA backend may return 502 on cached vehicle status requests
+            # (REFRESH: false).  This is a server-side failure, not an auth
+            # or client error.  Keep existing vehicle data rather than
+            # propagating the exception and making all entities unavailable.
+            _LOGGER.warning(
+                f"{DOMAIN} - Cached vehicle status unavailable"
+                f" (will retry on next poll): {e}"
+            )
+            return
         state["evTripDetails"] = self._get_ev_trip_details(token, vehicle)
 
         if state["vehicleStatus"] is not None:
