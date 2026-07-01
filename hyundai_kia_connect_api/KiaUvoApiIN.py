@@ -9,6 +9,7 @@ import math
 import random
 import re
 import time
+from time import sleep
 import typing as ty
 import uuid
 from typing import Optional
@@ -36,7 +37,12 @@ from .const import (
 )
 from .exceptions import AuthenticationError
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+    parse_datetime,
+)
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -283,19 +289,72 @@ class KiaUvoApiIN(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
-        response = self.session.get(
-            url,
+        # Step 1: Trigger refresh from vehicle (no /latest)
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        trigger_time = time.time()
+        trigger_response = self.session.get(
+            trigger_url,
             headers=self._get_authenticated_headers(
                 token, vehicle.ccu_ccs2_protocol_support
             ),
         ).json()
         _LOGGER.debug(
-            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
+            f"{DOMAIN} - CCS2 force refresh trigger response: {trigger_response}"
         )
-        _check_response_for_errors(response)
-        state = response["resMsg"]
-        self._update_vehicle_properties(vehicle, state)
+
+        # Step 2: Poll /latest until data is newer than trigger_time
+        poll_url = trigger_url + "/latest"
+        max_attempts = 10
+        poll_interval = 2  # seconds
+        state = None
+
+        for attempt in range(1, max_attempts + 1):
+            sleep(poll_interval)
+            response = self.session.get(
+                poll_url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+            _LOGGER.debug(
+                f"{DOMAIN} - CCS2 force refresh poll {attempt}/{max_attempts}: {response}"
+            )
+
+            if response.get("retCode") != "S":
+                continue
+
+            res_msg = response.get("resMsg")
+            if res_msg is None:
+                continue
+
+            # Check if data is fresh via vehicleStatus.time
+            raw_time = get_child_value(res_msg, "vehicleStatus.time")
+            if raw_time:
+                try:
+                    last_update = parse_datetime(raw_time, self.data_timezone)
+                    if last_update.timestamp() > trigger_time:
+                        _LOGGER.debug(
+                            f"{DOMAIN} - CCS2 force refresh: fresh data after {attempt} polls"
+                        )
+                        state = res_msg
+                        break
+                except (ValueError, TypeError):  # fmt: skip
+                    _LOGGER.warning(
+                        f"{DOMAIN} - CCS2 force refresh: cannot parse time '{raw_time}'"
+                    )
+
+        if state is None:
+            # Timeout: use last fetched data
+            _LOGGER.warning(
+                f"{DOMAIN} - CCS2 force refresh: no fresh data after {max_attempts} polls, "
+                f"using last fetched data"
+            )
+            if response.get("retCode") == "S":
+                state = response.get("resMsg")
+
+        if state is not None:
+            self._update_vehicle_properties(vehicle, state)
+
         location = self._get_location(token, vehicle)
         self._update_vehicle_location(vehicle, location)
 
