@@ -1092,9 +1092,24 @@ class KiaUvoApiUSA(ApiImpl):
                 "rearRightSeat": self._seat_settings(options.rear_right_seat),
             }
         _LOGGER.debug(f"{DOMAIN} - Planned start_climate payload: {body}")
-        response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle
-        )
+        try:
+            response = self.post_request_with_logging_and_active_session(
+                token=token, url=url, json_body=body, vehicle=vehicle
+            )
+        except AuthenticationError:
+            # Auth errors should not trigger seat-setting retry
+            raise
+        except RequestException:
+            if "heatVentSeat" in body.get("remoteClimate", {}):
+                _LOGGER.warning(
+                    f"{DOMAIN} - Climate start with seat settings failed, retrying without seat settings"
+                )
+                del body["remoteClimate"]["heatVentSeat"]
+                response = self.post_request_with_logging_and_active_session(
+                    token=token, url=url, json_body=body, vehicle=vehicle
+                )
+            else:
+                raise
         return response.headers["Xid"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
