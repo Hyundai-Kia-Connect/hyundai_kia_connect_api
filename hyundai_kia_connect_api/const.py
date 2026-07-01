@@ -56,15 +56,17 @@ PRESSURE_KPA = "kPa"
 PRESSURE_BAR = "bar"
 PRESSURE_PSI = "psi"
 # PressureUnit enum from Chassis.Axle.Tire.PressureUnit (CCS2). The car's
-# tire-pressure display unit is user-selectable (psi/kPa/bar); the enum maps
-# to consecutive ints {1: kPa, 2: bar, 3: psi}.
-#   2 = bar (confirmed live, EU Santa Fe 2026: raw 27 -> 2.7 bar, matches dash)
-#   1 = kPa, 3 = psi (inferred by ordering; raw scale unverified — see note)
-# NOTE: the parser assumes raw Pressure is canonical 0.1 bar regardless of
-# PressureUnit (model A, the only model confirmed live). Follow-up: switch the
-# car display unit to psi/kPa and re-run tests/integration/test_pressure_unit_switch_live.py
-# to verify; if raw changes with the unit (model B), switch to per-unit conversion.
-PRESSURE_UNITS = {None: None, 1: PRESSURE_KPA, 2: PRESSURE_BAR, 3: PRESSURE_PSI}
+# tire-pressure display unit is user-selectable (psi | kPa | bar); the enum
+# maps to consecutive ints matching the car's selector order:
+#   0 = psi, 1 = kPa, 2 = bar.
+# Model B (live-confirmed EU Santa Fe 2026): raw Pressure is in the car's
+# display unit, and the scale depends on the unit:
+#   bar (unit=2): raw 27 -> 2.7 (x0.1, 0.1-bar)
+#   psi (unit=0): raw 38 -> 38  (x1, integer psi)
+#   kPa (unit=1): inferred x1 (integer kPa, e.g. 270) — pending live kPa test.
+PRESSURE_UNITS = {None: None, 0: PRESSURE_PSI, 1: PRESSURE_KPA, 2: PRESSURE_BAR}
+# Raw Pressure -> display-value scale per PressureUnit (model B).
+PRESSURE_SCALES = {0: 1.0, 1: 1.0, 2: 0.1}
 
 SEAT_STATUS = {
     None: None,

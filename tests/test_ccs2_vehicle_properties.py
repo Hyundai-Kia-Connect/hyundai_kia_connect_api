@@ -179,11 +179,47 @@ def test_tire_pressure_values_bar(ccs2_api, vehicle, ccs2_state_new_fields):
     assert vehicle.tire_pressure_rear_left == 2.7
     assert vehicle.tire_pressure_rear_right == 2.6
     assert vehicle.tire_pressure_unit == 2
+    assert vehicle.tire_pressure_front_left_unit == "bar"
+    assert vehicle.tire_pressure_rear_right_unit == "bar"
+
+
+def test_tire_pressure_values_psi(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (car display unit = psi, PressureUnit=0): raw 38/38/37/36
+    # -> 38/38/37/36 psi (raw x 1, integer psi). Model B (raw unit-dependent).
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 0
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 38
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 38
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 37
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 36
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 38.0
+    assert vehicle.tire_pressure_front_right == 38.0
+    assert vehicle.tire_pressure_rear_left == 37.0
+    assert vehicle.tire_pressure_rear_right == 36.0
+    assert vehicle.tire_pressure_unit == 0
+    assert vehicle.tire_pressure_front_left_unit == "psi"
+
+
+def test_tire_pressure_values_kpa(ccs2_api, vehicle, ccs2_state_new_fields):
+    # INFERRED (pending live kPa test): PressureUnit=1 (kPa), raw = integer kPa
+    # (2.7 bar ~= 270 kPa) -> value = raw x 1 = kPa.
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 1
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 270
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 270
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 270
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 260
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 270.0
+    assert vehicle.tire_pressure_rear_right == 260.0
+    assert vehicle.tire_pressure_unit == 1
+    assert vehicle.tire_pressure_front_left_unit == "kPa"
 
 
 def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fields):
     # Older CCS2 responses (e.g. EU EV9 2024) report PressureLow but no Pressure
-    # and no PressureUnit -> values stay None (entity not created downstream).
+    # and no PressureUnit -> values + units stay None (entity not created).
     for row in ("Row1", "Row2"):
         for side in ("Left", "Right"):
             ccs2_state_new_fields["Chassis"]["Axle"][row][side]["Tire"].pop("Pressure")
@@ -194,6 +230,7 @@ def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fie
     assert vehicle.tire_pressure_rear_left is None
     assert vehicle.tire_pressure_rear_right is None
     assert vehicle.tire_pressure_unit is None
+    assert vehicle.tire_pressure_front_left_unit is None
 
 
 def test_drive_mode(ccs2_api, vehicle, ccs2_state_new_fields):

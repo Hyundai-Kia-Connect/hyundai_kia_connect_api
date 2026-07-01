@@ -35,6 +35,8 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
     ORDER_STATUS,
+    PRESSURE_UNITS,
+    PRESSURE_SCALES,
 )
 
 from .exceptions import (
@@ -463,31 +465,35 @@ class ApiImplType1(ApiImpl):
         vehicle.tire_pressure_all_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Tire.PressureLow")
         )
-        # Tire pressure values. Assumes raw Pressure is canonical 0.1 bar
-        # regardless of PressureUnit (model A — confirmed live for bar/unit=2:
-        # raw 27 -> 2.7 bar, matches dashboard). psi/kPa raw scale unverified;
-        # follow-up: switch the car display unit and re-test
-        # (tests/integration/test_pressure_unit_switch_live.py). If raw turns
-        # out unit-dependent (model B), replace the x0.1 with per-unit conversion.
-        vehicle.tire_pressure_unit = get_child_value(
-            state, "Chassis.Axle.Tire.PressureUnit"
-        )
+        # Tire pressure values (model B: raw is in the car's display unit; the
+        # scale depends on PressureUnit). Live-confirmed EU Santa Fe 2026:
+        #   bar (unit=2) raw 27 -> 2.7 (x0.1); psi (unit=0) raw 38 -> 38 (x1).
+        # kPa (unit=1) scale inferred (x1, integer kPa) — pending live kPa test.
+        # See const.PRESSURE_UNITS / PRESSURE_SCALES.
+        _pressure_unit = get_child_value(state, "Chassis.Axle.Tire.PressureUnit")
+        vehicle.tire_pressure_unit = _pressure_unit
+        _unit_label = PRESSURE_UNITS.get(_pressure_unit)
+        _scale = PRESSURE_SCALES.get(_pressure_unit)
         _pfl = get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         _pfr = get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
         _prl = get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
         _prr = get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
         vehicle.tire_pressure_front_left = (
-            round(_pfl * 0.1, 1) if _pfl is not None else None
+            round(_pfl * _scale, 1) if _pfl is not None and _scale is not None else None
         )
         vehicle.tire_pressure_front_right = (
-            round(_pfr * 0.1, 1) if _pfr is not None else None
+            round(_pfr * _scale, 1) if _pfr is not None and _scale is not None else None
         )
         vehicle.tire_pressure_rear_left = (
-            round(_prl * 0.1, 1) if _prl is not None else None
+            round(_prl * _scale, 1) if _prl is not None and _scale is not None else None
         )
         vehicle.tire_pressure_rear_right = (
-            round(_prr * 0.1, 1) if _prr is not None else None
+            round(_prr * _scale, 1) if _prr is not None and _scale is not None else None
         )
+        vehicle.tire_pressure_front_left_unit = _unit_label
+        vehicle.tire_pressure_front_right_unit = _unit_label
+        vehicle.tire_pressure_rear_left_unit = _unit_label
+        vehicle.tire_pressure_rear_right_unit = _unit_label
         # Drive mode (e.g. "Eco", "Sport", "Comfort", "Snow", "Smart").
         vehicle.drive_mode = get_child_value(state, "Chassis.DrivingMode.State")
         # Low oil level warning (HEV/ICE). Preserve None when unreported.
