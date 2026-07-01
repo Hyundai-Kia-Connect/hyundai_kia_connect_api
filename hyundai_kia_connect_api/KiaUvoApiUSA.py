@@ -27,7 +27,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     OTP_NOTIFY_TYPE,
 )
-from .exceptions import APIError, AuthenticationError
+from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
 from .utils import get_child_value, parse_datetime
 
 
@@ -101,6 +101,37 @@ def request_with_logging(func):
         raise RequestException
 
     return request_with_logging_wrapper
+
+
+def _retry_on_auth_error(func):
+    """Token-only retry decorator: re-login and retry once on AuthenticationError.
+
+    Symmetric with request_with_active_session but for methods that only take
+    a token (get_vehicles / refresh_vehicles). No threading.Lock, matching
+    request_with_active_session's concurrency behavior.
+    """
+
+    def _retry_on_auth_error_wrapper(self, token, *args, **kwargs):
+        try:
+            return func(self, token, *args, **kwargs)
+        except AuthenticationError:
+            _LOGGER.debug(
+                f"{DOMAIN} - Session expired during {func.__name__}, re-logging in"
+            )
+            new_token = self.login(
+                token.username,
+                token.password,
+                token,
+                getattr(self, "_otp_handler", None),
+            )
+            if not isinstance(new_token, Token):
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+            token.access_token = new_token.access_token
+            token.refresh_token = new_token.refresh_token
+            token.valid_until = new_token.valid_until
+            return func(self, token, *args, **kwargs)
+
+    return _retry_on_auth_error_wrapper
 
 
 class KiaUvoApiUSA(ApiImpl):
@@ -340,6 +371,7 @@ class KiaUvoApiUSA(ApiImpl):
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, token)
 
+    @_retry_on_auth_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Return all Vehicle instances for a given Token"""
         url = self.API_URL + "ownr/gvl"
@@ -348,6 +380,13 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        status = response.get("status") or {}
+        if (
+            status.get("statusCode") == 1
+            and status.get("errorType") == 1
+            and status.get("errorCode") in (1003, 1005)
+        ):
+            raise AuthenticationError("Session invalid")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         result = []
@@ -373,6 +412,7 @@ class KiaUvoApiUSA(ApiImpl):
             return ENGINE_TYPES.EV
         return None
 
+    @_retry_on_auth_error
     def refresh_vehicles(
         self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
     ) -> None:
@@ -388,6 +428,13 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
         response = response.json()
+        status = response.get("status") or {}
+        if (
+            status.get("statusCode") == 1
+            and status.get("errorType") == 1
+            and status.get("errorCode") in (1003, 1005)
+        ):
+            raise AuthenticationError("Session invalid")
         if "payload" not in response:
             raise APIError("Missing payload in response")
         if isinstance(vehicles, dict):
