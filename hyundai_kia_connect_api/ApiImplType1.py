@@ -19,9 +19,9 @@ from .ApiImpl import (
     POIInfo,
 )
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleProfile
 
-from .utils import get_child_value, parse_datetime, get_index_into_hex_temp
+from .utils import get_child_value, parse_datetime, get_index_into_hex_temp, str_or_none
 
 from .const import (
     DOMAIN,
@@ -223,7 +223,116 @@ class ApiImplType1(ApiImpl):
                 ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
             )
             result.append(vehicle)
+        if self.supports_vehicle_profile:
+            self._fetch_vehicle_profiles(token, result)
         return result
+
+    def _fetch_vehicle_profiles(self, token: Token, vehicles: list[Vehicle]) -> None:
+        for vehicle in vehicles:
+            try:
+                url = self.SPA_API_URL + f"vehicles/{vehicle.id}/profile"
+                headers = self._get_authenticated_headers(token)
+                response = self.session.get(url, headers=headers)
+                _check_response_for_errors(response.json())
+                profile_data = response.json().get("resMsg", {}).get("vinInfo", [])
+                if profile_data:
+                    vehicle.profile = self._map_vehicle_profile(profile_data[0])
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Vehicle profile fetch failed for {vehicle.id}"
+                )
+
+    def _map_vehicle_profile(self, profile_data: dict) -> VehicleProfile:
+        """Map API profile response dict to VehicleProfile dataclass."""
+        basic = profile_data.get("basic", {})
+        device = profile_data.get("device", {})
+        option = profile_data.get("option", {})
+        service_option = profile_data.get("serviceOption", {})
+        battery_type = profile_data.get("batteryType", {})
+        detail_info = profile_data.get("detailInfo", {})
+        dtc_category = profile_data.get("dtcCategory", [])
+
+        seat_heater_vent = option.get("seatHeaterVent", {})
+
+        # The API returns some option fields as integers and others as strings.
+        # Capability properties compare against string values ("1", "0"), so
+        # coerce integer fields to strings via str_or_none (None-safe).
+        return VehicleProfile(
+            # basic
+            brand=basic.get("brand"),
+            country=basic.get("country"),
+            ota_update_supported=basic.get("ecuOtaUpdateSupport") == 1,
+            remote_ota_update_supported=basic.get("ecuRemoteOTAUpdateSupport") == 1,
+            # device
+            sim_status=device.get("simStatus"),
+            sim_start_date=device.get("simStartDate"),
+            sim_end_date=device.get("simEndDate"),
+            head_unit_type=device.get("headUnitType"),
+            head_unit_model_name=device.get("headUnitModelName"),
+            head_unit_version=device.get("currentHeadUnitVersion"),
+            platform=device.get("platform"),
+            navi_applied=device.get("naviApplied") == 1,
+            web_manual_url=device.get("webManualUrl"),
+            # option — string fields that may arrive as ints
+            air_control_type=option.get("airControlType"),
+            driver_seat_location=option.get("drvSeatLoc"),
+            remote_control=option.get("remoteControl"),
+            heating1=option.get("heating1"),
+            heating_front_window=option.get("heatingFrontWindow"),
+            steering_wheel_heat_option=option.get("strgWhlHeatOption"),
+            heating_steering_wheel=option.get("heatingSteeringWheel"),
+            heating_side_mirror=option.get("heatingSideMirror"),
+            heating_rear_window=option.get("heatingRearWindow"),
+            light_only_available=str_or_none(option.get("lightOnlyAvailable")),
+            horn_light_available=str_or_none(option.get("hornLightAvailable")),
+            hvac_temp_type=option.get("hvacTempType"),
+            remote_control_waiting_time=option.get("remoteControlWaitingTime"),
+            window_safety_option2=option.get("windowSafetyOption2"),
+            sunroof_option=str_or_none(option.get("sunRoofOption")),
+            digital_key2=str_or_none(option.get("digitalKey2")),
+            remote_heat_control=option.get("remoteHeatControl"),
+            air_purifier_option=str_or_none(option.get("airPurifierOption")),
+            dvrs_option=option.get("dvrsOption"),
+            ignition_control_option=str_or_none(option.get("ignCtrlOption")),
+            seat_heater_vent_front_left=seat_heater_vent.get("flSeatHeat"),
+            seat_heater_vent_front_right=seat_heater_vent.get("frSeatHeat"),
+            seat_heater_vent_rear_left=seat_heater_vent.get("rlSeatHeat"),
+            seat_heater_vent_rear_right=seat_heater_vent.get("rrSeatHeat"),
+            ev_alarm_option_info=str_or_none(option.get("evAlarmOptionInfo")),
+            remote_air_ctrl_control_option=option.get("remoteAirCtrlControlOption"),
+            # serviceOption
+            battery_warning_service=service_option.get("batteryWarningService") == 1,
+            schedule_link_service=service_option.get("scheduleLinkService") == 1,
+            center_user_profile_option=service_option.get("centerUserProfileOption"),
+            final_destination_noti=service_option.get("finalDestinationNoti") == 1,
+            valet_service_option=service_option.get("valetServiceOption") == 1,
+            notification_support=service_option.get("notificationSupport") == 1,
+            remote_valet_act_option=service_option.get("remoteValetActOption") == 1,
+            alert_service_option=service_option.get("alertServiceOption") == 1,
+            media_streaming_service=service_option.get("mediaStreamingService"),
+            media_streaming_selection_option=service_option.get(
+                "mediaStreamingSelectionOption"
+            )
+            == 1,
+            idle_alert_setting_service=service_option.get("idleAlertSettingService")
+            == 1,
+            engine_idle_time_notification=service_option.get(
+                "engineIdleTimeNotification"
+            )
+            == 1,
+            send2car_option_info=service_option.get("send2CarOptionInfo"),
+            speed_event_support=service_option.get("speedEventSupport") == 1,
+            # batteryType
+            main_battery_type=battery_type.get("mainbatteryType"),
+            aux_battery_type=battery_type.get("auxbatteryType"),
+            # detailInfo
+            sale_model_code=detail_info.get("saleCarmdlCd"),
+            body_type=detail_info.get("bodyType"),
+            interior_color=detail_info.get("inColor"),
+            exterior_color=detail_info.get("outColor"),
+            # dtcCategory
+            dtc_categories=dtc_category if dtc_category else None,
+        )
 
     def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
         if value is not None:

@@ -41,6 +41,16 @@ def get_child_value(data, key):
     return value
 
 
+def str_or_none(v):
+    """Coerce an int-or-string option value to a string for capability comparisons.
+
+    Returns None when the value is None (capability stays None = unknown/unsupported).
+    """
+    if v is None:
+        return None
+    return str(v)
+
+
 def get_float(value):
     if value is None:
         return None
