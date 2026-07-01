@@ -79,6 +79,7 @@ SUPPORTED_LANGUAGES_LIST = [
 class KiaUvoApiEU(ApiImplType1):
     data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = [x * 0.5 for x in range(28, 60)]
+    supports_vehicle_profile: bool = True
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         language = language.lower()

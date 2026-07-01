@@ -1,6 +1,10 @@
 import datetime
 from zoneinfo import ZoneInfo
-from hyundai_kia_connect_api.utils import detect_timezone_for_date, float_or_none
+from hyundai_kia_connect_api.utils import (
+    detect_timezone_for_date,
+    float_or_none,
+    str_or_none,
+)
 
 
 def test_detect_timezone_for_date():
@@ -54,3 +58,19 @@ def test_float_or_none_non_numeric():
 
 def test_float_or_none_empty_string():
     assert float_or_none("") is None
+
+
+def test_str_or_none_none():
+    assert str_or_none(None) is None
+
+
+def test_str_or_none_string():
+    assert str_or_none("1") == "1"
+
+
+def test_str_or_none_int():
+    assert str_or_none(1) == "1"
+
+
+def test_str_or_none_zero():
+    assert str_or_none(0) == "0"
