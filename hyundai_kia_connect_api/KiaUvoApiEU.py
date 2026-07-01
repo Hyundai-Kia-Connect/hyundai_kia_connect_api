@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from .ApiImplType1 import ApiImplSession, ApiImplType1
 from .ApiImplType1 import _check_response_for_errors
+from .ApiImplType1 import _retry_on_device_id_error
 
 from .Token import Token
 from .Vehicle import (
@@ -354,6 +355,7 @@ class KiaUvoApiEU(ApiImplType1):
                 )
         return self.login(token.username, token.password, token.pin)
 
+    @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -410,6 +412,7 @@ class KiaUvoApiEU(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
+    @_retry_on_device_id_error
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
         if is_ccs2:
@@ -1037,6 +1040,7 @@ class KiaUvoApiEU(ApiImplType1):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
+    @_retry_on_device_id_error
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
@@ -1050,7 +1054,6 @@ class KiaUvoApiEU(ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
@@ -1264,6 +1267,7 @@ class KiaUvoApiEU(ApiImplType1):
             )
             return None
 
+    @_retry_on_device_id_error
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:
@@ -1276,7 +1280,6 @@ class KiaUvoApiEU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
         _check_response_for_errors(response)
-        token.device_id = self._get_device_id(self._get_stamp())
         return response["msgId"]
 
     def _get_stamp(self) -> str:

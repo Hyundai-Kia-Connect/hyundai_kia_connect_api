@@ -224,8 +224,8 @@ class TestSetNavigation:
 
         api._get_control_headers.assert_called_once_with(token, vehicle)
 
-    def test_regenerates_device_id_after_call(self):
-        """Device ID is regenerated after set_navigation (proactive rotation)."""
+    def test_does_not_proactively_rotate_device_id(self):
+        """Device ID is not regenerated after set_navigation without error."""
         api = _make_api()
         vehicle = _make_vehicle()
         token = _make_token()
@@ -235,7 +235,7 @@ class TestSetNavigation:
         api.session.post.return_value = mock_response
         api.set_navigation(token, vehicle, [poi])
 
-        api._get_device_id.assert_called_once()
+        api._get_device_id.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
