@@ -137,14 +137,25 @@ class KiaUvoApiCA(ApiImpl):
             "client_secret": "CLISCR01AHSPA",
         }
         self._sessions = None
+        # Cached device_id. Seeded from the persisted Token by refresh_access_token
+        # (so re-login reuses it), or computed once from MAC+hostname on first login.
+        self._device_id: str | None = None
 
     def _get_device_id(self) -> str:
-        """Generate a deterministic device ID based on MAC address and hostname.
-        This ensures the same device ID is used across sessions, avoiding OTP triggers."""
-        device_uuid = uuid.uuid5(
-            uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
-        )
-        return base64.b64encode(device_uuid.hex.encode()).decode()
+        """Return a stable device ID, persisted across re-logins.
+
+        Reuse the cached device_id if set (seeded from the persisted Token by
+        refresh_access_token, or computed on first login). Otherwise derive it
+        deterministically from MAC+hostname (uuid5) and cache it. Caching means
+        a Docker restart with a changed MAC/hostname no longer produces a new
+        device_id the server does not recognize (kia_uvo#1715).
+        """
+        if self._device_id is None:
+            device_uuid = uuid.uuid5(
+                uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
+            )
+            self._device_id = base64.b64encode(device_uuid.hex.encode()).decode()
+        return self._device_id
 
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
@@ -278,8 +289,23 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
+            device_id=self._device_id,
             valid_until=valid_until,
             pin=pin,
+        )
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token. CA has no refresh endpoint, so this re-logs-in.
+
+        Carry forward the persisted device_id so the server still recognizes
+        the device and does not trigger OTP (kia_uvo#1715). When the Token has
+        no device_id (first run after upgrade from a pre-fix install), fall back
+        to the deterministic uuid5(MAC+hostname) computed inside login().
+        """
+        if token.device_id:
+            self._device_id = token.device_id
+        return self.login(
+            username=token.username, password=token.password, pin=token.pin
         )
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
@@ -390,6 +416,7 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
+            device_id=self._device_id,
             valid_until=valid_until,
             pin=pin,
         )
