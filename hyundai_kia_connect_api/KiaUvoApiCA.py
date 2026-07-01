@@ -137,14 +137,25 @@ class KiaUvoApiCA(ApiImpl):
             "client_secret": "CLISCR01AHSPA",
         }
         self._sessions = None
+        # Cached device_id. Seeded from the persisted Token by refresh_access_token
+        # (so re-login reuses it), or computed once from MAC+hostname on first login.
+        self._device_id: str | None = None
 
     def _get_device_id(self) -> str:
-        """Generate a deterministic device ID based on MAC address and hostname.
-        This ensures the same device ID is used across sessions, avoiding OTP triggers."""
-        device_uuid = uuid.uuid5(
-            uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
-        )
-        return base64.b64encode(device_uuid.hex.encode()).decode()
+        """Return a stable device ID, persisted across re-logins.
+
+        Reuse the cached device_id if set (seeded from the persisted Token by
+        refresh_access_token, or computed on first login). Otherwise derive it
+        deterministically from MAC+hostname (uuid5) and cache it. Caching means
+        a Docker restart with a changed MAC/hostname no longer produces a new
+        device_id the server does not recognize (kia_uvo#1715).
+        """
+        if self._device_id is None:
+            device_uuid = uuid.uuid5(
+                uuid.NAMESPACE_DNS, f"{uuid.getnode():x}-{platform.node() or ''}"
+            )
+            self._device_id = base64.b64encode(device_uuid.hex.encode()).decode()
+        return self._device_id
 
     def get_implementation_by_region_brand(self, region, brand, language):
         return KiaUvoApiCA(region, brand, language)
