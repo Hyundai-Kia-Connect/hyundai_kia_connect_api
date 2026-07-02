@@ -5,7 +5,6 @@ import datetime as dt
 import logging
 import ssl
 import time
-import typing as ty
 from datetime import datetime
 
 import certifi
@@ -364,7 +363,7 @@ class KiaUvoApiUSA(ApiImpl):
         return result
 
     @staticmethod
-    def _engine_type_from_fuel_type(fuel_type) -> ty.Optional[ENGINE_TYPES]:
+    def _engine_type_from_fuel_type(fuel_type) -> ENGINE_TYPES | None:
         # Only fuelType=4 (EV) is confirmed against a live Kia USA account
         # (2020 Niro EV). Mappings for ICE/PHEV/HEV are unknown, so leave
         # engine_type as None for those and let _update_vehicle_properties
@@ -373,9 +372,7 @@ class KiaUvoApiUSA(ApiImpl):
             return ENGINE_TYPES.EV
         return None
 
-    def refresh_vehicles(
-        self, token: Token, vehicles: ty.Union[list[Vehicle], Vehicle]
-    ) -> None:
+    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle] | Vehicle) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
