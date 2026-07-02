@@ -79,3 +79,69 @@ class TestCCS2UpdateVehicleProperties:
         data = load_fixture(fixture_file)
         ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
         assert vehicle.data is data
+
+
+def _window_state(open_front_left=0, open_level_front_left=0, **levels) -> dict:
+    """Build a CCS2 state dict from the EV9 fixture with Window overridden.
+
+    Reuses the real fixture so every non-window branch of
+    ``_update_vehicle_properties_ccs2`` still has the fields it expects; only
+    ``Cabin.Window`` is replaced with the given Open/OpenLevel values.
+    """
+    import copy
+
+    data = copy.deepcopy(load_fixture(CCS2_FIXTURE_FILES[0]))
+    row1 = {
+        "Driver": {"Open": open_front_left, "OpenLevel": open_level_front_left},
+        "Passenger": {
+            "Open": levels.get("open_front_right", 0),
+            "OpenLevel": levels.get("open_level_front_right", 0),
+        },
+    }
+    row2 = {
+        "Left": {
+            "Open": levels.get("open_back_left", 0),
+            "OpenLevel": levels.get("open_level_back_left", 0),
+        },
+        "Right": {
+            "Open": levels.get("open_back_right", 0),
+            "OpenLevel": levels.get("open_level_back_right", 0),
+        },
+    }
+    data["Cabin"]["Window"] = {"Row1": row1, "Row2": row2}
+    return data
+
+
+class TestCCS2WindowOpenLevel:
+    """CCS2 vents report Open=0, OpenLevel>0 and must parse as open (#1215)."""
+
+    def test_closed_windows_are_false(self, ccs2_api, vehicle):
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, _window_state())
+        assert vehicle.front_left_window_is_open is False
+        assert vehicle.front_right_window_is_open is False
+        assert vehicle.back_left_window_is_open is False
+        assert vehicle.back_right_window_is_open is False
+
+    def test_vented_window_is_open(self, ccs2_api, vehicle):
+        # Vent: Open=0, OpenLevel=1 (issue #1215 reproduction)
+        ccs2_api._update_vehicle_properties_ccs2(
+            vehicle, _window_state(open_level_front_left=1, open_level_front_right=1)
+        )
+        assert vehicle.front_left_window_is_open is True
+        assert vehicle.front_right_window_is_open is True
+        assert vehicle.back_left_window_is_open is False
+        assert vehicle.back_right_window_is_open is False
+
+    def test_fully_open_window_is_open(self, ccs2_api, vehicle):
+        ccs2_api._update_vehicle_properties_ccs2(
+            vehicle, _window_state(open_front_left=1, open_back_right=1)
+        )
+        assert vehicle.front_left_window_is_open is True
+        assert vehicle.back_right_window_is_open is True
+
+    def test_missing_window_fields_are_none(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        del data["Cabin"]["Window"]
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.front_left_window_is_open is None
+        assert vehicle.back_right_window_is_open is None

@@ -4,7 +4,7 @@
 import datetime
 import re
 from enum import IntEnum
-from typing import TypeVar
+from typing import Any, TypeVar
 
 
 T = TypeVar("T", bound=IntEnum)
@@ -39,6 +39,23 @@ def get_child_value(data, key):
             except Exception:
                 value = None
     return value
+
+
+def window_is_open(
+    state: dict[str, Any], open_key: str, open_level_key: str
+) -> bool | None:
+    """Whether a CCS2 window is open (fully open or vented).
+
+    CCS2 status exposes ``Open`` (fully-open flag) and ``OpenLevel`` (vent
+    level). A vented window reports ``Open=0`` with ``OpenLevel>0``; that must
+    be treated as open, not closed (see issue #1215). Returns ``None`` when
+    both fields are absent so callers can distinguish "unknown" from "closed".
+    """
+    open_value = get_child_value(state, open_key)
+    open_level = get_child_value(state, open_level_key)
+    if open_value is None and open_level is None:
+        return None
+    return bool(open_value) or bool(open_level)
 
 
 def get_float(value):
