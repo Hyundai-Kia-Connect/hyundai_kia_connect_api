@@ -82,3 +82,13 @@ class TestEUUpdateVehicleProperties:
         data = load_fixture(fixture_file)
         eu_api._update_vehicle_properties(vehicle, data)
         assert vehicle.data is data
+
+
+def test_ev_timers_unset_when_api_returns_zero(eu_api, vehicle):
+    """issue #1206: '0000' means no scheduled timer -> None, no crash."""
+    data = load_fixture("eu_kia_ev6_unset_timers.json")
+    eu_api._update_vehicle_properties(vehicle, data)
+    assert vehicle.ev_first_departure_time is None
+    assert vehicle.ev_second_departure_time is None
+    assert vehicle.ev_off_peak_start_time is None
+    assert vehicle.ev_off_peak_end_time is None
