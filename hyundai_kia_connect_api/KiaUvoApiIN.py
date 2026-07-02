@@ -11,7 +11,6 @@ import re
 import time
 import typing as ty
 import uuid
-from typing import Optional
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -112,7 +111,7 @@ class KiaUvoApiIN(ApiImplType1):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None
+        self, token: Token, ccs2_support: int | None = None
     ) -> dict:
         return {
             "Authorization": token.access_token,

@@ -3,7 +3,6 @@
 
 import logging
 import datetime
-import typing
 from dataclasses import dataclass, field
 
 from .utils import float_or_none, get_float, get_safe_local_datetime
@@ -98,10 +97,10 @@ class Vehicle:
 
     _last_updated_at: datetime.datetime = None
     _last_scanned_at: datetime.datetime = None
-    timezone: datetime.timezone = datetime.timezone.utc  # default UTC
+    timezone: datetime.timezone = datetime.UTC  # default UTC
 
-    dtc_count: typing.Union[int, None] = None
-    dtc_descriptions: typing.Union[dict, None] = None
+    dtc_count: int | None = None
+    dtc_descriptions: dict | None = None
 
     smart_key_battery_warning_is_on: bool = None
     washer_fluid_warning_is_on: bool = None
@@ -173,18 +172,18 @@ class Vehicle:
 
     # EV fields (EV/PHEV)
 
-    ev_charge_port_door_is_open: typing.Union[bool, None] = None
-    ev_charging_power: typing.Union[float, None] = None  # Charging power in kW
+    ev_charge_port_door_is_open: bool | None = None
+    ev_charging_power: float | None = None  # Charging power in kW
 
-    ev_charge_limits_dc: typing.Union[int, None] = None
-    ev_charge_limits_ac: typing.Union[int, None] = None
-    ev_charging_current: typing.Union[int, None] = (
+    ev_charge_limits_dc: int | None = None
+    ev_charge_limits_ac: int | None = None
+    ev_charging_current: int | None = (
         None  # Europe feature only, ac charging current limit
     )
-    ev_v2l_discharge_limit: typing.Union[int, None] = None
+    ev_v2l_discharge_limit: int | None = None
 
-    ev_v2l_status: typing.Union[bool, None] = None
-    ev_v2x_status: typing.Union[bool, None] = None
+    ev_v2l_status: bool | None = None
+    ev_v2x_status: bool | None = None
 
     # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
@@ -317,46 +316,46 @@ class Vehicle:
     _ev_estimated_station_charge_duration_value: int = None
     _ev_estimated_station_charge_duration_unit: str = None
 
-    _ev_target_range_charge_AC: typing.Union[float, None] = None
-    _ev_target_range_charge_AC_value: typing.Union[float, None] = None
-    _ev_target_range_charge_AC_unit: typing.Union[str, None] = None
+    _ev_target_range_charge_AC: float | None = None
+    _ev_target_range_charge_AC_value: float | None = None
+    _ev_target_range_charge_AC_unit: str | None = None
 
-    _ev_target_range_charge_DC: typing.Union[float, None] = None
-    _ev_target_range_charge_DC_value: typing.Union[float, None] = None
-    _ev_target_range_charge_DC_unit: typing.Union[str, None] = None
+    _ev_target_range_charge_DC: float | None = None
+    _ev_target_range_charge_DC_value: float | None = None
+    _ev_target_range_charge_DC_unit: str | None = None
 
-    ev_power_consumption_battery_cooling: typing.Union[float, None] = None
-    ev_power_consumption_battery_heater: typing.Union[float, None] = None
-    ev_power_consumption_air_conditioning: typing.Union[float, None] = None
+    ev_power_consumption_battery_cooling: float | None = None
+    ev_power_consumption_battery_heater: float | None = None
+    ev_power_consumption_air_conditioning: float | None = None
 
-    ev_first_departure_enabled: typing.Union[bool, None] = None
-    ev_second_departure_enabled: typing.Union[bool, None] = None
+    ev_first_departure_enabled: bool | None = None
+    ev_second_departure_enabled: bool | None = None
 
-    ev_first_departure_days: typing.Union[list, None] = None
-    ev_second_departure_days: typing.Union[list, None] = None
+    ev_first_departure_days: list | None = None
+    ev_second_departure_days: list | None = None
 
-    ev_first_departure_time: typing.Union[datetime.time, None] = None
-    ev_second_departure_time: typing.Union[datetime.time, None] = None
+    ev_first_departure_time: datetime.time | None = None
+    ev_second_departure_time: datetime.time | None = None
 
-    ev_first_departure_climate_enabled: typing.Union[bool, None] = None
-    ev_second_departure_climate_enabled: typing.Union[bool, None] = None
+    ev_first_departure_climate_enabled: bool | None = None
+    ev_second_departure_climate_enabled: bool | None = None
 
-    _ev_first_departure_climate_temperature: typing.Union[float, None] = None
-    _ev_first_departure_climate_temperature_value: typing.Union[float, None] = None
-    _ev_first_departure_climate_temperature_unit: typing.Union[str, None] = None
+    _ev_first_departure_climate_temperature: float | None = None
+    _ev_first_departure_climate_temperature_value: float | None = None
+    _ev_first_departure_climate_temperature_unit: str | None = None
 
-    _ev_second_departure_climate_temperature: typing.Union[float, None] = None
-    _ev_second_departure_climate_temperature_value: typing.Union[float, None] = None
-    _ev_second_departure_climate_temperature_unit: typing.Union[str, None] = None
+    _ev_second_departure_climate_temperature: float | None = None
+    _ev_second_departure_climate_temperature_value: float | None = None
+    _ev_second_departure_climate_temperature_unit: str | None = None
 
-    ev_first_departure_climate_defrost: typing.Union[bool, None] = None
-    ev_second_departure_climate_defrost: typing.Union[bool, None] = None
+    ev_first_departure_climate_defrost: bool | None = None
+    ev_second_departure_climate_defrost: bool | None = None
 
-    ev_off_peak_start_time: typing.Union[datetime.time, None] = None
-    ev_off_peak_end_time: typing.Union[datetime.time, None] = None
-    ev_off_peak_charge_only_enabled: typing.Union[bool, None] = None
+    ev_off_peak_start_time: datetime.time | None = None
+    ev_off_peak_end_time: datetime.time | None = None
+    ev_off_peak_charge_only_enabled: bool | None = None
 
-    ev_schedule_charge_enabled: typing.Union[bool, None] = None
+    ev_schedule_charge_enabled: bool | None = None
 
     # IC fields (PHEV/HEV/IC)
     _fuel_driving_range: float = None
