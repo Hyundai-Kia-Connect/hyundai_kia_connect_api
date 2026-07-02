@@ -202,17 +202,17 @@ def test_tire_pressure_values_psi(ccs2_api, vehicle, ccs2_state_new_fields):
 
 
 def test_tire_pressure_values_kpa(ccs2_api, vehicle, ccs2_state_new_fields):
-    # INFERRED (pending live kPa test): PressureUnit=1 (kPa), raw = integer kPa
-    # (2.7 bar ~= 270 kPa) -> value = raw x 1 = kPa.
+    # Live-confirmed 2026-07-02: PressureUnit=1 (kPa), raw in 5-kPa steps.
+    # Dashboard 255/255/255/250 kPa -> raw 51/51/51/50 -> value = raw x 5 = kPa.
     axle = ccs2_state_new_fields["Chassis"]["Axle"]
     axle["Tire"]["PressureUnit"] = 1
-    axle["Row1"]["Left"]["Tire"]["Pressure"] = 270
-    axle["Row1"]["Right"]["Tire"]["Pressure"] = 270
-    axle["Row2"]["Left"]["Tire"]["Pressure"] = 270
-    axle["Row2"]["Right"]["Tire"]["Pressure"] = 260
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 50
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
-    assert vehicle.tire_pressure_front_left == 270.0
-    assert vehicle.tire_pressure_rear_right == 260.0
+    assert vehicle.tire_pressure_front_left == 255.0
+    assert vehicle.tire_pressure_rear_right == 250.0
     assert vehicle.tire_pressure_unit == 1
     assert vehicle.tire_pressure_front_left_unit == "kPa"
 
