@@ -52,6 +52,22 @@ TEMPERATURE_C = "°C"
 TEMPERATURE_F = "°F"
 TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
 
+PRESSURE_KPA = "kPa"
+PRESSURE_BAR = "bar"
+PRESSURE_PSI = "psi"
+# PressureUnit enum from Chassis.Axle.Tire.PressureUnit (CCS2). The car's
+# tire-pressure display unit is user-selectable (psi | kPa | bar); the enum
+# maps to consecutive ints matching the car's selector order:
+#   0 = psi, 1 = kPa, 2 = bar.
+# Model B (live-confirmed EU Santa Fe 2026): raw Pressure is in the car's
+# display unit, and the scale depends on the unit:
+#   bar (unit=2): raw 27 -> 2.7  (x0.1, 0.1-bar steps)
+#   psi (unit=0): raw 38 -> 38   (x1, integer psi)
+#   kPa (unit=1): raw 51 -> 255   (x5, 5-kPa steps) — live-confirmed 2026-07-02.
+PRESSURE_UNITS = {None: None, 0: PRESSURE_PSI, 1: PRESSURE_KPA, 2: PRESSURE_BAR}
+# Raw Pressure -> display-value scale per PressureUnit (model B).
+PRESSURE_SCALES = {0: 1.0, 1: 5.0, 2: 0.1}
+
 SEAT_STATUS = {
     None: None,
     0: "Off",

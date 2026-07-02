@@ -79,3 +79,124 @@ class TestCCS2UpdateVehicleProperties:
         data = load_fixture(fixture_file)
         ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
         assert vehicle.data is data
+
+
+@pytest.fixture
+def ccs2_state_new_fields():
+    """A complete, parser-safe CCS2 state (EU EV9 2024 fixture) with the new
+    Tier 1 fields overlaid: tire Pressure values + PressureUnit, DrivingMode,
+    OilLevelWarning, Auxiliary.FailWarning. load_fixture returns a fresh dict
+    per call, so per-test mutation (e.g. popping Pressure) is safe."""
+    state = load_fixture("eu_kia_ev9_2024_ccs2.json")
+    axle = state["Chassis"]["Axle"]
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 26
+    axle["Tire"]["PressureUnit"] = 2
+    state.setdefault("Chassis", {}).setdefault("DrivingMode", {})["State"] = "Eco"
+    state.setdefault("Drivetrain", {}).setdefault("InternalCombustionEngine", {})[
+        "OilLevelWarning"
+    ] = 0
+    state.setdefault("Electronics", {}).setdefault("Battery", {}).setdefault(
+        "Auxiliary", {}
+    )["FailWarning"] = 0
+    return state
+
+
+def test_tire_pressure_values_bar(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (EU Santa Fe 2026, car display unit = bar, PressureUnit=2):
+    # raw 27/27/27/26 -> 2.7/2.7/2.7/2.6 bar (raw x 0.1).
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 2.7
+    assert vehicle.tire_pressure_front_right == 2.7
+    assert vehicle.tire_pressure_rear_left == 2.7
+    assert vehicle.tire_pressure_rear_right == 2.6
+    assert vehicle.tire_pressure_unit == 2
+    assert vehicle.tire_pressure_front_left_unit == "bar"
+    assert vehicle.tire_pressure_rear_right_unit == "bar"
+
+
+def test_tire_pressure_values_psi(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (car display unit = psi, PressureUnit=0): raw 38/38/37/36
+    # -> 38/38/37/36 psi (raw x 1, integer psi). Model B (raw unit-dependent).
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 0
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 38
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 38
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 37
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 36
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 38.0
+    assert vehicle.tire_pressure_front_right == 38.0
+    assert vehicle.tire_pressure_rear_left == 37.0
+    assert vehicle.tire_pressure_rear_right == 36.0
+    assert vehicle.tire_pressure_unit == 0
+    assert vehicle.tire_pressure_front_left_unit == "psi"
+
+
+def test_tire_pressure_values_kpa(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Live-confirmed 2026-07-02: PressureUnit=1 (kPa), raw in 5-kPa steps.
+    # Dashboard 255/255/255/250 kPa -> raw 51/51/51/50 -> value = raw x 5 = kPa.
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 1
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 50
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 255.0
+    assert vehicle.tire_pressure_rear_right == 250.0
+    assert vehicle.tire_pressure_unit == 1
+    assert vehicle.tire_pressure_front_left_unit == "kPa"
+
+
+def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Older CCS2 responses (e.g. EU EV9 2024) report PressureLow but no Pressure
+    # and no PressureUnit -> values + units stay None (entity not created).
+    for row in ("Row1", "Row2"):
+        for side in ("Left", "Right"):
+            ccs2_state_new_fields["Chassis"]["Axle"][row][side]["Tire"].pop("Pressure")
+    ccs2_state_new_fields["Chassis"]["Axle"]["Tire"].pop("PressureUnit")
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_unit is None
+    assert vehicle.tire_pressure_front_left_unit is None
+
+
+def test_drive_mode(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.drive_mode == "Eco"
+
+
+def test_oil_level_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is False
+
+
+def test_oil_level_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No OilLevelWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Drivetrain"]["InternalCombustionEngine"][
+        "OilLevelWarning"
+    ]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is None
+
+
+def test_battery_auxiliary_fail_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is False
+
+
+def test_battery_auxiliary_fail_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No FailWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Electronics"]["Battery"]["Auxiliary"]["FailWarning"]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is None

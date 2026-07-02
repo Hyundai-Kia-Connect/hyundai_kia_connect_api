@@ -157,6 +157,28 @@ class Vehicle:
     tire_pressure_front_left_warning_is_on: bool = None
     tire_pressure_front_right_warning_is_on: bool = None
     tire_pressure_rear_right_warning_is_on: bool = None
+    # Tire pressure values (CCS2 Chassis.Axle.*.Tire.Pressure). Model B: raw is
+    # in the car's display unit; value = raw x PRESSURE_SCALES[PressureUnit].
+    # See const.PRESSURE_UNITS / PRESSURE_SCALES. None when unreported.
+    tire_pressure_front_left: float = None
+    tire_pressure_front_right: float = None
+    tire_pressure_rear_left: float = None
+    tire_pressure_rear_right: float = None
+    tire_pressure_unit: int = None
+    # Per-tire unit string (from PressureUnit, shared across tires); HA entity
+    # uses DYNAMIC_UNIT and reads tire_pressure_<pos>_unit for native_unit.
+    tire_pressure_front_left_unit: str = None
+    tire_pressure_front_right_unit: str = None
+    tire_pressure_rear_left_unit: str = None
+    tire_pressure_rear_right_unit: str = None
+    # Drive mode (CCS2 Chassis.DrivingMode.State): Eco/Sport/Comfort/Snow/Smart…
+    drive_mode: str = None
+    # Low oil level warning (HEV/ICE, CCS2 Drivetrain.InternalCombustionEngine.OilLevelWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    oil_level_warning_is_on: bool = None
+    # 12V auxiliary battery fault warning (CCS2 Electronics.Battery.Auxiliary.FailWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    battery_auxiliary_fail_warning_is_on: bool = None
 
     # Service Data
     _next_service_distance: float = None
