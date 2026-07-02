@@ -63,10 +63,10 @@ def _serialize_value(value):
     if isinstance(value, datetime.datetime):
         # Normalize to UTC for consistent snapshots across timezones
         if value.tzinfo is not None:
-            value = value.astimezone(datetime.timezone.utc)
+            value = value.astimezone(datetime.UTC)
         else:
             # Assume naive datetimes are in UTC
-            value = value.replace(tzinfo=datetime.timezone.utc)
+            value = value.replace(tzinfo=datetime.UTC)
         return value.isoformat()
     if isinstance(value, datetime.time):
         return value.isoformat()

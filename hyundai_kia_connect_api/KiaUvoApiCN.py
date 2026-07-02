@@ -8,7 +8,6 @@ import math
 import typing as ty
 import uuid
 from time import sleep
-from typing import Optional
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -128,7 +127,7 @@ class KiaUvoApiCN(ApiImplType1):
         self.GCM_SENDER_ID = 199360397125
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None
+        self, token: Token, ccs2_support: int | None = None
     ) -> dict:
         return {
             "Authorization": token.access_token,

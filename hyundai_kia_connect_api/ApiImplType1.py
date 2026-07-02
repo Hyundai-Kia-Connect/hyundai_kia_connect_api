@@ -5,7 +5,6 @@ import functools
 import logging
 import math
 import threading
-from typing import Optional
 
 import time
 from time import sleep
@@ -240,7 +239,7 @@ class ApiImplType1(ApiImpl):
         return value
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None
+        self, token: Token, ccs2_support: int | None = None
     ) -> dict:
         return {
             "Authorization": token.access_token,
