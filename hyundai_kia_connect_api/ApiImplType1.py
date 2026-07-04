@@ -20,7 +20,12 @@ from .ApiImpl import (
 from .Token import Token
 from .Vehicle import Vehicle
 
-from .utils import get_child_value, parse_datetime, get_index_into_hex_temp
+from .utils import (
+    get_child_value,
+    parse_datetime,
+    get_index_into_hex_temp,
+    window_is_open,
+)
 
 from .const import (
     DOMAIN,
@@ -418,17 +423,25 @@ class ApiImplType1(ApiImpl):
         )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
-        vehicle.front_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Driver.Open"
+        vehicle.front_left_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row1.Driver.Open",
+            "Cabin.Window.Row1.Driver.OpenLevel",
         )
-        vehicle.front_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Passenger.Open"
+        vehicle.front_right_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row1.Passenger.Open",
+            "Cabin.Window.Row1.Passenger.OpenLevel",
         )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Left.Open"
+        vehicle.back_left_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row2.Left.Open",
+            "Cabin.Window.Row2.Left.OpenLevel",
         )
-        vehicle.back_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Right.Open"
+        vehicle.back_right_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row2.Right.Open",
+            "Cabin.Window.Row2.Right.OpenLevel",
         )
         vehicle.sunroof_is_open = (
             bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
