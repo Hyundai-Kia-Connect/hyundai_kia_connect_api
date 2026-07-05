@@ -9,6 +9,7 @@ import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.const import PressureUnit
 
 from tests.fixture_helpers import (
     discover_fixtures,
@@ -178,7 +179,7 @@ def test_tire_pressure_values_bar(ccs2_api, vehicle, ccs2_state_new_fields):
     assert vehicle.tire_pressure_front_right == 2.7
     assert vehicle.tire_pressure_rear_left == 2.7
     assert vehicle.tire_pressure_rear_right == 2.6
-    assert vehicle.tire_pressure_unit == 2
+    assert vehicle.tire_pressure_unit == PressureUnit.BAR
     assert vehicle.tire_pressure_front_left_unit == "bar"
     assert vehicle.tire_pressure_rear_right_unit == "bar"
 
@@ -197,7 +198,7 @@ def test_tire_pressure_values_psi(ccs2_api, vehicle, ccs2_state_new_fields):
     assert vehicle.tire_pressure_front_right == 38.0
     assert vehicle.tire_pressure_rear_left == 37.0
     assert vehicle.tire_pressure_rear_right == 36.0
-    assert vehicle.tire_pressure_unit == 0
+    assert vehicle.tire_pressure_unit == PressureUnit.PSI
     assert vehicle.tire_pressure_front_left_unit == "psi"
 
 
@@ -213,7 +214,7 @@ def test_tire_pressure_values_kpa(ccs2_api, vehicle, ccs2_state_new_fields):
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.tire_pressure_front_left == 255.0
     assert vehicle.tire_pressure_rear_right == 250.0
-    assert vehicle.tire_pressure_unit == 1
+    assert vehicle.tire_pressure_unit == PressureUnit.KPA
     assert vehicle.tire_pressure_front_left_unit == "kPa"
 
 

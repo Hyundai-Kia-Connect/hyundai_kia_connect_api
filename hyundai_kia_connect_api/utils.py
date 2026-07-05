@@ -83,6 +83,15 @@ def float_or_none(value: str | int | float | None) -> float | None:
         return None
 
 
+def bool_or_none(value: Any) -> bool | None:
+    """Cast to bool, preserving None (None -> None, else bool(value)).
+
+    Use for API fields that may be absent (e.g. oil/aux warnings on vehicles
+    without the sensor) so the downstream entity is not created when unreported.
+    """
+    return None if value is None else bool(value)
+
+
 def get_hex_temp_into_index(value):
     if value is not None:
         value = value.replace("H", "")
