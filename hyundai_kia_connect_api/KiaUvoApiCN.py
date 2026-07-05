@@ -43,6 +43,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    normalize_battery_soc,
     parse_datetime,
 )
 from .Vehicle import (
@@ -322,7 +323,9 @@ class KiaUvoApiCN(ApiImplType1):
                 )
             ],
         )
-        vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "status.battery.batSoc")
+        )
         vehicle.engine_is_running = get_child_value(state, "status.engine")
 
         # Converts temp to usable number. Currently only support celsius.

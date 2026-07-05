@@ -22,6 +22,7 @@ from .Vehicle import Vehicle
 
 from .utils import (
     get_child_value,
+    normalize_battery_soc,
     parse_datetime,
     get_index_into_hex_temp,
     window_is_open,
@@ -285,8 +286,9 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Drivetrain.Odometer"),
             DISTANCE_UNITS[1],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "Electronics.Battery.Level"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "Electronics.Battery.Level"),
+            get_child_value(state, "Electronics.Battery.SensorReliability"),
         )
 
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")

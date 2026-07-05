@@ -27,7 +27,7 @@ from .const import (
     OTP_NOTIFY_TYPE,
 )
 from .exceptions import APIError, AuthenticationError
-from .utils import get_child_value, parse_datetime
+from .utils import get_child_value, normalize_battery_soc, parse_datetime
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -458,9 +458,11 @@ class KiaUvoApiUSA(ApiImpl):
             get_child_value(state, "service.msopServiceOdometer"),
             DISTANCE_UNITS[3],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",  # noqa
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",  # noqa
+            )
         )
         vehicle.engine_is_running = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine"

@@ -2,12 +2,15 @@
 """utils.py"""
 
 import datetime
+import logging
 import re
 from enum import IntEnum
 from typing import Any, TypeVar
 
 
 T = TypeVar("T", bound=IntEnum)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def to_int_enum(enum_class: type[T], value: str | int | T | None) -> T | None:
@@ -81,6 +84,37 @@ def float_or_none(value: str | int | float | None) -> float | None:
         return float(value)
     except (TypeError, ValueError):  # fmt: skip
         return None
+
+
+def normalize_battery_soc(
+    value: int | float | None,
+    sensor_reliability: int | None = None,
+) -> int | None:
+    """Normalize 12V auxiliary battery state-of-charge.
+
+    Returns None when the car reports an unavailable or unreliable reading:
+    - sensor_reliability == 1  (CCS2 flag: "sensor unreliable")
+    - value is None
+    - value outside 0..100 (sentinel 0xFF=255, -1, etc.)
+
+    Otherwise returns int(value). A warning is logged only for out-of-range
+    sentinels (not for sensor_reliability==1, which is an expected state after
+    12V reset or during an ICCU failure on IONIQ 5 / Kia EV).
+    """
+    if sensor_reliability == 1:
+        return None
+    if value is None:
+        return None
+    if value < 0 or value > 100:
+        _LOGGER.warning(
+            "Invalid 12V auxiliary battery SOC value %s (expected 0..100); "
+            "treating as unavailable. A persistent 255/0xFF reading on "
+            "IONIQ 5 / Kia EV can be an early symptom of ICCU failure — "
+            "see kia_uvo#1771.",
+            value,
+        )
+        return None
+    return int(value)
 
 
 def get_hex_temp_into_index(value):

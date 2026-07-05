@@ -39,6 +39,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    normalize_battery_soc,
     parse_datetime,
 )
 from .Vehicle import DailyDrivingStats, Vehicle
@@ -588,7 +589,9 @@ class KiaUvoApiCA(ApiImpl):
             ],
         )
 
-        vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "status.battery.batSoc")
+        )
         vehicle.engine_is_running = get_child_value(state, "status.engine")
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "status.washerFluidStatus"

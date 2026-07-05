@@ -48,6 +48,7 @@ from .exceptions import (
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
+    normalize_battery_soc,
     parse_datetime,
 )
 
@@ -476,8 +477,8 @@ class KiaUvoApiEU(ApiImplType1):
                     )
                 ],
             )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "vehicleStatus.battery.batSoc")
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
 
