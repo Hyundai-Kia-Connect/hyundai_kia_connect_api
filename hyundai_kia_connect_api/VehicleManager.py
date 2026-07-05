@@ -14,6 +14,7 @@ from .ApiImpl import (
     OTPRequest,
     POIInfo,
 )
+from .svm import SVMDetails
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -190,6 +191,40 @@ class VehicleManager:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
+
+    def supports_svm(self, vehicle_id: str) -> bool:
+        """Return whether the given vehicle supports SVM.
+
+        Delegates to the region-specific API implementation. Missing vehicles
+        and any API failures are reported as False.
+        """
+        vehicle = self.vehicles.get(vehicle_id)
+        if vehicle is None:
+            return False
+        try:
+            return self.api.supports_svm(self.token, vehicle)
+        except Exception:
+            return False
+
+    def get_svm_details(self, vehicle_id: str) -> SVMDetails:
+        """Return the latest cached SVM composite image and metadata.
+
+        Delegates to the region-specific API implementation. Raises
+        NotImplementedError on regions without SVM support.
+        """
+        return self.api.get_svm_details(self.token, self.get_vehicle(vehicle_id))
+
+    def request_svm_capture(
+        self, vehicle_id: str, acknowledged_warning: bool
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image.
+
+        ``acknowledged_warning`` must be True; the caller must explicitly
+        acknowledge the safety warning before triggering a capture.
+        """
+        return self.api.request_svm_capture(
+            self.token, self.get_vehicle(vehicle_id), acknowledged_warning
+        )
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:

@@ -9,6 +9,7 @@ from .ApiImpl import (
     POICoord,
 )
 
+from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
 from .VehicleManager import VehicleManager

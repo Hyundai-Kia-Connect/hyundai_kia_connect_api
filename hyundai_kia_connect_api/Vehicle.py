@@ -150,6 +150,9 @@ class Vehicle:
     # Valet Status
     valet_mode_active: bool = None
 
+    # SVM (Surround View Monitor / Find My Car) — USA Hyundai
+    supports_svm: bool | None = None
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None
