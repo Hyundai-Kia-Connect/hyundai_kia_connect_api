@@ -901,6 +901,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.ICE
             elif entry["evStatus"] == "E":
                 entry_engine_type = ENGINE_TYPES.EV
+            elif entry["evStatus"] == "P":
+                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["regid"],
                 name=entry["nickName"],
