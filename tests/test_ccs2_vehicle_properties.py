@@ -145,3 +145,25 @@ class TestCCS2WindowOpenLevel:
         ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
         assert vehicle.front_left_window_is_open is None
         assert vehicle.back_right_window_is_open is None
+
+
+class TestCCS2LocationTimestampNone:
+    """kia_uvo #1771 sidetask: missing Location.TimeStamp must yield
+    location_last_updated_at None, not a 2000-01-01 sentinel ("27 years ago").
+    """
+
+    def test_location_timestamp_none_yields_none(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        del data["Location"]["TimeStamp"]
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.location_latitude == 48.8566
+        assert vehicle.location_longitude == 2.3522
+        assert vehicle.location_last_updated_at is None
+
+    def test_location_timestamp_present_yields_datetime(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        ts = vehicle.location_last_updated_at
+        assert ts is not None
+        assert ts.year == 2024 and ts.month == 9 and ts.day == 15
+        assert ts.hour == 14 and ts.minute == 0 and ts.second == 0

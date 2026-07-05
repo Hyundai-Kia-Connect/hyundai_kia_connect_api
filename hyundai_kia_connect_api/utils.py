@@ -102,9 +102,11 @@ def get_index_into_hex_temp(value):
         return None
 
 
-def parse_datetime(value, timezone) -> datetime.datetime:
+def parse_datetime(value, timezone) -> datetime.datetime | None:
+    # Missing timestamp must surface as None (HA renders "unknown") rather than
+    # a 2000-01-01 sentinel that renders as "27 years ago". See kia_uvo #1771.
     if value is None:
-        return datetime.datetime(2000, 1, 1, tzinfo=timezone)
+        return None
 
     # Try parsing the new format: Tue, 24 Jun 2025 16:18:10 GMT
     try:

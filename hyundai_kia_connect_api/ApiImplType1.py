@@ -657,9 +657,9 @@ class ApiImplType1(ApiImpl):
                 vehicle.ev_battery_is_charging = True
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
-            location_last_updated_at = dt.datetime(
-                2000, 1, 1, tzinfo=self.data_timezone
-            )
+            # Missing Location.TimeStamp must surface as None (HA "unknown")
+            # rather than a 2000-01-01 sentinel that renders as "27 years ago".
+            # See kia_uvo #1771 sidetask.
             timestamp = get_child_value(state, "Location.TimeStamp")
             if timestamp is not None:
                 location_last_updated_at = dt.datetime(
@@ -671,6 +671,8 @@ class ApiImplType1(ApiImpl):
                     second=int(get_child_value(timestamp, "Sec")),
                     tzinfo=self.data_timezone,
                 )
+            else:
+                location_last_updated_at = None
 
             vehicle.location = (
                 get_child_value(state, "Location.GeoCoord.Latitude"),
