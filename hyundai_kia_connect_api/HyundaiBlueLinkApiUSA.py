@@ -350,7 +350,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         url = self.API_URL + "rcs/rfc/findMyCar"
         headers = self._get_vehicle_headers(token, vehicle)
         try:
-            response = self.session.get(url, headers=headers)
+            response = self.session.get(url, headers=headers, timeout=(5, 10))
             response_json = response.json()
             _check_response_for_errors(response_json)
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
