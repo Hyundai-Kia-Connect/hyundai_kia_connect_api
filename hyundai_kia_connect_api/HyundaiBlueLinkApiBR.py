@@ -28,7 +28,7 @@ from .const import (
 )
 from .exceptions import APIError
 from .Token import Token
-from .utils import get_index_into_hex_temp, parse_date_br
+from .utils import get_index_into_hex_temp, normalize_battery_soc, parse_date_br
 from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -275,7 +275,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         # Battery (12V car battery, not EV battery)
         if battery := state.get("battery"):
-            vehicle.car_battery_percentage = battery.get("batSoc")
+            vehicle.car_battery_percentage = normalize_battery_soc(
+                battery.get("batSoc")
+            )
 
         # Temperature
         if air_temp := state.get("airTemp"):

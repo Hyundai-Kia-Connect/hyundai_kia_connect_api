@@ -23,7 +23,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
-from .utils import get_child_value, get_float, parse_datetime
+from .utils import get_child_value, get_float, normalize_battery_soc, parse_datetime
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -413,8 +413,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleDetails.odometer"),
             DISTANCE_UNITS[3],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "vehicleStatus.battery.batSoc")
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.washer_fluid_warning_is_on = get_child_value(
