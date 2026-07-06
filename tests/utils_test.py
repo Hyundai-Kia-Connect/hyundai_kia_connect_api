@@ -1,6 +1,12 @@
 import datetime
+
+import pytest
 from zoneinfo import ZoneInfo
-from hyundai_kia_connect_api.utils import detect_timezone_for_date, float_or_none
+from hyundai_kia_connect_api.utils import (
+    detect_timezone_for_date,
+    float_or_none,
+    parse_datetime,
+)
 
 
 def test_detect_timezone_for_date():
@@ -52,3 +58,36 @@ def test_float_or_none_non_numeric():
 
 def test_float_or_none_empty_string():
     assert float_or_none("") is None
+
+
+def test_parse_datetime_none_returns_none():
+    # The fix: None input must return None, not a 2000-01-01 sentinel.
+    # Previously this returned datetime(2000, 1, 1) which HA rendered as
+    # "27 years ago" for location_last_updated_at (kia_uvo #1771 sidetask).
+    assert parse_datetime(None, datetime.UTC) is None
+
+
+def test_parse_datetime_none_no_timezone_returns_none():
+    # timezone=None path must also return None for None input.
+    assert parse_datetime(None, None) is None
+
+
+def test_parse_datetime_new_format_gmt():
+    tz = ZoneInfo("Europe/Warsaw")
+    result = parse_datetime("Tue, 24 Jun 2025 16:18:10 GMT", tz)
+    assert result == datetime.datetime(2025, 6, 24, 18, 18, 10, tzinfo=tz)
+
+
+def test_parse_datetime_old_compact_format():
+    result = parse_datetime("20250624161810", datetime.UTC)
+    assert result == datetime.datetime(2025, 6, 24, 16, 18, 10, tzinfo=datetime.UTC)
+
+
+def test_parse_datetime_old_iso_format_with_separators():
+    result = parse_datetime("2025-06-24T16:18:10Z", datetime.UTC)
+    assert result == datetime.datetime(2025, 6, 24, 16, 18, 10, tzinfo=datetime.UTC)
+
+
+def test_parse_datetime_invalid_raises():
+    with pytest.raises(ValueError):
+        parse_datetime("garbage", datetime.UTC)
