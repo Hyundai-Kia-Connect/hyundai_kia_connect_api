@@ -1,9 +1,12 @@
-"""Unit tests for ApiImplType1._get_time_from_string and the CN override.
+"""Unit tests for ApiImplType1._get_time_from_string.
 
 Covers the unset-timer case (issue #1206): API returns "0000" when no
 departure/off-peak timer is configured; the parser must return None
 instead of raising ValueError. Also covers the preexisting timesection=None
 TypeError and defense-in-depth against unexpected formats.
+
+EU, AU, IN, and CN all inherit the base implementation (the CN and IN
+overrides were removed as bit-for-bit duplicates).
 """
 
 import datetime as dt
@@ -11,7 +14,6 @@ import datetime as dt
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
-from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
 
 
 @pytest.fixture
@@ -21,14 +23,8 @@ def type1_api() -> ApiImplType1:
     return api
 
 
-@pytest.fixture
-def cn_api() -> KiaUvoApiCN:
-    api = KiaUvoApiCN.__new__(KiaUvoApiCN)
-    return api
-
-
 class TestGetTypeFromStringBase:
-    """Covers EU, AU, IN (IN inherits the base after override removal)."""
+    """Covers EU, AU, IN, CN (all inherit the base)."""
 
     @pytest.mark.parametrize(
         "value,timesection,expected",
@@ -53,29 +49,3 @@ class TestGetTypeFromStringBase:
     )
     def test_parse(self, type1_api, value, timesection, expected):
         assert type1_api._get_time_from_string(value, timesection) == expected
-
-
-class TestGetTypeFromStringCN:
-    """CN uses the %I%M %p format with an AM/PM suffix derived from timesection."""
-
-    @pytest.mark.parametrize(
-        "value,timesection,expected",
-        [
-            # unset-timer values -> None (issue #1206)
-            ("0000", 0, None),
-            ("0", 0, None),
-            ("", 1, None),
-            (None, 0, None),
-            ("0000", None, None),
-            # real timers (AM/PM suffix)
-            ("0800", 0, dt.time(8, 0)),  # AM
-            ("0800", 1, dt.time(20, 0)),  # PM
-            ("2200", 0, dt.time(22, 0)),  # >1260 -> %H%M path
-            # timesection=None falls to else -> " AM" suffix (guard rejects 0000 first)
-            ("0800", None, dt.time(8, 0)),
-            # defense-in-depth
-            ("ABCD", 0, None),
-        ],
-    )
-    def test_parse_cn(self, cn_api, value, timesection, expected):
-        assert cn_api._get_time_from_string(value, timesection) == expected
