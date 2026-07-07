@@ -128,6 +128,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # the default REMOTE_POLL.
     _action_service_types: dict[str, str] = {}
 
+    # Cached enrollment/details response. Capabilities, seat configs,
+    # generation and model rarely change, so the response is cached for
+    # the instance lifetime. get_vehicles force-refreshes (vehicle list
+    # can change); _get_vehicle_details uses the cache.
+    _enrollment_details_cache: dict | None = None
+
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
@@ -282,13 +288,31 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # No refresh_token available — full login.
         return self.login(token.username, token.password, token.pin)
 
-    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+    def _get_enrollment_details(
+        self, token: Token, force_refresh: bool = False
+    ) -> dict:
+        """Return enrollment details for the account, cached on the instance.
+
+        Capabilities, seat configs, generation and model change rarely, so
+        the response is cached for the instance lifetime. ``get_vehicles``
+        forces a refresh (the vehicle list can change); ``_get_vehicle_details``
+        uses the cache.
+        """
+        if self._enrollment_details_cache is not None and not force_refresh:
+            return self._enrollment_details_cache
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        _check_response_for_errors(response)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+        if "enrolledVehicleDetails" not in response_json:
+            raise AuthenticationError("Missing enrolledVehicleDetails in response")
+        self._enrollment_details_cache = response_json
+        return response_json
+
+    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+        response = self._get_enrollment_details(token)
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
             if entry["regid"] == vehicle.id:
@@ -885,14 +909,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def get_vehicles(self, token: Token):
-        url = self.API_URL + "enrollment/details/" + token.username
-        headers = self._get_authenticated_headers(token)
-        response = self.session.get(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        _check_response_for_errors(response)
-        if "enrolledVehicleDetails" not in response:
-            raise AuthenticationError("Missing enrolledVehicleDetails in response")
+        response = self._get_enrollment_details(token, force_refresh=True)
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
