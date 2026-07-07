@@ -444,22 +444,6 @@ class KiaUvoApiEU(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
-    def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(
-            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
-        )
-        _check_response_for_errors(response)
-        state = response["resMsg"]["state"]["Vehicle"]
-        self._update_vehicle_properties_ccs2(vehicle, state)
-        self._set_cached_location_park(token, vehicle)
-
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "vehicleStatus.time"):
             vehicle.last_updated_at = parse_datetime(
@@ -980,6 +964,10 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             response = response["resMsg"]["state"]["Vehicle"]
         return response
+
+    def _post_refresh_ccs2_location(self, token: Token, vehicle: Vehicle) -> None:
+        """EU CCS2 location refresh uses /location/park endpoint."""
+        self._set_cached_location_park(token, vehicle)
 
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"

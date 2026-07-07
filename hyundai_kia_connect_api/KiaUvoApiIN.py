@@ -11,6 +11,7 @@ import re
 import time
 import typing as ty
 import uuid
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -35,7 +36,11 @@ from .const import (
 )
 from .exceptions import AuthenticationError
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
+from .utils import (
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+)
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -267,20 +272,31 @@ class KiaUvoApiIN(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
-    def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(
-            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
-        )
-        _check_response_for_errors(response)
-        state = response["resMsg"]
+    def _inspect_ccs2_response(
+        self, response: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, dt.datetime | None]:
+        """IN CCS2 shape: resMsg root + state.time (not state.Vehicle)."""
+        state = response.get("resMsg")
+        if not isinstance(state, dict):
+            return None, None
+        time_val = get_child_value(state, "time")
+        if not time_val:
+            return state, None
+        try:
+            last = self.get_last_updated_at(time_val)
+            return state, last
+        except (ValueError, TypeError):  # fmt: skip
+            _LOGGER.warning(
+                f"{DOMAIN} - IN CCS2 _inspect: cannot parse time '{time_val}'"
+            )
+            return state, None
+
+    def _apply_ccs2_state(self, vehicle: Vehicle, state: dict[str, Any]) -> None:
+        """IN uses its own non-CCS2 parser (state.time / airTemp)."""
         self._update_vehicle_properties(vehicle, state)
+
+    def _post_refresh_ccs2_location(self, token: Token, vehicle: Vehicle) -> None:
+        """IN location refresh via _update_vehicle_location helper."""
         location = self._get_location(token, vehicle)
         self._update_vehicle_location(vehicle, location)
 
