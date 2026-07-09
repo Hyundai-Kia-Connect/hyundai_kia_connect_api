@@ -10,7 +10,11 @@ import certifi
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
+from hyundai_kia_connect_api.exceptions import (
+    APIError,
+    AuthenticationError,
+    ServiceTemporaryUnavailable,
+)
 
 from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions
 from .const import (
@@ -42,21 +46,25 @@ def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
-    Known values:
-    502: AuthenticationError - Incorrect username or password
+
+    The HATA backend returns errorCode as int (e.g. 502) in the
+    response body.  HTTP 502 from HATA is a server-side error
+    ("HATA remoteVehicleStatus service failed"), NOT an
+    authentication failure.  502 maps to ServiceTemporaryUnavailable;
+    other codes raise generic APIError.
 
     :param response: the API's JSON response
     """
     error_code_mapping = {
-        "502": AuthenticationError,
+        "502": ServiceTemporaryUnavailable,
     }
     if "errorCode" in response:
-        if response["errorCode"] in error_code_mapping:
-            raise error_code_mapping[response["errorCode"]](response["errorMessage"])
-        else:
-            raise APIError(
-                f"API Error {response['errorCode']}: {response['errorMessage']}"
-            )
+        system = response.get("systemName", "")
+        function = response.get("functionName", "")
+        suffix = f" [{system}/{function}]" if system or function else ""
+        code = str(response["errorCode"])
+        exc = error_code_mapping.get(code, APIError)
+        raise exc(f"API Error {code}{suffix}: {response['errorMessage']}")
 
 
 def _safe_parse_json(response, action_name: str):
