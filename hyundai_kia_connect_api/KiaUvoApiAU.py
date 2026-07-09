@@ -226,7 +226,7 @@ class KiaUvoApiAU(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
         response = self.session.get(
             url,
             headers=self._get_authenticated_headers(
