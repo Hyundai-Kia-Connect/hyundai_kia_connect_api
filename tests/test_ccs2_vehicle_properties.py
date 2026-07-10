@@ -267,6 +267,8 @@ def test_battery_auxiliary_fail_warning_missing_leaves_none(
     del ccs2_state_new_fields["Electronics"]["Battery"]["Auxiliary"]["FailWarning"]
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.battery_auxiliary_fail_warning_is_on is None
+
+
 class TestCCS2LocationTimestampNone:
     """kia_uvo #1771 sidetask: missing Location.TimeStamp must yield
     location_last_updated_at None, not a 2000-01-01 sentinel ("27 years ago").
