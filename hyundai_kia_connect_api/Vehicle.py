@@ -6,7 +6,7 @@ import datetime
 from dataclasses import dataclass, field
 
 from .utils import float_or_none, get_float, get_safe_local_datetime
-from .const import DISTANCE_UNITS
+from .const import DISTANCE_UNITS, PRESSURE_UNITS, PressureUnit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -156,6 +156,26 @@ class Vehicle:
     tire_pressure_front_left_warning_is_on: bool = None
     tire_pressure_front_right_warning_is_on: bool = None
     tire_pressure_rear_right_warning_is_on: bool = None
+    # Tire pressure values (CCS2 Chassis.Axle.*.Tire.Pressure). Model B: raw is
+    # in the car's display unit; value = raw x PRESSURE_SCALES[PressureUnit].
+    # See const.PRESSURE_UNITS / PRESSURE_SCALES. None when unreported.
+    tire_pressure_front_left: float = None
+    tire_pressure_front_right: float = None
+    tire_pressure_rear_left: float = None
+    tire_pressure_rear_right: float = None
+    # Tire-pressure display unit (PressureUnit IntEnum). Single source of truth;
+    # the per-tire *_unit properties below derive the label from this (no
+    # duplicate storage). HA entities read tire_pressure_<pos>_unit for
+    # native_unit via the DYNAMIC_UNIT pattern.
+    tire_pressure_unit: PressureUnit | None = None
+    # Drive mode (CCS2 Chassis.DrivingMode.State): Eco/Sport/Comfort/Snow/Smart…
+    drive_mode: str = None
+    # Low oil level warning (HEV/ICE, CCS2 Drivetrain.InternalCombustionEngine.OilLevelWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    oil_level_warning_is_on: bool = None
+    # 12V auxiliary battery fault warning (CCS2 Electronics.Battery.Auxiliary.FailWarning).
+    # None when unreported so the entity is not created for vehicles without the sensor.
+    battery_auxiliary_fail_warning_is_on: bool = None
 
     # Service Data
     _next_service_distance: float = None
@@ -391,6 +411,23 @@ class Vehicle:
     @property
     def total_driving_range_unit(self):
         return self._total_driving_range_unit
+
+    @property
+    def tire_pressure_front_left_unit(self) -> str | None:
+        """Display-unit label for tire pressure (shared across all tires)."""
+        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+
+    @property
+    def tire_pressure_front_right_unit(self) -> str | None:
+        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+
+    @property
+    def tire_pressure_rear_left_unit(self) -> str | None:
+        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+
+    @property
+    def tire_pressure_rear_right_unit(self) -> str | None:
+        return PRESSURE_UNITS.get(self.tire_pressure_unit)
 
     @total_driving_range.setter
     def total_driving_range(self, value):

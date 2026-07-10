@@ -3,6 +3,7 @@ import datetime
 import pytest
 from zoneinfo import ZoneInfo
 from hyundai_kia_connect_api.utils import (
+    bool_or_none,
     detect_timezone_for_date,
     float_or_none,
     parse_datetime,
@@ -54,6 +55,20 @@ def test_float_or_none_decimal_string():
 
 def test_float_or_none_non_numeric():
     assert float_or_none("abc") is None
+
+
+def test_bool_or_none_none():
+    assert bool_or_none(None) is None
+
+
+def test_bool_or_none_truthy():
+    assert bool_or_none(1) is True
+    assert bool_or_none("1") is True
+
+
+def test_bool_or_none_falsy():
+    assert bool_or_none(0) is False
+    assert bool_or_none("") is False
 
 
 def test_float_or_none_empty_string():
