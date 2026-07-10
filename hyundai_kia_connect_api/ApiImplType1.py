@@ -230,7 +230,7 @@ class ApiImplType1(ApiImpl):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time | None:
+    def _get_time_from_string(self, value, timesection) -> dt.time | None:
         if value is None:
             return None
         try:
