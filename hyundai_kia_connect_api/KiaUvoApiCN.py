@@ -43,6 +43,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    normalize_battery_soc,
     parse_datetime,
 )
 from .Vehicle import (
@@ -219,21 +220,6 @@ class KiaUvoApiCN(ApiImplType1):
             result.append(vehicle)
         return result
 
-    def _get_time_from_string(self, value, timesection) -> dt.datetime.time:
-        if value is not None:
-            lastTwo = int(value[-2:])
-            if lastTwo > 60:
-                value = int(value) + 40
-            if int(value) > 1260:
-                value = dt.datetime.strptime(str(value), "%H%M").time()
-            else:
-                if timesection == 0:
-                    value = str(value) + " AM"
-                elif timesection == 1:
-                    value = str(value) + " PM"
-                value = dt.datetime.strptime(value, "%I%M %p").time()
-        return value
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
@@ -284,7 +270,7 @@ class KiaUvoApiCN(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
         response = self.session.get(
             url,
             headers=self._get_authenticated_headers(
@@ -322,7 +308,9 @@ class KiaUvoApiCN(ApiImplType1):
                 )
             ],
         )
-        vehicle.car_battery_percentage = get_child_value(state, "status.battery.batSoc")
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "status.battery.batSoc")
+        )
         vehicle.engine_is_running = get_child_value(state, "status.engine")
 
         # Converts temp to usable number. Currently only support celsius.

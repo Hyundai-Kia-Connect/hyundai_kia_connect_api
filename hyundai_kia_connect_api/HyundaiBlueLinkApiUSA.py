@@ -10,7 +10,11 @@ import certifi
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
-from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
+from hyundai_kia_connect_api.exceptions import (
+    APIError,
+    AuthenticationError,
+    ServiceTemporaryUnavailable,
+)
 
 from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions
 from .const import (
@@ -23,7 +27,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
-from .utils import get_child_value, get_float, parse_datetime
+from .utils import get_child_value, get_float, normalize_battery_soc, parse_datetime
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -42,21 +46,25 @@ def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
-    Known values:
-    502: AuthenticationError - Incorrect username or password
+
+    The HATA backend returns errorCode as int (e.g. 502) in the
+    response body.  HTTP 502 from HATA is a server-side error
+    ("HATA remoteVehicleStatus service failed"), NOT an
+    authentication failure.  502 maps to ServiceTemporaryUnavailable;
+    other codes raise generic APIError.
 
     :param response: the API's JSON response
     """
     error_code_mapping = {
-        "502": AuthenticationError,
+        "502": ServiceTemporaryUnavailable,
     }
     if "errorCode" in response:
-        if response["errorCode"] in error_code_mapping:
-            raise error_code_mapping[response["errorCode"]](response["errorMessage"])
-        else:
-            raise APIError(
-                f"API Error {response['errorCode']}: {response['errorMessage']}"
-            )
+        system = response.get("systemName", "")
+        function = response.get("functionName", "")
+        suffix = f" [{system}/{function}]" if system or function else ""
+        code = str(response["errorCode"])
+        exc = error_code_mapping.get(code, APIError)
+        raise exc(f"API Error {code}{suffix}: {response['errorMessage']}")
 
 
 def _safe_parse_json(response, action_name: str):
@@ -127,6 +135,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
     _action_service_types: dict[str, str] = {}
+
+    # Cached enrollment/details response. Capabilities, seat configs,
+    # generation and model rarely change, so the response is cached for
+    # the instance lifetime. get_vehicles force-refreshes (vehicle list
+    # can change); _get_vehicle_details uses the cache.
+    _enrollment_details_cache: dict | None = None
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
@@ -282,13 +296,31 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # No refresh_token available — full login.
         return self.login(token.username, token.password, token.pin)
 
-    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+    def _get_enrollment_details(
+        self, token: Token, force_refresh: bool = False
+    ) -> dict:
+        """Return enrollment details for the account, cached on the instance.
+
+        Capabilities, seat configs, generation and model change rarely, so
+        the response is cached for the instance lifetime. ``get_vehicles``
+        forces a refresh (the vehicle list can change); ``_get_vehicle_details``
+        uses the cache.
+        """
+        if self._enrollment_details_cache is not None and not force_refresh:
+            return self._enrollment_details_cache
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        _check_response_for_errors(response)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+        if "enrolledVehicleDetails" not in response_json:
+            raise AuthenticationError("Missing enrolledVehicleDetails in response")
+        self._enrollment_details_cache = response_json
+        return response_json
+
+    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+        response = self._get_enrollment_details(token)
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
             if entry["regid"] == vehicle.id:
@@ -413,8 +445,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(state, "vehicleDetails.odometer"),
             DISTANCE_UNITS[3],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "vehicleStatus.battery.batSoc")
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
         vehicle.washer_fluid_warning_is_on = get_child_value(
@@ -885,14 +917,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         self._update_vehicle_properties(vehicle, state)
 
     def get_vehicles(self, token: Token):
-        url = self.API_URL + "enrollment/details/" + token.username
-        headers = self._get_authenticated_headers(token)
-        response = self.session.get(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
-        response = response.json()
-        _check_response_for_errors(response)
-        if "enrolledVehicleDetails" not in response:
-            raise AuthenticationError("Missing enrolledVehicleDetails in response")
+        response = self._get_enrollment_details(token, force_refresh=True)
         result = []
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]

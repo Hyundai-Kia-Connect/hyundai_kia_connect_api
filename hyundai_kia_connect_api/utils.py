@@ -2,12 +2,15 @@
 """utils.py"""
 
 import datetime
+import logging
 import re
 from enum import IntEnum
 from typing import Any, TypeVar
 
 
 T = TypeVar("T", bound=IntEnum)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def to_int_enum(enum_class: type[T], value: str | int | T | None) -> T | None:
@@ -92,6 +95,37 @@ def bool_or_none(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
+def normalize_battery_soc(
+    value: int | float | None,
+    sensor_reliability: int | None = None,
+) -> int | None:
+    """Normalize 12V auxiliary battery state-of-charge.
+
+    Returns None when the car reports an unavailable or unreliable reading:
+    - sensor_reliability == 1  (CCS2 flag: "sensor unreliable")
+    - value is None
+    - value outside 0..100 (sentinel 0xFF=255, -1, etc.)
+
+    Otherwise returns int(value). A warning is logged only for out-of-range
+    sentinels (not for sensor_reliability==1, which is an expected state after
+    12V reset or during an ICCU failure on IONIQ 5 / Kia EV).
+    """
+    if sensor_reliability == 1:
+        return None
+    if value is None:
+        return None
+    if value < 0 or value > 100:
+        _LOGGER.warning(
+            "Invalid 12V auxiliary battery SOC value %s (expected 0..100); "
+            "treating as unavailable. A persistent 255/0xFF reading on "
+            "IONIQ 5 / Kia EV can be an early symptom of ICCU failure — "
+            "see kia_uvo#1771.",
+            value,
+        )
+        return None
+    return int(value)
+
+
 def get_hex_temp_into_index(value):
     if value is not None:
         value = value.replace("H", "")
@@ -111,9 +145,11 @@ def get_index_into_hex_temp(value):
         return None
 
 
-def parse_datetime(value, timezone) -> datetime.datetime:
+def parse_datetime(value, timezone) -> datetime.datetime | None:
+    # Missing timestamp must surface as None (HA renders "unknown") rather than
+    # a 2000-01-01 sentinel that renders as "27 years ago". See kia_uvo #1771.
     if value is None:
-        return datetime.datetime(2000, 1, 1, tzinfo=timezone)
+        return None
 
     # Try parsing the new format: Tue, 24 Jun 2025 16:18:10 GMT
     try:

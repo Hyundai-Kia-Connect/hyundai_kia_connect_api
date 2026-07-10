@@ -48,6 +48,7 @@ from .exceptions import (
 from .utils import (
     get_child_value,
     get_hex_temp_into_index,
+    normalize_battery_soc,
     parse_datetime,
 )
 
@@ -444,7 +445,7 @@ class KiaUvoApiEU(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
         response = self.session.get(
             url,
             headers=self._get_authenticated_headers(
@@ -476,8 +477,8 @@ class KiaUvoApiEU(ApiImplType1):
                     )
                 ],
             )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "vehicleStatus.battery.batSoc"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "vehicleStatus.battery.batSoc")
         )
         vehicle.engine_is_running = get_child_value(state, "vehicleStatus.engine")
 
