@@ -577,12 +577,30 @@ class ApiImplType1(ApiImpl):
             TEMPERATURE_UNITS[0],
         )
 
-        battery_winter_mode = get_child_value(
+        winter_mode = get_child_value(
             state, "Green.BatteryManagement.WinterModeOperation"
         )
-        if battery_winter_mode is not None:
-            vehicle.ev_battery_winter_mode = bool(battery_winter_mode)
-            vehicle.ev_battery_precondition_enabled = bool(battery_winter_mode)
+        if winter_mode is not None:
+            vehicle.ev_battery_winter_mode = bool(winter_mode)
+
+        # EV battery preconditioning toggle.
+        # EV (e.g. IONIQ 5) reports Green.BatteryManagement.BatteryPreCondition.Status
+        # — a configuration setting (stable across ignition/climate state), not a
+        # runtime flag (BatteryConditioning is the runtime flag). HEV (e.g. Santa
+        # Fe) reports only WinterModeOperation; "winter mode" is itself the
+        # battery preconditioning/winter-heating toggle there, so keep it as the
+        # fallback (preserves existing HEV behaviour, no regression).
+        # Status enum confirmed via reporter dumps (kia_uvo #1652, 2026-07-12):
+        #   0 = disabled in vehicle settings, 2 = enabled in vehicle settings.
+        # Pre-#1205 this sensor aliased WinterModeOperation, which is absent on
+        # EVs -> the sensor never appeared (see API #1187).
+        battery_precondition_status = get_child_value(
+            state, "Green.BatteryManagement.BatteryPreCondition.Status"
+        )
+        if battery_precondition_status is not None:
+            vehicle.ev_battery_precondition_enabled = battery_precondition_status != 0
+        elif winter_mode is not None:
+            vehicle.ev_battery_precondition_enabled = bool(winter_mode)
 
         if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
             vehicle.ev_charging_power = get_child_value(
