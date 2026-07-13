@@ -7,6 +7,7 @@ from hyundai_kia_connect_api.utils import (
     detect_timezone_for_date,
     float_or_none,
     parse_datetime,
+    pressure_or_none,
 )
 
 
@@ -69,6 +70,23 @@ def test_bool_or_none_truthy():
 def test_bool_or_none_falsy():
     assert bool_or_none(0) is False
     assert bool_or_none("") is False
+
+
+def test_pressure_or_none_none():
+    assert pressure_or_none(None) is None
+
+
+def test_pressure_or_none_sentinel_255():
+    # 255 (0xFF) is the TPMS "no reading" sentinel (car off / before driving).
+    assert pressure_or_none(255) is None
+
+
+def test_pressure_or_none_real_value_passthrough():
+    # Known-good raw values pass through unchanged for the caller to scale.
+    assert pressure_or_none(27) == 27  # bar (raw 27 -> 2.7)
+    assert pressure_or_none(38) == 38  # psi
+    assert pressure_or_none(51) == 51  # kPa
+    assert pressure_or_none(0) == 0  # 0 is NOT a sentinel (could be a flat)
 
 
 def test_float_or_none_empty_string():

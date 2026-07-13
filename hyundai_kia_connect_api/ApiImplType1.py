@@ -23,9 +23,10 @@ from .Vehicle import Vehicle
 from .utils import (
     bool_or_none,
     get_child_value,
-    normalize_battery_soc,
     get_index_into_hex_temp,
+    normalize_battery_soc,
     parse_datetime,
+    pressure_or_none,
     window_is_open,
 )
 
@@ -486,14 +487,37 @@ class ApiImplType1(ApiImpl):
         # See const.PRESSURE_UNITS / PRESSURE_SCALES. Per-tire *_unit labels are
         # read-only properties on Vehicle deriving from tire_pressure_unit.
         _pu_raw = get_child_value(state, "Chassis.Axle.Tire.PressureUnit")
-        vehicle.tire_pressure_unit = (
-            PressureUnit(_pu_raw) if _pu_raw is not None else None
-        )
+        if _pu_raw is None:
+            vehicle.tire_pressure_unit = None
+        else:
+            try:
+                vehicle.tire_pressure_unit = PressureUnit(_pu_raw)
+            except ValueError:
+                # Some vehicles return a PressureUnit not in the enum (e.g. 3,
+                # see API #1230 / kia_uvo #1784 #1785). Degrade gracefully instead
+                # of crashing the whole vehicle update / integration setup.
+                _LOGGER.warning(
+                    "%s - Unknown tire PressureUnit %r; tire pressure values ignored",
+                    DOMAIN,
+                    _pu_raw,
+                )
+                vehicle.tire_pressure_unit = None
         _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
-        _pfl = get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
-        _pfr = get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
-        _prl = get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
-        _prr = get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
+        # 255 (0xFF) is the TPMS "no reading" sentinel (car off / before
+        # driving) -> pressure_or_none returns None so the entity shows
+        # unavailable instead of an impossible value. See kia_uvo #1783, #1232.
+        _pfl = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
+        )
+        _pfr = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
+        )
+        _prl = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
+        )
+        _prr = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
+        )
         vehicle.tire_pressure_front_left = (
             round(_pfl * _scale, 1) if _pfl is not None and _scale is not None else None
         )
