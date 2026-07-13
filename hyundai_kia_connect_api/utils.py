@@ -95,6 +95,26 @@ def bool_or_none(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
+# TPMS "no reading" sentinel: the CCS2 status returns raw tire Pressure = 255
+# (0xFF) for all tires when the sensors haven't reported yet (car off / before
+# driving). With any unit's scale that yields an impossible value (25.5 bar /
+# 255 psi / 1275 kPa), so it must surface as unknown, not a real pressure.
+# See kia_uvo #1783, API #1232.
+_TPMS_NO_READING_SENTINEL = 255
+
+
+def pressure_or_none(value: int | float | None) -> int | float | None:
+    """Return a tire pressure raw value, or None if it's the no-reading sentinel.
+
+    None passes through; 255 (0xFF, TPMS "no reading") -> None; everything else
+    is returned as-is for the caller to scale. ``PressureLow`` already flags
+    actual low/flat tires, so 0 is NOT treated as a sentinel here.
+    """
+    if value is None or value == _TPMS_NO_READING_SENTINEL:
+        return None
+    return value
+
+
 def normalize_battery_soc(
     value: int | float | None,
     sensor_reliability: int | None = None,

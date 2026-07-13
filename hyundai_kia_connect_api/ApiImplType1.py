@@ -23,9 +23,10 @@ from .Vehicle import Vehicle
 from .utils import (
     bool_or_none,
     get_child_value,
-    normalize_battery_soc,
     get_index_into_hex_temp,
+    normalize_battery_soc,
     parse_datetime,
+    pressure_or_none,
     window_is_open,
 )
 
@@ -502,26 +503,19 @@ class ApiImplType1(ApiImpl):
                 )
                 vehicle.tire_pressure_unit = None
         _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
-
-        # 255 (0xFF) is the TPMS "no reading" sentinel, returned for all tires
-        # when the sensors haven't reported yet (car off / before driving). With
-        # any unit's scale it yields an impossible value (25.5 bar / 255 psi /
-        # 1275 kPa), so treat it as unknown. See kia_uvo #1783, API #1232.
-        def _pressure_or_none(raw: float | int | None) -> float | int | None:
-            if raw is None or raw == 255:
-                return None
-            return raw
-
-        _pfl = _pressure_or_none(
+        # 255 (0xFF) is the TPMS "no reading" sentinel (car off / before
+        # driving) -> pressure_or_none returns None so the entity shows
+        # unavailable instead of an impossible value. See kia_uvo #1783, #1232.
+        _pfl = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         )
-        _pfr = _pressure_or_none(
+        _pfr = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
         )
-        _prl = _pressure_or_none(
+        _prl = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
         )
-        _prr = _pressure_or_none(
+        _prr = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
         )
         vehicle.tire_pressure_front_left = (
