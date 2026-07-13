@@ -486,9 +486,21 @@ class ApiImplType1(ApiImpl):
         # See const.PRESSURE_UNITS / PRESSURE_SCALES. Per-tire *_unit labels are
         # read-only properties on Vehicle deriving from tire_pressure_unit.
         _pu_raw = get_child_value(state, "Chassis.Axle.Tire.PressureUnit")
-        vehicle.tire_pressure_unit = (
-            PressureUnit(_pu_raw) if _pu_raw is not None else None
-        )
+        if _pu_raw is None:
+            vehicle.tire_pressure_unit = None
+        else:
+            try:
+                vehicle.tire_pressure_unit = PressureUnit(_pu_raw)
+            except ValueError:
+                # Some vehicles return a PressureUnit not in the enum (e.g. 3,
+                # see API #1230 / kia_uvo #1784 #1785). Degrade gracefully instead
+                # of crashing the whole vehicle update / integration setup.
+                _LOGGER.warning(
+                    "%s - Unknown tire PressureUnit %r; tire pressure values ignored",
+                    DOMAIN,
+                    _pu_raw,
+                )
+                vehicle.tire_pressure_unit = None
         _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
         _pfl = get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         _pfr = get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")

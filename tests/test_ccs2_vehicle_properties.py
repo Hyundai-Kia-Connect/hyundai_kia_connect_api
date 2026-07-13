@@ -234,6 +234,28 @@ def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fie
     assert vehicle.tire_pressure_front_left_unit is None
 
 
+def test_tire_pressure_unknown_unit_does_not_crash(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # Some vehicles return a PressureUnit not in the enum (e.g. 3 — see API #1230,
+    # kia_uvo #1784/#1785). An unknown unit must NOT raise ValueError and break the
+    # whole vehicle update; it degrades gracefully: unit None, values None, no
+    # entities created.
+    ccs2_state_new_fields["Chassis"]["Axle"]["Tire"]["PressureUnit"] = 3
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row1"]["Left"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row1"]["Right"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row2"]["Left"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row2"]["Right"]["Tire"]["Pressure"] = 26
+    # Must not raise.
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_unit is None
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_front_left_unit is None
+
+
 def test_drive_mode(ccs2_api, vehicle, ccs2_state_new_fields):
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.drive_mode == "Eco"
