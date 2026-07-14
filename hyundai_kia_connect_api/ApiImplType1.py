@@ -543,6 +543,16 @@ class ApiImplType1(ApiImpl):
         vehicle.battery_auxiliary_fail_warning_is_on = bool_or_none(
             get_child_value(state, "Electronics.Battery.Auxiliary.FailWarning")
         )
+        # Power/ignition/sleep — gap vs CA/IN flat format.
+        vehicle.accessory_on = bool_or_none(
+            get_child_value(state, "Electronics.PowerSupply.Accessory")
+        )
+        vehicle.ign3 = bool_or_none(
+            get_child_value(state, "Electronics.PowerSupply.Ignition3")
+        )
+        vehicle.sleep_mode_check = bool_or_none(
+            get_child_value(state, "RemoteControl.SleepMode")
+        )
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(
