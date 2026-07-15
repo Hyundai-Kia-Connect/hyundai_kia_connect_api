@@ -6,6 +6,7 @@ from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
 from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
 from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.exceptions import DeviceIDError
 
 _TOKEN_RESPONSE = {
     "token_type": "Bearer",
@@ -52,3 +53,16 @@ def test_au_refresh_grant_type_and_url() -> None:
     assert call.args[0] == api.USER_API_URL + "oauth2/token"
     assert "grant_type=refresh_token" in call.kwargs["data"]
     assert "refresh_token=old-rtk" in call.kwargs["data"]
+
+
+def test_au_refresh_falls_back_to_login_on_error() -> None:
+    """If the refresh request raises, the base must fall back to self.login()."""
+    api = KiaUvoApiAU(region=5, brand=2, language="en")
+    api._get_stamp = lambda: "STAMP-FAKE"  # type: ignore[assignment]
+    api.session.post = MagicMock(  # type: ignore[assignment]
+        side_effect=DeviceIDError("4002 Invalid parameters")
+    )
+    api.login = MagicMock(return_value="FELLBACK")  # type: ignore[assignment]
+    result = api.refresh_access_token(Token(refresh_token="old-rtk"))
+    assert result == "FELLBACK"
+    api.login.assert_called_once()
