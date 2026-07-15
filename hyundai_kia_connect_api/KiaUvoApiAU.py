@@ -955,3 +955,7 @@ class KiaUvoApiAU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """AU requires the Stamp header on the refresh_token grant."""
+        return {"Stamp": self._get_stamp()}

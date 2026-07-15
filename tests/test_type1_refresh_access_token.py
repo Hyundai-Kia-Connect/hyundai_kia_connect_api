@@ -1,12 +1,13 @@
 """Tests for ApiImplType1.refresh_access_token (shared by AU, IN, CN).
 
-Locks in the unified base behaviour: the refresh_token grant is sent to
-``oauth2/token`` without a Stamp header. CN's existing ``_get_refresh_token``
-already omits Stamp and works, which shows the endpoint family does not
-require it. AU and IN previously sent Stamp, but that was carried over from
-``_get_access_token`` (authorization_code grant) and is not required for the
-refresh_token grant. If a region's server turns out to require Stamp, the
-call fails and falls back to ``self.login()`` — no regression vs. pre-PR.
+The base implementation sends the refresh_token grant to ``oauth2/token``
+without a Stamp header. CN's existing ``_get_refresh_token`` already omits
+Stamp and works, so CN and IN inherit the base (no Stamp). AU, however,
+requires Stamp on the refresh_token grant — confirmed live in kia_uvo #1778
+(errCode 4002 "Invalid parameters" without it) — so AU overrides the
+``_refresh_access_token_headers`` hook to add ``Stamp`` while still inheriting
+the base method. If a region's refresh fails, the base falls back to
+``self.login()`` — no regression vs. pre-PR.
 """
 
 from unittest.mock import patch
@@ -166,7 +167,10 @@ class TestRegionsUseBaseRefreshAccessToken:
     def test_cn_does_not_override_refresh_access_token(self):
         assert KiaUvoApiCN.refresh_access_token is ApiImplType1.refresh_access_token
 
-    def test_au_refresh_does_not_send_stamp(self):
+    def test_au_refresh_sends_stamp(self):
+        # AU requires the Stamp header on the refresh_token grant — confirmed
+        # live in kia_uvo #1778 (errCode 4002 "Invalid parameters" without it).
+        # AU overrides the _refresh_access_token_headers hook, not the method.
         api = KiaUvoApiAU(region=5, brand=2, language="en")
         captured = {}
 
@@ -179,4 +183,5 @@ class TestRegionsUseBaseRefreshAccessToken:
         ):
             api.refresh_access_token(_make_token())
 
-        assert "Stamp" not in captured["headers"]
+        assert "Stamp" in captured["headers"]
+        assert captured["headers"]["Stamp"]
