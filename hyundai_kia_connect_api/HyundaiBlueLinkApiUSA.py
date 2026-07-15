@@ -465,7 +465,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             air_temp = self.temperature_range[0]
         if air_temp == "HI":
             air_temp = self.temperature_range[-1]
-        if air_temp:
+        if air_temp not in (None, "OFF"):
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(state, "vehicleStatus.defrost")
         vehicle.steering_wheel_heater_is_on = get_child_value(
