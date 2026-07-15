@@ -477,7 +477,7 @@ class KiaUvoApiUSA(ApiImpl):
             air_temp = self.temperature_range[0]
         if air_temp == "HIGH":
             air_temp = self.temperature_range[-1]
-        if air_temp:
+        if air_temp not in (None, "OFF"):
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.defrost"
