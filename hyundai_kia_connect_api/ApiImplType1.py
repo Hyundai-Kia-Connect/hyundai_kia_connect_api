@@ -1321,6 +1321,14 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         return response["msgId"]
 
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """Extra headers for the refresh_token grant. Default: none.
+
+        AU overrides to add the Stamp header its server requires;
+        IN/CN inherit the empty default (no behavior change).
+        """
+        return {}
+
     def refresh_access_token(self, token: Token) -> Token:
         """Refresh access token using the stored refresh token.
 
@@ -1355,6 +1363,7 @@ class ApiImplType1(ApiImpl):
                     "Accept-Encoding": "gzip, deflate",
                     "User-Agent": USER_AGENT_OK_HTTP,
                 }
+                headers.update(self._refresh_access_token_headers())
                 data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
                 response = self.session.post(url, data=data, headers=headers)
                 response_json = response.json()
