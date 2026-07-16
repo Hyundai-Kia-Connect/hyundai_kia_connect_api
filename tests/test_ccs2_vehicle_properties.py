@@ -168,6 +168,10 @@ def ccs2_state_new_fields():
     state.setdefault("Electronics", {}).setdefault("Battery", {}).setdefault(
         "Auxiliary", {}
     )["FailWarning"] = 0
+    # Car-ON overlay: Accessory/Ignition3=1, SleepMode=0 (asleep=False).
+    state.setdefault("Electronics", {}).setdefault("PowerSupply", {})["Accessory"] = 1
+    state.setdefault("Electronics", {}).setdefault("PowerSupply", {})["Ignition3"] = 1
+    state.setdefault("RemoteControl", {})["SleepMode"] = 0
     return state
 
 
@@ -307,6 +311,25 @@ def test_battery_auxiliary_fail_warning_missing_leaves_none(
     del ccs2_state_new_fields["Electronics"]["Battery"]["Auxiliary"]["FailWarning"]
     ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
     assert vehicle.battery_auxiliary_fail_warning_is_on is None
+
+
+def test_power_supply_sleep_mapped(ccs2_api, vehicle, ccs2_state_new_fields):
+    # CCS2 gap vs CA/IN flat: accessory_on/ign3/sleep_mode_check mapped.
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.accessory_on is True
+    assert vehicle.ign3 is True
+    assert vehicle.sleep_mode_check is False
+
+
+def test_power_supply_sleep_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    ccs2_state_new_fields.pop("Electronics", None)
+    ccs2_state_new_fields.pop("RemoteControl", None)
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.accessory_on is None
+    assert vehicle.ign3 is None
+    assert vehicle.sleep_mode_check is None
 
 
 class TestCCS2LocationTimestampNone:
