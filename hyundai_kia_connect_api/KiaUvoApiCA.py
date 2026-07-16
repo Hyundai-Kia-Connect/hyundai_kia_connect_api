@@ -431,7 +431,13 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Test Token Response {response.text}")
         response = response.json()
-        token_errors = ["7403", "7602"]
+        # 7403/7602: token expired/deleted. 7606: CA binds the access token to
+        # the IP that issued it, and rejects it outright if the caller's IP has
+        # since changed (e.g. an ISP lease renewal around a nightly HA restart)
+        # rather than expiring it normally. Treating 7606 as valid left
+        # check_and_refresh_token() reusing the stale token, which then failed
+        # again in get_vehicles() as an unhandled APIError (kia_uvo#1715).
+        token_errors = ["7403", "7602", "7606"]
         if (
             response["responseHeader"]["responseCode"] == 1
             and response["error"]["errorCode"] in token_errors
