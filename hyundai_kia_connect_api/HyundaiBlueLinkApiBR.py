@@ -7,7 +7,7 @@ import logging
 import typing as ty
 from datetime import timedelta
 from time import sleep
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from .ApiImpl import (
     ApiImpl,
@@ -26,12 +26,31 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
-from .exceptions import APIError
+from .exceptions import APIError, AuthenticationError
 from .Token import Token
 from .utils import get_index_into_hex_temp, normalize_battery_soc, parse_date_br
 from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
+
+# The Brazilian signin endpoint returns {"step": N} (HTTP 200, no redirectUrl)
+# when the account must complete an action in the Bluelink app / web portal
+# before OAuth can proceed. The step numbers map to the routes handled by
+# toStep() in the login SPA bundle (/web/v1/user static JS).
+_SIGNIN_STEP_MESSAGES = {
+    0: "the account must accept the terms of service",
+    3: "the account must accept the data-access agreement",
+    4: "the account must re-accept updated terms of service",
+    5: "the account password has expired and must be reset",
+    6: "the account is not activated yet",
+    7: "identity verification is required",
+    8: "identity verification is required",
+    9: "the account is blocked",
+    10: "email verification is required",
+    11: "the account email must be changed",
+    12: "identity verification is required",
+    13: "email verification is required",
+}
 
 
 class HyundaiBlueLinkApiBR(ApiImpl):
@@ -102,8 +121,9 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Requesting cookies from {url}")
         response = self.session.get(url, params=params)
         response.raise_for_status()
-        cookies = response.cookies.get_dict()
-        return cookies
+        # The session cookie ('account') is set during the 302 redirect, so it
+        # lives in the session cookie jar rather than on the final response.
+        return self.session.cookies.get_dict()
 
     def _get_authorization_code(
         self, cookies: dict, username: str, password: str
@@ -131,10 +151,33 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response.raise_for_status()
         response_data = response.json()
 
+        redirect_url = response_data.get("redirectUrl")
+        if not redirect_url:
+            # The account authenticated but must complete an action before
+            # OAuth can proceed (see _SIGNIN_STEP_MESSAGES). Surface a clear
+            # message instead of a raw KeyError on "redirectUrl".
+            step = response_data.get("step")
+            reason = _SIGNIN_STEP_MESSAGES.get(step)
+            if reason is not None:
+                raise AuthenticationError(
+                    f"Brazilian Hyundai login incomplete: {reason} "
+                    f"(signin step={step}). Complete this in the Bluelink app "
+                    "or web portal, then retry."
+                )
+            raise AuthenticationError(
+                "Brazilian Hyundai login failed: no redirectUrl in signin "
+                f"response (keys={sorted(response_data.keys())}). "
+                "Check your username and password."
+            )
+
         _LOGGER.debug(f"{DOMAIN} - Got redirect URL")
-        parsed_url = urlparse(response_data["redirectUrl"])
-        authorization_code = parsed_url.query.split("=")[1]
-        return authorization_code
+        parsed_url = urlparse(redirect_url)
+        code_list = parse_qs(parsed_url.query).get("code")
+        if not code_list:
+            raise AuthenticationError(
+                "Brazilian Hyundai login failed: no authorization code in redirect URL."
+            )
+        return code_list[0]
 
     def _get_auth_response(self, authorization_code: str) -> dict:
         """Request access token from the API."""
