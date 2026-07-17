@@ -175,8 +175,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         code_list = parse_qs(parsed_url.query).get("code")
         if not code_list:
             raise AuthenticationError(
-                "Brazilian Hyundai login failed: no authorization code in "
-                "redirect URL."
+                "Brazilian Hyundai login failed: no authorization code in redirect URL."
             )
         return code_list[0]
 
