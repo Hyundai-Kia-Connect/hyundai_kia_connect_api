@@ -21,6 +21,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     REGION_AUSTRALIA,
     REGION_NZ,
     REGIONS,
@@ -109,11 +110,16 @@ class KiaUvoApiAU(ApiImplType1):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code = self._get_access_token(
+        _, access_token, authorization_code, expires_in = self._get_access_token(
             authorization_code, stamp
         )
         _, refresh_token = self._get_refresh_token(authorization_code, stamp)
-        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=23)
+        if expires_in is not None:
+            valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+                seconds=int(expires_in)
+            )
+        else:
+            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -934,7 +940,8 @@ class KiaUvoApiAU(ApiImplType1):
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
         authorization_code = response["refresh_token"]
-        return token_type, access_token, authorization_code
+        expires_in = response.get("expires_in")
+        return token_type, access_token, authorization_code, expires_in
 
     def _get_refresh_token(self, authorization_code, stamp):
         # Get Refresh Token #
@@ -955,3 +962,7 @@ class KiaUvoApiAU(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
+
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """AU requires the Stamp header on the refresh_token grant."""
+        return {"Stamp": self._get_stamp()}
