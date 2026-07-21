@@ -1158,7 +1158,7 @@ class ApiImplType1(ApiImpl):
                         "time": options.off_peak_start_time.strftime("%I%M"),
                     },
                 },
-                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+                "offPeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
             },
             "reservFlag": 1 if options.charging_enabled else 0,
         }

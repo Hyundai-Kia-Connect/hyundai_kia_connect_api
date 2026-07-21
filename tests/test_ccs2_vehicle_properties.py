@@ -431,3 +431,77 @@ def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
     assert vehicle.ev_off_peak_charge_only_enabled is None
     # window still parsed even if Mode unknown
     assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
+
+
+def test_schedule_charging_off_peak_flag_not_inverted(ccs2_api, vehicle):
+    """charge_only=True (time-priority) must send offPeakPowerFlag=1, not 2."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=True,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 1
+
+
+def test_schedule_charging_off_peak_flag_target_priority(ccs2_api, vehicle):
+    """charge_only=False (target-priority) must send offPeakPowerFlag=2."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=False,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 2
