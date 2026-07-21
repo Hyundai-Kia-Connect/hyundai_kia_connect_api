@@ -737,11 +737,65 @@ class ApiImplType1(ApiImpl):
             state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
         )
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+        # Green.Reservation.OffPeakTime — off-peak charging window + priority mode.
+        # Mode 0 = off, 2 = target-priority (off-peak tariffs prioritized),
+        # 3 = time-priority (charge only during off-peak). 1 is reserved/unused.
+        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime") or {}
+        try:
+            vehicle.ev_off_peak_start_time = dt.time(
+                int(off_peak.get("StartHour") or 0), int(off_peak.get("StartMin") or 0)
+            )
+            vehicle.ev_off_peak_end_time = dt.time(
+                int(off_peak.get("EndHour") or 0), int(off_peak.get("EndMin") or 0)
+            )
+        except (TypeError, ValueError):
+            _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
+            vehicle.ev_off_peak_start_time = None
+            vehicle.ev_off_peak_end_time = None
+
+        mode = off_peak.get("Mode")
+        if mode == 0:
+            vehicle.ev_schedule_charge_enabled = False
+            vehicle.ev_off_peak_charge_only_enabled = None
+        elif mode == 2:
+            vehicle.ev_schedule_charge_enabled = True
+            vehicle.ev_off_peak_charge_only_enabled = False
+        elif mode == 3:
+            vehicle.ev_schedule_charge_enabled = True
+            vehicle.ev_off_peak_charge_only_enabled = True
+        elif mode is not None:
+            _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
+        # mode is None -> no OffPeakTime block (HEV/unconfigured) -> attrs stay None
+
+        # Departure schedules
+        schedule1 = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule1") or {}
+        )
+        schedule2 = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule2") or {}
+        )
+        try:
+            vehicle.ev_first_departure_time = dt.time(
+                int(schedule1.get("Hour") or 0), int(schedule1.get("Min") or 0)
+            )
+            vehicle.ev_second_departure_time = dt.time(
+                int(schedule2.get("Hour") or 0), int(schedule2.get("Min") or 0)
+            )
+        except (TypeError, ValueError):
+            _LOGGER.warning("%s - CCS2 departure time malformed", DOMAIN)
+        vehicle.ev_first_departure_days = [
+            i
+            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+            if schedule1.get(k) == 1
+        ] or None
+        vehicle.ev_second_departure_days = [
+            i
+            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+            if schedule2.get(k) == 1
+        ] or None
+
+        # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
+        # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
