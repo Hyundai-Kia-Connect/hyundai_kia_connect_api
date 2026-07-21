@@ -39,7 +39,7 @@ pytestmark = pytest.mark.skipif(not _has_syrupy, reason="syrupy not installed")
 # ---------------------------------------------------------------------------
 US_KIA_FILES = discover_fixtures("us_kia_")
 US_HYUNDAI_FILES = discover_fixtures("us_hyundai_")
-EU_FILES = discover_fixtures("eu_kia_ev6_")
+EU_FILES = [f for f in discover_fixtures("eu_kia_ev6_") if "ccs2" not in f]
 # All EU Kia CCS2 fixtures, identified by the "ccs2" suffix in the filename.
 # Covers EV9 (EV) and Sportage PHEV; future EU Kia CCS2 fixtures (any model)
 # are picked up automatically.
