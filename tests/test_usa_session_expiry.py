@@ -124,14 +124,14 @@ def test_decorator_one_retry_only(usa_api):
 
 def test_get_vehicles_recovers_after_relogin(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.side_effect = [_expired_response(), _vehicles_response()]
+    usa_api.session = MagicMock()
+    usa_api.session.get.side_effect = [_expired_response(), _vehicles_response()]
     usa_api.login = MagicMock(return_value=_fresh_token())
 
     result = usa_api.get_vehicles(token)
 
     assert result == []
-    assert usa_api._session.get.call_count == 2
+    assert usa_api.session.get.call_count == 2
     usa_api.login.assert_called_once()
     assert token.access_token == "fresh-sid"
     assert token.refresh_token == "rm2"
@@ -139,21 +139,21 @@ def test_get_vehicles_recovers_after_relogin(usa_api):
 
 def test_get_vehicles_success_no_retry(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.return_value = _vehicles_response()
+    usa_api.session = MagicMock()
+    usa_api.session.get.return_value = _vehicles_response()
     usa_api.login = MagicMock()
 
     result = usa_api.get_vehicles(token)
 
     assert result == []
     usa_api.login.assert_not_called()
-    assert usa_api._session.get.call_count == 1
+    assert usa_api.session.get.call_count == 1
 
 
 def test_get_vehicles_raises_otp_when_login_needs_otp(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.return_value = _expired_response()
+    usa_api.session = MagicMock()
+    usa_api.session.get.return_value = _expired_response()
     otp = OTPRequest(
         otp_key="k",
         request_id="r",
@@ -170,26 +170,26 @@ def test_get_vehicles_raises_otp_when_login_needs_otp(usa_api):
 
 def test_get_vehicles_one_retry_only(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.side_effect = [_expired_response(), _expired_response()]
+    usa_api.session = MagicMock()
+    usa_api.session.get.side_effect = [_expired_response(), _expired_response()]
     usa_api.login = MagicMock(return_value=_fresh_token())
 
     with pytest.raises(AuthenticationError):
         usa_api.get_vehicles(token)
-    assert usa_api._session.get.call_count == 2
+    assert usa_api.session.get.call_count == 2
     usa_api.login.assert_called_once()
 
 
 def test_refresh_vehicles_recovers_after_relogin(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.side_effect = [_expired_response(), _vehicles_response()]
+    usa_api.session = MagicMock()
+    usa_api.session.get.side_effect = [_expired_response(), _vehicles_response()]
     usa_api.login = MagicMock(return_value=_fresh_token())
 
     # Pass an empty list — refresh_vehicles iterates payload.vehicleSummary
     usa_api.refresh_vehicles(token, [])
 
-    assert usa_api._session.get.call_count == 2
+    assert usa_api.session.get.call_count == 2
     usa_api.login.assert_called_once()
     assert token.access_token == "fresh-sid"
     assert token.refresh_token == "rm2"
@@ -197,23 +197,23 @@ def test_refresh_vehicles_recovers_after_relogin(usa_api):
 
 def test_refresh_vehicles_success_no_retry(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.return_value = _vehicles_response()
+    usa_api.session = MagicMock()
+    usa_api.session.get.return_value = _vehicles_response()
     usa_api.login = MagicMock()
 
     usa_api.refresh_vehicles(token, [])
 
     usa_api.login.assert_not_called()
-    assert usa_api._session.get.call_count == 1
+    assert usa_api.session.get.call_count == 1
 
 
 def test_refresh_vehicles_one_retry_only(usa_api):
     token = _token()
-    usa_api._session = MagicMock()
-    usa_api._session.get.side_effect = [_expired_response(), _expired_response()]
+    usa_api.session = MagicMock()
+    usa_api.session.get.side_effect = [_expired_response(), _expired_response()]
     usa_api.login = MagicMock(return_value=_fresh_token())
 
     with pytest.raises(AuthenticationError):
         usa_api.refresh_vehicles(token, [])
-    assert usa_api._session.get.call_count == 2
+    assert usa_api.session.get.call_count == 2
     usa_api.login.assert_called_once()
