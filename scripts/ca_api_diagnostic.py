@@ -24,20 +24,10 @@ Safe: This script only reads data. It does not send commands to your vehicle.
 import argparse
 import base64
 import platform
-import socket
 import time
 import uuid
 
 import requests
-import requests.packages.urllib3.util.connection as urllib3_cn
-
-
-# Force IPv4 — CA API has known IPv6 issues
-def allowed_gai_family():
-    return socket.AF_INET
-
-
-urllib3_cn.allowed_gai_family = allowed_gai_family
 
 # ── Brand config ────────────────────────────────────────────────────────────
 
