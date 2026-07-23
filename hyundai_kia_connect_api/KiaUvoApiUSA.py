@@ -229,15 +229,16 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
         response_json = response.json()
-        if response_json["status"]["statusCode"] != 0:
-            raise Exception(
-                f"{DOMAIN} - OTP verification failed: {response_json['status']['errorMessage']}"
+        status = response_json.get("status") or {}
+        if status.get("statusCode") != 0:
+            raise AuthenticationError(
+                f"OTP verification failed: {status.get('errorMessage', '')}"
             )
         sid = response.headers.get("sid")
         rmtoken = response.headers.get("rmtoken")
         if not sid or not rmtoken:
-            raise Exception(
-                f"{DOMAIN} - No sid or rmtoken in OTP verification response. Headers: {response.headers}"
+            raise APIError(
+                f"No sid or rmtoken in OTP verification response. Headers: {response.headers}"
             )
         return sid, rmtoken
 

@@ -168,3 +168,35 @@ def test_login_otp_required_returns_otprequest(usa_api):
 
     assert isinstance(result, OTPRequest)
     assert result.otp_key == "k"
+
+
+def test_verify_otp_wrong_code_raises_authentication_error(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _otp_verify_response(
+        status_code=1, error_message="Invalid OTP"
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        usa_api._verify_otp("otpkey", "0000", "xid")
+    assert "OTP verification failed" in str(exc_info.value)
+
+
+def test_verify_otp_missing_sid_rmtoken_raises_apierror(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _otp_verify_response(status_code=0)
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api._verify_otp("otpkey", "1234", "xid")
+    assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_verify_otp_success_returns_sid_rmtoken(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _otp_verify_response(
+        status_code=0, sid="sid-val", rmtoken="rm-val"
+    )
+
+    sid, rmtoken = usa_api._verify_otp("otpkey", "1234", "xid")
+
+    assert sid == "sid-val"
+    assert rmtoken == "rm-val"
