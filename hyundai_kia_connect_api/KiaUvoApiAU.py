@@ -110,10 +110,9 @@ class KiaUvoApiAU(ApiImplType1):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code, expires_in = self._get_access_token(
+        _, access_token, refresh_token, expires_in = self._get_access_token(
             authorization_code, stamp
         )
-        _, refresh_token = self._get_refresh_token(authorization_code, stamp)
         if expires_in is not None:
             valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
                 seconds=int(expires_in)
@@ -939,29 +938,12 @@ class KiaUvoApiAU(ApiImplType1):
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
-        authorization_code = response["refresh_token"]
+        # Keep the refresh token verbatim: the oauth2/token refresh_token grant
+        # rejects "Bearer "-prefixed values and access tokens in the
+        # refresh_token slot with 4002 (kia_uvo #1778).
+        refresh_token = response["refresh_token"]
         expires_in = response.get("expires_in")
-        return token_type, access_token, authorization_code, expires_in
-
-    def _get_refresh_token(self, authorization_code, stamp):
-        # Get Refresh Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": stamp,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = "grant_type=refresh_token&refresh_token=" + authorization_code
-        response = self.session.post(url, data=data, headers=headers)
-        response = response.json()
-        token_type = response["token_type"]
-        refresh_token = token_type + " " + response["access_token"]
-        return token_type, refresh_token
+        return token_type, access_token, refresh_token, expires_in
 
     def _refresh_access_token_headers(self) -> dict[str, str]:
         """AU requires the Stamp header on the refresh_token grant."""
