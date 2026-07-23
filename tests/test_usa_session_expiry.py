@@ -105,6 +105,24 @@ def test_decorator_raises_otp_when_login_needs_otp(usa_api):
         do_thing(usa_api, token)
 
 
+def test_decorator_re_raises_login_failure_as_authentication_error(usa_api):
+    """A failed re-login (e.g. wrong password) must surface as AuthenticationError,
+    not the generic Exception that KiaUvoApiUSA.login raises, and not as OTP."""
+
+    @_retry_on_auth_error
+    def do_thing(self, token):
+        raise AuthenticationError("expired")
+
+    token = _token()
+    usa_api.login = MagicMock(side_effect=Exception("No session id returned in login"))
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        do_thing(usa_api, token)
+    assert not isinstance(exc_info.value, AuthenticationOTPRequired)
+    assert "Re-login failed" in str(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, Exception)
+
+
 def test_decorator_one_retry_only(usa_api):
     calls = {"n": 0}
 
@@ -178,6 +196,19 @@ def test_get_vehicles_one_retry_only(usa_api):
         usa_api.get_vehicles(token)
     assert usa_api.session.get.call_count == 2
     usa_api.login.assert_called_once()
+
+
+def test_get_vehicles_relogin_failure_raises_authentication_error(usa_api):
+    token = _token()
+    usa_api.session = MagicMock()
+    usa_api.session.get.return_value = _expired_response()
+    usa_api.login = MagicMock(side_effect=Exception("No session id returned in login"))
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        usa_api.get_vehicles(token)
+    assert not isinstance(exc_info.value, AuthenticationOTPRequired)
+    assert "Re-login failed" in str(exc_info.value)
+    assert usa_api.session.get.call_count == 1
 
 
 def test_refresh_vehicles_recovers_after_relogin(usa_api):

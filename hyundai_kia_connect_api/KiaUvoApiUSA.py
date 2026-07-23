@@ -117,13 +117,16 @@ def _retry_on_auth_error(func):
             _LOGGER.debug(
                 f"{DOMAIN} - Session expired during {func.__name__}, re-logging in"
             )
-            new_token = self.login(
-                token.username,
-                token.password,
-                token,
-                getattr(self, "_otp_handler", None),
-            )
-            if not isinstance(new_token, Token):
+            try:
+                new_token = self.login(
+                    token.username,
+                    token.password,
+                    token,
+                    getattr(self, "_otp_handler", None),
+                )
+            except Exception as e:
+                raise AuthenticationError(f"Re-login failed: {e}") from e
+            if isinstance(new_token, OTPRequest):
                 raise AuthenticationOTPRequired("OTP required to refresh token")
             token.access_token = new_token.access_token
             token.refresh_token = new_token.refresh_token
