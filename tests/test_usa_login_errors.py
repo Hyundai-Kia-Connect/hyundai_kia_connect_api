@@ -9,7 +9,10 @@ import json
 import pytest
 from unittest.mock import MagicMock
 
+from hyundai_kia_connect_api.ApiImpl import OTPRequest
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
+from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
 
 @pytest.fixture
@@ -85,3 +88,83 @@ def _complete_login_response(sid: str | None = None) -> MagicMock:
     resp.text = "{}"
     resp.headers = {"sid": sid} if sid is not None else {}
     return resp
+
+
+def test_login_wrong_credentials_raises_authentication_error(usa_api):
+    token = Token(username="u", password="bad", access_token="x", refresh_token="r")
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=1,
+        error_type=1,
+        error_code=1001,
+        error_message="Invalid Email or Password",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        usa_api.login("u", "bad", token)
+    assert "Invalid Email or Password" in str(exc_info.value)
+    assert not isinstance(exc_info.value, APIError) or isinstance(
+        exc_info.value, AuthenticationError
+    )
+
+
+def test_login_invalid_request_raises_apierror_not_auth(usa_api):
+    """9789 'Invalid Request' is a protocol issue, not bad creds — must NOT be AuthenticationError."""
+    token = Token(username="u", password="p", access_token="x", refresh_token="r")
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=1,
+        error_type=3,
+        error_code=9789,
+        error_message="Invalid Request",
+    )
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api.login("u", "p", token)
+    assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_login_status_zero_no_sid_raises_apierror(usa_api):
+    token = Token(username="u", password="p", access_token="x", refresh_token="r")
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=0, error_message="Success with response body"
+    )
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api.login("u", "p", token)
+    assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_login_success_returns_token(usa_api):
+    """Regression: sid present -> Token (unchanged path)."""
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=0, sid="session-id", error_message="Success"
+    )
+
+    result = usa_api.login("u", "p")
+
+    assert isinstance(result, Token)
+    assert result.access_token == "session-id"
+
+
+def test_login_otp_required_returns_otprequest(usa_api):
+    """Regression: otpKey in payload -> OTPRequest (unchanged path)."""
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=0,
+        payload={
+            "otpKey": "k",
+            "email": "e",
+            "phone": "s",
+            "hasEmail": True,
+            "hasPhone": True,
+        },
+        error_message="Success",
+    )
+
+    result = usa_api.login("u", "p")
+
+    assert isinstance(result, OTPRequest)
+    assert result.otp_key == "k"

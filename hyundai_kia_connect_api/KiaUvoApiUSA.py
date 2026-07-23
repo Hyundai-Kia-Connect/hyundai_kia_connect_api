@@ -365,9 +365,12 @@ class KiaUvoApiUSA(ApiImpl):
                 has_email=bool(payload.get("hasEmail")),
                 has_sms=bool(payload.get("hasPhone")),
             )
-        raise Exception(
-            f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
-        )
+        status = response_json.get("status") or {}
+        if status.get("errorCode") == 1001:
+            raise AuthenticationError(
+                f"Invalid Email or Password: {status.get('errorMessage', '')}"
+            )
+        raise APIError(f"No session id returned in login. Response: {response.text}")
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
