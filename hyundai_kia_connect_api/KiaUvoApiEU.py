@@ -8,6 +8,7 @@ import datetime as dt
 import logging
 import uuid
 import re
+from time import sleep
 from urllib.parse import parse_qs, urlparse
 
 from Crypto.PublicKey import RSA
@@ -445,13 +446,22 @@ class KiaUvoApiEU(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
+        """Force-refresh CCS2 state: wake the vehicle, wait, read the cached snapshot.
+
+        GET /ccs2/carstatus (no /latest) wakes the vehicle but returns an async
+        command envelope ({retCode, resCode, msgId}), not state — reading
+        resMsg.state.Vehicle from it raised KeyError: 'resMsg' (kia_uvo #1786,
+        #1806). Instead: wake, sleep for the car to report (~20s live-measured on
+        a reachable EU CCS2 car), then read the now-fresh cached /latest snapshot.
+        """
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        self.session.get(trigger_url, headers=headers).json()
+        sleep(25)
+        latest_url = trigger_url + "/latest"
+        response = self.session.get(latest_url, headers=headers).json()
         _LOGGER.debug(
             f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
         )
