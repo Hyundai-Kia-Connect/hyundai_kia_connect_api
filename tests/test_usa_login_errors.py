@@ -200,3 +200,17 @@ def test_verify_otp_success_returns_sid_rmtoken(usa_api):
 
     assert sid == "sid-val"
     assert rmtoken == "rm-val"
+
+
+def test_verify_otp_no_status_block_raises_apierror(usa_api):
+    """A malformed verifyOTP response with no status block must not be misclassified as wrong-OTP (AuthenticationError)."""
+    usa_api.session = MagicMock()
+    resp = MagicMock()
+    resp.json.return_value = {}  # no "status" key at all
+    resp.text = "{}"
+    resp.headers = {}
+    usa_api.session.post.return_value = resp
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api._verify_otp("otpkey", "1234", "xid")
+    assert not isinstance(exc_info.value, AuthenticationError)

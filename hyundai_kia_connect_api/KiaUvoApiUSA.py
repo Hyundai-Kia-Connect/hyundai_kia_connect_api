@@ -230,7 +230,7 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
         response_json = response.json()
         status = response_json.get("status") or {}
-        if status.get("statusCode") != 0:
+        if status.get("statusCode"):
             raise AuthenticationError(
                 f"OTP verification failed: {status.get('errorMessage', '')}"
             )
