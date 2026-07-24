@@ -8,6 +8,7 @@ import threading
 
 import time
 from time import sleep
+from typing import Any
 
 from .ApiImpl import (
     ApiImpl,
@@ -797,6 +798,102 @@ class ApiImplType1(ApiImpl):
         # self._sanitize_ice_value(state)
 
         vehicle.data = state
+
+    def _inspect_ccs2_response(
+        self, response: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, dt.datetime | None]:
+        """Extract (state, last_updated) from a CCS2 /latest response.
+
+        Default impl for EU/AU shape: resMsg.state.Vehicle + Date (UTC).
+        Does NOT call the parser — caller checks freshness before applying.
+        """
+        try:
+            state: dict[str, Any] | None = response["resMsg"]["state"]["Vehicle"]
+        except (KeyError, TypeError):
+            return None, None
+        if state is None:
+            return None, None
+        raw_date = get_child_value(state, "Date")
+        if not raw_date:
+            return state, None
+        try:
+            last = parse_datetime(str(raw_date).split(".")[0], dt.timezone.utc)
+            return state, last.astimezone(self.data_timezone)
+        except (ValueError, TypeError):
+            _LOGGER.warning(f"{DOMAIN} - CCS2 _inspect: cannot parse Date '{raw_date}'")
+            return state, None
+
+    def _apply_ccs2_state(self, vehicle: Vehicle, state: dict[str, Any]) -> None:
+        """Parse + write vehicle state. Called only when data is fresh.
+
+        Default impl: CCS2 parser (EU/AU).
+        """
+        self._update_vehicle_properties_ccs2(vehicle, state)
+
+    def _post_refresh_ccs2_location(self, token: Token, vehicle: Vehicle) -> None:
+        """Refresh vehicle location after a CCS2 force-refresh.
+
+        Default impl: _get_location + inline set (AU/CN shape).
+        """
+        location = self._get_location(token, vehicle)
+        if location and get_child_value(location, "coord.lat"):
+            vehicle.location = (
+                get_child_value(location, "coord.lat"),
+                get_child_value(location, "coord.lon"),
+                parse_datetime(get_child_value(location, "time"), self.data_timezone),
+            )
+
+    def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
+        """Force-refresh CCS2 vehicle state: trigger, poll until fresh, apply.
+
+        1. GET /ccs2/carstatus (no /latest) to wake the vehicle.
+        2. Poll /ccs2/carstatus/latest every 10s, max 14 attempts (~140s window,
+           matching the app's controlRetrofit readTimeout = backend max
+           wake-to-report), until last_updated > trigger_time.
+        3. Apply state only when fresh (HA: do not mask stale).
+        4. Refresh location.
+        """
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        self.session.get(trigger_url, headers=headers).json()
+        trigger_time = time.time()
+
+        poll_url = trigger_url + "/latest"
+        # Window ~140s = app controlRetrofit readTimeout (backend max wake for a
+        # slow/deep-sleep car). Early-exit on fresh => typical ~20s unchanged;
+        # 140s matters only for slow wakes. 10s interval => 14 calls max
+        # (server-friendly; HA force_refresh has no HA-side timeout cap).
+        max_attempts = 14
+        poll_interval = 10
+        fresh_state: dict[str, Any] | None = None
+
+        for attempt in range(1, max_attempts + 1):
+            sleep(poll_interval)
+            response: dict[str, Any] = self.session.get(
+                poll_url, headers=headers
+            ).json()
+            state, last_updated = self._inspect_ccs2_response(response)
+            if (
+                state is not None
+                and last_updated is not None
+                and last_updated.timestamp() > trigger_time
+            ):
+                fresh_state = state
+                _LOGGER.debug(
+                    f"{DOMAIN} - CCS2 force refresh: fresh after {attempt} polls"
+                )
+                break
+
+        if fresh_state is not None:
+            self._apply_ccs2_state(vehicle, fresh_state)
+            self._post_refresh_ccs2_location(token, vehicle)
+        else:
+            _LOGGER.warning(
+                f"{DOMAIN} - CCS2 force refresh: no fresh data after "
+                f"{max_attempts} polls, keeping previous vehicle state"
+            )
 
     @_retry_on_device_id_error
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:

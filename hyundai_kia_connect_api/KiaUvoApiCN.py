@@ -8,6 +8,7 @@ import math
 import typing as ty
 import uuid
 from time import sleep
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -269,27 +270,31 @@ class KiaUvoApiCN(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
-    def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(
-            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
-        )
-        _check_response_for_errors(response)
-        state = response["resMsg"]
-        self._update_vehicle_properties(vehicle, state)
-        location = self._get_location(token, vehicle)
-        if location and get_child_value(location, "coord.lat"):
-            vehicle.location = (
-                get_child_value(location, "coord.lat"),
-                get_child_value(location, "coord.lon"),
-                parse_datetime(get_child_value(location, "time"), self.data_timezone),
+    def _inspect_ccs2_response(
+        self, response: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, dt.datetime | None]:
+        """CN CCS2 shape: resMsg root + status.time (non-CCS2 lookalike).
+
+        Does NOT call the parser — caller checks freshness before applying.
+        """
+        state = response.get("resMsg")
+        if not isinstance(state, dict):
+            return None, None
+        raw_time = get_child_value(state, "status.time")
+        if not raw_time:
+            return state, None
+        try:
+            last = parse_datetime(str(raw_time), self.data_timezone)
+            return state, last
+        except (ValueError, TypeError):  # fmt: skip
+            _LOGGER.warning(
+                f"{DOMAIN} - CN CCS2 _inspect: cannot parse status.time '{raw_time}'"
             )
+            return state, None
+
+    def _apply_ccs2_state(self, vehicle: Vehicle, state: dict[str, Any]) -> None:
+        """CN uses its own non-CCS2 parser (status.* path)."""
+        self._update_vehicle_properties(vehicle, state)
 
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
