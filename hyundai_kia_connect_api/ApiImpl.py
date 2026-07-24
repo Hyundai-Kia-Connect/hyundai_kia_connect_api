@@ -164,6 +164,7 @@ class ApiImpl:
     previous_longitude: float = None
     supports_window_control: bool = False
     supports_valet_mode: bool = False
+    supports_vehicle_profile: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
