@@ -10,25 +10,23 @@ from time import sleep
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from .ApiImpl import (
-    ApiImpl,
     ApiImplSession,
     ClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import ApiImplType1
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
-    DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
-    SEAT_STATUS,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
 from .exceptions import APIError, AuthenticationError
 from .Token import Token
-from .utils import get_index_into_hex_temp, normalize_battery_soc, parse_date_br
+from .utils import get_index_into_hex_temp
 from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,11 +51,24 @@ _SIGNIN_STEP_MESSAGES = {
 }
 
 
-class HyundaiBlueLinkApiBR(ApiImpl):
-    """Brazilian Hyundai BlueLink API implementation."""
+class HyundaiBlueLinkApiBR(ApiImplType1):
+    """Brazilian Hyundai BlueLink API implementation.
+
+    Extends ApiImplType1 to reuse its CCS2 status parser
+    (``_update_vehicle_properties_ccs2``). BR overrides all of its own auth,
+    headers, endpoint selection and force-refresh flow below; only the CCS2
+    parsing is inherited.
+    """
 
     supports_window_control: bool = True
+    # BR does not implement valet mode; keep it off (ApiImplType1 defaults True).
+    supports_valet_mode: bool = False
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+
+    # Async force-refresh polling: how long to wait for the vehicle to report
+    # a fresh snapshot to /ccs2/carstatus/latest after triggering /ccs2/carstatus.
+    _FORCE_REFRESH_POLL_INTERVAL = 5  # seconds between polls
+    _FORCE_REFRESH_MAX_POLLS = 12  # ~60s total
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
         if BRANDS[brand] != BRAND_HYUNDAI:
@@ -235,7 +246,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         response = self.session.get(url, headers=headers)
         response.raise_for_status()
         response_data = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
+        _LOGGER.debug(f"{DOMAIN} - Got vehicles response: {response_data}")
         if "resMsg" not in response_data or "vehicles" not in response_data.get(
             "resMsg", {}
         ):
@@ -269,195 +280,72 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         return result
 
-    def _get_vehicle_state(
-        self, token: Token, vehicle: Vehicle, force_refresh: bool = False
-    ) -> dict:
-        """Get vehicle state (cached or forced refresh)."""
-        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}")
+    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+        """Return the server-cached vehicle status (does not wake the car).
 
-        if not vehicle.ccu_ccs2_protocol_support:
-            url = url + "/status/latest"
-        else:
-            url = url + "/ccs2/carstatus/latest"
-
+        Despite BR vehicles reporting ccuCCS2ProtocolSupport=0, the cached
+        status is served in CCS2 format at /ccs2/carstatus/latest, including
+        location. The legacy /status/latest endpoint returns HTTP 503
+        (resCode 5031, "Unavailable remote control") on BR — it is the
+        remote-control result endpoint, not a status read.
+        """
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest")
         headers = self._get_authenticated_headers(token)
-        if force_refresh:
-            headers["REFRESH"] = "true"
-
-        _LOGGER.debug(f"{DOMAIN} - Getting vehicle state (force={force_refresh})")
         response = self.session.get(url, headers=headers)
         response.raise_for_status()
-        return response.json()["resMsg"]
-
-    def _get_vehicle_location(self, token: Token, vehicle: Vehicle) -> dict:
-        """Get vehicle location."""
-        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/location/park")
-        headers = self._get_authenticated_headers(token)
-
-        try:
-            response = self.session.get(url, headers=headers)
-            response.raise_for_status()
-            location_data = response.json()["resMsg"]
-            _LOGGER.debug(f"{DOMAIN} - Got vehicle location")
-            return location_data
-        except Exception as e:
-            _LOGGER.warning(f"{DOMAIN} - Failed to get vehicle location: {e}")
-            return None
-
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
-        """Update vehicle properties from state."""
-        # Parse timestamp
-        if state.get("time"):
-            vehicle.last_updated_at = parse_date_br(state["time"], self.data_timezone)
-        else:
-            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
-
-        # Basic vehicle status
-        vehicle.engine_is_running = state.get("engine", False)
-        vehicle.air_control_is_on = state.get("airCtrlOn", False)
-
-        # Battery (12V car battery, not EV battery)
-        if battery := state.get("battery"):
-            vehicle.car_battery_percentage = normalize_battery_soc(
-                battery.get("batSoc")
-            )
-
-        # Temperature
-        if air_temp := state.get("airTemp"):
-            temp_value = air_temp.get("value")
-            temp_unit = air_temp.get("unit")
-            # Handle special values: "00H" means off, or hex temperature values
-            # For now, only set if it's a valid numeric value
-            if temp_value and temp_value != "00H":
-                try:
-                    # Try to parse as hex if it contains 'H'
-                    if "H" in str(temp_value):
-                        # Will be handled in future if needed
-                        pass
-                    else:
-                        vehicle.air_temperature = (temp_value, temp_unit)
-                except (ValueError, TypeError, KeyError):  # fmt: skip
-                    pass
-
-        # Fuel information
-        vehicle.fuel_level = state.get("fuelLevel")
-        vehicle.fuel_level_is_low = state.get("lowFuelLight", False)
-
-        # Driving range (DTE = Distance To Empty)
-        if dte := state.get("dte"):
-            vehicle.fuel_driving_range = (
-                dte.get("value"),
-                DISTANCE_UNITS.get(dte.get("unit")),
-            )
-
-        # Doors
-        door_state = state.get("doorOpen", {})
-        vehicle.is_locked = state.get("doorLock", True)
-        vehicle.front_left_door_is_open = bool(door_state.get("frontLeft"))
-        vehicle.front_right_door_is_open = bool(door_state.get("frontRight"))
-        vehicle.back_left_door_is_open = bool(door_state.get("backLeft"))
-        vehicle.back_right_door_is_open = bool(door_state.get("backRight"))
-        vehicle.hood_is_open = state.get("hoodOpen", False)
-        vehicle.trunk_is_open = state.get("trunkOpen", False)
-
-        # Windows
-        window_state = state.get("windowOpen", {})
-        vehicle.front_left_window_is_open = bool(window_state.get("frontLeft"))
-        vehicle.front_right_window_is_open = bool(window_state.get("frontRight"))
-        vehicle.back_left_window_is_open = bool(window_state.get("backLeft"))
-        vehicle.back_right_window_is_open = bool(window_state.get("backRight"))
-
-        # Climate control
-        vehicle.defrost_is_on = state.get("defrost", False)
-
-        # Steering wheel heat: 0=off, 1=on, 2=unknown/not available
-        steer_heat = state.get("steerWheelHeat", 0)
-        vehicle.steering_wheel_heater_is_on = steer_heat == 1
-
-        # Side/back window heat: 0=off, 1=on, 2=unknown
-        side_heat = state.get("sideBackWindowHeat", 0)
-        vehicle.back_window_heater_is_on = side_heat == 1
-
-        # Seat heater/ventilation status
-        # Values: 0=off, 1=level1, 2=level2, 3=level3, etc.
-        seat_state = state.get("seatHeaterVentState", {})
-        vehicle.front_left_seat_status = SEAT_STATUS.get(
-            seat_state.get("drvSeatHeatState")
-        )
-        vehicle.front_right_seat_status = SEAT_STATUS.get(
-            seat_state.get("astSeatHeatState")
-        )
-        vehicle.rear_left_seat_status = SEAT_STATUS.get(
-            seat_state.get("rlSeatHeatState")
-        )
-        vehicle.rear_right_seat_status = SEAT_STATUS.get(
-            seat_state.get("rrSeatHeatState")
-        )
-
-        # Tire pressure warnings
-        # Note: Brazilian Creta only has "all" indicator, not individual sensors
-        tire_lamp = state.get("tirePressureLamp", {})
-        vehicle.tire_pressure_all_warning_is_on = bool(
-            tire_lamp.get("tirePressureLampAll")
-        )
-
-        # Set individual tire warnings to match "all" if they don't exist
-        # (Some vehicles may have individual sensors)
-        tire_all = bool(tire_lamp.get("tirePressureLampAll"))
-        vehicle.tire_pressure_rear_left_warning_is_on = bool(
-            tire_lamp.get("tirePressureWarningLampRearLeft", tire_all)
-        )
-        vehicle.tire_pressure_front_left_warning_is_on = bool(
-            tire_lamp.get("tirePressureWarningLampFrontLeft", tire_all)
-        )
-        vehicle.tire_pressure_front_right_warning_is_on = bool(
-            tire_lamp.get("tirePressureWarningLampFrontRight", tire_all)
-        )
-        vehicle.tire_pressure_rear_right_warning_is_on = bool(
-            tire_lamp.get("tirePressureWarningLampRearRight", tire_all)
-        )
-
-        # Warnings and alerts
-        vehicle.washer_fluid_warning_is_on = state.get("washerFluidStatus", False)
-        vehicle.brake_fluid_warning_is_on = state.get("breakOilStatus", False)
-        vehicle.smart_key_battery_warning_is_on = state.get(
-            "smartKeyBatteryWarning", False
-        )
-
-        # Store raw data for future use
-        vehicle.data = state
-
-    def _update_vehicle_location(self, vehicle: Vehicle, location_data: dict) -> None:
-        """Update vehicle location from location data."""
-        if not location_data:
-            return
-
-        coord = location_data.get("coord", {})
-        lat = coord.get("lat")
-        lon = coord.get("lng") or coord.get("lon")
-        time_str = location_data.get("time")
-
-        if lat and lon:
-            location_time = (
-                parse_date_br(time_str, self.data_timezone) if time_str else None
-            )
-            vehicle.location = (lat, lon, location_time)
+        return response.json()["resMsg"]["state"]["Vehicle"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Update vehicle with cached state from API."""
-        state = self._get_vehicle_state(token, vehicle, force_refresh=False)
-        location_data = self._get_vehicle_location(token, vehicle)
-
-        self._update_vehicle_properties(vehicle, state)
-        self._update_vehicle_location(vehicle, location_data)
+        """Update with the server-cached CCS2 state (does not wake the car)."""
+        state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties_ccs2(vehicle, state)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Force refresh vehicle state (wakes up the vehicle)."""
-        state = self._get_vehicle_state(token, vehicle, force_refresh=True)
-        location_data = self._get_vehicle_location(token, vehicle)
+        """Force a fresh reading from the vehicle (wakes the car).
 
-        self._update_vehicle_properties(vehicle, state)
-        self._update_vehicle_location(vehicle, location_data)
+        The BR CCS2 force is asynchronous: GET /ccs2/carstatus only returns an
+        acknowledgement, then the vehicle pushes a fresh snapshot to
+        /ccs2/carstatus/latest a few seconds later (its lastUpdateTime
+        advances). Trigger the refresh, poll until the timestamp changes, then
+        parse the fresh state; fall back to the last cached snapshot if the
+        vehicle does not report in time.
+        """
+        latest_url = self._build_api_url(
+            f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest"
+        )
+        previous = self.session.get(
+            latest_url, headers=self._get_authenticated_headers(token)
+        )
+        previous.raise_for_status()
+        previous_update = previous.json()["resMsg"].get("lastUpdateTime")
+
+        trigger_url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus")
+        _LOGGER.debug(f"{DOMAIN} - Triggering async force refresh")
+        trigger = self.session.get(
+            trigger_url, headers=self._get_authenticated_headers(token)
+        )
+        trigger.raise_for_status()
+
+        state = None
+        for _ in range(self._FORCE_REFRESH_MAX_POLLS):
+            sleep(self._FORCE_REFRESH_POLL_INTERVAL)
+            response = self.session.get(
+                latest_url, headers=self._get_authenticated_headers(token)
+            )
+            response.raise_for_status()
+            resmsg = response.json()["resMsg"]
+            if resmsg.get("lastUpdateTime") != previous_update:
+                state = resmsg["state"]["Vehicle"]
+                break
+
+        if state is None:
+            _LOGGER.warning(
+                f"{DOMAIN} - Force refresh did not report new data in time; "
+                "using the latest cached snapshot"
+            )
+            state = self._get_cached_vehicle_state(token, vehicle)
+
+        self._update_vehicle_properties_ccs2(vehicle, state)
 
     def _ensure_control_token(self, token: Token) -> str:
         """Ensure we have a valid control token for remote commands."""
