@@ -259,9 +259,7 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Complete Login Response {response.text}")
         final_sid = response.headers.get("sid")
         if not final_sid:
-            raise Exception(
-                f"{DOMAIN} - No final sid returned. Response: {response.text}"
-            )
+            raise APIError(f"No final sid returned. Response: {response.text}")
         return final_sid
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:

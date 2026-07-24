@@ -214,3 +214,22 @@ def test_verify_otp_no_status_block_raises_apierror(usa_api):
     with pytest.raises(APIError) as exc_info:
         usa_api._verify_otp("otpkey", "1234", "xid")
     assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_complete_login_with_otp_missing_sid_raises_apierror(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _complete_login_response(sid=None)
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api._complete_login_with_otp("u", "p", "sid", "rmtoken")
+    assert "No final sid returned" in str(exc_info.value)
+    assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_complete_login_with_otp_success_returns_sid(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _complete_login_response(sid="final-sid")
+
+    result = usa_api._complete_login_with_otp("u", "p", "sid", "rmtoken")
+
+    assert result == "final-sid"
