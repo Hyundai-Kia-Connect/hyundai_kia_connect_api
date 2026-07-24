@@ -229,15 +229,16 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
         response_json = response.json()
-        if response_json["status"]["statusCode"] != 0:
-            raise Exception(
-                f"{DOMAIN} - OTP verification failed: {response_json['status']['errorMessage']}"
+        status = response_json.get("status") or {}
+        if status.get("statusCode"):
+            raise AuthenticationError(
+                f"OTP verification failed: {status.get('errorMessage', '')}"
             )
         sid = response.headers.get("sid")
         rmtoken = response.headers.get("rmtoken")
         if not sid or not rmtoken:
-            raise Exception(
-                f"{DOMAIN} - No sid or rmtoken in OTP verification response. Headers: {response.headers}"
+            raise APIError(
+                f"No sid or rmtoken in OTP verification response. Headers: {response.headers}"
             )
         return sid, rmtoken
 
@@ -258,9 +259,7 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Complete Login Response {response.text}")
         final_sid = response.headers.get("sid")
         if not final_sid:
-            raise Exception(
-                f"{DOMAIN} - No final sid returned. Response: {response.text}"
-            )
+            raise APIError(f"No final sid returned. Response: {response.text}")
         return final_sid
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
@@ -365,9 +364,12 @@ class KiaUvoApiUSA(ApiImpl):
                 has_email=bool(payload.get("hasEmail")),
                 has_sms=bool(payload.get("hasPhone")),
             )
-        raise Exception(
-            f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"
-        )
+        status = response_json.get("status") or {}
+        if status.get("errorCode") == 1001:
+            raise AuthenticationError(
+                f"Invalid Email or Password: {status.get('errorMessage', '')}"
+            )
+        raise APIError(f"No session id returned in login. Response: {response.text}")
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
