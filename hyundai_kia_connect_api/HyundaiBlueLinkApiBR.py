@@ -286,6 +286,24 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - Getting vehicle state (force={force_refresh})")
         response = self.session.get(url, headers=headers)
+
+        # The Brazil API can keep reporting ccuCCS2ProtocolSupport=0 in the
+        # vehicle list while requiring the CCS2 header for the legacy status
+        # endpoint. Retry 5031 once with protocol support enabled.
+        if not vehicle.ccu_ccs2_protocol_support and response.status_code == 503:
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {}
+            if response_data.get("resCode") == "5031":
+                _LOGGER.info(
+                    "%s - Legacy vehicle status is unavailable; retrying with "
+                    "CCS2 protocol header",
+                    DOMAIN,
+                )
+                headers["ccuCCS2ProtocolSupport"] = "1"
+                response = self.session.get(url, headers=headers)
+
         response.raise_for_status()
         return response.json()["resMsg"]
 
