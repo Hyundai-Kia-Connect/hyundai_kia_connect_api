@@ -62,7 +62,7 @@ def _otp_verify_response(
 ) -> MagicMock:
     """Build a mocked /cmm/verifyOTP response."""
     resp = MagicMock()
-    body = {
+    body: dict = {
         "status": {
             "statusCode": status_code,
             "errorType": 0,
@@ -85,7 +85,7 @@ def _complete_login_response(sid: str | None = None) -> MagicMock:
     """Build a mocked final /prof/authUser (complete-login) response."""
     resp = MagicMock()
     resp.json.return_value = {"status": {"statusCode": 0, "errorMessage": ""}}
-    resp.text = "{}"
+    resp.text = json.dumps({"status": {"statusCode": 0, "errorMessage": ""}})
     resp.headers = {"sid": sid} if sid is not None else {}
     return resp
 
@@ -103,9 +103,6 @@ def test_login_wrong_credentials_raises_authentication_error(usa_api):
     with pytest.raises(AuthenticationError) as exc_info:
         usa_api.login("u", "bad", token)
     assert "Invalid Email or Password" in str(exc_info.value)
-    assert not isinstance(exc_info.value, APIError) or isinstance(
-        exc_info.value, AuthenticationError
-    )
 
 
 def test_login_invalid_request_raises_apierror_not_auth(usa_api):
