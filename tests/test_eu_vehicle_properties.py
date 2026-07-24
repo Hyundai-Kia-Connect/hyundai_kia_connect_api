@@ -16,7 +16,10 @@ from tests.fixture_helpers import (
     load_fixture,
 )
 
-EU_FIXTURE_FILES = discover_fixtures("eu_kia_ev6_")
+# CCS2 fixtures (eu_kia_ev6_2024_ccs2_*) use the newer protocol shape and are
+# covered by tests/test_ccs2_vehicle_properties.py; exclude them here so the
+# legacy EU parser is only tested against fixtures it actually understands.
+EU_FIXTURE_FILES = [f for f in discover_fixtures("eu_kia_ev6_") if "ccs2" not in f]
 
 
 @pytest.fixture

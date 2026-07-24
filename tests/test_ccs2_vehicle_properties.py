@@ -5,6 +5,9 @@ the newer CCS2 protocol structure (Drivetrain/Cabin/Green/Body/Chassis paths).
 TargetSoC in CCS2 is direct scalar values, not arrays.
 """
 
+import datetime as dt
+import json
+
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
@@ -19,6 +22,7 @@ from tests.fixture_helpers import (
 )
 
 CCS2_FIXTURE_FILES = discover_fixtures("eu_kia_ev9_")
+EV6_CCS2_FIXTURE_FILES = discover_fixtures("eu_kia_ev6_2024_ccs2_")
 
 
 @pytest.fixture
@@ -352,3 +356,152 @@ class TestCCS2LocationTimestampNone:
         assert ts is not None
         assert ts.year == 2024 and ts.month == 9 and ts.day == 15
         assert ts.hour == 14 and ts.minute == 0 and ts.second == 0
+
+
+@pytest.mark.parametrize(
+    "fixture_file", EV6_CCS2_FIXTURE_FILES, ids=EV6_CCS2_FIXTURE_FILES
+)
+class TestCCS2ScheduledCharging:
+    def test_ev_off_peak_start_time(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert str(vehicle.ev_off_peak_start_time) == expected["ev_off_peak_start_time"]
+
+    def test_ev_off_peak_end_time(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert str(vehicle.ev_off_peak_end_time) == expected["ev_off_peak_end_time"]
+
+    def test_ev_schedule_charge_enabled(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert (
+            vehicle.ev_schedule_charge_enabled == expected["ev_schedule_charge_enabled"]
+        )
+
+    def test_ev_off_peak_charge_only_enabled(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert (
+            vehicle.ev_off_peak_charge_only_enabled
+            == expected["ev_off_peak_charge_only_enabled"]
+        )
+
+    def test_ev_first_departure_time(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert (
+            str(vehicle.ev_first_departure_time) == expected["ev_first_departure_time"]
+        )
+
+    def test_ev_first_departure_days(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.ev_first_departure_days == expected["ev_first_departure_days"]
+
+    def test_ev_second_departure_time(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert (
+            str(vehicle.ev_second_departure_time)
+            == expected["ev_second_departure_time"]
+        )
+
+    def test_ev_second_departure_days(self, ccs2_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.ev_second_departure_days == expected["ev_second_departure_days"]
+
+
+def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
+    """Unknown OffPeakTime.Mode (e.g. reserved 1) -> attrs None, no crash."""
+    data = load_fixture("eu_kia_ev6_2024_ccs2_off.json")
+    data = json.loads(json.dumps(data))  # deep copy
+    data["Green"]["Reservation"]["OffPeakTime"]["Mode"] = 1
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_schedule_charge_enabled is None
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+    # window still parsed even if Mode unknown
+    assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
+
+
+def test_schedule_charging_off_peak_flag_not_inverted(ccs2_api, vehicle):
+    """charge_only=True (time-priority) must send offPeakPowerFlag=1, not 2."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=True,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 1
+
+
+def test_schedule_charging_off_peak_flag_target_priority(ccs2_api, vehicle):
+    """charge_only=False (target-priority) must send offPeakPowerFlag=2."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=False,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 2

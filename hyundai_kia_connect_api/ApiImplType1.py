@@ -737,11 +737,65 @@ class ApiImplType1(ApiImpl):
             state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
         )
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+        # Green.Reservation.OffPeakTime — off-peak charging window + priority mode.
+        # Mode 0 = off, 2 = target-priority (off-peak tariffs prioritized),
+        # 3 = time-priority (charge only during off-peak). 1 is reserved/unused.
+        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime") or {}
+        try:
+            vehicle.ev_off_peak_start_time = dt.time(
+                int(off_peak.get("StartHour") or 0), int(off_peak.get("StartMin") or 0)
+            )
+            vehicle.ev_off_peak_end_time = dt.time(
+                int(off_peak.get("EndHour") or 0), int(off_peak.get("EndMin") or 0)
+            )
+        except (TypeError, ValueError):
+            _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
+            vehicle.ev_off_peak_start_time = None
+            vehicle.ev_off_peak_end_time = None
+
+        mode = off_peak.get("Mode")
+        if mode == 0:
+            vehicle.ev_schedule_charge_enabled = False
+            vehicle.ev_off_peak_charge_only_enabled = None
+        elif mode == 2:
+            vehicle.ev_schedule_charge_enabled = True
+            vehicle.ev_off_peak_charge_only_enabled = False
+        elif mode == 3:
+            vehicle.ev_schedule_charge_enabled = True
+            vehicle.ev_off_peak_charge_only_enabled = True
+        elif mode is not None:
+            _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
+        # mode is None -> no OffPeakTime block (HEV/unconfigured) -> attrs stay None
+
+        # Departure schedules
+        schedule1 = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule1") or {}
+        )
+        schedule2 = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule2") or {}
+        )
+        try:
+            vehicle.ev_first_departure_time = dt.time(
+                int(schedule1.get("Hour") or 0), int(schedule1.get("Min") or 0)
+            )
+            vehicle.ev_second_departure_time = dt.time(
+                int(schedule2.get("Hour") or 0), int(schedule2.get("Min") or 0)
+            )
+        except (TypeError, ValueError):
+            _LOGGER.warning("%s - CCS2 departure time malformed", DOMAIN)
+        vehicle.ev_first_departure_days = [
+            i
+            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+            if schedule1.get(k) == 1
+        ] or None
+        vehicle.ev_second_departure_days = [
+            i
+            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+            if schedule2.get(k) == 1
+        ] or None
+
+        # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
+        # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1054,6 +1108,12 @@ class ApiImplType1(ApiImpl):
         if options.defrost is None:
             options.defrost = False
 
+        # ccNC/EV5-appMode EVs (EV6/EV9) use two flat endpoints instead of the
+        # combined /ccs2/reservation/chargehvac, which is a no-op for them.
+        # Dispatch by ccu_ccs2_protocol_support (== ccNC head unit) + EV type.
+        if vehicle.ccu_ccs2_protocol_support and vehicle.engine_type == ENGINE_TYPES.EV:
+            return self._schedule_ev5_flat(token, vehicle, options)
+
         temperature: float = options.temperature
         if options.temperature_unit == 0:
             # Round to nearest 0.5
@@ -1104,7 +1164,7 @@ class ApiImplType1(ApiImpl):
                         "time": options.off_peak_start_time.strftime("%I%M"),
                     },
                 },
-                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+                "offPeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
             },
             "reservFlag": 1 if options.charging_enabled else 0,
         }
@@ -1116,6 +1176,93 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
+
+    def _schedule_ev5_flat(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Set scheduled charging + climate for ccNC/EV5-appMode EVs.
+
+        EV5-appMode vehicles (ccNC EV6/EV9) use two flat endpoints instead of
+        the combined /ccs2/reservation/chargehvac: charge settings go to
+        /ccs2/reservation/charge (flat body, lowercase ``offpeakPowerFlag``),
+        departure-climate presets to /ccs2/reservation/hvac. Options defaults
+        are already applied by ``schedule_charging_and_climate``.
+        """
+        departures = [options.first_departure, options.second_departure]
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            if temperature > 27.0:
+                temperature = 27.0
+            elif temperature < 17.0:
+                temperature = 17.0
+
+        charge_payload = {
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
+            "reservStartTime": {
+                "time": options.off_peak_start_time.strftime("%I%M"),
+                "timeSection": (
+                    1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                ),
+            },
+            "reservEndTime": {
+                "time": options.off_peak_end_time.strftime("%I%M"),
+                "timeSection": (
+                    1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                ),
+            },
+        }
+
+        hvac_payload = {
+            "reservedHVACInfo" + str(i + 1): {
+                "reservHVACflag": 1 if departures[i].enabled else 0,
+                "reservInfo": {
+                    "day": departures[i].days,
+                    "time": {
+                        "time": departures[i].time.strftime("%I%M"),
+                        "timeSection": (
+                            1 if departures[i].time >= dt.time(12, 0) else 0
+                        ),
+                    },
+                },
+                "reservHVACSet": {
+                    "airCtrl": 1 if options.climate_enabled else 0,
+                    "airTemp": {
+                        "value": f"{temperature:.1f}",
+                        "hvacTempType": 1,
+                        "unit": options.temperature_unit,
+                    },
+                    "defrost": options.defrost,
+                },
+            }
+            for i in range(2)
+        }
+
+        base_url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/reservation"
+        _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge request: {charge_payload}")
+        charge_response = self.session.post(
+            base_url + "/charge",
+            json=charge_payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge response: {charge_response}")
+        _check_response_for_errors(charge_response)
+
+        _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac request: {hvac_payload}")
+        hvac_response = self.session.post(
+            base_url + "/hvac",
+            json=hvac_payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac response: {hvac_response}")
+        _check_response_for_errors(hvac_response)
+
+        return charge_response["msgId"]
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
         """Return the driver seat location for CCS2 climate payloads.
