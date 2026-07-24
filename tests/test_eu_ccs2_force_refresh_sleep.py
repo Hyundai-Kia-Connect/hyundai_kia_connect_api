@@ -101,3 +101,35 @@ def test_force_refresh_does_not_read_resMsg_from_wake_endpoint(eu_api, ccs2_vehi
         eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
 
     eu_api._update_vehicle_properties_ccs2.assert_called_once()
+
+
+def test_force_refresh_wake_failure_propagates_no_stale_apply(eu_api, ccs2_vehicle):
+    """A failed wake GET (non-JSON / network error) must propagate and NOT
+    fall through to a stale /latest apply. Locks in the safer error behavior
+    so a future try/except wrapper cannot reintroduce stale-apply-on-wake-failure.
+    """
+    from unittest.mock import patch
+
+    token = SimpleNamespace(access_token="t", device_id="d")
+
+    def mock_get(url, headers=None):
+        resp = MagicMock()
+        if url.endswith("/ccs2/carstatus") and not url.endswith("/latest"):
+            resp.json.side_effect = ValueError("not JSON")  # wake fails
+        else:
+            resp.json.return_value = {
+                "retCode": "S",
+                "resMsg": {"state": {"Vehicle": {"Date": "20260724120000.000"}}},
+            }
+        return resp
+
+    with (
+        patch.object(eu_api.session, "get", side_effect=mock_get),
+        patch("hyundai_kia_connect_api.KiaUvoApiEU.sleep"),
+    ):
+        with pytest.raises(ValueError):
+            eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
+
+    # wake failed -> no sleep-then-/latest apply happened
+    eu_api._update_vehicle_properties_ccs2.assert_not_called()
+    eu_api._set_cached_location_park.assert_not_called()

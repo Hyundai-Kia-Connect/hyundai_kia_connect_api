@@ -453,6 +453,9 @@ class KiaUvoApiEU(ApiImplType1):
         resMsg.state.Vehicle from it raised KeyError: 'resMsg' (kia_uvo #1786,
         #1806). Instead: wake, sleep for the car to report (~20s live-measured on
         a reachable EU CCS2 car), then read the now-fresh cached /latest snapshot.
+
+        The wake GET must return valid JSON; its body is discarded but errors
+        propagate, so a failed wake does not fall through to a stale /latest apply.
         """
         headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support
