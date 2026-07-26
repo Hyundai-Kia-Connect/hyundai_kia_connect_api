@@ -27,9 +27,6 @@ def _au_api_with_login_chain(expires_in: int | None) -> KiaUvoApiAU:
     api._get_access_token = (  # type: ignore[assignment]
         lambda authorization_code, stamp: ("Bearer", "Bearer atk", "rtk", expires_in)
     )
-    api._get_refresh_token = (  # type: ignore[assignment]
-        lambda authorization_code, stamp: ("Bearer", "Bearer rtk")
-    )
     return api
 
 
