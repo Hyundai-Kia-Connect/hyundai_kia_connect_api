@@ -8,9 +8,8 @@ TargetSoC in CCS2 is direct scalar values, not arrays.
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
-from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.const import PressureUnit
-
+from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.fixture_helpers import (
     discover_fixtures,
     get_fixture_expected,

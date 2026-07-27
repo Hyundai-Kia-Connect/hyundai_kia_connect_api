@@ -13,21 +13,21 @@ try:
 except ImportError:
     GoogleV3 = None
 
-from .utils import get_child_value, to_int_enum
-from .Token import Token
-from .Vehicle import Vehicle
 from .const import (
-    WINDOW_STATE,
     CHARGE_PORT_ACTION,
-    ORDER_STATUS,
     DOMAIN,
+    GEO_LOCATION_PROVIDERS,
+    GOOGLE,
+    OPENSTREETMAP,
+    ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
-    GEO_LOCATION_PROVIDERS,
-    OPENSTREETMAP,
-    GOOGLE,
-    OTP_NOTIFY_TYPE,
+    WINDOW_STATE,
 )
+from .Token import Token
+from .utils import get_child_value, to_int_enum
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ class ApiImplSession(requests.Session):
 
 
 class ApiImpl:
-    data_timezone = dt.timezone.utc
+    data_timezone = dt.UTC
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
@@ -201,7 +201,7 @@ class ApiImpl:
     def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific"""
-        return None
+        return
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""

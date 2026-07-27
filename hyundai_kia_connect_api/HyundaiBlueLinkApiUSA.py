@@ -129,7 +129,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     """HyundaiBlueLinkApiUSA"""
 
     # initialize with a timestamp which will allow the first fetch to occur
-    last_loc_timestamp = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)
+    last_loc_timestamp = dt.datetime.now(dt.UTC) - dt.timedelta(hours=3)
 
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
@@ -163,7 +163,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             "accept": "application/json, text/plain, */*",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",  # noqa
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36",
             "host": self.BASE_URL,
             "origin": origin,
             "referer": referer,
@@ -223,9 +223,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         refresh_token = response["refresh_token"]
         expires_in = float(response["expires_in"])
 
-        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-            seconds=expires_in
-        )
+        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
 
         return Token(
             username=username,
@@ -272,9 +270,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     "refresh_token", token.refresh_token
                 )
                 expires_in = float(response_json["expires_in"])
-                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-                    seconds=expires_in
-                )
+                valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
                 _LOGGER.debug(
                     f"{DOMAIN} - Access token refreshed successfully, "
                     f"expires in {expires_in}s"
@@ -393,11 +389,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     response_json.get("errorCode", 0) == 502
                     and response_json.get("errorSubCode", "") == "HT_534"
                 ):
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         f"{DOMAIN} - get vehicle location rate limit exceeded."
                     )
                 else:
-                    _LOGGER.warn(
+                    _LOGGER.warning(
                         f"{DOMAIN} - Unable to get vehicle location: {response_json}"
                     )
 
@@ -416,12 +412,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
@@ -628,12 +624,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
+                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
                     )
                 ],
             )
@@ -673,7 +669,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             and previous_odometer > vehicle.odometer
         ):
             _LOGGER.debug(
-                f"Overruling odometer: {previous_odometer:.1f} old: {vehicle.odometer:.1f}"  # noqa
+                f"Overruling odometer: {previous_odometer:.1f} old: {vehicle.odometer:.1f}"
             )
             vehicle.odometer = (
                 previous_odometer,
@@ -884,7 +880,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     vehicle_location_result = self._get_vehicle_location(token, vehicle)
                 else:
                     _LOGGER.debug(
-                        f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback"  # noqa
+                        f"{DOMAIN} - update_vehicle_with_cached_state keep Location fallback"
                     )
             else:
                 vehicle_location_result = self._get_vehicle_location(token, vehicle)
@@ -893,7 +889,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 state["vehicleStatus"]["vehicleLocation"] = vehicle_location_result
             else:
                 _LOGGER.debug(
-                    f"{DOMAIN} - update_vehicle_with_cached_state Location fallback"  # noqa
+                    f"{DOMAIN} - update_vehicle_with_cached_state Location fallback"
                 )
 
         self._update_vehicle_properties(vehicle, state)
@@ -911,7 +907,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             else:
                 cached_location = state["vehicleStatus"]["vehicleLocation"]
                 _LOGGER.debug(
-                    f"{DOMAIN} - force_refresh_vehicle_state Location fallback {cached_location}"  # noqa
+                    f"{DOMAIN} - force_refresh_vehicle_state Location fallback {cached_location}"
                 )
 
         self._update_vehicle_properties(vehicle, state)
@@ -1009,7 +1005,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if response_json is not None:
             _check_response_for_errors(response_json)
         _LOGGER.debug(
-            f"{DOMAIN} - Received lock_action response status code: {response.status_code}"  # noqa
+            f"{DOMAIN} - Received lock_action response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response: {response.text}")
 
@@ -1188,7 +1184,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if response_json is not None:
             _check_response_for_errors(response_json)
         _LOGGER.debug(
-            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"  # noqa
+            f"{DOMAIN} - Setting charge limits response status code: {response.status_code}"
         )
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {response.text}")
 

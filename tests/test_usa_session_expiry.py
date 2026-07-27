@@ -1,15 +1,16 @@
 """Tests for USA session-expiry auto-recovery in get_vehicles / refresh_vehicles."""
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
 from hyundai_kia_connect_api.ApiImpl import OTPRequest
-from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA, _retry_on_auth_error
-from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.exceptions import (
     AuthenticationError,
     AuthenticationOTPRequired,
 )
+from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA, _retry_on_auth_error
+from hyundai_kia_connect_api.Token import Token
 
 
 @pytest.fixture
@@ -17,7 +18,7 @@ def usa_api() -> KiaUvoApiUSA:
     api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
     api.API_URL = "https://example.com/"
     api._otp_handler = None
-    api.api_headers = lambda: {}
+    api.api_headers = dict
     return api
 
 

@@ -2,21 +2,20 @@
 
 # pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
 
+import base64
 import datetime as dt
 import json
 import logging
 import platform
 import socket
 import time
-from zoneinfo import ZoneInfo
 import uuid
-import base64
+from zoneinfo import ZoneInfo
 
 import requests
 import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
-
 from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
@@ -56,7 +55,14 @@ _LOGGER = logging.getLogger(__name__)
 
 CA_TIMEZONES = [
     ZoneInfo(f"Canada/{zone}")
-    for zone in "Newfoundland Atlantic Eastern Central Mountain Pacific".split()
+    for zone in [
+        "Newfoundland",
+        "Atlantic",
+        "Eastern",
+        "Central",
+        "Mountain",
+        "Pacific",
+    ]
 ]
 
 
@@ -281,9 +287,7 @@ class KiaUvoApiCA(ApiImpl):
         access_token = response_data["accessToken"]
         refresh_token = response_data["refreshToken"]
 
-        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-            seconds=token_expire_in
-        )
+        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=token_expire_in)
 
         return Token(
             username=username,
@@ -408,9 +412,7 @@ class KiaUvoApiCA(ApiImpl):
         access_token = token_data["accessToken"]
         refresh_token = token_data["refreshToken"]
 
-        valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-            seconds=token_expire_in
-        )
+        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=token_expire_in)
 
         return Token(
             username=username,
@@ -508,9 +510,9 @@ class KiaUvoApiCA(ApiImpl):
         # lastStatusDate uses one of the Canadian timezones configured through
         # the car entertainment system.
         last_updated_at = parse_datetime(
-            get_child_value(state, "status.lastStatusDate"), dt.timezone.utc
+            get_child_value(state, "status.lastStatusDate"), dt.UTC
         )
-        ref_date = dt.datetime.now(tz=dt.timezone.utc)
+        ref_date = dt.datetime.now(tz=dt.UTC)
         raw_delta_seconds = (ref_date - last_updated_at).total_seconds()
         if abs(raw_delta_seconds) < 20 * 60:
             # Timestamp is already in UTC (e.g. fresh forced-refresh response);
@@ -590,7 +592,7 @@ class KiaUvoApiCA(ApiImpl):
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )

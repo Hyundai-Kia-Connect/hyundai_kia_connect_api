@@ -19,7 +19,7 @@ def _au_api_with_login_chain() -> KiaUvoApiAU:
     api = KiaUvoApiAU(region=5, brand=2, language="en")
     api._get_stamp = lambda: "S"  # type: ignore[assignment]
     api._get_device_id = lambda stamp: "dev"  # type: ignore[assignment]
-    api._get_cookies = lambda: {}  # type: ignore[assignment]
+    api._get_cookies = dict  # type: ignore[assignment]
     api._get_authorization_code_with_redirect_url = (  # type: ignore[assignment]
         lambda username, password, cookies: "authcode"
     )

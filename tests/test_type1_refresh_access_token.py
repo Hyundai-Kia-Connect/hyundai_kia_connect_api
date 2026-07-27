@@ -10,16 +10,14 @@ the base method. If a region's refresh fails, the base falls back to
 ``self.login()`` — no regression vs. pre-PR.
 """
 
+import datetime as dt
 from unittest.mock import patch
-
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
-from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
 from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
+from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
 from hyundai_kia_connect_api.Token import Token
-
-import datetime as dt
 
 
 def _make_token(**overrides) -> Token:
@@ -29,7 +27,7 @@ def _make_token(**overrides) -> Token:
         access_token="Bearer old-access-token",
         refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
         device_id="device-123",
-        valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
         pin="1234",
     )
     defaults.update(overrides)
