@@ -128,6 +128,46 @@ class TestEV5Dispatch:
         assert any(u.endswith("/reservation/chargehvac") for u in urls)
 
 
+class TestCCSPCombinedPayload:
+    """CCSP / EV2-EV4 combined /reservation/chargehvac payload shape.
+
+    The offPeakPowerFlag enum direction (1 = time, 2 = target) is covered by
+    ``test_ccs2_vehicle_properties::test_schedule_charging_off_peak_flag_*``;
+    this class locks the surrounding payload structure and the off-peak
+    window envelope so a refactor cannot silently drop fields.
+    """
+
+    def _combined(self, api, **opts) -> dict:
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=0, engine_type=ENGINE_TYPES.EV)
+        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options(**opts))
+        # exactly one POST to the combined endpoint
+        return next(c["json"] for c in calls if c["url"].endswith("/chargehvac"))
+
+    def test_reserv_flag_on_off(self, api):
+        payload = self._combined(api, charging_enabled=False)
+        assert payload["reservFlag"] == 0
+
+    def test_reserv_charge_info_keys(self, api):
+        payload = self._combined(api)
+        assert set(payload.keys()) == {
+            "reservChargeInfo1",
+            "reservChargeInfo2",
+            "offPeakPowerInfo",
+            "reservFlag",
+        }
+
+    def test_offpeak_window_envelope(self, api):
+        payload = self._combined(
+            api,
+            off_peak_start_time=dt.time(23, 30),  # PM -> section 1
+            off_peak_end_time=dt.time(1, 30),  # AM -> section 0
+        )
+        window = payload["offPeakPowerInfo"]["offPeakPowerTime1"]
+        assert window["starttime"] == {"time": "1130", "timeSection": 1}
+        assert window["endtime"] == {"time": "0130", "timeSection": 0}
+
+
 class TestEV5FlatChargePayload:
     def test_charge_payload_keys_and_lowercase_flag(self, api):
         calls = _mock_post(api)

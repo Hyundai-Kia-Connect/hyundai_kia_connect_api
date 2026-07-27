@@ -420,6 +420,45 @@ class TestCCS2ScheduledCharging:
         assert vehicle.ev_second_departure_days == expected["ev_second_departure_days"]
 
 
+def test_ccs2_off_peak_absent_yields_none_not_midnight(ccs2_api, vehicle):
+    """No Green.Reservation.OffPeakTime block -> all off-peak attrs None.
+
+    Regression guard: a missing block must NOT synthesise dt.time(0,0),
+    which would create a phantom midnight time entity downstream. EV9
+    fixtures ship without the OffPeakTime block.
+    """
+    for fixture_file in CCS2_FIXTURE_FILES:
+        data = load_fixture(fixture_file)
+        v = Vehicle()
+        ccs2_api._update_vehicle_properties_ccs2(v, data)
+        assert v.ev_off_peak_start_time is None, fixture_file
+        assert v.ev_off_peak_end_time is None, fixture_file
+        assert v.ev_schedule_charge_enabled is None, fixture_file
+        assert v.ev_off_peak_charge_only_enabled is None, fixture_file
+
+
+def test_ccs2_departure_absent_yields_none_not_midnight(ccs2_api, vehicle):
+    """Stub Schedule block (Enable only, no Hour/Min) -> time/days stay None.
+
+    Same regression class as off-peak: a Schedule block without Hour must not
+    synthesise dt.time(0,0) (would create a phantom 00:00 departure entity).
+    EV9 fixtures ship Schedule1/2 = {"Enable": False} with no Hour/Min.
+    ev_*_departure_enabled is still derived from Enable (False) — only
+    time/days must be None.
+    """
+    for fixture_file in CCS2_FIXTURE_FILES:
+        data = load_fixture(fixture_file)
+        v = Vehicle()
+        ccs2_api._update_vehicle_properties_ccs2(v, data)
+        assert v.ev_first_departure_time is None, fixture_file
+        assert v.ev_first_departure_days is None, fixture_file
+        assert v.ev_second_departure_time is None, fixture_file
+        assert v.ev_second_departure_days is None, fixture_file
+        # Enable is still parsed (False), not None
+        assert v.ev_first_departure_enabled is False, fixture_file
+        assert v.ev_second_departure_enabled is False, fixture_file
+
+
 def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
     """Unknown OffPeakTime.Mode (e.g. reserved 1) -> attrs None, no crash."""
     data = load_fixture("eu_kia_ev6_2024_ccs2_off.json")

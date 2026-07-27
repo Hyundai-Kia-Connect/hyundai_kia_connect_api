@@ -735,59 +735,72 @@ class ApiImplType1(ApiImpl):
         # Green.Reservation.OffPeakTime — off-peak charging window + priority mode.
         # Mode 0 = off, 2 = target-priority (off-peak tariffs prioritized),
         # 3 = time-priority (charge only during off-peak). 1 is reserved/unused.
-        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime") or {}
-        try:
-            vehicle.ev_off_peak_start_time = dt.time(
-                int(off_peak.get("StartHour") or 0), int(off_peak.get("StartMin") or 0)
-            )
-            vehicle.ev_off_peak_end_time = dt.time(
-                int(off_peak.get("EndHour") or 0), int(off_peak.get("EndMin") or 0)
-            )
-        except (TypeError, ValueError):
-            _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
-            vehicle.ev_off_peak_start_time = None
-            vehicle.ev_off_peak_end_time = None
+        # When the block is absent (HEV / unconfigured EV) all fields stay None —
+        # do NOT synthesise dt.time(0,0), which would create phantom time
+        # entities downstream and collide with a legitimate midnight window.
+        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime")
+        if off_peak:
+            try:
+                vehicle.ev_off_peak_start_time = dt.time(
+                    int(off_peak.get("StartHour") or 0),
+                    int(off_peak.get("StartMin") or 0),
+                )
+                vehicle.ev_off_peak_end_time = dt.time(
+                    int(off_peak.get("EndHour") or 0), int(off_peak.get("EndMin") or 0)
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
+                vehicle.ev_off_peak_start_time = None
+                vehicle.ev_off_peak_end_time = None
 
-        mode = off_peak.get("Mode")
-        if mode == 0:
-            vehicle.ev_schedule_charge_enabled = False
-            vehicle.ev_off_peak_charge_only_enabled = None
-        elif mode == 2:
-            vehicle.ev_schedule_charge_enabled = True
-            vehicle.ev_off_peak_charge_only_enabled = False
-        elif mode == 3:
-            vehicle.ev_schedule_charge_enabled = True
-            vehicle.ev_off_peak_charge_only_enabled = True
-        elif mode is not None:
-            _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
-        # mode is None -> no OffPeakTime block (HEV/unconfigured) -> attrs stay None
+            mode = off_peak.get("Mode")
+            if mode == 0:
+                vehicle.ev_schedule_charge_enabled = False
+                vehicle.ev_off_peak_charge_only_enabled = None
+            elif mode == 2:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = False
+            elif mode == 3:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif mode is not None:
+                _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
+        # off_peak is None/falsy -> no OffPeakTime block (HEV/unconfigured) ->
+        # ev_off_peak_* and ev_schedule_charge_enabled stay None (None default).
 
-        # Departure schedules
-        schedule1 = (
-            get_child_value(state, "Green.Reservation.Departure.Schedule1") or {}
-        )
-        schedule2 = (
-            get_child_value(state, "Green.Reservation.Departure.Schedule2") or {}
-        )
-        try:
-            vehicle.ev_first_departure_time = dt.time(
-                int(schedule1.get("Hour") or 0), int(schedule1.get("Min") or 0)
-            )
-            vehicle.ev_second_departure_time = dt.time(
-                int(schedule2.get("Hour") or 0), int(schedule2.get("Min") or 0)
-            )
-        except (TypeError, ValueError):
-            _LOGGER.warning("%s - CCS2 departure time malformed", DOMAIN)
-        vehicle.ev_first_departure_days = [
-            i
-            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
-            if schedule1.get(k) == 1
-        ] or None
-        vehicle.ev_second_departure_days = [
-            i
-            for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
-            if schedule2.get(k) == 1
-        ] or None
+        # Departure schedules — same None-when-absent rule. A missing or
+        # stub Schedule block (e.g. EV9 ships Schedule1 = {"Enable": False}
+        # with no Hour/Min) must yield None time/days, not a synthesised
+        # dt.time(0,0). ev_*_departure_enabled is set earlier from the
+        # Enable field and is unaffected. Guard on Hour presence so a
+        # disabled-but-remembered schedule (EV6: Enable=0 + Hour present)
+        # still parses, while an unconfigured stub (EV9: no Hour) stays None.
+        schedule1 = get_child_value(state, "Green.Reservation.Departure.Schedule1")
+        schedule2 = get_child_value(state, "Green.Reservation.Departure.Schedule2")
+        if schedule1 and "Hour" in schedule1:
+            try:
+                vehicle.ev_first_departure_time = dt.time(
+                    int(schedule1.get("Hour") or 0), int(schedule1.get("Min") or 0)
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
+            vehicle.ev_first_departure_days = [
+                i
+                for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+                if schedule1.get(k) == 1
+            ] or None
+        if schedule2 and "Hour" in schedule2:
+            try:
+                vehicle.ev_second_departure_time = dt.time(
+                    int(schedule2.get("Hour") or 0), int(schedule2.get("Min") or 0)
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
+            vehicle.ev_second_departure_days = [
+                i
+                for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+                if schedule2.get(k) == 1
+            ] or None
 
         # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
         # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
