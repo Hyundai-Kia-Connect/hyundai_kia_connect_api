@@ -248,8 +248,9 @@ class ApiImplType1(ApiImpl):
                 if profile_data:
                     vehicle.profile = self._map_vehicle_profile(profile_data[0])
             except Exception:
-                _LOGGER.debug(
-                    f"{DOMAIN} - Vehicle profile fetch failed for {vehicle.id}"
+                _LOGGER.warning(
+                    f"{DOMAIN} - Vehicle profile fetch failed for {vehicle.id}",
+                    exc_info=True,
                 )
 
     def _map_vehicle_profile(self, profile_data: dict) -> VehicleProfile:
