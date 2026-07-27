@@ -560,8 +560,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "vehicleStatus.evStatus.batteryPlugin"
         )
+        # `realTimePower` is instantaneous charging power, and is what
+        # KiaUvoApiUSA and ApiImplType1 report for `ev_charging_power`. The
+        # sibling `batteryStndChrgPower` is *standard*/AC charge power: it holds
+        # the AC rate through a DC fast charge, so it never reports one.
         vehicle.ev_charging_power = get_child_value(
-            state, "vehicleStatus.evStatus.batteryStndChrgPower"
+            state, "vehicleStatus.evStatus.realTimePower"
         )
         ChargeDict = get_child_value(
             state, "vehicleStatus.evStatus.reservChargeInfos.targetSOClist"
