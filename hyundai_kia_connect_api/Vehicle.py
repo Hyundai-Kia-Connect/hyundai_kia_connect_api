@@ -64,6 +64,103 @@ class DailyDrivingStats:
 
 
 @dataclass
+class VehicleProfile:
+    # basic
+    brand: str | None = None
+    country: str | None = None
+    ota_update_supported: bool | None = None
+    remote_ota_update_supported: bool | None = None
+
+    # device
+    sim_status: str | None = None
+    sim_start_date: str | None = None
+    sim_end_date: str | None = None
+    head_unit_type: str | None = None
+    head_unit_model_name: str | None = None
+    head_unit_version: str | None = None
+    platform: str | None = None
+    navi_applied: bool | None = None
+    web_manual_url: str | None = None
+
+    # option (raw API values)
+    air_control_type: str | None = None
+    driver_seat_location: str | None = None
+    remote_control: str | None = None
+    heating1: str | None = None
+    heating_front_window: str | None = None
+    steering_wheel_heat_option: str | None = None
+    heating_steering_wheel: str | None = None
+    heating_side_mirror: str | None = None
+    heating_rear_window: str | None = None
+    light_only_available: str | None = None
+    horn_light_available: str | None = None
+    hvac_temp_type: str | None = None
+    remote_control_waiting_time: int | None = None
+    window_safety_option2: int | None = None
+    sunroof_option: str | None = None
+    digital_key2: str | None = None
+    remote_heat_control: str | None = None
+    air_purifier_option: str | None = None
+    dvrs_option: str | None = None
+    ignition_control_option: str | None = None
+    seat_heater_vent_front_left: int | None = None
+    seat_heater_vent_front_right: int | None = None
+    seat_heater_vent_rear_left: int | None = None
+    seat_heater_vent_rear_right: int | None = None
+    ev_alarm_option_info: str | None = None
+    remote_air_ctrl_control_option: str | None = None
+    svm_option_info: str | None = None
+    v2l_option: str | None = None
+    v2x_option: str | None = None
+    v2g_option: str | None = None
+    frunk_option: str | None = None
+    clmt_ctrl_option: str | None = None
+    battery_preconditioning_option: str | None = None
+    cms_option: str | None = None
+    wireless_charging_option: str | None = None
+    remote_front_window_heat_control: str | None = None
+    window_safety_option: str | None = None
+
+    # serviceOption
+    battery_warning_service: bool | None = None
+    schedule_link_service: bool | None = None
+    center_user_profile_option: int | None = None
+    final_destination_noti: bool | None = None
+    valet_service_option: bool | None = None
+    notification_support: bool | None = None
+    remote_valet_act_option: bool | None = None
+    alert_service_option: bool | None = None
+    media_streaming_service: list[int] | None = None
+    media_streaming_selection_option: bool | None = None
+    idle_alert_setting_service: bool | None = None
+    engine_idle_time_notification: bool | None = None
+    send2car_option_info: int | None = None
+    speed_event_support: bool | None = None
+    charge_port_door_option: str | None = None
+    charging_current_support: str | None = None
+    v2l_soc_set_service_option: str | None = None
+    window_control_option: str | None = None
+    remote_light_control_option: str | None = None
+
+    # batteryType
+    main_battery_type: int | None = None
+    aux_battery_type: int | None = None
+
+    # detailInfo
+    sale_model_code: str | None = None
+    body_type: str | None = None
+    interior_color: str | None = None
+    exterior_color: str | None = None
+
+    # dtcCategory
+    dtc_categories: list | None = None
+
+    # Top-level vinInfo dispatch field ("EV5" = flat /ccs2/reservation/{charge,hvac};
+    # absent on older CCSP vehicles that use combined /chargehvac).
+    app_mode: str | None = None
+
+
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -390,6 +487,7 @@ class Vehicle:
 
     # Debug fields
     data: dict = None
+    profile: VehicleProfile | None = None
 
     @property
     def geocode(self):
@@ -730,3 +828,239 @@ class Vehicle:
         self._fuel_driving_range = value[0]
         if value[1] is not None:
             self._fuel_driving_range_unit = value[1]
+
+    # Capability properties from VehicleProfile (flat, for HA getattr pattern)
+
+    @property
+    def steering_wheel_heater_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.heating_steering_wheel == "1"
+
+    @property
+    def side_mirror_heater_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.heating_side_mirror == "1"
+
+    @property
+    def rear_window_heater_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.heating_rear_window == "1"
+
+    @property
+    def sunroof_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.sunroof_option == "1"
+
+    @property
+    def digital_key_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.digital_key2 != "0"
+
+    @property
+    def air_purifier_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.air_purifier_option == "1"
+
+    @property
+    def remote_heat_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.remote_heat_control != "0"
+
+    @property
+    def ignition_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.ignition_control_option == "1"
+
+    @property
+    def horn_light_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.horn_light_available == "1"
+
+    @property
+    def light_only_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.light_only_available == "1"
+
+    @property
+    def ev_alarm_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.ev_alarm_option_info != "0"
+
+    @property
+    def front_window_heating_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.heating_front_window == "1"
+
+    @property
+    def is_left_hand_drive(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return self.profile.driver_seat_location == "L"
+
+    # Capability properties from VehicleProfile option/serviceOption flags.
+    # None when profile or the flag is absent (unknown); non-zero = supported.
+
+    @property
+    def svm_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.svm_option_info is None
+            else self.profile.svm_option_info != "0"
+        )
+
+    @property
+    def v2l_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None if self.profile.v2l_option is None else self.profile.v2l_option != "0"
+        )
+
+    @property
+    def v2x_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None if self.profile.v2x_option is None else self.profile.v2x_option != "0"
+        )
+
+    @property
+    def v2g_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None if self.profile.v2g_option is None else self.profile.v2g_option != "0"
+        )
+
+    @property
+    def frunk_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.frunk_option is None
+            else self.profile.frunk_option != "0"
+        )
+
+    @property
+    def climate_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.clmt_ctrl_option is None
+            else self.profile.clmt_ctrl_option != "0"
+        )
+
+    @property
+    def battery_preconditioning_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.battery_preconditioning_option is None
+            else self.profile.battery_preconditioning_option != "0"
+        )
+
+    @property
+    def digital_side_mirror_supported(self) -> bool | None:
+        # cms = Camera Monitoring System (digital side mirrors)
+        if self.profile is None:
+            return None
+        return (
+            None if self.profile.cms_option is None else self.profile.cms_option != "0"
+        )
+
+    @property
+    def wireless_charging_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.wireless_charging_option is None
+            else self.profile.wireless_charging_option != "0"
+        )
+
+    @property
+    def remote_front_window_heat_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.remote_front_window_heat_control is None
+            else self.profile.remote_front_window_heat_control != "0"
+        )
+
+    @property
+    def window_safety_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.window_safety_option is None
+            else self.profile.window_safety_option != "0"
+        )
+
+    @property
+    def charge_port_door_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.charge_port_door_option is None
+            else self.profile.charge_port_door_option != "0"
+        )
+
+    @property
+    def charging_current_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.charging_current_support is None
+            else self.profile.charging_current_support != "0"
+        )
+
+    @property
+    def v2l_soc_set_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.v2l_soc_set_service_option is None
+            else self.profile.v2l_soc_set_service_option != "0"
+        )
+
+    @property
+    def window_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.window_control_option is None
+            else self.profile.window_control_option != "0"
+        )
+
+    @property
+    def remote_light_control_supported(self) -> bool | None:
+        if self.profile is None:
+            return None
+        return (
+            None
+            if self.profile.remote_light_control_option is None
+            else self.profile.remote_light_control_option != "0"
+        )
