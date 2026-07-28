@@ -5,6 +5,7 @@
 import datetime as dt
 import logging
 import time
+from typing import ClassVar
 
 import certifi
 from requests.adapters import HTTPAdapter
@@ -134,7 +135,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
-    _action_service_types: dict[str, str] = {}
+    _action_service_types: ClassVar[dict[str, str]] = {}
 
     # Cached enrollment/details response. Capabilities, seat configs,
     # generation and model rarely change, so the response is cached for

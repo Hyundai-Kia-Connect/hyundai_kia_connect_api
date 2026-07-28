@@ -97,8 +97,8 @@ class RetrySession(requests.Session):
 class KiaUvoApiCA(ApiImpl):
     """KiaUvoApiCA"""
 
-    temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
-    temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
+    temperature_range_c_old = tuple(x * 0.5 for x in range(32, 64))
+    temperature_range_c_new = tuple(x * 0.5 for x in range(28, 64))
     temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int, language: str) -> None:

@@ -53,7 +53,7 @@ USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build
 
 class KiaUvoApiAU(ApiImplType1):
     data_timezone = ZoneInfo("Australia/Sydney")
-    temperature_range = [x * 0.5 for x in range(34, 54)]
+    temperature_range = tuple(x * 0.5 for x in range(34, 54))
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
