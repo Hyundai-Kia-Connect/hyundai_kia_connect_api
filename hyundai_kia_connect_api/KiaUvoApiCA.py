@@ -7,13 +7,11 @@ import datetime as dt
 import json
 import logging
 import platform
-import socket
 import time
 import uuid
 from zoneinfo import ZoneInfo
 
 import requests
-import requests.packages.urllib3.util.connection as urllib3_cn
 
 # Try to fix hyundai/cloudflare
 from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
@@ -42,13 +40,6 @@ from .utils import (
     parse_datetime,
 )
 from .Vehicle import DailyDrivingStats, Vehicle
-
-
-def allowed_gai_family():
-    return socket.AF_INET
-
-
-urllib3_cn.allowed_gai_family = allowed_gai_family
 
 _LOGGER = logging.getLogger(__name__)
 
