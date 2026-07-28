@@ -1033,8 +1033,8 @@ class KiaUvoApiEU(ApiImplType1):
                     "vehicle may be offline or returning partial status"
                 )
             return gps_detail
-        except Exception:
-            _LOGGER.exception(f"{DOMAIN} - _get_location failed")
+        except Exception as e:
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:

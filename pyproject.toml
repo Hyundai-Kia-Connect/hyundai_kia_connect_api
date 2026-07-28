@@ -15,6 +15,6 @@ ignore = [
     # DTZ*: naive datetimes in token-expiry + region timestamp handling.
     # Tz-aware migration is all-or-nothing (mixed aware/naive raises
     # TypeError on comparison) — needs its own PR with timestamp audit.
-    # Deferred; see follow-up issue.
+    # Deferred to a separate tz-aware migration PR.
     "DTZ001", "DTZ004", "DTZ005", "DTZ006", "DTZ007", "DTZ901",
 ]
