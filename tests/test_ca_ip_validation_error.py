@@ -120,7 +120,7 @@ def test_check_and_refresh_token_reauthenticates_on_ip_validation_error():
         access_token="STALE-AT",
         refresh_token="STALE-RT",
         device_id="PERSISTED-DEVICE-ID",
-        valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=12),
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=12),
     )
     vm = VehicleManager(
         region=2,

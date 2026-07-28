@@ -59,40 +59,48 @@ class TestApiImplSessionTimeoutException:
 
     def test_timeout_raises_request_timeout_error(self):
         session = ApiImplSession()
-        with patch.object(
-            requests.Session,
-            "request",
-            side_effect=requests.exceptions.Timeout("connection timed out"),
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.Timeout("connection timed out"),
+            ),
+            pytest.raises(RequestTimeoutError, match="connection timed out"),
         ):
-            with pytest.raises(RequestTimeoutError, match="connection timed out"):
-                session.get("https://example.com")
+            session.get("https://example.com")
 
     def test_connect_timeout_raises_request_timeout_error(self):
         session = ApiImplSession()
-        with patch.object(
-            requests.Session,
-            "request",
-            side_effect=requests.exceptions.ConnectTimeout("connect timed out"),
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.ConnectTimeout("connect timed out"),
+            ),
+            pytest.raises(RequestTimeoutError, match="connect timed out"),
         ):
-            with pytest.raises(RequestTimeoutError, match="connect timed out"):
-                session.get("https://example.com")
+            session.get("https://example.com")
 
     def test_read_timeout_raises_request_timeout_error(self):
         session = ApiImplSession()
-        with patch.object(
-            requests.Session,
-            "request",
-            side_effect=requests.exceptions.ReadTimeout("read timed out"),
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.ReadTimeout("read timed out"),
+            ),
+            pytest.raises(RequestTimeoutError, match="read timed out"),
         ):
-            with pytest.raises(RequestTimeoutError, match="read timed out"):
-                session.get("https://example.com")
+            session.get("https://example.com")
 
     def test_other_exceptions_passthrough(self):
         session = ApiImplSession()
-        with patch.object(
-            requests.Session,
-            "request",
-            side_effect=requests.exceptions.ConnectionError("refused"),
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.ConnectionError("refused"),
+            ),
+            pytest.raises(requests.exceptions.ConnectionError, match="refused"),
         ):
-            with pytest.raises(requests.exceptions.ConnectionError, match="refused"):
-                session.get("https://example.com")
+            session.get("https://example.com")

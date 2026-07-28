@@ -1,7 +1,8 @@
 import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
-from zoneinfo import ZoneInfo
+
 from hyundai_kia_connect_api.utils import (
     bool_or_none,
     detect_timezone_for_date,

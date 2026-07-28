@@ -3,8 +3,8 @@
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import _retry_on_device_id_error
-from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.exceptions import DeviceIDError
+from hyundai_kia_connect_api.Token import Token
 
 
 class TestRetryOnDeviceIdError:

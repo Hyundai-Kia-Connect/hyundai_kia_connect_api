@@ -9,12 +9,10 @@ import datetime as dt
 import logging
 from unittest.mock import MagicMock, patch
 
-
 from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-
 
 # ---------------------------------------------------------------------------
 # Helpers

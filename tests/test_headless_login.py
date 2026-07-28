@@ -6,10 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequiredError
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequiredError
-
 
 # ── Helper: patches for _login_with_password() tests ─────────────
 # RSA/PKCS1v15 crypto is not under test, so we mock it out.
@@ -429,9 +428,9 @@ def test_login_genesis_password_fails_falls_back_to_error():
             "_login_with_password",
             side_effect=AuthenticationError("Signin failed: HTTP 404"),
         ),
+        pytest.raises(AuthenticationError, match="Signin failed"),
     ):
-        with pytest.raises(AuthenticationError, match="Signin failed"):
-            api.login("user@test.com", "MyPassword123!")
+        api.login("user@test.com", "MyPassword123!")
 
 
 # ── refresh_access_token() tests ───────────────────────────────
@@ -445,7 +444,7 @@ def _make_token(**overrides) -> Token:
         access_token="Bearer old-access-token",
         refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
         device_id="device-123",
-        valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
         pin="1234",
     )
     defaults.update(overrides)

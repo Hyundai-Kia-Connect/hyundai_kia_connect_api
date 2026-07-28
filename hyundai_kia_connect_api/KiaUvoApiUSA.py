@@ -5,30 +5,29 @@ import datetime as dt
 import logging
 import ssl
 import time
+import uuid
 from datetime import datetime
 
 import certifi
-import uuid
 from requests import RequestException, Response
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
-from .Token import Token
-from .Vehicle import Vehicle
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
     LOGIN_TOKEN_LIFETIME,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
-    OTP_NOTIFY_TYPE,
 )
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .Token import Token
 from .utils import get_child_value, normalize_battery_soc, parse_datetime
-
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -180,7 +179,7 @@ class KiaUvoApiUSA(ApiImpl):
             "tokentype": "A",
             "user-agent": "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0",
         }
-        date = datetime.now(tz=dt.timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        date = datetime.now(tz=dt.UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
         return headers
@@ -282,7 +281,7 @@ class KiaUvoApiUSA(ApiImpl):
         )
         final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
         _LOGGER.debug("OTP Successful, obtained final session id")
-        valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
+        valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
             password=password,
@@ -341,7 +340,7 @@ class KiaUvoApiUSA(ApiImpl):
         session_id = response.headers.get("sid")
         if session_id:
             _LOGGER.debug(f"Got session id {session_id}")
-            valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
+            valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
             existing_rmtoken = token.refresh_token if token else None
             return Token(
                 username=username,
@@ -513,7 +512,7 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.car_battery_percentage = normalize_battery_soc(
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",
             )
         )
         vehicle.engine_is_running = get_child_value(
@@ -550,31 +549,31 @@ class KiaUvoApiUSA(ApiImpl):
 
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",
         )
         vehicle.back_window_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",
         )
         vehicle.front_left_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",
         )
         vehicle.front_right_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",
         )
         vehicle.rear_left_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",
         )
         vehicle.rear_right_seat_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",
         )
         vehicle.is_locked = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorLock"
@@ -691,40 +690,40 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.ev_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
                 )
             ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",
             ),
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",
             ),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",
             ),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",
             ),
             "m",
         )
@@ -735,28 +734,28 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
         if get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
                     )
                 ],
             )
@@ -764,12 +763,12 @@ class KiaUvoApiUSA(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",  # noqa
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
                     )
                 ],
             )
@@ -817,7 +816,7 @@ class KiaUvoApiUSA(ApiImpl):
             if ev_status:
                 gas_mode_range = get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 )
                 if gas_mode_range is not None:
                     vehicle.engine_type = ENGINE_TYPES.PHEV

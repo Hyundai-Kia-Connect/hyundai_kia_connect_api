@@ -15,7 +15,7 @@ class DummyApi(ApiImpl):
         return Token(
             username=username,
             password=password,
-            valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=1),
+            valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1),
         )
 
     def get_vehicles(self, token):

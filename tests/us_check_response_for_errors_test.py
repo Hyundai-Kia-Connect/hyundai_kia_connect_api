@@ -8,8 +8,8 @@ Covers:
 
 import pytest
 
-from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import _check_response_for_errors
 from hyundai_kia_connect_api.exceptions import APIError, ServiceTemporaryUnavailable
+from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import _check_response_for_errors
 
 
 class TestCheckResponseForErrors:

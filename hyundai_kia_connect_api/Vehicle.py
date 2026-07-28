@@ -1,12 +1,12 @@
 # pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation
 """Vehicle class"""
 
-import logging
 import datetime
+import logging
 from dataclasses import dataclass, field
 
-from .utils import float_or_none, get_float, get_safe_local_datetime
 from .const import DISTANCE_UNITS, PRESSURE_UNITS, PressureUnit
+from .utils import float_or_none, get_float, get_safe_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -474,8 +474,9 @@ class Vehicle:
                 newest_updated_at_corrected = newest_updated_at + utcoffset
                 if newest_updated_at_corrected >= previous_updated_at:
                     newest_updated_at = newest_updated_at_corrected
-                if newest_updated_at < previous_updated_at:
-                    newest_updated_at = previous_updated_at  # keep old because newer
+                newest_updated_at = max(
+                    newest_updated_at, previous_updated_at
+                )  # keep old because newer
         self._last_updated_at = newest_updated_at
 
     @property

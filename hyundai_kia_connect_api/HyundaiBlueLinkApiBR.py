@@ -213,9 +213,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         auth_response = self._get_auth_response(authorization_code)
 
         expires_in_seconds = auth_response["expires_in"]
-        expires_at = dt.datetime.now(dt.timezone.utc) + timedelta(
-            seconds=expires_in_seconds
-        )
+        expires_at = dt.datetime.now(dt.UTC) + timedelta(seconds=expires_in_seconds)
 
         return Token(
             access_token=auth_response["access_token"],
@@ -466,7 +464,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         if (
             control_token
             and expires_at
-            and expires_at - dt.timedelta(seconds=5) > dt.datetime.now(dt.timezone.utc)
+            and expires_at - dt.timedelta(seconds=5) > dt.datetime.now(dt.UTC)
         ):
             return control_token
 
@@ -489,9 +487,7 @@ class HyundaiBlueLinkApiBR(ApiImpl):
 
         control_token = f"Bearer {data['controlToken']}"
         expires_in = data.get("expiresTime", 0)
-        expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-            seconds=expires_in or 600
-        )
+        expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in or 600)
 
         token.control_token = control_token
         token.control_token_expires_at = expires_at
@@ -540,8 +536,8 @@ class HyundaiBlueLinkApiBR(ApiImpl):
             if timeout < 1:
                 raise APIError("Timeout must be 1 or higher for synchronous checks.")
 
-            end_time = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=timeout)
-            while dt.datetime.now(dt.timezone.utc) < end_time:
+            end_time = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=timeout)
+            while dt.datetime.now(dt.UTC) < end_time:
                 state = self.check_action_status(
                     token, vehicle, action_id, synchronous=False
                 )
@@ -589,13 +585,12 @@ class HyundaiBlueLinkApiBR(ApiImpl):
         # Brazilian API uses simple action for all windows at once
         # Check if any window should be open, otherwise close
         action = "open"
-        if options.front_left == WINDOW_STATE.CLOSED:
-            action = "close"
-        elif options.front_right == WINDOW_STATE.CLOSED:
-            action = "close"
-        elif options.back_left == WINDOW_STATE.CLOSED:
-            action = "close"
-        elif options.back_right == WINDOW_STATE.CLOSED:
+        if (
+            options.front_left == WINDOW_STATE.CLOSED
+            or options.front_right == WINDOW_STATE.CLOSED
+            or options.back_left == WINDOW_STATE.CLOSED
+            or options.back_right == WINDOW_STATE.CLOSED
+        ):
             action = "close"
 
         headers = self._get_authenticated_headers(token)

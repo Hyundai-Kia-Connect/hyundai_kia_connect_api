@@ -8,10 +8,10 @@ import datetime as dt
 import logging
 from unittest.mock import MagicMock, patch
 
+from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
 
 
 class _FakeResponse:

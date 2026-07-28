@@ -27,7 +27,7 @@ def _make_token(**overrides) -> Token:
         password="MyPassword123!",
         access_token="old-access-token",
         refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
-        valid_until=dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1),
+        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
         pin="1234",
     )
     defaults.update(overrides)
@@ -127,10 +127,10 @@ def test_refresh_access_token_sets_valid_until_from_expires_in() -> None:
     with patch.object(
         api.session, "post", return_value=_mock_refresh_response(expires_in="3600")
     ):
-        before = dt.datetime.now(dt.timezone.utc)
+        before = dt.datetime.now(dt.UTC)
         token = _make_token()
         result = api.refresh_access_token(token)
-        after = dt.datetime.now(dt.timezone.utc)
+        after = dt.datetime.now(dt.UTC)
 
     assert result.valid_until >= before + dt.timedelta(seconds=3599)
     assert result.valid_until <= after + dt.timedelta(seconds=3601)

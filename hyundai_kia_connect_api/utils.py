@@ -7,7 +7,6 @@ import re
 from enum import IntEnum
 from typing import Any, TypeVar
 
-
 T = TypeVar("T", bound=IntEnum)
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ def get_float(value):
     return value  # original fallback
 
 
-def float_or_none(value: str | int | float | None) -> float | None:
+def float_or_none(value: str | float | None) -> float | None:
     """Coerce to float; return None for missing or non-numeric values."""
     if value is None:
         return None
@@ -95,7 +94,7 @@ def bool_or_none(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
-def pressure_or_none(value: int | float | None) -> int | float | None:
+def pressure_or_none(value: float | None) -> int | float | None:
     """Return a tire pressure raw value, or None if it's the no-reading sentinel.
 
     None passes through; 255 (0xFF, TPMS "no reading" — the CCS2 status returns
@@ -112,7 +111,7 @@ def pressure_or_none(value: int | float | None) -> int | float | None:
 
 
 def normalize_battery_soc(
-    value: int | float | None,
+    value: float | None,
     sensor_reliability: int | None = None,
 ) -> int | None:
     """Normalize 12V auxiliary battery state-of-charge.

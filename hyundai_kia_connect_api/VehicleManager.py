@@ -9,10 +9,10 @@ from datetime import timedelta
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
-    ScheduleChargingClimateRequestOptions,
-    WindowRequestOptions,
     OTPRequest,
     POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
 )
 from .const import (
     BRAND_GENESIS,
@@ -22,6 +22,7 @@ from .const import (
     CHARGE_PORT_ACTION,
     DOMAIN,
     ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
     REGION_BRAZIL,
     REGION_CANADA,
@@ -33,7 +34,6 @@ from .const import (
     REGIONS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
-    OTP_NOTIFY_TYPE,
 )
 from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
@@ -142,7 +142,7 @@ class VehicleManager:
     def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
-            vehicle.last_scanned_at = dt.datetime.now(dt.timezone.utc)
+            vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
@@ -164,11 +164,11 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt.datetime = dt.datetime.now(dt.timezone.utc)
+        started_at_utc: dt.datetime = dt.datetime.now(dt.UTC)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
             _LOGGER.debug(
-                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"  # noqa
+                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
             )
             if (
                 started_at_utc - vehicle.last_updated_at
@@ -186,7 +186,7 @@ class VehicleManager:
     def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
-            vehicle.last_scanned_at = dt.datetime.now(dt.timezone.utc)
+            vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
@@ -199,16 +199,16 @@ class VehicleManager:
                 return True
             else:
                 raise AuthenticationOTPRequired("OTP required to refresh token")
-        now_utc = dt.datetime.now(dt.timezone.utc)
+        now_utc = dt.datetime.now(dt.UTC)
         grace_period = timedelta(seconds=10)
-        min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+        min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.UTC)
         valid_until = self.token.valid_until
         token_expired = False
         if not isinstance(valid_until, dt.datetime):
             token_expired = True
         else:
             if valid_until.tzinfo is None:
-                valid_until = valid_until.replace(tzinfo=dt.timezone.utc)
+                valid_until = valid_until.replace(tzinfo=dt.UTC)
             if valid_until <= min_supported_datetime + grace_period:
                 token_expired = True
             else:

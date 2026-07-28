@@ -46,7 +46,7 @@ def _make_api(response_text=None):
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
     api.session = MagicMock()
-    api.data_timezone = dt.timezone.utc
+    api.data_timezone = dt.UTC
     if response_text is not None:
         api.session.get = MagicMock(return_value=_FakeResponse(text=response_text))
     return api
@@ -58,7 +58,7 @@ def _make_vehicle(vid="rid1"):
         name="Test",
         model="TMU",
         key="key1",
-        timezone=dt.timezone.utc,
+        timezone=dt.UTC,
     )
 
 

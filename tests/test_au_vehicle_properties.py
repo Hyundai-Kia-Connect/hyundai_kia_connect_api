@@ -8,7 +8,6 @@ import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.Vehicle import Vehicle
-
 from tests.fixture_helpers import (
     discover_fixtures,
     get_fixture_expected,

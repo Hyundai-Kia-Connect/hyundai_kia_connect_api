@@ -58,8 +58,8 @@ from .Vehicle import (
 _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"  # noqa
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"  # noqa
+USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
+ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -111,13 +111,13 @@ class KiaUvoApiCN(ApiImplType1):
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
-            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="  # noqa
+            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
         elif BRANDS[brand] == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
             self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
             self.APP_ID: str = "ed01581a-380f-48cd-83d4-ed1490c272d0"
             self.BASIC_AUTHORIZATION: str = (
-                "Basic NzJiM2QwMTktNWJjNy00NDNkLWE0MzctMDhmMzA3Y2YwNmUyOnNlY3JldA=="  # noqa
+                "Basic NzJiM2QwMTktNWJjNy00NDNkLWE0MzctMDhmMzA3Y2YwNmUyOnNlY3JldA=="
             )
 
         self.BASE_URL: str = self.BASE_DOMAIN
@@ -178,7 +178,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         _, access_token, authorization_code = self._get_access_token(authorization_code)
         _, refresh_token = self._get_refresh_token(authorization_code)
-        valid_until = dt.datetime.now(dt.timezone.utc) + LOGIN_TOKEN_LIFETIME
+        valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -418,7 +418,7 @@ class KiaUvoApiCN(ApiImplType1):
         if (
             get_child_value(
                 state,
-                "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             )
             is not None
         ):
@@ -427,7 +427,7 @@ class KiaUvoApiCN(ApiImplType1):
                     float(
                         get_child_value(
                             state,
-                            "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                            "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
                         )
                     ),
                     1,
@@ -435,7 +435,7 @@ class KiaUvoApiCN(ApiImplType1):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                     )
                 ],
             )
@@ -451,7 +451,7 @@ class KiaUvoApiCN(ApiImplType1):
                     float(
                         get_child_value(
                             state,
-                            "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
+                            "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
                         )
                     ),
                     1,
@@ -459,7 +459,7 @@ class KiaUvoApiCN(ApiImplType1):
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
                     )
                 ],
             )
@@ -502,12 +502,12 @@ class KiaUvoApiCN(ApiImplType1):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
+                        "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
                     )
                 ],
             )
@@ -526,96 +526,96 @@ class KiaUvoApiCN(ApiImplType1):
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",  # noqa
+                "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
         vehicle.ev_first_departure_enabled = get_child_value(
             state,
-            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",  # noqa
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",
         )
         vehicle.ev_second_departure_enabled = get_child_value(
             state,
-            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",  # noqa
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",
         )
         vehicle.ev_first_departure_days = get_child_value(
             state,
-            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",  # noqa
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",
         )
         vehicle.ev_second_departure_days = get_child_value(
             state,
-            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",  # noqa
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",
         )
 
         vehicle.ev_first_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",  # noqa
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",
             ),
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",
             ),
         )
 
         vehicle.ev_second_departure_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",  # noqa
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",
             ),
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",
             ),
         )
 
         vehicle.ev_off_peak_start_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",
             ),
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",
             ),
         )
 
         vehicle.ev_off_peak_end_time = self._get_time_from_string(
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",
             ),
             get_child_value(
                 state,
-                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",  # noqa
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",
             ),
         )
 
         if get_child_value(
             state,
-            "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+            "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
         ):
             if (
                 get_child_value(
                     state,
-                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
                 )
                 == 1
             ):
@@ -623,7 +623,7 @@ class KiaUvoApiCN(ApiImplType1):
             elif (
                 get_child_value(
                     state,
-                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",  # noqa
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
                 )
                 == 2
             ):
@@ -980,7 +980,7 @@ class KiaUvoApiCN(ApiImplType1):
             return drivingInfo
         else:
             _LOGGER.debug(
-                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."  # noqa
+                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."
             )
             return None
 
@@ -1117,7 +1117,7 @@ class KiaUvoApiCN(ApiImplType1):
         }
 
         data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="  # noqa
+            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
             + authorization_code
         )
         response = self.session.post(url, data=data, headers=headers)
@@ -1193,7 +1193,7 @@ class KiaUvoApiCN(ApiImplType1):
                         return ORDER_STATUS.TIMEOUT
                     elif action["result"] is None:
                         _LOGGER.debug(
-                            "Action status not set yet by server - try again in a few seconds"  # noqa
+                            "Action status not set yet by server - try again in a few seconds"
                         )
                         return ORDER_STATUS.PENDING
 

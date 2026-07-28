@@ -10,8 +10,8 @@ to LOGIN_TOKEN_LIFETIME (23h) only when the server omits it.
 import datetime as dt
 from unittest.mock import MagicMock
 
-from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.const import LOGIN_TOKEN_LIFETIME
+from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 
 
 def _au_api_with_login_chain(expires_in: int | None) -> KiaUvoApiAU:
@@ -20,7 +20,7 @@ def _au_api_with_login_chain(expires_in: int | None) -> KiaUvoApiAU:
     api = KiaUvoApiAU(region=5, brand=2, language="en")
     api._get_stamp = lambda: "S"  # type: ignore[assignment]
     api._get_device_id = lambda stamp: "dev"  # type: ignore[assignment]
-    api._get_cookies = lambda: {}  # type: ignore[assignment]
+    api._get_cookies = dict  # type: ignore[assignment]
     api._get_authorization_code_with_redirect_url = (  # type: ignore[assignment]
         lambda username, password, cookies: "authcode"
     )
@@ -49,7 +49,7 @@ def test_au_login_valid_until_from_expires_in() -> None:
     """login() must set valid_until from expires_in (6h), not the 23h hardcode."""
     api = _au_api_with_login_chain(expires_in=21600)
     token = api.login("u", "p", pin="0000")
-    delta = token.valid_until - dt.datetime.now(dt.timezone.utc)
+    delta = token.valid_until - dt.datetime.now(dt.UTC)
     assert dt.timedelta(hours=5, minutes=55) < delta < dt.timedelta(hours=6, minutes=5)
 
 
@@ -57,7 +57,7 @@ def test_au_login_valid_until_fallback_when_no_expires_in() -> None:
     """When the server omits expires_in, fall back to LOGIN_TOKEN_LIFETIME (23h)."""
     api = _au_api_with_login_chain(expires_in=None)
     token = api.login("u", "p", pin="0000")
-    delta = token.valid_until - dt.datetime.now(dt.timezone.utc)
+    delta = token.valid_until - dt.datetime.now(dt.UTC)
     assert (
         dt.timedelta(hours=22, minutes=55) < delta < dt.timedelta(hours=23, minutes=5)
     )

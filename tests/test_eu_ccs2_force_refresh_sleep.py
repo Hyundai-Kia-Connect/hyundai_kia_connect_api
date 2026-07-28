@@ -1,8 +1,9 @@
 """Unit test for the simpler wake+sleep+read CCS2 force-refresh (counter-PR to #1184)."""
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -126,9 +127,9 @@ def test_force_refresh_wake_failure_propagates_no_stale_apply(eu_api, ccs2_vehic
     with (
         patch.object(eu_api.session, "get", side_effect=mock_get),
         patch("hyundai_kia_connect_api.KiaUvoApiEU.sleep"),
+        pytest.raises(ValueError),
     ):
-        with pytest.raises(ValueError):
-            eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
+        eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
 
     # wake failed -> no sleep-then-/latest apply happened
     eu_api._update_vehicle_properties_ccs2.assert_not_called()

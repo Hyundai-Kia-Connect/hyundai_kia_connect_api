@@ -2,11 +2,11 @@
 
 from unittest.mock import MagicMock
 
+from hyundai_kia_connect_api.exceptions import DeviceIDError
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
 from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.exceptions import DeviceIDError
 
 _TOKEN_RESPONSE = {
     "token_type": "Bearer",

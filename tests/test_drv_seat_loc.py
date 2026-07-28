@@ -19,9 +19,9 @@ Mirrors egmp-bluelink-scriptable: ``europe.ts`` uses
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.const import DISTANCE_UNITS
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
-from hyundai_kia_connect_api.const import DISTANCE_UNITS
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 

@@ -5,21 +5,41 @@ import functools
 import logging
 import math
 import threading
-
 import time
 from time import sleep
 
 from .ApiImpl import (
     ApiImpl,
     ApiImplSession,
-    ScheduleChargingClimateRequestOptions,
     ClimateRequestOptions,
-    WindowRequestOptions,
     POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
+from .const import (
+    DISTANCE_UNITS,
+    DOMAIN,
+    ENGINE_TYPES,
+    ORDER_STATUS,
+    PRESSURE_SCALES,
+    SEAT_STATUS,
+    TEMPERATURE_UNITS,
+    VEHICLE_LOCK_ACTION,
+    PressureUnit,
+)
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    DeviceIDError,
+    DuplicateRequestError,
+    InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    UnsupportedControlError,
 )
 from .Token import Token
-from .Vehicle import Vehicle
-
 from .utils import (
     bool_or_none,
     get_child_value,
@@ -29,31 +49,7 @@ from .utils import (
     pressure_or_none,
     window_is_open,
 )
-
-from .const import (
-    DOMAIN,
-    DISTANCE_UNITS,
-    ENGINE_TYPES,
-    SEAT_STATUS,
-    TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION,
-    ORDER_STATUS,
-    PRESSURE_SCALES,
-    PressureUnit,
-)
-
-from .exceptions import (
-    APIError,
-    AuthenticationError,
-    DuplicateRequestError,
-    RequestTimeoutError,
-    ServiceTemporaryUnavailable,
-    NoDataFound,
-    InvalidAPIResponseError,
-    RateLimitingError,
-    DeviceIDError,
-    UnsupportedControlError,
-)
+from .Vehicle import Vehicle
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
@@ -291,7 +287,7 @@ class ApiImplType1(ApiImpl):
             # In EU, CCS2 'Offset' is always 1 (CET), but CEST is UTC+0100.
             # In AU, CCS2 'Offset' is 10 (AEST), but AEDT is UTC+1100.
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), dt.timezone.utc
+                get_child_value(state, "Date"), dt.UTC
             ).astimezone(self.data_timezone)
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -643,13 +639,13 @@ class ApiImplType1(ApiImpl):
             float(
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Total",
                 )
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
@@ -697,24 +693,24 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
-                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
-                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
@@ -737,11 +733,11 @@ class ApiImplType1(ApiImpl):
             state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
         )
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun)
+        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour)
+        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour)
+        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -994,7 +990,7 @@ class ApiImplType1(ApiImpl):
                         return ORDER_STATUS.TIMEOUT
                     elif action["result"] is None:
                         _LOGGER.info(
-                            "Action status not set yet by server - try again in a few seconds"  # noqa
+                            "Action status not set yet by server - try again in a few seconds"
                         )
                         return ORDER_STATUS.PENDING
 
@@ -1376,9 +1372,7 @@ class ApiImplType1(ApiImpl):
                 )
                 expires_in = int(response_json.get("expires_in", 86400))
 
-                valid_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
-                    seconds=expires_in
-                )
+                valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
 
                 _LOGGER.debug(
                     f"{DOMAIN} - Access token refreshed successfully, "

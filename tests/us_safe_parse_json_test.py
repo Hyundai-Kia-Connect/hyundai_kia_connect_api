@@ -5,8 +5,9 @@ empty response body (HTTP 200 OK, no body) for control commands.
 """
 
 import pytest
-from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import _safe_parse_json
+
 from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import _safe_parse_json
 
 
 class _FakeResponse:

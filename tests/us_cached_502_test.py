@@ -11,10 +11,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 
 
 def _make_token():
@@ -137,9 +137,7 @@ class TestCheckAndForceUpdateVehicleNoData:
 
         mgr = VehicleManager.__new__(VehicleManager)
         vehicle = _make_vehicle()
-        vehicle.last_updated_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(
-            minutes=30
-        )
+        vehicle.last_updated_at = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=30)
         mgr.vehicles = {vehicle.id: vehicle}
 
         with (
@@ -156,9 +154,7 @@ class TestCheckAndForceUpdateVehicleNoData:
 
         mgr = VehicleManager.__new__(VehicleManager)
         vehicle = _make_vehicle()
-        vehicle.last_updated_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(
-            hours=25
-        )
+        vehicle.last_updated_at = dt.datetime.now(dt.UTC) - dt.timedelta(hours=25)
         mgr.vehicles = {vehicle.id: vehicle}
 
         with (
