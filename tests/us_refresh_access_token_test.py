@@ -22,14 +22,14 @@ def _make_usa_api() -> HyundaiBlueLinkApiUSA:
 
 def _make_token(**overrides) -> Token:
     """Create a Token instance with sensible defaults for testing."""
-    defaults = dict(
-        username="user@test.com",
-        password="MyPassword123!",
-        access_token="old-access-token",
-        refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
-        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
-        pin="1234",
-    )
+    defaults = {
+        "username": "user@test.com",
+        "password": "MyPassword123!",
+        "access_token": "old-access-token",
+        "refresh_token": "OLDREFRESHTOKEN1234567890123456789012345678",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "pin": "1234",
+    }
     defaults.update(overrides)
     return Token(**defaults)
 

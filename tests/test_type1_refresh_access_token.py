@@ -21,15 +21,15 @@ from hyundai_kia_connect_api.Token import Token
 
 
 def _make_token(**overrides) -> Token:
-    defaults = dict(
-        username="user@test.com",
-        password="MyPassword123!",
-        access_token="Bearer old-access-token",
-        refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
-        device_id="device-123",
-        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
-        pin="1234",
-    )
+    defaults = {
+        "username": "user@test.com",
+        "password": "MyPassword123!",
+        "access_token": "Bearer old-access-token",
+        "refresh_token": "OLDREFRESHTOKEN1234567890123456789012345678",
+        "device_id": "device-123",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "pin": "1234",
+    }
     defaults.update(overrides)
     return Token(**defaults)
 
