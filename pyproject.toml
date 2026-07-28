@@ -1,2 +1,20 @@
 [tool.ruff]
 target-version = "py312"
+
+[tool.ruff.lint]
+# ruff 0.16 expanded the default rule set (59 -> 413). We adopt the new
+# defaults but ignore rules that conflict with this library's conventions
+# or need a larger semantic migration (tracked separately).
+ignore = [
+    "N999",   # PascalCase module names (ApiImpl, KiaUvoApiEU, ...) are the
+              # package's public API; kia_uvo imports them directly. Renaming
+              # is a breaking major-version change. Permanent.
+    "BLE001", # `except Exception` is the library's resilience pattern for
+              # flaky vendor HTTP; narrowing would let new exception types
+              # crash the HA integration. Permanent.
+    # DTZ*: naive datetimes in token-expiry + region timestamp handling.
+    # Tz-aware migration is all-or-nothing (mixed aware/naive raises
+    # TypeError on comparison) — needs its own PR with timestamp audit.
+    # Deferred; see follow-up issue.
+    "DTZ001", "DTZ004", "DTZ005", "DTZ006", "DTZ007", "DTZ901",
+]
