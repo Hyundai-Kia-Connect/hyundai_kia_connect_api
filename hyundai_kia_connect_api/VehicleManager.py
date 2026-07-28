@@ -136,7 +136,7 @@ class VehicleManager:
         return self.vehicles[vehicle_id]
 
     def update_all_vehicles_with_cached_state(self) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.update_vehicle_with_cached_state(vehicle_id)
 
     def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
@@ -156,7 +156,7 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.check_and_force_update_vehicle(force_refresh_interval, vehicle_id)
 
     def check_and_force_update_vehicle(
@@ -180,7 +180,7 @@ class VehicleManager:
             self.update_vehicle_with_cached_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.force_refresh_vehicle_state(vehicle_id)
 
     def force_refresh_vehicle_state(self, vehicle_id: str) -> None:

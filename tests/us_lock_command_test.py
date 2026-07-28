@@ -96,9 +96,11 @@ class TestLockAction:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        with caplog.at_level(logging.DEBUG):
-            with patch.object(api, "_get_vehicle_headers", return_value={}):
-                api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+        with (
+            caplog.at_level(logging.DEBUG),
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+        ):
+            api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
 
         assert "empty" in caplog.text.lower()
 

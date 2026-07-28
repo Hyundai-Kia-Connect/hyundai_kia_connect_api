@@ -431,12 +431,10 @@ class KiaUvoApiCA(ApiImpl):
         # check_and_refresh_token() reusing the stale token, which then failed
         # again in get_vehicles() as an unhandled APIError (kia_uvo#1715).
         token_errors = ["7403", "7602", "7606"]
-        if (
+        return not (
             response["responseHeader"]["responseCode"] == 1
             and response["error"]["errorCode"] in token_errors
-        ):
-            return False
-        return True
+        )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"
