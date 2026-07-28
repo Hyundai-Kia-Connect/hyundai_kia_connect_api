@@ -98,11 +98,13 @@ class TestCheckActionStatus:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        with patch.object(api, "_get_vehicle_headers", return_value={}):
-            with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
-                result = api.check_action_status(
-                    token, vehicle, "tx-123", synchronous=True, timeout=4
-                )
+        with (
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+            patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"),
+        ):
+            result = api.check_action_status(
+                token, vehicle, "tx-123", synchronous=True, timeout=4
+            )
 
         assert result == ORDER_STATUS.TIMEOUT
 

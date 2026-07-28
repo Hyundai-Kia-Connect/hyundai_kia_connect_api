@@ -81,7 +81,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 class KiaUvoApiEU(ApiImplType1):
     data_timezone = ZoneInfo("Europe/Berlin")
-    temperature_range = [x * 0.5 for x in range(28, 60)]
+    temperature_range = tuple(x * 0.5 for x in range(28, 60))
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         language = language.lower()
@@ -1034,7 +1034,7 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             return gps_detail
         except Exception as e:
-            _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -1299,9 +1299,7 @@ class KiaUvoApiEU(ApiImplType1):
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp: str):
-        my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
-            10**80
-        )
+        my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {

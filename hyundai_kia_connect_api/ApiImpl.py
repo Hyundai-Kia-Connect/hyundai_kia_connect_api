@@ -236,7 +236,7 @@ class ApiImpl:
         vehicle: Vehicle,
         use_email: bool,
         provider: int = 1,
-        API_KEY: str = None,
+        API_KEY: str | None = None,
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
             if (

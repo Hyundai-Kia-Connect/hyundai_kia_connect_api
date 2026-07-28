@@ -89,7 +89,7 @@ class RetrySession(requests.Session):
                 _LOGGER.debug(
                     f"{DOMAIN} - {method} Other exception not connection reset {attempt + 1}: Connection error ({e})"
                 )
-                raise e
+                raise
 
         raise last_exception
 
@@ -97,8 +97,8 @@ class RetrySession(requests.Session):
 class KiaUvoApiCA(ApiImpl):
     """KiaUvoApiCA"""
 
-    temperature_range_c_old = [x * 0.5 for x in range(32, 64)]
-    temperature_range_c_new = [x * 0.5 for x in range(28, 64)]
+    temperature_range_c_old = tuple(x * 0.5 for x in range(32, 64))
+    temperature_range_c_new = tuple(x * 0.5 for x in range(28, 64))
     temperature_range_model_year = 2020
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -431,12 +431,10 @@ class KiaUvoApiCA(ApiImpl):
         # check_and_refresh_token() reusing the stale token, which then failed
         # again in get_vehicles() as an unhandled APIError (kia_uvo#1715).
         token_errors = ["7403", "7602", "7606"]
-        if (
+        return not (
             response["responseHeader"]["responseCode"] == 1
             and response["error"]["errorCode"] in token_errors
-        ):
-            return False
-        return True
+        )
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.API_URL + "vhcllst"

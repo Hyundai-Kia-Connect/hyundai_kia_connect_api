@@ -468,15 +468,18 @@ class Vehicle:
         # https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/931#issuecomment-2381569934
         newest_updated_at = get_safe_local_datetime(value)
         previous_updated_at = self._last_updated_at
-        if newest_updated_at and previous_updated_at:  # both filled
-            if newest_updated_at < previous_updated_at:
-                utcoffset = newest_updated_at.utcoffset()
-                newest_updated_at_corrected = newest_updated_at + utcoffset
-                if newest_updated_at_corrected >= previous_updated_at:
-                    newest_updated_at = newest_updated_at_corrected
-                newest_updated_at = max(
-                    newest_updated_at, previous_updated_at
-                )  # keep old because newer
+        if (
+            newest_updated_at
+            and previous_updated_at
+            and newest_updated_at < previous_updated_at
+        ):
+            utcoffset = newest_updated_at.utcoffset()
+            newest_updated_at_corrected = newest_updated_at + utcoffset
+            if newest_updated_at_corrected >= previous_updated_at:
+                newest_updated_at = newest_updated_at_corrected
+            newest_updated_at = max(
+                newest_updated_at, previous_updated_at
+            )  # keep old because newer
         self._last_updated_at = newest_updated_at
 
     @property

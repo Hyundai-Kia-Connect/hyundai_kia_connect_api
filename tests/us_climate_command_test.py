@@ -91,9 +91,11 @@ class TestStartClimate:
         token = _make_token()
         options = _make_climate_options()
 
-        with caplog.at_level(logging.DEBUG):
-            with patch.object(api, "_get_vehicle_headers", return_value={}):
-                api.start_climate(token, vehicle, options)
+        with (
+            caplog.at_level(logging.DEBUG),
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+        ):
+            api.start_climate(token, vehicle, options)
 
         assert "empty" in caplog.text.lower()
 
@@ -132,8 +134,10 @@ class TestStopClimate:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        with caplog.at_level(logging.DEBUG):
-            with patch.object(api, "_get_vehicle_headers", return_value={}):
-                api.stop_climate(token, vehicle)
+        with (
+            caplog.at_level(logging.DEBUG),
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+        ):
+            api.stop_climate(token, vehicle)
 
         assert "empty" in caplog.text.lower()

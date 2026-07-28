@@ -438,15 +438,15 @@ def test_login_genesis_password_fails_falls_back_to_error():
 
 def _make_token(**overrides) -> Token:
     """Create a Token instance with sensible defaults for testing."""
-    defaults = dict(
-        username="user@test.com",
-        password="MyPassword123!",
-        access_token="Bearer old-access-token",
-        refresh_token="OLDREFRESHTOKEN1234567890123456789012345678",
-        device_id="device-123",
-        valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
-        pin="1234",
-    )
+    defaults = {
+        "username": "user@test.com",
+        "password": "MyPassword123!",
+        "access_token": "Bearer old-access-token",
+        "refresh_token": "OLDREFRESHTOKEN1234567890123456789012345678",
+        "device_id": "device-123",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "pin": "1234",
+    }
     defaults.update(overrides)
     return Token(**defaults)
 

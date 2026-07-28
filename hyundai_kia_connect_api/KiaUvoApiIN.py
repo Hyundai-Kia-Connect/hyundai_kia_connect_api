@@ -72,7 +72,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 class KiaUvoApiIN(ApiImplType1):
     data_timezone = ZoneInfo("Asia/Kolkata")
-    temperature_range = [x * 0.5 for x in range(28, 60)]
+    temperature_range = tuple(x * 0.5 for x in range(28, 60))
 
     def __init__(self, brand: int) -> None:
         # Strip language variants (e.g. en-Gb)
@@ -967,9 +967,7 @@ class KiaUvoApiIN(ApiImplType1):
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp: str):
-        my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
-            10**80
-        )
+        my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {

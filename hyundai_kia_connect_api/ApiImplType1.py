@@ -173,23 +173,22 @@ class ApiImplType1(ApiImpl):
             dte = fuel_system.get("DTE", {})
             ice_value = dte.get("ICE")
 
-            if ice_value is not None:
-                # Check if the value is a number and unreasonably large
-                # A reasonable ICE range should be < 1,000,000 km/miles
-                # Values larger than this are likely corrupted API data
-                if isinstance(ice_value, (int, float)):
-                    # Also check if it exceeds JavaScript's Number.MAX_SAFE_INTEGER
-                    # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
-                    max_safe_integer = 9007199254740991
-                    max_reasonable_range = 1000000
+            # Check if the value is a number and unreasonably large
+            # A reasonable ICE range should be < 1,000,000 km/miles
+            # Values larger than this are likely corrupted API data
+            if ice_value is not None and isinstance(ice_value, (int, float)):
+                # Also check if it exceeds JavaScript's Number.MAX_SAFE_INTEGER
+                # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
+                max_safe_integer = 9007199254740991
+                max_reasonable_range = 1000000
 
-                    if ice_value > max_safe_integer or ice_value > max_reasonable_range:
-                        _LOGGER.warning(
-                            f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
-                            "too large to be valid. Replacing with None. "
-                            "This appears to be corrupted data from Hyundai's API."
-                        )
-                        dte["ICE"] = None
+                if ice_value > max_safe_integer or ice_value > max_reasonable_range:
+                    _LOGGER.warning(
+                        f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
+                        "too large to be valid. Replacing with None. "
+                        "This appears to be corrupted data from Hyundai's API."
+                    )
+                    dte["ICE"] = None
         except (KeyError, TypeError, AttributeError):  # fmt: skip
             # If the structure doesn't exist or is malformed, silently continue
             # This is defensive programming in case the API structure changes

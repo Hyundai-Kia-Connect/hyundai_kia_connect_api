@@ -99,9 +99,11 @@ class TestStartCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        with caplog.at_level(logging.DEBUG):
-            with patch.object(api, "_get_vehicle_headers", return_value={}):
-                api.start_charge(token, vehicle)
+        with (
+            caplog.at_level(logging.DEBUG),
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+        ):
+            api.start_charge(token, vehicle)
 
         assert (
             "empty response body" in caplog.text.lower()
@@ -175,9 +177,11 @@ class TestStopCharge:
         vehicle = _make_vehicle()
         token = _make_token()
 
-        with caplog.at_level(logging.DEBUG):
-            with patch.object(api, "_get_vehicle_headers", return_value={}):
-                api.stop_charge(token, vehicle)
+        with (
+            caplog.at_level(logging.DEBUG),
+            patch.object(api, "_get_vehicle_headers", return_value={}),
+        ):
+            api.stop_charge(token, vehicle)
 
         assert (
             "empty response body" in caplog.text.lower()
