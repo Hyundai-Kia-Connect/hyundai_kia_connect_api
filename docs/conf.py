@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # hyundai_kia_connect_api documentation build configuration file, created by
 # sphinx-quickstart on Fri Jun  9 13:47:02 2017.

@@ -89,7 +89,7 @@ class RetrySession(requests.Session):
                 _LOGGER.debug(
                     f"{DOMAIN} - {method} Other exception not connection reset {attempt + 1}: Connection error ({e})"
                 )
-                raise e
+                raise
 
         raise last_exception
 

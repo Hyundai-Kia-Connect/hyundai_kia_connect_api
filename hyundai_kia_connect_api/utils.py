@@ -5,14 +5,14 @@ import datetime
 import logging
 import re
 from enum import IntEnum
-from typing import Any, TypeVar
-
-T = TypeVar("T", bound=IntEnum)
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def to_int_enum(enum_class: type[T], value: str | int | T | None) -> T | None:
+def to_int_enum[T: IntEnum](
+    enum_class: type[T], value: str | int | T | None
+) -> T | None:
     """Convert string, int, or existing IntEnum to the specified IntEnum type.
 
     Handles "1" -> 1 -> WINDOW_STATE.OPEN conversions.

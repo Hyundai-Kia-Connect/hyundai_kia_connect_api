@@ -852,9 +852,7 @@ class KiaUvoApiAU(ApiImplType1):
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp):
-        my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
-            10**80
-        )
+        my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {

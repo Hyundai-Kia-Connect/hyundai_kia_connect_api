@@ -63,7 +63,9 @@ def get_random_device_id() -> str:
     return base64.b64encode(uuid.uuid4().hex.encode()).decode()
 
 
-def make_headers(brand_config: dict, device_id: str, access_token: str = None) -> dict:
+def make_headers(
+    brand_config: dict, device_id: str, access_token: str | None = None
+) -> dict:
     base_url = brand_config["base_url"]
     headers = {
         "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",

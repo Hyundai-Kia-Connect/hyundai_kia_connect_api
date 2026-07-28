@@ -61,8 +61,8 @@ class VehicleManager:
         geocode_api_enable: bool = False,
         geocode_api_use_email: bool = False,
         geocode_provider: int = 1,
-        geocode_api_key: str = None,
-        token: Token = None,
+        geocode_api_key: str | None = None,
+        token: Token | None = None,
         language: str = "en",
     ):
         self.region: int = region

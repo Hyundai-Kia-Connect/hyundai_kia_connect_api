@@ -1033,8 +1033,8 @@ class KiaUvoApiEU(ApiImplType1):
                     "vehicle may be offline or returning partial status"
                 )
             return gps_detail
-        except Exception as e:
-            _LOGGER.error(f"{DOMAIN} - _get_location failed: {e}", exc_info=True)
+        except Exception:
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed")
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
@@ -1299,9 +1299,7 @@ class KiaUvoApiEU(ApiImplType1):
         return base64.b64encode(result).decode("utf-8")
 
     def _get_device_id(self, stamp: str):
-        my_hex = "%064x" % random.randrange(  # pylint: disable=consider-using-f-string
-            10**80
-        )
+        my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
         payload = {
