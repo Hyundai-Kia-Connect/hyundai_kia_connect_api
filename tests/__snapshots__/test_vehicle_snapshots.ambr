@@ -1014,6 +1014,7 @@
     'stop_lamp_left': 0,
     'stop_lamp_right': 0,
     'sunroof_is_open': False,
+    'supports_svm': None,
     'supports_valet_mode': None,
     'supports_window_control': None,
     'timezone': 'UTC',
