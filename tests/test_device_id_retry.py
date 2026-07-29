@@ -164,6 +164,7 @@ class TestCheckActionStatusDecorator:
 
         api.session.get = lambda url, headers=None: SimpleNamespace(
             json=lambda: {
+                "retCode": "S",
                 "resCode": "0000",
                 "resMsg": [{"recordId": "action-1", "result": "success"}],
             }
