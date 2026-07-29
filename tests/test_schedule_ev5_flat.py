@@ -13,9 +13,9 @@ import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from hyundai_kia_connect_api.const import ENGINE_TYPES
 
 
 @pytest.fixture
