@@ -938,6 +938,7 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         return response["msgId"]
 
+    @_retry_on_device_id_error
     def check_action_status(
         self,
         token: Token,

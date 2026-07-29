@@ -1,8 +1,11 @@
 """Tests for _retry_on_device_id_error decorator."""
 
+from types import SimpleNamespace
+
 import pytest
 
-from hyundai_kia_connect_api.ApiImplType1 import _retry_on_device_id_error
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1, _retry_on_device_id_error
+from hyundai_kia_connect_api.const import ORDER_STATUS
 from hyundai_kia_connect_api.exceptions import DeviceIDError
 from hyundai_kia_connect_api.Token import Token
 
@@ -108,3 +111,68 @@ class TestRetryOnDeviceIdError:
         with pytest.raises(ValueError, match="some other error"):
             mock_method(mock_self, token)
         assert call_count == 1
+
+
+class TestCheckActionStatusDecorator:
+    """check_action_status must be decorated with @_retry_on_device_id_error.
+
+    On a 4002 (DeviceIDError) during the action-status poll, the decorator
+    re-registers device_id and retries once. The retried poll returns empty
+    resMsg (records live under the invalidated device_id), so the method
+    returns ORDER_STATUS.UNKNOWN instead of propagating the exception.
+    Regression for kia_uvo#1798 / hyundai_kia_connect_api#1190 gap 1.
+    """
+
+    def test_recovers_from_4002_and_reregisters_device_id(self):
+        api = ApiImplType1()
+        api.SPA_API_URL = "https://example.test/"
+        api._get_device_id = lambda stamp: "new-device-id"
+        api._get_stamp = lambda: "stamp"
+        api._get_authenticated_headers = lambda token, ccu: {
+            "Authorization": "Bearer x"
+        }
+
+        responses = [
+            SimpleNamespace(
+                json=lambda: {
+                    "retCode": "F",
+                    "resCode": "4002",
+                    "resMsg": "Invalid request body - Invalid deviceId.",
+                }
+            ),
+            SimpleNamespace(json=lambda: {"resCode": "0000", "resMsg": []}),
+        ]
+        api.session.get = lambda url, headers=None: responses.pop(0)
+
+        token = Token(access_token="at", device_id="old-device-id")
+        vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
+
+        result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
+
+        assert result == ORDER_STATUS.UNKNOWN
+        assert token.device_id == "new-device-id"
+        assert len(responses) == 0  # both GETs consumed: initial 4002 + retry
+
+    def test_no_error_returns_success(self):
+        api = ApiImplType1()
+        api.SPA_API_URL = "https://example.test/"
+        api._get_device_id = lambda stamp: "new-device-id"
+        api._get_stamp = lambda: "stamp"
+        api._get_authenticated_headers = lambda token, ccu: {
+            "Authorization": "Bearer x"
+        }
+
+        api.session.get = lambda url, headers=None: SimpleNamespace(
+            json=lambda: {
+                "resCode": "0000",
+                "resMsg": [{"recordId": "action-1", "result": "success"}],
+            }
+        )
+
+        token = Token(access_token="at", device_id="old-device-id")
+        vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
+
+        result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
+
+        assert result == ORDER_STATUS.SUCCESS
+        assert token.device_id == "old-device-id"  # unchanged — no error occurred
