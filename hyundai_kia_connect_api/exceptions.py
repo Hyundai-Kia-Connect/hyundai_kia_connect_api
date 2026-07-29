@@ -71,8 +71,6 @@ class SafetyAcknowledgmentError(APIError):
     before it can be executed (e.g. SVM/Find My Car capture).
     """
 
-    pass
-
 
 class UnsupportedControlError(APIError):
     """

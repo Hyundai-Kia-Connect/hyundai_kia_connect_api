@@ -25,10 +25,10 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
+from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
 from .Vehicle import Vehicle
-from .svm import SVMDetails
 
 _LOGGER = logging.getLogger(__name__)
 

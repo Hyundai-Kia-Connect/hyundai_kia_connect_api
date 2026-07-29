@@ -63,16 +63,14 @@ def test_parse_svm_response_decodes_image_and_metadata():
     from hyundai_kia_connect_api.svm import parse_svm_response
 
     image = b"\xff\xd8\xff\xe0fakejpg"
-    tz = dt.timezone.utc
+    tz = dt.UTC
     response = _make_svm_response(image, "2026-06-23T12:34:56Z")
 
     details = parse_svm_response(response, tz)
 
     assert details.image_bytes == image
     assert details.captured_at_raw == "2026-06-23T12:34:56Z"
-    assert details.captured_at == dt.datetime(
-        2026, 6, 23, 12, 34, 56, tzinfo=dt.timezone.utc
-    )
+    assert details.captured_at == dt.datetime(2026, 6, 23, 12, 34, 56, tzinfo=dt.UTC)
     assert details.latitude == 12.345678
     assert details.longitude == -98.765432
     assert details.heading == 149
@@ -92,7 +90,7 @@ def test_parse_svm_response_unknown_timestamp_does_not_crash():
 
     image = b"\xff\xd8\xff\xe0fakejpg"
     response = _make_svm_response(image, "not-a-date")
-    details = parse_svm_response(response, dt.timezone.utc)
+    details = parse_svm_response(response, dt.UTC)
 
     assert details.image_bytes == image
     assert details.captured_at is None
@@ -123,8 +121,9 @@ def test_safety_acknowledgment_error_is_api_error():
 
 
 def test_api_impl_svm_stubs_raise_not_implemented():
-    from hyundai_kia_connect_api.ApiImpl import ApiImpl
     from unittest.mock import MagicMock
+
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
 
     api = ApiImpl()
     token = MagicMock()
@@ -172,7 +171,7 @@ def _make_api():
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
     api.API_HEADERS = {}
-    api.data_timezone = dt.timezone.utc
+    api.data_timezone = dt.UTC
     api.session = MagicMock()
     return api
 
@@ -393,7 +392,7 @@ def test_parse_svm_response_raw_metadata_preserves_full_response():
     response = _make_svm_response(image, "2026-06-23T12:34:56Z")
     response["topLevelField"] = "preserved"
 
-    details = parse_svm_response(response, dt.timezone.utc)
+    details = parse_svm_response(response, dt.UTC)
 
     assert details.raw_metadata is not None
     assert details.raw_metadata["topLevelField"] == "preserved"
@@ -452,8 +451,8 @@ def test_request_svm_capture_detects_freshness_from_raw_string():
 
 
 def test_vehicle_manager_supports_svm_delegates_to_api():
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
@@ -475,8 +474,8 @@ def test_vehicle_manager_supports_svm_delegates_to_api():
 
 
 def test_vehicle_manager_supports_svm_returns_false_for_missing_vehicle():
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
@@ -492,8 +491,8 @@ def test_vehicle_manager_supports_svm_returns_false_for_missing_vehicle():
 
 
 def test_vehicle_manager_supports_svm_returns_false_on_exception():
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
@@ -514,9 +513,9 @@ def test_vehicle_manager_supports_svm_returns_false_on_exception():
 
 
 def test_vehicle_manager_get_svm_details_delegates_to_api():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.svm import SVMDetails
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
@@ -542,9 +541,9 @@ def test_vehicle_manager_get_svm_details_delegates_to_api():
 
 
 def test_vehicle_manager_request_svm_capture_delegates_to_api():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.svm import SVMDetails
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")

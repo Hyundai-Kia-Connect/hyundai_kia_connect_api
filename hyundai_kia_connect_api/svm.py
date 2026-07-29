@@ -29,7 +29,7 @@ def _parse_int(value: str | int | None) -> int | None:
         return None
 
 
-def _parse_float(value: str | float | int | None) -> float | None:
+def _parse_float(value: str | float | None) -> float | None:
     if value is None:
         return None
     try:

@@ -14,7 +14,6 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
-from .svm import SVMDetails
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -45,6 +44,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
 
