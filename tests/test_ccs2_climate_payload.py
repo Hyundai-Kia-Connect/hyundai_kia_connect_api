@@ -89,3 +89,59 @@ class TestSideRearMirrorHeating:
     def test_heating_eu_steering_side_back_enables(self):
         options = ClimateRequestOptions(set_temp=21, heating=1)
         assert self._heating(options) == 1
+
+
+class TestRhdSeatSwap:
+    """For RHD (drvSeatLoc == "R") the front driver/passenger seats are swapped.
+
+    The HA service fields flseat/frseat are physical (front-left/right). The
+    API fields drvSeatClimateState/psgSeatClimateState are logical
+    (driver/passenger). For RHD vehicles the driver sits on the right, so the
+    physical front-right seat is the driver. Regression for
+    Hyundai-Kia-Connect/kia_uvo#1447 (UK Ioniq 5: frseat activated passenger).
+    """
+
+    def setup_method(self):
+        self.api = _make_api()
+
+    def _seat_info(self, vehicle, options):
+        return _post_payload(self.api, vehicle, options)["seatClimateInfo"]
+
+    def test_lhd_driver_is_front_left(self):
+        """LHD: driver sits on the left -> drvSeatClimateState = front_left."""
+        from hyundai_kia_connect_api.const import DISTANCE_UNITS
+
+        vehicle = _make_vehicle(ccs2=True)
+        vehicle._odometer_unit = DISTANCE_UNITS[1]  # km -> LHD
+        options = ClimateRequestOptions(
+            set_temp=21, front_left_seat=1, front_right_seat=2
+        )
+        info = self._seat_info(vehicle, options)
+        assert info["drvSeatClimateState"] == 1  # front_left
+        assert info["psgSeatClimateState"] == 2  # front_right
+
+    def test_rhd_driver_is_front_right(self):
+        """RHD: driver sits on the right -> drvSeatClimateState = front_right."""
+        from hyundai_kia_connect_api.const import DISTANCE_UNITS
+
+        vehicle = _make_vehicle(ccs2=True)
+        vehicle._odometer_unit = DISTANCE_UNITS[2]  # miles -> RHD (UK)
+        options = ClimateRequestOptions(
+            set_temp=21, front_left_seat=1, front_right_seat=2
+        )
+        info = self._seat_info(vehicle, options)
+        assert info["drvSeatClimateState"] == 2  # front_right -> driver
+        assert info["psgSeatClimateState"] == 1  # front_left -> passenger
+
+    def test_rhd_rear_seats_not_swapped(self):
+        """Rear seats are physical left/right and must NOT be swapped for RHD."""
+        from hyundai_kia_connect_api.const import DISTANCE_UNITS
+
+        vehicle = _make_vehicle(ccs2=True)
+        vehicle._odometer_unit = DISTANCE_UNITS[2]  # RHD
+        options = ClimateRequestOptions(
+            set_temp=21, rear_left_seat=3, rear_right_seat=4
+        )
+        info = self._seat_info(vehicle, options)
+        assert info["rlSeatClimateState"] == 3
+        assert info["rrSeatClimateState"] == 4
