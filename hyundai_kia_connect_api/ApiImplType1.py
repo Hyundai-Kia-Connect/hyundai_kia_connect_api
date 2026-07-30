@@ -1187,7 +1187,9 @@ class ApiImplType1(ApiImpl):
                 "strgWhlHeating": options.steering_wheel,
                 "hvacTempType": 1,
                 "hvacTemp": options.set_temp,
-                "sideRearMirrorHeating": 1,
+                # heating 1/2/4 engage the rear-window + side-mirror heaters;
+                # 0 (off) and 3 (steering wheel only) leave them off.
+                "sideRearMirrorHeating": 1 if options.heating in (1, 2, 4) else 0,
                 "drvSeatLoc": self._get_drv_seat_loc(vehicle),
                 "seatClimateInfo": {
                     "drvSeatClimateState": options.front_left_seat,
