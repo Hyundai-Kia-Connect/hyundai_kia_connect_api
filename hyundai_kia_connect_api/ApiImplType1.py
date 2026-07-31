@@ -1190,17 +1190,26 @@ class ApiImplType1(ApiImpl):
                 + vehicle.id
                 + "/ccs2/control/temperature"
             )
+            # For RHD vehicles the driver sits on the right, so the front
+            # physical seats map to passenger/driver respectively.
+            drv_seat_loc = self._get_drv_seat_loc(vehicle)
+            if drv_seat_loc == "R":
+                drv_seat, psg_seat = options.front_right_seat, options.front_left_seat
+            else:
+                drv_seat, psg_seat = options.front_left_seat, options.front_right_seat
             payload = {
                 "command": "start",
                 "ignitionDuration": options.duration,
                 "strgWhlHeating": options.steering_wheel,
                 "hvacTempType": 1,
                 "hvacTemp": options.set_temp,
-                "sideRearMirrorHeating": 1,
-                "drvSeatLoc": self._get_drv_seat_loc(vehicle),
+                # heating 1/2/4 engage the rear-window + side-mirror heaters;
+                # 0 (off) and 3 (steering wheel only) leave them off.
+                "sideRearMirrorHeating": 1 if options.heating in (1, 2, 4) else 0,
+                "drvSeatLoc": drv_seat_loc,
                 "seatClimateInfo": {
-                    "drvSeatClimateState": options.front_left_seat,
-                    "psgSeatClimateState": options.front_right_seat,
+                    "drvSeatClimateState": drv_seat,
+                    "psgSeatClimateState": psg_seat,
                     "rrSeatClimateState": options.rear_right_seat,
                     "rlSeatClimateState": options.rear_left_seat,
                 },
