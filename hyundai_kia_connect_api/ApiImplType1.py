@@ -655,7 +655,16 @@ class ApiImplType1(ApiImpl):
                 vehicle.total_driving_range,
                 vehicle.total_driving_range_unit,
             )
-        # TODO: vehicle.ev_driving_range for non EV
+        elif vehicle.engine_type == ENGINE_TYPES.PHEV:
+            # PHEV reports the electric-only range separately in DTE.EV
+            # (DTE.Total includes the ICE range). HEV/ICE have no plug and no
+            # EV-only range, so ev_driving_range stays None for them.
+            ev_range = get_child_value(state, "Drivetrain.FuelSystem.DTE.EV")
+            if ev_range is not None:
+                vehicle.ev_driving_range = (
+                    float(ev_range),
+                    vehicle.total_driving_range_unit,
+                )
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
