@@ -28,7 +28,13 @@ from .const import (
     VEHICLE_LOCK_ACTION,
 )
 from .Token import Token
-from .utils import get_child_value, get_float, normalize_battery_soc, parse_datetime
+from .utils import (
+    float_or_none,
+    get_child_value,
+    get_float,
+    normalize_battery_soc,
+    parse_datetime,
+)
 from .Vehicle import (
     DailyDrivingStats,
     DayTripCounts,
@@ -438,8 +444,14 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     )
                 ],
             )
+        odometer_values = (
+            float_or_none(get_child_value(state, "vehicleDetails.odometer")),
+            float_or_none(get_child_value(state, "vehicleStatus.odometer")),
+        )
         vehicle.odometer = (
-            get_child_value(state, "vehicleDetails.odometer"),
+            max(
+                (value for value in odometer_values if value is not None), default=None
+            ),
             DISTANCE_UNITS[3],
         )
         vehicle.car_battery_percentage = normalize_battery_soc(
