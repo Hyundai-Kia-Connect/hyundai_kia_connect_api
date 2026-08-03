@@ -118,3 +118,29 @@ def test_bluelink_air_temp_off_yields_none(
     bluelink_api._update_vehicle_properties(vehicle, bluelink_status_with_air_temp_off)
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value is None
+
+
+@pytest.mark.parametrize(
+    ("details_odometer", "status_odometer", "expected"),
+    [
+        (12000, 12035, 12035.0),
+        (14000.4, 9000, 14000.4),
+        (12000, None, 12000.0),
+        (None, 12035, 12035.0),
+        ("unknown", 12035, 12035.0),
+        (None, None, None),
+    ],
+)
+def test_bluelink_odometer_uses_highest_valid_value(
+    bluelink_api, details_odometer, status_odometer, expected
+):
+    """Use the freshest valid odometer when Hyundai's USA fields disagree."""
+    state = {
+        "vehicleDetails": {"odometer": details_odometer},
+        "vehicleStatus": {"odometer": status_odometer},
+    }
+
+    vehicle = Vehicle()
+    bluelink_api._update_vehicle_properties(vehicle, state)
+
+    assert vehicle.odometer == expected
