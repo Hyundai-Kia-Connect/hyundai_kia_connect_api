@@ -224,7 +224,7 @@
     'ev_charge_limits_dc': 80,
     'ev_charge_port_door_is_open': None,
     'ev_charging_current': None,
-    'ev_charging_power': 0.0,
+    'ev_charging_power': None,
     'ev_driving_range': 240,
     'ev_driving_range_unit': 'mi',
     'ev_estimated_current_charge_duration': 0,

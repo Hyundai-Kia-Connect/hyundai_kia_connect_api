@@ -16,7 +16,8 @@
             "engine_is_running": false,
             "is_locked": true,
             "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0
+            "ev_battery_is_plugged_in": 0,
+            "ev_charging_power": null
         }
     },
     "vehicleStatus": {

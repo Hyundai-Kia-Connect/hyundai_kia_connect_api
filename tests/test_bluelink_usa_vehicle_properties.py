@@ -80,6 +80,12 @@ class TestBlueLinkUSAUpdateVehicleProperties:
         assert vehicle.ev_battery_is_charging == expected["ev_battery_is_charging"]
         assert vehicle.ev_battery_is_plugged_in == expected["ev_battery_is_plugged_in"]
 
+    def test_ev_charging_power(self, bluelink_api, vehicle, fixture_file):
+        data = load_fixture(fixture_file)
+        expected = get_fixture_expected(data)
+        bluelink_api._update_vehicle_properties(vehicle, data)
+        assert vehicle.ev_charging_power == expected["ev_charging_power"]
+
     def test_data_is_stored(self, bluelink_api, vehicle, fixture_file):
         data = load_fixture(fixture_file)
         bluelink_api._update_vehicle_properties(vehicle, data)
@@ -99,6 +105,54 @@ def bluelink_status_with_air_temp_off():
             "airTemp": {"value": "OFF", "unit": 1, "hvacTempType": 1},
         },
     }
+
+
+def test_bluelink_dc_charging_power_reads_real_time_power(bluelink_api):
+    """`ev_charging_power` must come from `realTimePower`, not `batteryStndChrgPower`.
+
+    `batteryStndChrgPower` is *standard* (AC) charge power. During a DC fast
+    charge it keeps reporting the AC rate, so a Hyundai USA vehicle could never
+    observe a fast charge at all — the field is flat across the one event it is
+    being read for. `realTimePower` is instantaneous, and is already the source
+    used by KiaUvoApiUSA and ApiImplType1 for this same attribute.
+
+    The two values are deliberately different here: with the old key this
+    asserts 10.9 (the vehicle's AC ceiling) instead of 58.7, which is the
+    signature of the bug rather than a rounding difference.
+    """
+    vehicle = Vehicle()
+    state = {
+        "vehicleStatus": {
+            "evStatus": {
+                "batteryCharge": True,
+                "batteryStndChrgPower": 10.9,
+                "realTimePower": 58.7,
+            },
+        },
+    }
+    bluelink_api._update_vehicle_properties(vehicle, state)
+    assert vehicle.ev_charging_power == 58.7
+
+
+def test_bluelink_charging_power_none_when_real_time_power_absent(bluelink_api):
+    """`realTimePower` is absent while idle, so `ev_charging_power` is None.
+
+    Reading `realTimePower` directly — as KiaUvoApiUSA does — returns None when
+    the field is missing, rather than substituting the stale AC rate carried by
+    `batteryStndChrgPower`.
+    """
+    vehicle = Vehicle()
+    state = {
+        "vehicleStatus": {
+            "evStatus": {
+                "batteryCharge": False,
+                "batteryStndChrgPower": 0.0,
+                "realTimePower": None,
+            },
+        },
+    }
+    bluelink_api._update_vehicle_properties(vehicle, state)
+    assert vehicle.ev_charging_power is None
 
 
 def test_bluelink_air_temp_off_yields_none(
