@@ -5,6 +5,7 @@ import pytest
 
 from hyundai_kia_connect_api.utils import (
     bool_or_none,
+    ccs2_reservation_time_or_none,
     detect_timezone_for_date,
     float_or_none,
     parse_datetime,
@@ -88,6 +89,37 @@ def test_pressure_or_none_real_value_passthrough():
     assert pressure_or_none(38) == 38  # psi
     assert pressure_or_none(51) == 51  # kPa
     assert pressure_or_none(0) == 0  # 0 is NOT a sentinel (could be a flat)
+
+
+def test_ccs2_reservation_time_sentinel_31_70_is_none_silent():
+    # Kia EV3 AU/EU ships OffPeakTime 31:70 (Mode=0) as "unconfigured" (#1269,
+    # kia_uvo #1108). hour>23 / minute>59 -> None, must NOT raise.
+    assert ccs2_reservation_time_or_none(31, 70) is None
+    assert ccs2_reservation_time_or_none(25, 0) is None
+    assert ccs2_reservation_time_or_none(0, 60) is None
+    assert ccs2_reservation_time_or_none(-1, 0) is None
+
+
+def test_ccs2_reservation_time_stub_block_is_none():
+    # EV9 Schedule = {"Enable": False} with no Hour/Min -> None.
+    assert ccs2_reservation_time_or_none(None, None) is None
+    assert ccs2_reservation_time_or_none(None, 30) is None
+    assert ccs2_reservation_time_or_none(14, None) is None
+
+
+def test_ccs2_reservation_time_valid():
+    assert ccs2_reservation_time_or_none(14, 40) == datetime.time(14, 40)
+    assert ccs2_reservation_time_or_none(0, 0) == datetime.time(0, 0)  # midnight valid
+    assert ccs2_reservation_time_or_none(23, 59) == datetime.time(23, 59)
+
+
+def test_ccs2_reservation_time_malformed_raises():
+    # string/null where int() fails -> raise so the caller logs a genuine
+    # malformed-block warning (not the known sentinel).
+    with pytest.raises((TypeError, ValueError)):
+        ccs2_reservation_time_or_none("xx", 0)
+    with pytest.raises((TypeError, ValueError)):
+        ccs2_reservation_time_or_none(14, "yy")
 
 
 def test_float_or_none_empty_string():

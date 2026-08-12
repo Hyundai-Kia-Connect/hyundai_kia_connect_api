@@ -110,6 +110,25 @@ def pressure_or_none(value: float | None) -> int | float | None:
     return value
 
 
+def ccs2_reservation_time_or_none(hour: Any, minute: Any) -> datetime.time | None:
+    """Parse a CCS2 Green.Reservation time field (OffPeakTime, Schedule{1,2}).
+
+    The API uses out-of-range values ``31:70`` (hour=31, minute=70, Mode=0)
+    as the "unconfigured" default on ccNC EVs (Kia EV3 AU/EU, #1269,
+    kia_uvo #1108); that must resolve to None silently rather than spam HA
+    logs as a malformed-block warning. ``hour``/``minute`` None (stub block,
+    e.g. EV9 ``Schedule={"Enable": False}``) also -> None. A genuine type
+    error (string in a numeric field) raises so the caller can warn — that
+    is a real API breakage, not the known sentinel.
+    """
+    if hour is None or minute is None:
+        return None
+    h, m = int(hour), int(minute)  # raises on string/null -> caller warns
+    if h > 23 or m > 59 or h < 0 or m < 0:
+        return None  # sentinel 31:70 — unconfigured, not malformed
+    return datetime.time(h, m)
+
+
 def normalize_battery_soc(
     value: float | None,
     sensor_reliability: int | None = None,
