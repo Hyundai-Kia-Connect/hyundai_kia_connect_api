@@ -141,6 +141,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _SVM_POLL_TIMEOUT_SECONDS = 120
     _SVM_INITIAL_WAIT_SECONDS = 15
 
+    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
+    # Capability is declared per-region (like supports_window_control); the
+    # actual image is fetched on demand via get_svm_details / request_svm_capture.
+    supports_svm: bool = True
+
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
@@ -1027,21 +1032,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             "SVM capture did not produce a new image within "
             f"{self._SVM_POLL_TIMEOUT_SECONDS} seconds"
         )
-
-    def supports_svm(self, token: Token, vehicle: Vehicle) -> bool:
-        """Probe whether this USA Hyundai vehicle supports SVM.
-
-        Caches the result on the vehicle. Any API or auth failure is treated
-        as "not supported" so that consumers do not have to handle exceptions.
-        """
-        if vehicle.supports_svm is not None:
-            return vehicle.supports_svm
-        try:
-            details = self.get_svm_details(token, vehicle)
-            vehicle.supports_svm = bool(details.image_bytes)
-        except Exception:
-            vehicle.supports_svm = False
-        return vehicle.supports_svm
 
     @staticmethod
     def _svm_is_fresh(

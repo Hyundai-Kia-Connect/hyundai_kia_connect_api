@@ -63,16 +63,14 @@ def test_parse_svm_response_decodes_image_and_metadata():
     from hyundai_kia_connect_api.svm import parse_svm_response
 
     image = b"\xff\xd8\xff\xe0fakejpg"
-    tz = dt.timezone.utc
+    tz = dt.UTC
     response = _make_svm_response(image, "2026-06-23T12:34:56Z")
 
     details = parse_svm_response(response, tz)
 
     assert details.image_bytes == image
     assert details.captured_at_raw == "2026-06-23T12:34:56Z"
-    assert details.captured_at == dt.datetime(
-        2026, 6, 23, 12, 34, 56, tzinfo=dt.timezone.utc
-    )
+    assert details.captured_at == dt.datetime(2026, 6, 23, 12, 34, 56, tzinfo=dt.UTC)
     assert details.latitude == 12.345678
     assert details.longitude == -98.765432
     assert details.heading == 149
@@ -92,7 +90,7 @@ def test_parse_svm_response_unknown_timestamp_does_not_crash():
 
     image = b"\xff\xd8\xff\xe0fakejpg"
     response = _make_svm_response(image, "not-a-date")
-    details = parse_svm_response(response, dt.timezone.utc)
+    details = parse_svm_response(response, dt.UTC)
 
     assert details.image_bytes == image
     assert details.captured_at is None
@@ -123,8 +121,9 @@ def test_safety_acknowledgment_error_is_api_error():
 
 
 def test_api_impl_svm_stubs_raise_not_implemented():
-    from hyundai_kia_connect_api.ApiImpl import ApiImpl
     from unittest.mock import MagicMock
+
+    from hyundai_kia_connect_api.ApiImpl import ApiImpl
 
     api = ApiImpl()
     token = MagicMock()
@@ -137,42 +136,46 @@ def test_api_impl_svm_stubs_raise_not_implemented():
         api.request_svm_capture(token, vehicle, acknowledged_warning=True)
 
 
-def test_api_impl_supports_svm_returns_cached_true():
+def test_api_impl_supports_svm_default_false():
     from hyundai_kia_connect_api.ApiImpl import ApiImpl
 
-    api = ApiImpl()
-    token = MagicMock()
+    # Capability is a per-region class attribute (like supports_window_control),
+    # not a probe method.
+    assert ApiImpl.supports_svm is False
+
+
+def test_usa_supports_svm_class_attr_true():
+    # Hyundai BlueLink USA declares SVM support at the region level.
+    assert HyundaiBlueLinkApiUSA.supports_svm is True
+
+
+def test_vehicle_manager_stamps_supports_svm_from_api():
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
+
+    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
+    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
+
+    manager = VehicleManager(
+        region=region_usa_id,
+        brand=brand_hyundai_id,
+        username="test-user",
+        password="test-pass",
+        pin="1234",
+    )
     vehicle = _make_vehicle()
-    vehicle.supports_svm = True
-    assert api.supports_svm(token, vehicle) is True
-
-
-def test_api_impl_supports_svm_returns_cached_false():
-    from hyundai_kia_connect_api.ApiImpl import ApiImpl
-
-    api = ApiImpl()
-    token = MagicMock()
-    vehicle = _make_vehicle()
-    vehicle.supports_svm = False
-    assert api.supports_svm(token, vehicle) is False
-
-
-def test_api_impl_supports_svm_default_false_when_not_cached():
-    from hyundai_kia_connect_api.ApiImpl import ApiImpl
-
-    api = ApiImpl()
-    token = MagicMock()
-    vehicle = _make_vehicle()
-    assert vehicle.supports_svm is None
-    assert api.supports_svm(token, vehicle) is False
-    assert vehicle.supports_svm is None
+    with patch.object(manager.api, "get_vehicles", return_value=[vehicle]):
+        manager.initialize_vehicles()
+    assert manager.api.supports_svm is True
+    assert vehicle.supports_svm is True
+    assert vehicle.supports_svm is manager.api.supports_svm
 
 
 def _make_api():
     api = object.__new__(HyundaiBlueLinkApiUSA)
     api.API_URL = "https://api.telematics.hyundaiusa.com/ac/v2/"
     api.API_HEADERS = {}
-    api.data_timezone = dt.timezone.utc
+    api.data_timezone = dt.UTC
     api.session = MagicMock()
     return api
 
@@ -205,7 +208,9 @@ class _FakeResponse:
 
     def json(self):
         if isinstance(self.json_data, str):
-            raise ValueError("No JSON object could be decoded")
+            # Simulates requests' JSONDecodeError (a ValueError subclass),
+            # not a type error on the argument.
+            raise ValueError("No JSON object could be decoded")  # noqa: TRY004
         return self.json_data
 
 
@@ -222,53 +227,6 @@ def test_get_svm_details_calls_correct_endpoint():
     call_url = api.session.get.call_args[0][0]
     assert call_url.endswith("svm/getSVMDetails")
     assert details.image_bytes == image
-
-
-def test_usa_supports_svm_true_when_image_present():
-    api = _make_api()
-    vehicle = _make_vehicle()
-    response = _make_svm_response(b"\xff\xd8\xff\xe0fakejpg", "2026-06-23T12:34:56Z")
-    api.session.get.return_value = _FakeResponse(response)
-
-    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
-        assert api.supports_svm(_make_token(), vehicle) is True
-    assert vehicle.supports_svm is True
-
-
-def test_usa_supports_svm_false_when_image_empty():
-    api = _make_api()
-    vehicle = _make_vehicle()
-    response = _make_svm_response(b"", "2026-06-23T12:34:56Z")
-    api.session.get.return_value = _FakeResponse(response)
-
-    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
-        assert api.supports_svm(_make_token(), vehicle) is False
-    assert vehicle.supports_svm is False
-
-
-def test_usa_supports_svm_false_on_api_error():
-    api = _make_api()
-    vehicle = _make_vehicle()
-    api.session.get.return_value = _FakeResponse(
-        {"errorCode": "502", "errorMessage": "nope"}, status_code=200
-    )
-
-    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
-        assert api.supports_svm(_make_token(), vehicle) is False
-    assert vehicle.supports_svm is False
-
-
-def test_usa_supports_svm_caches_result():
-    api = _make_api()
-    vehicle = _make_vehicle()
-    response = _make_svm_response(b"\xff\xd8\xff\xe0fakejpg", "2026-06-23T12:34:56Z")
-    api.session.get.return_value = _FakeResponse(response)
-
-    with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
-        assert api.supports_svm(_make_token(), vehicle) is True
-        assert api.supports_svm(_make_token(), vehicle) is True
-
-    assert api.session.get.call_count == 1
 
 
 def test_request_svm_capture_requires_acknowledgment():
@@ -292,11 +250,13 @@ def test_request_svm_capture_maps_ht_533_to_duplicate_request():
         status_code=502,
     )
 
-    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
-        with pytest.raises(DuplicateRequestError):
-            api.request_svm_capture(
-                _make_token(), _make_vehicle(), acknowledged_warning=True
-            )
+    with (
+        patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"),
+        pytest.raises(DuplicateRequestError),
+    ):
+        api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
 
 
 def test_request_svm_capture_non_ht_533_502_is_api_error():
@@ -314,11 +274,13 @@ def test_request_svm_capture_non_ht_533_502_is_api_error():
         status_code=502,
     )
 
-    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
-        with pytest.raises(APIError, match="Something else went wrong"):
-            api.request_svm_capture(
-                _make_token(), _make_vehicle(), acknowledged_warning=True
-            )
+    with (
+        patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"),
+        pytest.raises(APIError, match="Something else went wrong"),
+    ):
+        api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
 
 
 def test_request_svm_capture_polls_until_new_timestamp():
@@ -352,11 +314,13 @@ def test_request_svm_capture_times_out_when_timestamp_never_changes():
     api.session.get.return_value = _FakeResponse(baseline)
     api.session.post.return_value = _FakeResponse({"tid": "abc-123"})
 
-    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
-        with pytest.raises(RequestTimeoutError):
-            api.request_svm_capture(
-                _make_token(), _make_vehicle(), acknowledged_warning=True
-            )
+    with (
+        patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"),
+        pytest.raises(RequestTimeoutError),
+    ):
+        api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
 
 
 def test_get_svm_details_logs_do_not_contain_image_or_gps(caplog):
@@ -367,9 +331,11 @@ def test_get_svm_details_logs_do_not_contain_image_or_gps(caplog):
     response = _make_svm_response(image, "2026-06-23T12:34:56Z")
     api.session.get.return_value = _FakeResponse(response)
 
-    with caplog.at_level(logging.DEBUG):
-        with patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}):
-            api.get_svm_details(_make_token(), _make_vehicle())
+    with (
+        caplog.at_level(logging.DEBUG),
+        patch.object(api, "_get_vehicle_headers", return_value={"x": "y"}),
+    ):
+        api.get_svm_details(_make_token(), _make_vehicle())
 
     # The logged image is base64-encoded, not the raw bytes.
     image_b64 = base64.b64encode(image).decode("ascii")
@@ -393,7 +359,7 @@ def test_parse_svm_response_raw_metadata_preserves_full_response():
     response = _make_svm_response(image, "2026-06-23T12:34:56Z")
     response["topLevelField"] = "preserved"
 
-    details = parse_svm_response(response, dt.timezone.utc)
+    details = parse_svm_response(response, dt.UTC)
 
     assert details.raw_metadata is not None
     assert details.raw_metadata["topLevelField"] == "preserved"
@@ -412,11 +378,13 @@ def test_request_svm_capture_empty_502_is_api_error():
     api.session.get.return_value = _FakeResponse(_make_svm_response(b"", "0"))
     api.session.post.return_value = _FakeResponse("not json", status_code=502)
 
-    with patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"):
-        with pytest.raises(APIError, match="SVM request failed with HTTP 502"):
-            api.request_svm_capture(
-                _make_token(), _make_vehicle(), acknowledged_warning=True
-            )
+    with (
+        patch("hyundai_kia_connect_api.HyundaiBlueLinkApiUSA.time.sleep"),
+        pytest.raises(APIError, match="SVM request failed with HTTP 502"),
+    ):
+        api.request_svm_capture(
+            _make_token(), _make_vehicle(), acknowledged_warning=True
+        )
 
 
 def test_svm_is_fresh_uses_raw_string_when_parsed_time_is_none():
@@ -451,72 +419,10 @@ def test_request_svm_capture_detects_freshness_from_raw_string():
     assert details.captured_at_raw == "not-a-parseable-date-v2"
 
 
-def test_vehicle_manager_supports_svm_delegates_to_api():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
-
-    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
-    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
-
-    manager = VehicleManager(
-        region=region_usa_id,
-        brand=brand_hyundai_id,
-        username="test-user",
-        password="test-pass",
-        pin="1234",
-    )
-    manager.token = _make_token()
-    vehicle = _make_vehicle()
-    manager.vehicles[vehicle.id] = vehicle
-
-    with patch.object(manager.api, "supports_svm", return_value=True) as mock_supports:
-        assert manager.supports_svm(vehicle.id) is True
-        mock_supports.assert_called_once_with(manager.token, vehicle)
-
-
-def test_vehicle_manager_supports_svm_returns_false_for_missing_vehicle():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
-
-    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
-    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
-
-    manager = VehicleManager(
-        region=region_usa_id,
-        brand=brand_hyundai_id,
-        username="test-user",
-        password="test-pass",
-        pin="1234",
-    )
-    assert manager.supports_svm("missing-id") is False
-
-
-def test_vehicle_manager_supports_svm_returns_false_on_exception():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
-
-    region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
-    brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
-
-    manager = VehicleManager(
-        region=region_usa_id,
-        brand=brand_hyundai_id,
-        username="test-user",
-        password="test-pass",
-        pin="1234",
-    )
-    manager.token = _make_token()
-    vehicle = _make_vehicle()
-    manager.vehicles[vehicle.id] = vehicle
-
-    with patch.object(manager.api, "supports_svm", side_effect=APIError("boom")):
-        assert manager.supports_svm(vehicle.id) is False
-
-
 def test_vehicle_manager_get_svm_details_delegates_to_api():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.svm import SVMDetails
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")
@@ -542,9 +448,9 @@ def test_vehicle_manager_get_svm_details_delegates_to_api():
 
 
 def test_vehicle_manager_request_svm_capture_delegates_to_api():
-    from hyundai_kia_connect_api.VehicleManager import VehicleManager
-    from hyundai_kia_connect_api.const import REGIONS, BRANDS
+    from hyundai_kia_connect_api.const import BRANDS, REGIONS
     from hyundai_kia_connect_api.svm import SVMDetails
+    from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
     region_usa_id = next(k for k, v in REGIONS.items() if v == "USA")
     brand_hyundai_id = next(k for k, v in BRANDS.items() if v == "Hyundai")

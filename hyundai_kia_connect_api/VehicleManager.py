@@ -14,7 +14,6 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
-from .svm import SVMDetails
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -45,6 +44,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -131,6 +131,7 @@ class VehicleManager:
         for vehicle in vehicles:
             vehicle.supports_window_control = self.api.supports_window_control
             vehicle.supports_valet_mode = self.api.supports_valet_mode
+            vehicle.supports_svm = self.api.supports_svm
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -191,20 +192,6 @@ class VehicleManager:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
-
-    def supports_svm(self, vehicle_id: str) -> bool:
-        """Return whether the given vehicle supports SVM.
-
-        Delegates to the region-specific API implementation. Missing vehicles
-        and any API failures are reported as False.
-        """
-        vehicle = self.vehicles.get(vehicle_id)
-        if vehicle is None:
-            return False
-        try:
-            return self.api.supports_svm(self.token, vehicle)
-        except Exception:
-            return False
 
     def get_svm_details(self, vehicle_id: str) -> SVMDetails:
         """Return the latest cached SVM composite image and metadata.

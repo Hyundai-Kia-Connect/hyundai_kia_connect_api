@@ -25,10 +25,10 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
+from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
 from .Vehicle import Vehicle
-from .svm import SVMDetails
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -165,6 +165,7 @@ class ApiImpl:
     previous_longitude: float = None
     supports_window_control: bool = False
     supports_valet_mode: bool = False
+    supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -460,14 +461,3 @@ class ApiImpl:
         raise NotImplementedError(
             "request_svm_capture is not implemented for this region"
         )
-
-    def supports_svm(self, token: Token, vehicle: Vehicle) -> bool:
-        """Return whether this vehicle supports SVM.
-
-        The base implementation returns a cached value if present, otherwise
-        False without mutating the vehicle. Region subclasses that support SVM
-        should override and probe.
-        """
-        if vehicle.supports_svm is not None:
-            return vehicle.supports_svm
-        return False
