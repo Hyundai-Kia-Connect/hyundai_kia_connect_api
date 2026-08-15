@@ -10,8 +10,7 @@ from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequi
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Token import Token
 
-# ── Helper: patches for _login_with_password() tests ─────────────
-# RSA/PKCS1v15 crypto is not under test, so we mock it out.
+# ── Helpers ─────────────────────────────────────────────────────
 
 
 def _mock_crypto():
@@ -32,95 +31,86 @@ def _make_eu_api(brand: int = 1) -> KiaUvoApiEU:
     return KiaUvoApiEU(region=1, brand=brand, language="en")
 
 
-# ── _login_with_password() error paths ──────────────────────────
+def _certs_response() -> MagicMock:
+    """A 200 certs response with a fake JWK."""
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "retValue": {
+            "kid": "test-kid",
+            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
+            "e": "AQAB",
+        }
+    }
+    return resp
+
+
+def _cci_session(certs_resp: MagicMock, signin_resp: MagicMock) -> MagicMock:
+    """A mock ApiImplSession for CCI login steps 1-3 (authorize, certs, signin).
+
+    The authorize response is a non-WAF page (empty text, clean url) so the
+    WAF-detection check in _login_with_password_cci does not trigger.
+    """
+    authorize_resp = MagicMock(text="", url="https://idpconnect-eu.kia.com/authorize")
+    session = MagicMock()
+    session.get.side_effect = [authorize_resp, certs_resp]
+    session.post.return_value = signin_resp
+    return session
+
+
+def _signin_resp(location: str) -> MagicMock:
+    """A 302 signin response with the given Location header."""
+    resp = MagicMock(status_code=302)
+    resp.headers = {"location": location}
+    return resp
+
+
+# ── _login_with_password_cci() error paths ─────────────────────
 
 
 def test_login_with_password_certs_endpoint_fails():
     """Certs endpoint returns non-200 -> AuthenticationError."""
     api = _make_eu_api(brand=1)
-
-    mock_response = MagicMock()
-    mock_response.status_code = 500
-
-    mock_session = MagicMock()
-    mock_session.get.return_value = mock_response
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(MagicMock(status_code=500), MagicMock()),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="failed to fetch RSA certs"):
-            api._login_with_password_legacy("user@test.com", "password")
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_signin_returns_non_302():
-    """Signin endpoint returns 200 instead of 302 -> AuthenticationError."""
+    """Signin returns 200 instead of 302 -> AuthenticationError."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 200
-    signin_resp.text = "Login page"
-
-    mock_session = MagicMock()
-    # _login_with_password calls s.get() twice (authorize, certs) then s.post() (signin)
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.return_value = signin_resp
-
+    signin_resp = MagicMock(status_code=200, text="Login page")
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(_certs_response(), signin_resp),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin failed"):
-            api._login_with_password_legacy("user@test.com", "password")
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_signin_no_code_in_redirect():
     """Signin redirect has no code parameter -> AuthenticationError."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {"location": "https://example.com/login?no_code=true"}
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.return_value = signin_resp
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp("https://example.com/login?no_code=true"),
+                ),
             )
         )
         for p in _mock_crypto():
@@ -128,209 +118,169 @@ def test_login_with_password_signin_no_code_in_redirect():
         with pytest.raises(
             AuthenticationError, match="unexpected redirect after signin"
         ):
-            api._login_with_password_legacy("user@test.com", "password")
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_signin_error_in_redirect():
     """Signin redirect contains error parameter -> AuthenticationError."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {
-        "location": (
-            "https://example.com/callback?error=access_denied"
-            "&error_description=Invalid+credentials"
-        )
-    }
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.return_value = signin_resp
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://example.com/callback?error=access_denied"
+                        "&error_description=Invalid+credentials"
+                    ),
+                ),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Authentication rejected"):
-            api._login_with_password_legacy("user@test.com", "wrong-password")
+            api._login_with_password_cci("user@test.com", "wrong-password", "device-1")
 
 
 def test_login_with_password_signin_redirect_to_login_page():
     """Signin redirects back to authorize page -> AuthenticationError."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {
-        "location": (
-            "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
-        )
-    }
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.return_value = signin_resp
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+                    ),
+                ),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="returned to login page"):
-            api._login_with_password_legacy("user@test.com", "password")
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_signin_consent_spa_redirect():
-    """Kia EU redirects to /web/v1/user/authorization SPA (consent page)."""
+    """Signin redirects to /web/v1/user/authorization SPA (consent page)."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {
-        "location": "https://prd.eu-ccapi.kia.com:8080/web/v1/user/authorization"
-    }
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.return_value = signin_resp
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://prd.eu-ccapi.kia.com/web/v1/user/authorization"
+                    ),
+                ),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(ConsentRequiredError, match="consent is required"):
-            api._login_with_password_legacy("user@test.com", "password")
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
-def test_login_with_password_token_exchange_fails():
-    """Token exchange returns non-200 -> AuthenticationError."""
+def test_login_with_password_waf_block_detected():
+    """Authorize returns the WAF block page -> AuthenticationError with #1273 ref."""
     api = _make_eu_api(brand=1)
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
-    }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {"location": "https://example.com/callback?code=abc123"}
-
-    token_resp = MagicMock()
-    token_resp.status_code = 400
-    token_resp.text = "Bad request"
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.side_effect = [signin_resp, token_resp]
-
+    authorize_resp = MagicMock(
+        text="It was classified as an abusing request and blocked",
+        url="https://idpconnect-eu.kia.com/error?status=400",
+    )
+    session = MagicMock()
+    session.get.return_value = authorize_resp
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=session,
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="token exchange failed"):
-            api._login_with_password_legacy("user@test.com", "password")
+        with pytest.raises(AuthenticationError, match="abusing request"):
+            api._login_with_password_cci("user@test.com", "password", "device-1")
+
+
+def test_login_with_password_cci_token_exchange_fails():
+    """CCI token endpoint returns non-200 -> AuthenticationError."""
+    api = _make_eu_api(brand=1)
+    token_resp = MagicMock(status_code=400, text="Bad request")
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp("https://example.com/cb?code=abc123"),
+                ),
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
+                return_value=token_resp,
+            )
+        )
+        with pytest.raises(AuthenticationError, match="CCI token exchange failed"):
+            api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_success():
-    """Full successful _login_with_password flow returns correct tokens."""
+    """Full CCI login flow returns access_token, refresh_token and CCI fields."""
     api = _make_eu_api(brand=2)  # Hyundai
-
-    certs_resp = MagicMock()
-    certs_resp.status_code = 200
-    certs_resp.json.return_value = {
-        "retValue": {
-            "kid": "test-kid",
-            "n": "AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0AJRQISPa0A",
-            "e": "AQAB",
-        }
+    cci_token_resp = MagicMock(status_code=200)
+    cci_token_resp.json.return_value = {
+        "accessToken": "cci-access",
+        "refreshToken": "CCIREFRESHTOKEN1234567890123456789012345678901234567890",
+        "exchangeableAccessToken": "exch-at",
+        "exchangeableRefreshToken": "exch-rt",
+        "nonCcsToken": "nonccs",
+        "nonCcsRefreshToken": "nonccs-rt",
+        "idToken": "id-tok",
+        "expiresIn": 3599,
     }
-
-    signin_resp = MagicMock()
-    signin_resp.status_code = 302
-    signin_resp.headers = {"location": "https://example.com/callback?code=abc123"}
-
-    token_resp = MagicMock()
-    token_resp.status_code = 200
-    token_resp.json.return_value = {
-        "token_type": "Bearer",
-        "access_token": "test-access-token",
-        "refresh_token": "TESTRFTOKEN12345678901234567890123456789012345678",
-        "expires_in": 86400,
+    exchange_resp = MagicMock(status_code=200)
+    exchange_resp.json.return_value = {
+        "accessToken": "ccs-token",
+        "expiresTime": 9999999999999,
     }
-
-    mock_session = MagicMock()
-    mock_session.get.side_effect = [MagicMock(), certs_resp]
-    mock_session.post.side_effect = [signin_resp, token_resp]
-
     with ExitStack() as stack:
         stack.enter_context(
             patch(
                 "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
-                return_value=mock_session,
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp("https://example.com/cb?code=abc123"),
+                ),
             )
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        info = api._login_with_password_legacy("user@test.com", "password")
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.requests.post",
+                side_effect=[cci_token_resp, exchange_resp],
+            )
+        )
+        info = api._login_with_password_cci("user@test.com", "password", "device-1")
 
-    assert info["access_token"] == "Bearer test-access-token"
-    assert info["refresh_token"] == "TESTRFTOKEN12345678901234567890123456789012345678"
-    assert info["expires_in"] == 86400
+    assert info["access_token"] == "Bearer ccs-token"
+    assert (
+        info["refresh_token"]
+        == "CCIREFRESHTOKEN1234567890123456789012345678901234567890"
+    )
+    assert info["cci_access_token"] == "cci-access"
+    assert info["exchangeable_token"] == "exch-at"
+    assert info["non_ccs_token"] == "nonccs"
+    assert info["id_token"] == "id-tok"
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
@@ -361,7 +311,7 @@ def test_login_refresh_token_flow():
 
 
 def test_login_plaintext_password_calls_login_with_password():
-    """Plaintext password for Kia invokes _login_with_password()."""
+    """Plaintext password invokes _login_with_password(user, pw, device_id)."""
     api = _make_eu_api(brand=1)  # Kia
 
     with (
@@ -429,6 +379,44 @@ def test_login_genesis_password_fails_falls_back_to_error():
         pytest.raises(AuthenticationError, match="Signin failed"),
     ):
         api.login("user@test.com", "MyPassword123!")
+
+
+def test_genesis_uses_cci_login_constants():
+    """Genesis EU has the OneApp/CCI constants (WAF bypass)."""
+    api = _make_eu_api(brand=3)  # Genesis
+    assert api.ONEAPP_CLIENT_ID == "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+    assert api.ONEAPP_REDIRECT_URI == "https://oneapp.genesis.com/redirect"
+    assert api.CCI_API_URL == "https://cci-api-eu.genesis.com"
+    assert api.CCI_DOMAIN_API_URL == "https://cci-api-eu.genesis.com/domain/api/"
+    assert api._cci_package_id == "com.genesis.oneapp.eu"
+    assert api._cci_client_name == "genesis"
+
+
+def test_genesis_login_routes_to_login_with_password_with_device_id():
+    """Genesis _login_with_password delegates to the CCI flow with device_id."""
+    api = _make_eu_api(brand=3)  # Genesis
+
+    cci_return = {
+        "access_token": "Bearer genesis-ccs-token",
+        "refresh_token": "GENESISCCIREFRESHTOKEN1234567890123456789012345678901234567890",
+        "expires_in": 3600,
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "cci_access_token": "genesis-cci-at",
+        "exchangeable_token": "genesis-exch",
+        "exchangeable_refresh_token": "genesis-exch-rt",
+        "non_ccs_token": "genesis-nonccs",
+        "non_ccs_refresh_token": "genesis-nonccs-rt",
+        "id_token": "genesis-id",
+    }
+    with patch.object(
+        api, "_login_with_password_cci", return_value=cci_return
+    ) as mock_cci:
+        result = api._login_with_password(
+            "user@test.com", "MyPassword123!", "device-123"
+        )
+
+    mock_cci.assert_called_once_with("user@test.com", "MyPassword123!", "device-123")
+    assert result is cci_return
 
 
 # ── refresh_access_token() tests ───────────────────────────────
