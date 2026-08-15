@@ -156,11 +156,12 @@ class KiaUvoApiEU(ApiImplType1):
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
-        # OneApp/CCI login flow (EU Hyundai + Kia) — bypasses the IDPConnect WAF
-        # that blocks the legacy 6d477c38/:8080 authorize (#1273). Genesis keeps
-        # the legacy flow (PORT=443, not WAF-affected).
+        # OneApp/CCI login flow (EU Hyundai/Kia/Genesis) — bypasses the IDPConnect
+        # WAF that blocks the legacy authorize by client_id (#1273). All three EU
+        # brands are blocked (Genesis PORT=443 is not spared — the WAF blocks by
+        # client_id, not port).
         self._use_cci_login: bool = False
-        if BRANDS[self.brand] in (BRAND_HYUNDAI, BRAND_KIA):
+        if BRANDS[self.brand] in (BRAND_HYUNDAI, BRAND_KIA, BRAND_GENESIS):
             self._use_cci_login = True
             if BRANDS[self.brand] == BRAND_HYUNDAI:
                 self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
@@ -168,12 +169,18 @@ class KiaUvoApiEU(ApiImplType1):
                 self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
                 self._cci_package_id: str = "com.hyundai.oneapp.eu"
                 self._cci_client_name: str = "hyundai"
-            else:  # BRAND_KIA
+            elif BRANDS[self.brand] == BRAND_KIA:
                 self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
                 self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
                 self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
                 self._cci_package_id: str = "com.kia.oneapp.eu"
                 self._cci_client_name: str = "kia"
+            else:  # BRAND_GENESIS
+                self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
+                self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
+                self._cci_package_id: str = "com.genesis.oneapp.eu"
+                self._cci_client_name: str = "genesis"
             self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
             self._cci_client_version: str = "1.3.3"
             self._cci_client_os_version: str = (

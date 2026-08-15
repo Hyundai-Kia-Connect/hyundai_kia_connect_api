@@ -431,6 +431,49 @@ def test_login_genesis_password_fails_falls_back_to_error():
         api.login("user@test.com", "MyPassword123!")
 
 
+def test_genesis_uses_cci_login_constants():
+    """Genesis EU has OneApp/CCI constants and _use_cci_login=True (WAF bypass)."""
+    api = _make_eu_api(brand=3)  # Genesis
+    assert api._use_cci_login is True
+    assert api.ONEAPP_CLIENT_ID == "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+    assert api.ONEAPP_REDIRECT_URI == "https://oneapp.genesis.com/redirect"
+    assert api.CCI_API_URL == "https://cci-api-eu.genesis.com"
+    assert api.CCI_DOMAIN_API_URL == "https://cci-api-eu.genesis.com/domain/api/"
+    assert api._cci_package_id == "com.genesis.oneapp.eu"
+    assert api._cci_client_name == "genesis"
+
+
+def test_genesis_login_routes_to_login_with_password_with_device_id():
+    """Genesis _login_with_password routes to the CCI flow (not legacy)."""
+    api = _make_eu_api(brand=3)  # Genesis
+
+    cci_return = {
+        "access_token": "Bearer genesis-ccs-token",
+        "refresh_token": "GENESISCCIREFRESHTOKEN1234567890123456789012345678901234567890",
+        "expires_in": 3600,
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "cci_access_token": "genesis-cci-at",
+        "exchangeable_token": "genesis-exch",
+        "exchangeable_refresh_token": "genesis-exch-rt",
+        "non_ccs_token": "genesis-nonccs",
+        "non_ccs_refresh_token": "genesis-nonccs-rt",
+        "id_token": "genesis-id",
+    }
+    with (
+        patch.object(
+            api, "_login_with_password_cci", return_value=cci_return
+        ) as mock_cci,
+        patch.object(api, "_login_with_password_legacy") as mock_legacy,
+    ):
+        result = api._login_with_password(
+            "user@test.com", "MyPassword123!", "device-123"
+        )
+
+    mock_cci.assert_called_once_with("user@test.com", "MyPassword123!", "device-123")
+    mock_legacy.assert_not_called()
+    assert result is cci_return
+
+
 # ── refresh_access_token() tests ───────────────────────────────
 
 
