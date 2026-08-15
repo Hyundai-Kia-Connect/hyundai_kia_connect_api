@@ -168,14 +168,12 @@ class KiaUvoApiEU(ApiImplType1):
                 self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
                 self._cci_package_id: str = "com.hyundai.oneapp.eu"
                 self._cci_client_name: str = "hyundai"
-                self._cci_client_build: str = "1312"
             else:  # BRAND_KIA
                 self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
                 self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
                 self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
                 self._cci_package_id: str = "com.kia.oneapp.eu"
                 self._cci_client_name: str = "kia"
-                self._cci_client_build: str = "1557"
             self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
             self._cci_client_version: str = "1.3.3"
             self._cci_client_os_version: str = (
@@ -222,10 +220,11 @@ class KiaUvoApiEU(ApiImplType1):
 
         # Plaintext password login — CCI flow (Hyundai/Kia) or legacy (Genesis).
         info = self._login_with_password(username, password, device_id)
-        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=info["expires_in"])
-        # CCS token expiry (CCI flow) overrides valid_until when present.
-        if info.get("ccs_token_valid_until"):
-            valid_until = info["ccs_token_valid_until"]
+        # CCI flow returns the CCS token expiry as valid_until; legacy falls back
+        # to expires_in from the token response.
+        valid_until = info.get("valid_until") or (
+            dt.datetime.now(dt.UTC) + dt.timedelta(seconds=info["expires_in"])
+        )
 
         return Token(
             username=username,
@@ -241,8 +240,6 @@ class KiaUvoApiEU(ApiImplType1):
             non_ccs_token=info.get("non_ccs_token"),
             non_ccs_refresh_token=info.get("non_ccs_refresh_token"),
             id_token=info.get("id_token"),
-            ccs_token=info.get("ccs_token"),
-            ccs_token_valid_until=info.get("ccs_token_valid_until"),
         )
 
     def _login_with_password(
@@ -297,11 +294,7 @@ class KiaUvoApiEU(ApiImplType1):
             "timezone": self._cci_timezone_offset(),
             "Accept": "application/json",
             "Accept-Language": self.LANGUAGE,
-            "User-Agent": (
-                f"{self._cci_client_name}/{self._cci_client_version} "
-                f"({self._cci_package_id}; build:{self._cci_client_build}; "
-                f"iOS {self._cci_client_os_version}) Alamofire/5.12.0"
-            ),
+            "User-Agent": USER_AGENT_OK_HTTP,
         }
         if non_ccs_token is not None:
             headers["Authentication"] = non_ccs_token
@@ -444,14 +437,13 @@ class KiaUvoApiEU(ApiImplType1):
             "access_token": "Bearer " + ccs_token,
             "refresh_token": cci_refresh_token,
             "expires_in": cci_expires_in,
+            "valid_until": ccs_valid_until,
             "cci_access_token": cci_access_token,
             "exchangeable_token": exchangeable_token,
             "exchangeable_refresh_token": exchangeable_refresh_token,
             "non_ccs_token": non_ccs_token,
             "non_ccs_refresh_token": non_ccs_refresh_token,
             "id_token": id_token,
-            "ccs_token": ccs_token,
-            "ccs_token_valid_until": ccs_valid_until,
         }
 
     def _exchange_ccs_token(
@@ -739,8 +731,6 @@ class KiaUvoApiEU(ApiImplType1):
             non_ccs_token=non_ccs_token,
             non_ccs_refresh_token=non_ccs_refresh_token,
             id_token=id_token,
-            ccs_token=ccs_token,
-            ccs_token_valid_until=ccs_valid_until,
         )
 
     @_retry_on_device_id_error
