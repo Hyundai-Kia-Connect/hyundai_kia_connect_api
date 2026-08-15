@@ -12,6 +12,7 @@ from time import sleep
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
+import requests
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
@@ -155,6 +156,33 @@ class KiaUvoApiEU(ApiImplType1):
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
+        # OneApp/CCI login flow (EU Hyundai + Kia) — bypasses the IDPConnect WAF
+        # that blocks the legacy 6d477c38/:8080 authorize (#1273). Genesis keeps
+        # the legacy flow (PORT=443, not WAF-affected).
+        self._use_cci_login: bool = False
+        if BRANDS[self.brand] in (BRAND_HYUNDAI, BRAND_KIA):
+            self._use_cci_login = True
+            if BRANDS[self.brand] == BRAND_HYUNDAI:
+                self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
+                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.hyundai.com/redirect"
+                self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
+                self._cci_package_id: str = "com.hyundai.oneapp.eu"
+                self._cci_client_name: str = "hyundai"
+            else:  # BRAND_KIA
+                self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
+                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
+                self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
+                self._cci_package_id: str = "com.kia.oneapp.eu"
+                self._cci_client_name: str = "kia"
+            self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
+            self._cci_client_version: str = "1.3.3"
+            self._cci_client_os_version: str = (
+                "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
+            )
+            self._cci_notification_provider: str = (
+                "IOS_APPSTORE" if BRANDS[self.brand] == BRAND_KIA else "APNS"
+            )
+
         self.session = ApiImplSession()
 
     def login(
@@ -168,46 +196,306 @@ class KiaUvoApiEU(ApiImplType1):
         cookies = self._get_cookies()
         self._set_session_language(cookies)
 
-        # Determine if password is a refresh_token or plaintext credentials
+        # Determine if password is a legacy 48-char refresh_token or plaintext.
+        # (CCI 87-char refresh tokens are not usable as a standalone password —
+        # the CCI token refresh needs the full token set, handled by
+        # refresh_access_token with the persisted Token.)
         is_refresh_token = bool(re.match(r"^[A-Z0-9]{48}$", password))
 
         if is_refresh_token:
-            # Existing flow: use the 48-char refresh_token directly
             refresh_token = password
             _, access_token, _, expires_in = self._get_access_token(
                 stamp, refresh_token
             )
-        else:
-            # Headless login: username + plaintext password
-            access_token, refresh_token, expires_in = self._login_with_password(
-                username, password
+            valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
+            return Token(
+                username=username,
+                password=password,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                device_id=device_id,
+                valid_until=valid_until,
+                pin=pin,
             )
 
-        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
+        # Plaintext password login — CCI flow (Hyundai/Kia) or legacy (Genesis).
+        info = self._login_with_password(username, password, device_id)
+        # CCI flow returns the CCS token expiry as valid_until; legacy falls back
+        # to expires_in from the token response.
+        valid_until = info.get("valid_until") or (
+            dt.datetime.now(dt.UTC) + dt.timedelta(seconds=info["expires_in"])
+        )
 
         return Token(
             username=username,
             password=password,
-            access_token=access_token,
-            refresh_token=refresh_token,
+            access_token=info["access_token"],
+            refresh_token=info["refresh_token"],
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
+            cci_access_token=info.get("cci_access_token"),
+            exchangeable_token=info.get("exchangeable_token"),
+            exchangeable_refresh_token=info.get("exchangeable_refresh_token"),
+            non_ccs_token=info.get("non_ccs_token"),
+            non_ccs_refresh_token=info.get("non_ccs_refresh_token"),
+            id_token=info.get("id_token"),
         )
 
     def _login_with_password(
-        self, username: str, password: str
-    ) -> tuple[str, str, int]:
+        self, username: str, password: str, device_id: str
+    ) -> dict:
         """Headless login using username + plaintext password.
 
-        Performs the IDPConnect OAuth2 flow with RSA-encrypted password,
-        using standard HTTP requests. No browser needed.
+        EU Hyundai/Kia use the OneApp/CCI flow (client_id 4f4953b5 / 01b36c86)
+        which bypasses the IDPConnect WAF that blocks the legacy 6d477c38
+        authorize with :8080 redirect (#1273). Genesis keeps the legacy flow.
 
-        Returns:
-            (access_token, refresh_token, expires_in)
+        Returns a dict with access_token, refresh_token, expires_in and — for
+        the CCI flow — the CCI token fields needed for refresh.
 
         Raises:
             AuthenticationError: If login fails.
+        """
+        if self._use_cci_login:
+            return self._login_with_password_cci(username, password, device_id)
+        return self._login_with_password_legacy(username, password)
+
+    def _cci_timezone_offset(self) -> str:
+        """Current UTC offset of the EU data timezone as '+HH:MM'."""
+        aware = dt.datetime.now(dt.UTC).astimezone(self.data_timezone)
+        off = aware.strftime("%z")  # e.g. +0200
+        return f"{off[:3]}:{off[3:]}" if off else "+00:00"
+
+    def _get_cci_headers(
+        self,
+        device_id: str,
+        cci_access_token: str | None = None,
+        non_ccs_token: str | None = None,
+        exchangeable_token: str | None = None,
+        content_type: str | None = None,
+    ) -> dict:
+        """Headers for the CCI API (cci-api-eu.{hyundai,kia}.com).
+
+        - Authentication: raw nonCcsToken (no Bearer prefix)
+        - authorization: "Bearer " + CCI accessToken
+        - exchangeable-token / non-ccs-token (kebab-case)
+        """
+        headers = {
+            "client-id": self._cci_package_id,
+            "client-name": self._cci_client_name,
+            "client-version": self._cci_client_version,
+            "client-os-code": "ios",
+            "client-os-version": self._cci_client_os_version,
+            "client-device-id": device_id or "",
+            "client-device-model": "iPhone",
+            "client-notification-provider-type": self._cci_notification_provider,
+            "locale": self.LANGUAGE.upper(),
+            "timezone": self._cci_timezone_offset(),
+            "Accept": "application/json",
+            "Accept-Language": self.LANGUAGE,
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+        if non_ccs_token is not None:
+            headers["Authentication"] = non_ccs_token
+        if cci_access_token is not None:
+            cci_access_token = cci_access_token.removeprefix("Bearer ").strip()
+            headers["authorization"] = f"Bearer {cci_access_token}"
+        if exchangeable_token is not None:
+            headers["exchangeable-token"] = exchangeable_token
+            headers["non-ccs-token"] = non_ccs_token or ""
+        if content_type:
+            headers["Content-Type"] = content_type
+        else:
+            headers["Content-Length"] = "0"
+        return headers
+
+    def _login_with_password_cci(
+        self, username: str, password: str, device_id: str
+    ) -> dict:
+        """OneApp/CCI password login (EU Hyundai/Kia) — bypasses the IDPConnect WAF.
+
+        Uses the OneApp client_id (4f4953b5 / 01b36c86) whose authorize is not
+        WAF-blocked, then exchanges the resulting CCI token for a CCS token that
+        the legacy ccapi:8080 vehicle endpoints accept. See #1273.
+        """
+        host = self.LOGIN_FORM_HOST
+        client_id = self.ONEAPP_CLIENT_ID
+        redirect_uri = self.ONEAPP_REDIRECT_URI
+        mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
+
+        s = ApiImplSession()
+        s.headers.update({"User-Agent": mobile_ua})
+
+        # Step 1: authorize (passes WAF — OneApp client_id is not on the block list)
+        auth_url = (
+            f"{host}/auth/api/v2/user/oauth2/authorize"
+            f"?response_type=code&client_id={client_id}"
+            f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
+        )
+        auth_resp = s.get(auth_url, allow_redirects=True)
+        if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
+            raise AuthenticationError(
+                "IDPConnect authorize was blocked by the WAF ('abusing request'). "
+                "This is a server-side block, not a credentials problem. See #1273."
+            )
+
+        # Step 2: RSA public key
+        resp = s.get(f"{host}/auth/api/v1/accounts/certs")
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
+                "This may indicate a Hyundai API change."
+            )
+        jwk = resp.json().get("retValue", {})
+        kid = jwk.get("kid", "")
+        n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
+        e_bytes = base64.urlsafe_b64decode(jwk["e"] + "==")
+        key = RSA.construct(
+            (int.from_bytes(n_bytes, "big"), int.from_bytes(e_bytes, "big"))
+        )
+        encrypted_pw = PKCS1_v1_5.new(key).encrypt(password.encode("utf-8")).hex()
+
+        # Step 3: signin with RSA-encrypted password (state=ccsp, FULL email)
+        resp = s.post(
+            f"{host}/auth/account/signin",
+            data={
+                "client_id": client_id,
+                "encryptedPassword": "true",
+                "password": encrypted_pw,
+                "redirect_uri": redirect_uri,
+                "scope": "",
+                "nonce": "",
+                "state": "ccsp",
+                "username": username,
+                "connector_session_key": "",
+                "kid": kid,
+                "_csrf": "",
+            },
+            allow_redirects=False,
+        )
+        if resp.status_code != 302:
+            raise AuthenticationError(
+                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
+                "Check username and password."
+            )
+        location = resp.headers.get("location", "")
+        code_list = parse_qs(urlparse(location).query).get("code")
+        if not code_list:
+            if "error" in location.lower():
+                error_desc = parse_qs(urlparse(location).query).get(
+                    "error_description", ["unknown"]
+                )[0]
+                raise AuthenticationError(
+                    f"Authentication rejected: {error_desc}. "
+                    "Check username and password."
+                )
+            if "/web/v1/user/authorization" in location:
+                raise ConsentRequiredError(
+                    "Account consent is required. Please log in via a browser "
+                    "once to accept the terms, then retry."
+                )
+            if "authorize" in location:
+                raise AuthenticationError(
+                    "Authentication failed — returned to login page. "
+                    "Check username and password."
+                )
+            raise AuthenticationError(
+                f"API error: unexpected redirect after signin: {location[:250]}"
+            )
+        code = code_list[0]
+
+        # Step 4: exchange auth code for CCI tokens (code in URL query, no body)
+        headers = self._get_cci_headers(device_id)
+        resp = requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
+            params={"code": code},
+            headers=headers,
+            timeout=(5, 30),
+        )
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"CCI token exchange failed: HTTP {resp.status_code} — "
+                f"{resp.text[:200]}. This may indicate a Hyundai API change."
+            )
+        cci = resp.json()
+        cci_access_token = cci.get("accessToken", "")
+        cci_refresh_token = cci.get("refreshToken", "")
+        non_ccs_token = cci.get("nonCcsToken", "")
+        exchangeable_token = cci.get("exchangeableAccessToken", "")
+        exchangeable_refresh_token = cci.get("exchangeableRefreshToken", "")
+        non_ccs_refresh_token = cci.get("nonCcsRefreshToken", "")
+        id_token = cci.get("idToken", "")
+        cci_expires_in = int(cci.get("expiresIn", 3599))
+
+        # Step 5: exchange CCI token for a CCS token (usable on legacy ccapi:8080)
+        ccs_token, ccs_valid_until = self._exchange_ccs_token(
+            device_id, cci_access_token, non_ccs_token, exchangeable_token
+        )
+
+        return {
+            "access_token": "Bearer " + ccs_token,
+            "refresh_token": cci_refresh_token,
+            "expires_in": cci_expires_in,
+            "valid_until": ccs_valid_until,
+            "cci_access_token": cci_access_token,
+            "exchangeable_token": exchangeable_token,
+            "exchangeable_refresh_token": exchangeable_refresh_token,
+            "non_ccs_token": non_ccs_token,
+            "non_ccs_refresh_token": non_ccs_refresh_token,
+            "id_token": id_token,
+        }
+
+    def _exchange_ccs_token(
+        self,
+        device_id: str,
+        cci_access_token: str,
+        non_ccs_token: str,
+        exchangeable_token: str,
+    ) -> tuple[str, dt.datetime]:
+        """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
+
+        The CCS token is accepted by the legacy ccapi:8080 vehicle/control
+        endpoints as a Bearer access_token. Returns (ccs_token, valid_until).
+        """
+        headers = self._get_cci_headers(
+            device_id,
+            cci_access_token=cci_access_token,
+            non_ccs_token=non_ccs_token,
+            exchangeable_token=exchangeable_token,
+        )
+        resp = requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
+            params={"serviceType": "CCS"},
+            headers=headers,
+            timeout=(5, 30),
+        )
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"CCS token exchange failed: HTTP {resp.status_code} — "
+                f"{resp.text[:200]}. This may indicate a Hyundai API change."
+            )
+        data = resp.json()
+        ccs_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
+        if not ccs_token:
+            raise AuthenticationError(
+                f"CCS token exchange returned no accessToken: {resp.text[:200]}"
+            )
+        # expiresTime is a ms epoch when present; fall back to +1h.
+        expires_ms = data.get("expiresTime")
+        if expires_ms:
+            ccs_valid_until = dt.datetime.fromtimestamp(
+                int(expires_ms) / 1000, tz=dt.UTC
+            )
+        else:
+            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
+        return ccs_token, ccs_valid_until
+
+    def _login_with_password_legacy(self, username: str, password: str) -> dict:
+        """Legacy IDPConnect password login (6d477c38 / fdc85c00).
+
+        Used by Genesis EU (PORT=443, not WAF-affected) and as a fallback.
+        WAF-blocked for Hyundai/Kia (the :8080 redirect is rejected).
         """
         host = self.LOGIN_FORM_HOST
         client_id = self.CCSP_SERVICE_ID
@@ -323,15 +611,29 @@ class KiaUvoApiEU(ApiImplType1):
         refresh_token = tokens["refresh_token"]
         expires_in = int(tokens.get("expires_in", 86400))
 
-        return access_token, refresh_token, expires_in
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
+        }
 
     def refresh_access_token(self, token: Token) -> Token:
         """Refresh access token using the stored refresh token.
 
-        Uses the OAuth2 refresh_token grant to get a new access token
-        without repeating the full login flow. Falls back to full login
-        if the refresh token is missing or the exchange fails.
+        EU Hyundai/Kia (CCI flow): refresh the CCI token set via
+        cci-api-eu/domain/api/v2/auth/token-refresh, then re-exchange the CCS
+        token. Legacy/Genesis: use the OAuth2 refresh_token grant. Falls back
+        to full login if the refresh token is missing or the exchange fails.
         """
+        if getattr(token, "cci_access_token", None) or getattr(
+            token, "non_ccs_token", None
+        ):
+            try:
+                return self._refresh_cci_token(token)
+            except Exception:
+                _LOGGER.warning("CCI token refresh failed, falling back to full login")
+                return self.login(token.username, token.password, token.pin)
+
         if token.refresh_token:
             try:
                 stamp = self._get_stamp()
@@ -353,6 +655,83 @@ class KiaUvoApiEU(ApiImplType1):
                     "Refresh token exchange failed, falling back to full login"
                 )
         return self.login(token.username, token.password, token.pin)
+
+    def _refresh_cci_token(self, token: Token) -> Token:
+        """Refresh the CCI token set and re-exchange the CCS token.
+
+        POST cci-api-eu/domain/api/v2/auth/token-refresh with the full CCI
+        token set (all fields required in the body), then re-exchange the CCS
+        token. Returns a new Token with updated CCI + CCS fields.
+        """
+        device_id = token.device_id or ""
+        headers = self._get_cci_headers(
+            device_id,
+            cci_access_token=token.cci_access_token,
+            non_ccs_token=token.non_ccs_token,
+            exchangeable_token=token.exchangeable_token,
+            content_type="application/json",
+        )
+        body = {
+            "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
+            "refreshToken": token.refresh_token or "",
+            "exchangeableAccessToken": token.exchangeable_token or "",
+            "exchangeableRefreshToken": token.exchangeable_refresh_token or "",
+            "nonCcsToken": token.non_ccs_token or "",
+            "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
+            "idToken": token.id_token or "",
+        }
+        resp = requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+            headers=headers,
+            json=body,
+            timeout=(5, 30),
+        )
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
+            )
+        data = resp.json()
+        cci_access_token = data.get("accessToken", token.cci_access_token or "")
+        cci_refresh_token = data.get("refreshToken", token.refresh_token or "")
+        non_ccs_token = data.get("nonCcsToken", token.non_ccs_token or "")
+        exchangeable_token = data.get(
+            "exchangeableAccessToken", token.exchangeable_token or ""
+        )
+        exchangeable_refresh_token = data.get(
+            "exchangeableRefreshToken", token.exchangeable_refresh_token or ""
+        )
+        non_ccs_refresh_token = data.get(
+            "nonCcsRefreshToken", token.non_ccs_refresh_token or ""
+        )
+        id_token = data.get("idToken", token.id_token or "")
+
+        # set-cookie t= may carry an updated exchangeable token
+        set_cookie = resp.headers.get("set-cookie", "")
+        if "t=" in set_cookie:
+            m = re.search(r"t=([^;]+)", set_cookie)
+            if m and m.group(1):
+                exchangeable_token = m.group(1)
+
+        # Re-exchange the CCS token (accepted by legacy ccapi:8080)
+        ccs_token, ccs_valid_until = self._exchange_ccs_token(
+            device_id, cci_access_token, non_ccs_token, exchangeable_token
+        )
+
+        return Token(
+            username=token.username,
+            password=token.password,
+            access_token="Bearer " + ccs_token,
+            refresh_token=cci_refresh_token,
+            device_id=token.device_id,
+            valid_until=ccs_valid_until,
+            pin=token.pin,
+            cci_access_token=cci_access_token,
+            exchangeable_token=exchangeable_token,
+            exchangeable_refresh_token=exchangeable_refresh_token,
+            non_ccs_token=non_ccs_token,
+            non_ccs_refresh_token=non_ccs_refresh_token,
+            id_token=id_token,
+        )
 
     @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
