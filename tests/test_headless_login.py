@@ -250,7 +250,7 @@ def test_login_with_password_success():
     exchange_resp = MagicMock(status_code=200)
     exchange_resp.json.return_value = {
         "accessToken": "ccs-token",
-        "expiresTime": 9999999999999,
+        "expiresTime": 86400,
     }
     with ExitStack() as stack:
         stack.enter_context(
@@ -281,6 +281,11 @@ def test_login_with_password_success():
     assert info["exchangeable_token"] == "exch-at"
     assert info["non_ccs_token"] == "nonccs"
     assert info["id_token"] == "id-tok"
+    # expiresTime is a TTL in seconds (86400 = 24h), so valid_until is ~24h
+    # from now — not an epoch in 1970.
+    now = dt.datetime.now(dt.UTC)
+    assert info["valid_until"] > now
+    assert (info["valid_until"] - now).total_seconds() == pytest.approx(86400, abs=5)
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
