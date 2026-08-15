@@ -42,6 +42,7 @@ from .exceptions import (
 from .Token import Token
 from .utils import (
     bool_or_none,
+    ccs2_reservation_time_or_none,
     get_child_value,
     get_index_into_hex_temp,
     normalize_battery_soc,
@@ -747,15 +748,16 @@ class ApiImplType1(ApiImpl):
         # When the block is absent (HEV / unconfigured EV) all fields stay None —
         # do NOT synthesise dt.time(0,0), which would create phantom time
         # entities downstream and collide with a legitimate midnight window.
+        # The 31:70 "unconfigured" sentinel (#1269) is handled silently by
+        # ccs2_reservation_time_or_none.
         off_peak = get_child_value(state, "Green.Reservation.OffPeakTime")
         if off_peak:
             try:
-                vehicle.ev_off_peak_start_time = dt.time(
-                    int(off_peak.get("StartHour") or 0),
-                    int(off_peak.get("StartMin") or 0),
+                vehicle.ev_off_peak_start_time = ccs2_reservation_time_or_none(
+                    off_peak.get("StartHour"), off_peak.get("StartMin")
                 )
-                vehicle.ev_off_peak_end_time = dt.time(
-                    int(off_peak.get("EndHour") or 0), int(off_peak.get("EndMin") or 0)
+                vehicle.ev_off_peak_end_time = ccs2_reservation_time_or_none(
+                    off_peak.get("EndHour"), off_peak.get("EndMin")
                 )
             except (TypeError, ValueError):
                 _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
@@ -784,12 +786,14 @@ class ApiImplType1(ApiImpl):
         # Enable field and is unaffected. Guard on Hour presence so a
         # disabled-but-remembered schedule (EV6: Enable=0 + Hour present)
         # still parses, while an unconfigured stub (EV9: no Hour) stays None.
+        # The 31:70 sentinel can also appear here (ccNC EVs, #1269) and is
+        # handled silently by ccs2_reservation_time_or_none.
         schedule1 = get_child_value(state, "Green.Reservation.Departure.Schedule1")
         schedule2 = get_child_value(state, "Green.Reservation.Departure.Schedule2")
         if schedule1 and "Hour" in schedule1:
             try:
-                vehicle.ev_first_departure_time = dt.time(
-                    int(schedule1.get("Hour") or 0), int(schedule1.get("Min") or 0)
+                vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
+                    schedule1.get("Hour"), schedule1.get("Min")
                 )
             except (TypeError, ValueError):
                 _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
@@ -800,8 +804,8 @@ class ApiImplType1(ApiImpl):
             ] or None
         if schedule2 and "Hour" in schedule2:
             try:
-                vehicle.ev_second_departure_time = dt.time(
-                    int(schedule2.get("Hour") or 0), int(schedule2.get("Min") or 0)
+                vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
+                    schedule2.get("Hour"), schedule2.get("Min")
                 )
             except (TypeError, ValueError):
                 _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)

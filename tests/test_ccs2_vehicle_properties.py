@@ -471,6 +471,40 @@ def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
     assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
 
 
+def test_ccs2_off_peak_sentinel_31_70_is_none_silent(ccs2_api, vehicle, caplog):
+    """OffPeakTime 31:70 sentinel (Kia EV3 AU/EU, #1269) -> None, no warning.
+
+    The "unconfigured" default StartHour=31/StartMin=70/EndHour=31/EndMin=70
+    with Mode=0 must not spam HA logs as a malformed-block warning. The
+    fields resolve to None and Mode=0 still sets ev_schedule_charge_enabled=False.
+    Schedule1/2 carry the same sentinel and resolve to None too.
+    """
+    data = json.loads(json.dumps(load_fixture("eu_kia_ev6_2024_ccs2_off.json")))
+    data["Green"]["Reservation"]["OffPeakTime"] = {
+        "StartHour": 31,
+        "StartMin": 70,
+        "EndHour": 31,
+        "EndMin": 70,
+        "Mode": 0,
+    }
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Hour"] = 31
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Min"] = 70
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Hour"] = 31
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Min"] = 70
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hyundai_kia_connect_api"):
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_off_peak_start_time is None
+    assert vehicle.ev_off_peak_end_time is None
+    assert vehicle.ev_schedule_charge_enabled is False  # Mode=0
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+    assert vehicle.ev_first_departure_time is None  # Schedule1 31:70 sentinel
+    assert vehicle.ev_second_departure_time is None  # Schedule2 31:70 sentinel
+    # No malformed-block warning for the known sentinel.
+    assert "malformed" not in caplog.text
+
+
 def test_schedule_charging_off_peak_flag_not_inverted(ccs2_api, vehicle):
     """charge_only=True (time-priority) must send offPeakPowerFlag=1, not 2."""
     from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
