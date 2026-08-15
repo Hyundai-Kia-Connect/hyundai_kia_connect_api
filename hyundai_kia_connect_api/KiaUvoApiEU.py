@@ -35,6 +35,7 @@ from .const import (
     VALET_MODE_ACTION,
 )
 from .exceptions import (
+    APIError,
     AuthenticationError,
     ConsentRequiredError,
 )
@@ -227,7 +228,25 @@ class KiaUvoApiEU(ApiImplType1):
             f"?response_type=code&client_id={client_id}"
             f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
         )
-        s.get(auth_url, allow_redirects=True)
+        r = s.get(auth_url, allow_redirects=True)
+        # The IdP edge/WAF can reject the authorize request before any credential
+        # is sent, redirecting to /error?status=400 with an "abusing request"
+        # body. This is a server-side block on the registered redirect_uri (its
+        # non-standard :8080 port), not a credentials problem — see issue #1273.
+        # Detect it here so we fail with an explicit message instead of the
+        # misleading "Check username and password" raised further down.
+        if (
+            "classified as an abusing request" in r.text
+            or "abusing" in r.url.lower()
+            or "/error?status=400" in r.url
+        ):
+            raise APIError(
+                "The Hyundai/Kia IdP rejected the OAuth authorize request before "
+                "login (server-side WAF: 'abusing request'). This is NOT a "
+                "credentials problem — do not change your password. It is a "
+                "server-side block on the registered redirect_uri. See "
+                "https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/issues/1273"
+            )
 
         # Step 2: Get RSA public key for password encryption
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
