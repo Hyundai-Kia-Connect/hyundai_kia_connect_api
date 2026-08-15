@@ -159,36 +159,33 @@ class KiaUvoApiEU(ApiImplType1):
         # OneApp/CCI login flow (EU Hyundai/Kia/Genesis) — bypasses the IDPConnect
         # WAF that blocks the legacy authorize by client_id (#1273). All three EU
         # brands are blocked (Genesis PORT=443 is not spared — the WAF blocks by
-        # client_id, not port).
-        self._use_cci_login: bool = False
-        if BRANDS[self.brand] in (BRAND_HYUNDAI, BRAND_KIA, BRAND_GENESIS):
-            self._use_cci_login = True
-            if BRANDS[self.brand] == BRAND_HYUNDAI:
-                self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
-                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.hyundai.com/redirect"
-                self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
-                self._cci_package_id: str = "com.hyundai.oneapp.eu"
-                self._cci_client_name: str = "hyundai"
-            elif BRANDS[self.brand] == BRAND_KIA:
-                self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
-                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
-                self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
-                self._cci_package_id: str = "com.kia.oneapp.eu"
-                self._cci_client_name: str = "kia"
-            else:  # BRAND_GENESIS
-                self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
-                self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
-                self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
-                self._cci_package_id: str = "com.genesis.oneapp.eu"
-                self._cci_client_name: str = "genesis"
-            self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
-            self._cci_client_version: str = "1.3.3"
-            self._cci_client_os_version: str = (
-                "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
-            )
-            self._cci_notification_provider: str = (
-                "IOS_APPSTORE" if BRANDS[self.brand] == BRAND_KIA else "APNS"
-            )
+        # client_id, not port), so all three use the CCI flow.
+        if BRANDS[self.brand] == BRAND_HYUNDAI:
+            self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
+            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.hyundai.com/redirect"
+            self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
+            self._cci_package_id: str = "com.hyundai.oneapp.eu"
+            self._cci_client_name: str = "hyundai"
+        elif BRANDS[self.brand] == BRAND_KIA:
+            self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
+            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
+            self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
+            self._cci_package_id: str = "com.kia.oneapp.eu"
+            self._cci_client_name: str = "kia"
+        else:  # BRAND_GENESIS
+            self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
+            self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
+            self._cci_package_id: str = "com.genesis.oneapp.eu"
+            self._cci_client_name: str = "genesis"
+        self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
+        self._cci_client_version: str = "1.3.3"
+        self._cci_client_os_version: str = (
+            "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
+        )
+        self._cci_notification_provider: str = (
+            "IOS_APPSTORE" if BRANDS[self.brand] == BRAND_KIA else "APNS"
+        )
 
         self.session = ApiImplSession()
 
@@ -252,21 +249,17 @@ class KiaUvoApiEU(ApiImplType1):
     def _login_with_password(
         self, username: str, password: str, device_id: str
     ) -> dict:
-        """Headless login using username + plaintext password.
+        """Headless login using username + plaintext password (OneApp/CCI flow).
 
-        EU Hyundai/Kia use the OneApp/CCI flow (client_id 4f4953b5 / 01b36c86)
-        which bypasses the IDPConnect WAF that blocks the legacy 6d477c38
-        authorize with :8080 redirect (#1273). Genesis keeps the legacy flow.
-
-        Returns a dict with access_token, refresh_token, expires_in and — for
-        the CCI flow — the CCI token fields needed for refresh.
+        All EU brands (Hyundai/Kia/Genesis) use the OneApp/CCI flow, which
+        bypasses the IDPConnect WAF that blocks the legacy authorize by client_id
+        (#1273). Returns a dict with access_token, refresh_token, expires_in and
+        the CCI token fields needed for refresh.
 
         Raises:
             AuthenticationError: If login fails.
         """
-        if self._use_cci_login:
-            return self._login_with_password_cci(username, password, device_id)
-        return self._login_with_password_legacy(username, password)
+        return self._login_with_password_cci(username, password, device_id)
 
     def _cci_timezone_offset(self) -> str:
         """Current UTC offset of the EU data timezone as '+HH:MM'."""
@@ -497,132 +490,6 @@ class KiaUvoApiEU(ApiImplType1):
         else:
             ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
         return ccs_token, ccs_valid_until
-
-    def _login_with_password_legacy(self, username: str, password: str) -> dict:
-        """Legacy IDPConnect password login (6d477c38 / fdc85c00).
-
-        Used by Genesis EU (PORT=443, not WAF-affected) and as a fallback.
-        WAF-blocked for Hyundai/Kia (the :8080 redirect is rejected).
-        """
-        host = self.LOGIN_FORM_HOST
-        client_id = self.CCSP_SERVICE_ID
-        client_secret = self.CCS_SERVICE_SECRET
-        redirect_uri = self._oauth_redirect_uri
-
-        # The _CCS_APP_AOS suffix is required — without it, the IDPConnect
-        # authorize endpoint returns "400 Bad Request".
-        mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
-
-        s = ApiImplSession()
-        s.headers.update({"User-Agent": mobile_ua})
-
-        # Step 1: Load authorize page to get session cookies
-        auth_url = (
-            f"{host}/auth/api/v2/user/oauth2/authorize"
-            f"?response_type=code&client_id={client_id}"
-            f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
-        )
-        s.get(auth_url, allow_redirects=True)
-
-        # Step 2: Get RSA public key for password encryption
-        resp = s.get(f"{host}/auth/api/v1/accounts/certs")
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
-                "This may indicate a Hyundai API change."
-            )
-        jwk = resp.json().get("retValue", {})
-        kid = jwk.get("kid", "")
-
-        # Convert JWK to RSA key
-        n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
-        e_bytes = base64.urlsafe_b64decode(jwk["e"] + "==")
-        n = int.from_bytes(n_bytes, "big")
-        e = int.from_bytes(e_bytes, "big")
-        key = RSA.construct((n, e))
-        cipher = PKCS1_v1_5.new(key)
-        encrypted_pw = cipher.encrypt(password.encode("utf-8")).hex()
-
-        # Step 3: POST signin with encrypted password
-        resp = s.post(
-            f"{host}/auth/account/signin",
-            data={
-                "client_id": client_id,
-                "encryptedPassword": "true",
-                "password": encrypted_pw,
-                "redirect_uri": redirect_uri,
-                "scope": "",
-                "nonce": "",
-                "state": "ccsp",
-                "username": username,
-                "connector_session_key": "",
-                "kid": kid,
-                "_csrf": "",
-            },
-            allow_redirects=False,
-        )
-
-        if resp.status_code != 302:
-            raise AuthenticationError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
-                "Check username and password."
-            )
-
-        location = resp.headers.get("location", "")
-        code_list = parse_qs(urlparse(location).query).get("code")
-        if not code_list:
-            if "error" in location.lower():
-                error_desc = parse_qs(urlparse(location).query).get(
-                    "error_description", ["unknown"]
-                )[0]
-                raise AuthenticationError(
-                    f"Authentication rejected: {error_desc}. "
-                    "Check username and password."
-                )
-            if "/web/v1/user/authorization" in location:
-                raise ConsentRequiredError(
-                    "Account consent is required. Please log in via a browser "
-                    "once to accept the terms, then use the refresh token."
-                )
-            if "authorize" in location:
-                raise AuthenticationError(
-                    "Authentication failed — returned to login page. "
-                    "Check username and password."
-                )
-            raise AuthenticationError(
-                f"API error: unexpected redirect after signin: {location[:250]}"
-            )
-
-        code = code_list[0]
-
-        # Step 4: Exchange authorization code for tokens
-        resp = s.post(
-            f"{host}/auth/api/v2/user/oauth2/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": redirect_uri,
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
-        )
-
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"API error: token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate a Hyundai API change."
-            )
-
-        tokens = resp.json()
-        access_token = tokens["token_type"] + " " + tokens["access_token"]
-        refresh_token = tokens["refresh_token"]
-        expires_in = int(tokens.get("expires_in", 86400))
-
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "expires_in": expires_in,
-        }
 
     def refresh_access_token(self, token: Token) -> Token:
         """Refresh access token using the stored refresh token.
