@@ -55,7 +55,7 @@ def test_login_with_password_certs_endpoint_fails():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="failed to fetch RSA certs"):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_signin_returns_non_302():
@@ -91,7 +91,7 @@ def test_login_with_password_signin_returns_non_302():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Signin failed"):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_signin_no_code_in_redirect():
@@ -128,7 +128,7 @@ def test_login_with_password_signin_no_code_in_redirect():
         with pytest.raises(
             AuthenticationError, match="unexpected redirect after signin"
         ):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_signin_error_in_redirect():
@@ -168,7 +168,7 @@ def test_login_with_password_signin_error_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="Authentication rejected"):
-            api._login_with_password("user@test.com", "wrong-password")
+            api._login_with_password_legacy("user@test.com", "wrong-password")
 
 
 def test_login_with_password_signin_redirect_to_login_page():
@@ -207,7 +207,7 @@ def test_login_with_password_signin_redirect_to_login_page():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="returned to login page"):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_signin_consent_spa_redirect():
@@ -244,7 +244,7 @@ def test_login_with_password_signin_consent_spa_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(ConsentRequiredError, match="consent is required"):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_token_exchange_fails():
@@ -283,7 +283,7 @@ def test_login_with_password_token_exchange_fails():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(AuthenticationError, match="token exchange failed"):
-            api._login_with_password("user@test.com", "password")
+            api._login_with_password_legacy("user@test.com", "password")
 
 
 def test_login_with_password_success():
@@ -326,13 +326,11 @@ def test_login_with_password_success():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        access_token, refresh_token, expires_in = api._login_with_password(
-            "user@test.com", "password"
-        )
+        info = api._login_with_password_legacy("user@test.com", "password")
 
-    assert access_token == "Bearer test-access-token"
-    assert refresh_token == "TESTRFTOKEN12345678901234567890123456789012345678"
-    assert expires_in == 86400
+    assert info["access_token"] == "Bearer test-access-token"
+    assert info["refresh_token"] == "TESTRFTOKEN12345678901234567890123456789012345678"
+    assert info["expires_in"] == 86400
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
@@ -374,11 +372,11 @@ def test_login_plaintext_password_calls_login_with_password():
         patch.object(
             api,
             "_login_with_password",
-            return_value=(
-                "Bearer headless-access-token",
-                "HEADLESSREFRESHTOKEN123456789012345678",
-                3600,
-            ),
+            return_value={
+                "access_token": "Bearer headless-access-token",
+                "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
+                "expires_in": 3600,
+            },
         ),
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
@@ -400,11 +398,11 @@ def test_login_plaintext_password_genesis_calls_login_with_password():
         patch.object(
             api,
             "_login_with_password",
-            return_value=(
-                "Bearer genesis-access-token",
-                "GENESISREFRESHTOKEN12345678901234567",
-                3600,
-            ),
+            return_value={
+                "access_token": "Bearer genesis-access-token",
+                "refresh_token": "GENESISREFRESHTOKEN12345678901234567",
+                "expires_in": 3600,
+            },
         ),
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
