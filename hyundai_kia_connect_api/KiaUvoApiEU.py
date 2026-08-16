@@ -481,11 +481,12 @@ class KiaUvoApiEU(ApiImplType1):
             raise AuthenticationError(
                 f"CCS token exchange returned no accessToken: {resp.text[:200]}"
             )
-        # expiresTime is a ms epoch when present; fall back to +1h.
-        expires_ms = data.get("expiresTime")
-        if expires_ms:
-            ccs_valid_until = dt.datetime.fromtimestamp(
-                int(expires_ms) / 1000, tz=dt.UTC
+        # expiresTime is the CCS token TTL in seconds (e.g. 86400 = 24h), not an
+        # epoch. Treat it as a relative duration from now; fall back to +1h.
+        expires_in = data.get("expiresTime")
+        if expires_in:
+            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+                seconds=int(expires_in)
             )
         else:
             ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
