@@ -114,6 +114,7 @@ class HyundaiCciApiEU(ApiImpl):
 
         self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
         self.CCSP_API_URL: str = "https://gspa-ccs-eu.hyundai.com"
+        self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
         self._cci_client_version: str = "1.3.3"
         self._cci_client_os_version: str = "18.7"
         self._cci_notification_provider: str = "APNS"
@@ -667,13 +668,15 @@ class HyundaiCciApiEU(ApiImpl):
 
         Uses the CCS token (stored as token.access_token with 'Bearer ' prefix)
         as the Authorization bearer credential, plus the GSPA X-Stamp header
-        computed from the device_id and ccs_user_id.
+        computed from the device_id and ccs_user_id. The X-Request-Id (tsid)
+        must be sent alongside X-Stamp — the server validates the stamp against it.
         """
         ccs_token = (token.access_token or "").removeprefix("Bearer ")
+        device_id = (token.device_id or "").replace("-", "")
         headers = {
             "Authorization": f"Bearer {ccs_token}",
-            "ccsp-service-id": self.ONEAPP_CLIENT_ID,
-            "ccsp-application-id": self.ONEAPP_CLIENT_ID,
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.CCSP_SERVICE_ID,
             "ccsp-device-id": token.device_id or "",
             "X-Device-Id": token.device_id or "",
             "Ccuccs2protocolsupport": str(ccs2_support),
@@ -686,9 +689,26 @@ class HyundaiCciApiEU(ApiImpl):
             "Content-Type": "application/json",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-        stamp = self._compute_x_stamp(token)
-        if stamp:
-            headers["X-Stamp"] = stamp
+        # Compute X-Stamp + X-Request-Id (tsid) together — the server
+        # validates the stamp against the tsid in X-Request-Id.
+        try:
+            from .gspa import compute_x_stamp, create_tsid
+
+            tsid = create_tsid(device_id)
+            epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
+            user_id = token.ccs_user_id or ""
+            stamp = compute_x_stamp(
+                region=self.region,
+                is_production=True,
+                tsid=tsid,
+                epoch_seconds=epoch_seconds,
+                user_id=user_id,
+            )
+            if stamp:
+                headers["X-Stamp"] = stamp
+                headers["X-Request-Id"] = tsid
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation failed")
         return headers
 
     def _compute_x_stamp(self, token: Token) -> str:

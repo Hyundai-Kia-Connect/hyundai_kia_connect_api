@@ -42,7 +42,7 @@ _ROUND_GROUPS = (
     (GAP, POST_X27, 5),  # 5 rounds, sub-table base = (round - 8) * 16
 )
 
-# TSID epoch: 2020-01-01T00:00:00Z (matches APK's TsidCreator)
+# TSID epoch: 2020-01-01T00:00:00Z (matches the app's TSID format)
 TSID_EPOCH_MS = int(dt.datetime(2020, 1, 1, tzinfo=dt.UTC).timestamp() * 1000)
 
 # Region IV mapping for EU-cipher regions.  Regions 1 (EU), 2 (KR),
@@ -63,7 +63,7 @@ _UNSUPPORTED_REGIONS = {4, 5}
 
 
 def create_tsid(device_id_hex: str = "", counter: int = 0) -> str:
-    """Create a 14-byte Time-Sorted ID matching the APK's TsidCreator.
+    """Create a 14-byte Time-Sorted ID matching the app's TSID format.
 
     Format:
     - Bytes 0-4: timestamp (ms since 2020-01-01, big-endian, 40-bit mask)
