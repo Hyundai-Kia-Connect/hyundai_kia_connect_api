@@ -7,11 +7,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import (
     AuthenticationError,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.Vehicle import Vehicle
 
 # ── Helpers ─────────────────────────────────────────────────────
 
@@ -544,3 +546,126 @@ def test_test_token_returns_false_on_non_200():
         return_value=MagicMock(status_code=401),
     ):
         assert api.test_token(token) is False
+
+
+# ── supports_valet_mode class attribute ────────────────────────
+
+
+def test_supports_valet_mode_is_true():
+    """HyundaiCciApiEU overrides ApiImpl.supports_valet_mode (False) with True."""
+    api = _make_hyundai_api()
+    assert api.supports_valet_mode is True
+
+
+# ── get_vehicles() CCI parsing ────────────────────────
+
+
+def test_get_vehicles_parses_cci_response():
+    """get_vehicles parses CCI available-vehicles response into Vehicle list."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    mock_response = MagicMock(status_code=200)
+    mock_response.json.return_value = [
+        {
+            "ccspCarId": "car-123",
+            "vin": "VIN12345",
+            "vehicleNameView": "My Ioniq",
+            "vehicleModelName": "Ioniq 5",
+            "isCcs": True,
+            "isCcsOpen": True,
+            "isEv": True,
+        }
+    ]
+    with patch(
+        "hyundai_kia_connect_api.HyundaiCciApiEU.requests.get",
+        return_value=mock_response,
+    ):
+        vehicles = api.get_vehicles(token)
+
+    assert len(vehicles) == 1
+    v = vehicles[0]
+    assert v.id == "car-123"
+    assert v.VIN == "VIN12345"
+    assert v.name == "My Ioniq"
+    assert v.model == "Ioniq 5"
+    assert v.ccu_ccs2_protocol_support == 2  # isCcs + isCcsOpen
+    assert v.engine_type == ENGINE_TYPES.EV
+
+
+# ── update_vehicle_with_cached_state() CCS2 mapping ────────────
+
+
+def test_update_vehicle_with_cached_state_populates_vehicle():
+    """update_vehicle_with_cached_state fetches GSPA stored-status and maps
+    CCS2 fields including the 4 R1 field gaps (drive_mode,
+    oil_level_warning_is_on, battery_auxiliary_fail_warning_is_on,
+    supports_valet_mode)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    vehicle.engine_type = ENGINE_TYPES.EV
+
+    ccs2_state = {
+        "Date": "Tue, 24 Jun 2025 16:18:10 GMT",
+        "Offset": 0,
+        "Drivetrain": {
+            "Odometer": 12345,
+            "FuelSystem": {"DTE": {"Total": 300, "Unit": 1}},
+        },
+        "Electronics": {"Battery": {"Level": 85}},
+        "Chassis": {
+            "DrivingMode": {"State": "ECO"},
+            "Engine": {"OilLevel": {"Status": 0}},
+            "Battery": {"Auxiliary": {"State": 0}},
+            "Axle": {
+                "Row1": {
+                    "Left": {"Tire": {"Pressure": 230, "PressureLow": 0}},
+                    "Right": {"Tire": {"Pressure": 235, "PressureLow": 0}},
+                },
+                "Row2": {
+                    "Left": {"Tire": {"Pressure": 225, "PressureLow": 0}},
+                    "Right": {"Tire": {"Pressure": 240, "PressureLow": 0}},
+                },
+                "Tire": {"PressureUnit": 1, "PressureLow": 0},
+            },
+        },
+        "Green": {
+            "BatteryManagement": {
+                "BatteryRemain": {"Ratio": 78, "Value": 78},
+            },
+        },
+        "Location": {
+            "GeoCoord": {"Latitude": 50.0, "Longitude": 19.0},
+            "TimeStamp": {
+                "Year": 2025,
+                "Mon": 6,
+                "Day": 24,
+                "Hour": 16,
+                "Min": 18,
+                "Sec": 10,
+            },
+        },
+    }
+
+    with (
+        patch.object(
+            api,
+            "get_stored_status",
+            return_value={"state": {"Vehicle": ccs2_state}},
+        ),
+        patch.object(api, "_get_driving_info", return_value=None),
+        patch.object(api, "_get_driving_history", return_value=None),
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    # R1 field gaps
+    assert vehicle.drive_mode == "ECO"
+    assert vehicle.oil_level_warning_is_on is False
+    assert vehicle.battery_auxiliary_fail_warning_is_on is False
+
+    # Other mapped fields (odometer is a property: tuple (value, unit) -> float)
+    assert vehicle.odometer == 12345
+    assert vehicle.odometer_unit == DISTANCE_UNITS[1]
+    assert vehicle.car_battery_percentage == 85
+    assert vehicle.ev_battery_percentage == 78
