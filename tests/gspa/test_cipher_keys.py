@@ -1,7 +1,7 @@
 """Stamp parity tests for the pure-Python GSPA cipher.
 
 These tests pin the cipher output for fixed inputs so any future change
-to ``cipher_pure`` that breaks the output is caught immediately.
+to ``cipher_keys`` that breaks the output is caught immediately.
 """
 
 import base64
@@ -11,8 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from hyundai_kia_connect_api.gspa import cipher_pure
-from hyundai_kia_connect_api.gspa.cipher_pure import GspaCipher, create_tsid
+from hyundai_kia_connect_api.gspa import GspaCipher, cipher_keys, create_tsid
 
 # Known encrypt_block vectors (pin the ECB output for fixed 16-byte inputs).
 P1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
@@ -50,7 +49,7 @@ def test_create_tsid_known_vector(monkeypatch):
     """Pinned TSID output with a frozen timestamp.
 
     create_tsid uses the current time, so we replace the ``dt`` module
-    reference in ``cipher_pure`` with a fake whose ``datetime.now`` returns
+    reference in ``cipher_keys`` with a fake whose ``datetime.now`` returns
     a fixed value. This makes the output deterministic and pinnable.
     """
     fixed_dt = dt.datetime(2025, 6, 1, 12, 0, 0, tzinfo=dt.UTC)
@@ -64,13 +63,13 @@ def test_create_tsid_known_vector(monkeypatch):
         timezone=dt.timezone,
         UTC=dt.UTC,
     )
-    monkeypatch.setattr(cipher_pure, "dt", fake_dt)
+    monkeypatch.setattr(cipher_keys, "dt", fake_dt)
 
     result = create_tsid(device_id_hex="0123456789abcdef", counter=1)
 
     # Compute expected value manually to avoid relying on the function itself.
     now_ms = int(fixed_dt.timestamp() * 1000)
-    ts_offset = now_ms - cipher_pure.TSID_EPOCH_MS
+    ts_offset = now_ms - cipher_keys.TSID_EPOCH_MS
     ts_bytes = struct.pack(">Q", ts_offset)[3:]  # last 5 bytes
     node_bytes = bytes.fromhex("0123456789abcdef")
     counter_swapped = ((1 & 0x0F) << 4) | ((1 >> 4) & 0x0F)  # 0x10
@@ -137,14 +136,14 @@ def test_module_encrypt_cfb_us_ca_not_implemented():
     """Module-level encrypt_cfb(region=4) must raise NotImplementedError so a
     re-exported entry point cannot silently produce a wrong X-Stamp."""
     with pytest.raises(NotImplementedError):
-        cipher_pure.encrypt_cfb(b"iv.ccsp.stamp.us", b"x" * 16, region=4)
+        cipher_keys.encrypt_cfb(b"iv.ccsp.stamp.us", b"x" * 16, region=4)
 
 
 def test_module_encrypt_cfb_staging_not_implemented():
     """Module-level encrypt_cfb(is_production=False) must raise
     NotImplementedError — staging tables not available."""
     with pytest.raises(NotImplementedError):
-        cipher_pure.encrypt_cfb(
+        cipher_keys.encrypt_cfb(
             b"iv.ccsp.stamp.eu", b"x" * 16, region=1, is_production=False
         )
 
@@ -153,7 +152,7 @@ def test_module_compute_x_stamp_staging_not_implemented():
     """Module-level compute_x_stamp(is_production=False) must raise
     NotImplementedError — staging tables not available."""
     with pytest.raises(NotImplementedError):
-        cipher_pure.compute_x_stamp(region=1, is_production=False, user_id="u")
+        cipher_keys.compute_x_stamp(region=1, is_production=False, user_id="u")
 
 
 def test_encrypt_block_rejects_wrong_size():
