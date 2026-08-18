@@ -117,8 +117,6 @@ def test_compute_x_stamp_us_ca_not_implemented(region):
         )
 
 
-@pytest.mark.parametrize("region", [1, 2, 3, 9, -1])
-
 def test_module_encrypt_cfb_us_ca_not_implemented():
     """Module-level encrypt_cfb(region=4) must raise NotImplementedError so a
     re-exported entry point cannot silently produce a wrong X-Stamp."""

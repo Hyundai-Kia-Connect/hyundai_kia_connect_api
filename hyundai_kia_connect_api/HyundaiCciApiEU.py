@@ -526,7 +526,7 @@ class HyundaiCciApiEU(ApiImpl):
             )
             return stamp
         except NotImplementedError:
-            # Staging or unsupported region — fail loud, don't silently
+            # Unsupported region — fail loud
             # produce a wrong X-Stamp.
             raise
         except Exception as e:
