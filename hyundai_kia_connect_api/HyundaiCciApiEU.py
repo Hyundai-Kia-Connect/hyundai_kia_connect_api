@@ -79,7 +79,7 @@ class HyundaiCciApiEU(ApiImpl):
     supports_valet_mode = True
 
     def __init__(
-        self, region: int, brand: int, language: str, staging: bool = False
+        self, region: int, brand: int, language: str
     ) -> None:
         language = language.lower()
         if len(language) > 2:
@@ -91,7 +91,6 @@ class HyundaiCciApiEU(ApiImpl):
         self.region: int = region
         self.LANGUAGE: str = language
         self.brand: int = brand
-        self.staging: bool = staging
 
         if BRANDS[self.brand] == BRAND_HYUNDAI:
             # Confirmed production endpoints.
@@ -520,7 +519,7 @@ class HyundaiCciApiEU(ApiImpl):
             user_id = token.ccs_user_id or ""
             stamp = compute_x_stamp(
                 region=self.region,
-                is_production=not self.staging,
+                
                 tsid=tsid,
                 epoch_seconds=epoch_seconds,
                 user_id=user_id,
@@ -694,7 +693,7 @@ class HyundaiCciApiEU(ApiImpl):
             user_id = token.ccs_user_id or ""
             stamp = compute_x_stamp(
                 region=self.region,
-                is_production=True,
+                
                 tsid=tsid,
                 epoch_seconds=epoch_seconds,
                 user_id=user_id,

@@ -143,7 +143,6 @@ class GspaCipher:
     def compute_x_stamp(
         self,
         region: int = 1,
-        is_production: bool = True,
         tsid: str | None = None,
         epoch_seconds: int | None = None,
         user_id: str = "",
@@ -152,8 +151,6 @@ class GspaCipher:
             raise NotImplementedError("US/CA tables not extracted")
         if region not in _EU_CIPHER_REGION_IVS:
             raise ValueError(f"Unknown region {region!r}")
-        if not is_production:
-            raise NotImplementedError("staging not extracted — production only")
         if tsid is None:
             tsid = create_tsid()
         if epoch_seconds is None:
@@ -199,25 +196,22 @@ def encrypt_block(plaintext_16: bytes) -> bytes:
 
 
 def encrypt_cfb(
-    iv: bytes, plaintext: bytes, region: int = 1, is_production: bool = True
+    iv: bytes, plaintext: bytes, region: int = 1
 ) -> bytes:
     """CFB-128 encrypt for X-Stamp computation."""
     if region in (4, 5):
         raise NotImplementedError("US/CA tables not extracted — EU-cipher regions only")
     if region not in _EU_CIPHER_REGION_IVS:
         raise ValueError(f"Unknown region {region!r}")
-    if not is_production:
-        raise NotImplementedError("staging not extracted — production only")
     return _get_cipher().encrypt_cfb(iv, plaintext)
 
 
 def compute_x_stamp(
     region: int = 1,
-    is_production: bool = True,
     tsid: str | None = None,
     epoch_seconds: int | None = None,
     user_id: str = "",
 ) -> str:
     return _get_cipher().compute_x_stamp(
-        region, is_production, tsid, epoch_seconds, user_id
+        region, tsid, epoch_seconds, user_id
     )

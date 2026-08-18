@@ -118,19 +118,6 @@ def test_compute_x_stamp_us_ca_not_implemented(region):
 
 
 @pytest.mark.parametrize("region", [1, 2, 3, 9, -1])
-def test_compute_x_stamp_staging_not_implemented(region):
-    """is_production=False (staging) must raise NotImplementedError, not
-    silently produce a wrong X-Stamp with production tables."""
-    pure = GspaCipher()
-    with pytest.raises(NotImplementedError):
-        pure.compute_x_stamp(
-            region=region,
-            is_production=False,
-            tsid="test-tsid",
-            epoch_seconds=1748523600,
-            user_id="u",
-        )
-
 
 def test_module_encrypt_cfb_us_ca_not_implemented():
     """Module-level encrypt_cfb(region=4) must raise NotImplementedError so a
@@ -139,20 +126,6 @@ def test_module_encrypt_cfb_us_ca_not_implemented():
         cipher_keys.encrypt_cfb(b"iv.ccsp.stamp.us", b"x" * 16, region=4)
 
 
-def test_module_encrypt_cfb_staging_not_implemented():
-    """Module-level encrypt_cfb(is_production=False) must raise
-    NotImplementedError — staging tables not available."""
-    with pytest.raises(NotImplementedError):
-        cipher_keys.encrypt_cfb(
-            b"iv.ccsp.stamp.eu", b"x" * 16, region=1, is_production=False
-        )
-
-
-def test_module_compute_x_stamp_staging_not_implemented():
-    """Module-level compute_x_stamp(is_production=False) must raise
-    NotImplementedError — staging tables not available."""
-    with pytest.raises(NotImplementedError):
-        cipher_keys.compute_x_stamp(region=1, is_production=False, user_id="u")
 
 
 def test_encrypt_block_rejects_wrong_size():
