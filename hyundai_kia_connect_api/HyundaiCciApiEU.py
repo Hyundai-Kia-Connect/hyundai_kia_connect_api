@@ -212,6 +212,8 @@ class HyundaiCciApiEU(ApiImpl):
             )
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
+        if not jwk.get("n") or not jwk.get("e"):
+            raise AuthenticationError("API error: certs response missing RSA key material")
         n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
         e_bytes = base64.urlsafe_b64decode(jwk["e"] + "==")
         key = RSA.construct(
@@ -724,6 +726,10 @@ class HyundaiCciApiEU(ApiImpl):
         )
 
         response = requests.get(url, headers=headers, params=params, timeout=(5, 30))
+        if response.status_code == 401:
+            raise AuthenticationError("GSPA: Token expired or invalid")
+        if response.status_code >= 400:
+            raise APIError(f"GSPA error: HTTP {response.status_code}")
         data = response.json()
         meta = data.get("metaInfo", {})
         ret_code = meta.get("retCode")
@@ -885,6 +891,8 @@ class HyundaiCciApiEU(ApiImpl):
             if rc and rc != "0000":
                 raise APIError(f"GSPA error: rc={rc}, msg={data.get('msg', '')}")
             return data.get("rs", data)
+        except AuthenticationError:
+            raise
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA prewakeup failed")
             return None
@@ -905,6 +913,8 @@ class HyundaiCciApiEU(ApiImpl):
     def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
         if isinstance(state, dict):
             driving_info = state.get("drivingInfo", state)
+            if driving_info is None:
+                return
             if isinstance(driving_info, list) and len(driving_info) > 0:
                 driving_info = driving_info[0]
             vehicle.total_driving_range = (
@@ -1040,7 +1050,7 @@ class HyundaiCciApiEU(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         air_temp = get_child_value(state, "Cabin.HVAC.Row1.Driver.Temperature.Value")
-        if air_temp != "OFF":
+        if air_temp is not None and air_temp != "OFF":
             air_temp_unit = get_child_value(
                 state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
             )
@@ -1129,18 +1139,26 @@ class HyundaiCciApiEU(ApiImpl):
         )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
-        vehicle.front_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Driver.Open"
-        )
-        vehicle.front_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Passenger.Open"
-        )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Left.Open"
-        )
-        vehicle.back_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Right.Open"
-        )
+        _open = get_child_value(state, "Cabin.Window.Row1.Driver.Open")
+        _level = get_child_value(state, "Cabin.Window.Row1.Driver.OpenLevel")
+        vehicle.front_left_window_is_open = bool(_open) if _open is not None else None
+        if _level and _level > 0 and not _open:
+            vehicle.front_left_window_is_open = True  # vented
+        _open = get_child_value(state, "Cabin.Window.Row1.Passenger.Open")
+        _level = get_child_value(state, "Cabin.Window.Row1.Passenger.OpenLevel")
+        vehicle.front_right_window_is_open = bool(_open) if _open is not None else None
+        if _level and _level > 0 and not _open:
+            vehicle.front_right_window_is_open = True  # vented
+        _open = get_child_value(state, "Cabin.Window.Row2.Left.Open")
+        _level = get_child_value(state, "Cabin.Window.Row2.Left.OpenLevel")
+        vehicle.back_left_window_is_open = bool(_open) if _open is not None else None
+        if _level and _level > 0 and not _open:
+            vehicle.back_left_window_is_open = True  # vented
+        _open = get_child_value(state, "Cabin.Window.Row2.Right.Open")
+        _level = get_child_value(state, "Cabin.Window.Row2.Right.OpenLevel")
+        vehicle.back_right_window_is_open = bool(_open) if _open is not None else None
+        if _level and _level > 0 and not _open:
+            vehicle.back_right_window_is_open = True  # vented
         vehicle.sunroof_is_open = (
             bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
             if get_child_value(state, "Body.Sunroof.Glass.Open") is not None
