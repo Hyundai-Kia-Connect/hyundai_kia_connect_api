@@ -1,4 +1,4 @@
-"""GSPA X-Stamp cipher — pure-Python reimplementation from recovered params."""
+"""GSPA X-Stamp cipher — pure-Python AES-128 implementation."""
 
 import base64
 import datetime as dt
@@ -148,7 +148,7 @@ class GspaCipher:
         user_id: str = "",
     ) -> str:
         if region in (4, 5):
-            raise NotImplementedError("US/CA tables not extracted")
+            raise NotImplementedError("US/CA not supported")
         if region not in _EU_CIPHER_REGION_IVS:
             raise ValueError(f"Unknown region {region!r}")
         if tsid is None:
@@ -200,7 +200,7 @@ def encrypt_cfb(
 ) -> bytes:
     """CFB-128 encrypt for X-Stamp computation."""
     if region in (4, 5):
-        raise NotImplementedError("US/CA tables not extracted — EU-cipher regions only")
+        raise NotImplementedError("US/CA not supported — EU-cipher regions only")
     if region not in _EU_CIPHER_REGION_IVS:
         raise ValueError(f"Unknown region {region!r}")
     return _get_cipher().encrypt_cfb(iv, plaintext)
