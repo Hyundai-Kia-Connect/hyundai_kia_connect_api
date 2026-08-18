@@ -37,7 +37,13 @@ from .const import (
 )
 from .exceptions import APIError, AuthenticationError, ConsentRequiredError
 from .Token import Token
-from .utils import bool_or_none, get_child_value, parse_datetime, pressure_or_none
+from .utils import (
+    bool_or_none,
+    get_child_value,
+    normalize_battery_soc,
+    parse_datetime,
+    pressure_or_none,
+)
 from .Vehicle import DailyDrivingStats, Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -569,7 +575,7 @@ class HyundaiCciApiEU(ApiImpl):
         # set-cookie t= may carry an updated exchangeable token
         set_cookie = resp.headers.get("set-cookie", "")
         if "t=" in set_cookie:
-            m = re.search(r"t=([^;]+)", set_cookie)
+            m = re.search(r"(?:^|;\s*)t=([^;]+)", set_cookie)
             if m and m.group(1):
                 exchangeable_token = m.group(1)
 
@@ -752,6 +758,8 @@ class HyundaiCciApiEU(ApiImpl):
             return self._gspa_get(
                 token, vehicle, "status/vehicles/{carId}/stored-status"
             )
+        except AuthenticationError:
+            raise
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
@@ -1026,14 +1034,20 @@ class HyundaiCciApiEU(ApiImpl):
             get_child_value(state, "Drivetrain.Odometer"),
             DISTANCE_UNITS[1],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "Electronics.Battery.Level"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "Electronics.Battery.Level")
         )
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         air_temp = get_child_value(state, "Cabin.HVAC.Row1.Driver.Temperature.Value")
         if air_temp != "OFF":
-            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+            air_temp_unit = get_child_value(
+                state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
+            )
+            vehicle.air_temperature = (
+                air_temp,
+                TEMPERATURE_UNITS.get(air_temp_unit, TEMPERATURE_UNITS[0]),
+            )
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
@@ -1236,7 +1250,7 @@ class HyundaiCciApiEU(ApiImpl):
         vehicle.remote_ignition = get_child_value(
             state, "Drivetrain.RemoteIgnition.State"
         )
-        vehicle.sleep_mode_check = bool(
+        vehicle.sleep_mode_check = bool_or_none(
             get_child_value(state, "RemoteControl.SleepMode")
         )
 
@@ -1253,9 +1267,6 @@ class HyundaiCciApiEU(ApiImpl):
             state, "Green.BatteryManagement.SoH.Ratio"
         )
         vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
@@ -1264,10 +1275,12 @@ class HyundaiCciApiEU(ApiImpl):
         elif charging_door_state == 1:
             vehicle.ev_charge_port_door_is_open = True
 
-        vehicle.total_driving_range = (
-            float(get_child_value(state, "Drivetrain.FuelSystem.DTE.Total")),
-            DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
-        )
+        dte_total = get_child_value(state, "Drivetrain.FuelSystem.DTE.Total")
+        if dte_total is not None:
+            vehicle.total_driving_range = (
+                float(dte_total),
+                DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+            )
         fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
         if fuel_dte is not None:
             vehicle.fuel_driving_range = (
@@ -1321,28 +1334,38 @@ class HyundaiCciApiEU(ApiImpl):
             get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Quick"),
             DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
         )
-        vehicle.ev_first_departure_enabled = bool(
-            get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")
+        departure1_enable = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Enable"
         )
-        vehicle.ev_second_departure_enabled = bool(
-            get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
+        if departure1_enable is not None:
+            vehicle.ev_first_departure_enabled = bool(departure1_enable)
+        departure2_enable = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Enable"
         )
+        if departure2_enable is not None:
+            vehicle.ev_second_departure_enabled = bool(departure2_enable)
 
         departure1_hvac_temp = get_child_value(
             state, "Green.Reservation.Departure.Schedule1.HVAC.Temperature.Value"
         )
         if departure1_hvac_temp is not None:
+            departure1_unit = get_child_value(
+                state, "Green.Reservation.Departure.Schedule1.HVAC.Temperature.Unit"
+            )
             vehicle.ev_first_departure_climate_temperature = (
                 float(departure1_hvac_temp),
-                TEMPERATURE_UNITS[1],
+                TEMPERATURE_UNITS.get(departure1_unit, TEMPERATURE_UNITS[0]),
             )
         departure2_hvac_temp = get_child_value(
             state, "Green.Reservation.Departure.Schedule2.HVAC.Temperature.Value"
         )
         if departure2_hvac_temp is not None:
+            departure2_unit = get_child_value(
+                state, "Green.Reservation.Departure.Schedule2.HVAC.Temperature.Unit"
+            )
             vehicle.ev_second_departure_climate_temperature = (
                 float(departure2_hvac_temp),
-                TEMPERATURE_UNITS[1],
+                TEMPERATURE_UNITS.get(departure2_unit, TEMPERATURE_UNITS[0]),
             )
 
         schedule1_time = get_child_value(
