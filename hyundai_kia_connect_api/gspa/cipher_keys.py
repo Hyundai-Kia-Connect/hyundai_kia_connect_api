@@ -1,12 +1,4 @@
-"""14-round GSPA whitebox cipher REIMPLEMENTED from recovered affine params.
-
-NO ttables.py import. Loads cipher_params.json (recovered per-sub affine params:
-S-box stages M1/a/M2/t2/Lcols/c; linear stages lcols/lconst) and reproduces the
-cipher using the public round wiring (ShiftRows + column XOR, from the public round wiring)
-with each table lookup replaced by its param-computed value.
-
-Bit-identical to the original cipher on all known test vectors.
-"""
+"""GSPA X-Stamp cipher — pure-Python reimplementation from recovered params."""
 
 import base64
 import datetime as dt
@@ -209,9 +201,7 @@ def encrypt_block(plaintext_16: bytes) -> bytes:
 def encrypt_cfb(
     iv: bytes, plaintext: bytes, region: int = 1, is_production: bool = True
 ) -> bytes:
-    """CFB-128 encrypt (X-Stamp compatible). region/is_production accepted for
-    API parity; only EU-cipher regions + production supported (US/CA/staging
-    raise NotImplementedError rather than silently producing a wrong X-Stamp)."""
+    """CFB-128 encrypt for X-Stamp computation."""
     if region in (4, 5):
         raise NotImplementedError("US/CA tables not extracted — EU-cipher regions only")
     if region not in _EU_CIPHER_REGION_IVS:

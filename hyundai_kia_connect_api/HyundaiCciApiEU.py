@@ -328,12 +328,7 @@ class HyundaiCciApiEU(ApiImpl):
         exchangeable_token: str | None = None,
         content_type: str | None = None,
     ) -> dict:
-        """Headers for the CCI API (cci-api-eu.hyundai.com).
-
-        - Authentication: raw nonCcsToken (no Bearer prefix)
-        - authorization: "Bearer " + CCI accessToken
-        - exchangeable-token / non-ccs-token (kebab-case)
-        """
+        """Headers for the CCI API."""
         headers = {
             "client-id": self._cci_package_id,
             "client-name": self._cci_client_name,
