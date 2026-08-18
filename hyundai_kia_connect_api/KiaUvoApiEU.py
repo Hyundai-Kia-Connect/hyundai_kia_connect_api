@@ -872,6 +872,9 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
         )
+        vehicle.ev_battery_soh_percentage = get_child_value(
+            state, "vehicleStatus.evStatus.batterySoh"
+        )
         vehicle.ev_battery_is_charging = get_child_value(
             state, "vehicleStatus.evStatus.batteryCharge"
         )
