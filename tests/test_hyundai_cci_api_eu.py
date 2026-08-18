@@ -445,13 +445,14 @@ def test_refresh_cci_token_uses_v1_endpoint():
 
 
 def test_get_stamp_returns_valid_stamp():
-    """_get_stamp returns a non-None base64 stamp for EU region."""
+    """_get_stamp returns (stamp, tsid) — both non-None for EU region."""
     api = _make_hyundai_api()
     token = _make_token()
-    stamp = api._get_stamp(token)
+    stamp, tsid = api._get_stamp(token)
     assert stamp is not None
     assert isinstance(stamp, str)
-    # Should be valid base64
+    assert tsid is not None
+    assert isinstance(tsid, str)
     import base64
 
     base64.b64decode(stamp + "==")  # should not raise
@@ -463,7 +464,7 @@ def test_get_stamp_uses_ccs_user_id():
     token = _make_token(ccs_user_id="my-test-uid")
     # compute_x_stamp is imported inside _get_stamp from .gspa, so we patch
     # it at the source module rather than at HyundaiCciApiEU level.
-    stamp = api._get_stamp(token)
+    stamp, _tsid = api._get_stamp(token)
     assert stamp is not None
 
 

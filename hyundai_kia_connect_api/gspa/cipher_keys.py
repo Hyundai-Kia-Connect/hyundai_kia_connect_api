@@ -10,7 +10,7 @@ import time
 SR_POSITIONS = [0, 5, 10, 15, 4, 9, 14, 3, 8, 13, 2, 7, 12, 1, 6, 11]
 TSID_EPOCH_MS = int(dt.datetime(2020, 1, 1, tzinfo=dt.UTC).timestamp() * 1000)
 
-# Region IVs (public 16-byte ASCII strings, NOT key material — no ttables import).
+# Region IVs (public 16-byte ASCII strings).
 IVS = {
     1: b"iv.ccsp.stamp.eu",  # EU
     2: b"iv.ccsp.stamp.sa",  # KR -> SA IV

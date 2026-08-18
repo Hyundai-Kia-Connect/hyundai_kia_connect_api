@@ -496,44 +496,6 @@ class HyundaiCciApiEU(ApiImpl):
             return None
 
     # ------------------------------------------------------------------
-    # GSPA X-Stamp computation
-    # ------------------------------------------------------------------
-
-    def _get_stamp(self, token: Token) -> str | None:
-        """Compute GSPA X-Stamp header value.
-
-        X-Stamp = base64(encrypt_cfb(iv_for_region, payload))
-        payload = "{tsid}:{epoch_seconds}:{user_id}"
-
-        Region 1 (EU) uses IVS[1]. user_id is the uid claim from the
-        CCS token JWT (token.ccs_user_id).
-
-        Returns None if the gspa cipher is not available.
-        """
-        try:
-            from .gspa import compute_x_stamp, create_tsid
-
-            device_id = (token.device_id or "").replace("-", "")
-            tsid = create_tsid(device_id)
-            epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
-            user_id = token.ccs_user_id or ""
-            stamp = compute_x_stamp(
-                region=self.region,
-                
-                tsid=tsid,
-                epoch_seconds=epoch_seconds,
-                user_id=user_id,
-            )
-            return stamp
-        except NotImplementedError:
-            # Unsupported region — fail loud
-            # produce a wrong X-Stamp.
-            raise
-        except Exception as e:
-            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation error: {e}")
-            return None
-
-    # ------------------------------------------------------------------
     # Token refresh
     # ------------------------------------------------------------------
 
@@ -654,19 +616,44 @@ class HyundaiCciApiEU(ApiImpl):
             return False
 
     # ------------------------------------------------------------------
-    # GSPA authenticated headers + X-Stamp
+    # GSPA X-Stamp computation
+    # ------------------------------------------------------------------
+
+    def _get_stamp(self, token: Token) -> tuple[str | None, str | None]:
+        """Compute GSPA X-Stamp + tsid for GSPA endpoint authentication.
+
+        Returns (stamp, tsid) — both must be sent as X-Stamp + X-Request-Id
+        headers. The server validates the stamp against the tsid.
+
+        Returns (None, None) if computation fails.
+        """
+        try:
+            from .gspa import compute_x_stamp, create_tsid
+
+            device_id = (token.device_id or "").replace("-", "")
+            tsid = create_tsid(device_id)
+            epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
+            user_id = token.ccs_user_id or ""
+            stamp = compute_x_stamp(
+                region=self.region,
+                tsid=tsid,
+                epoch_seconds=epoch_seconds,
+                user_id=user_id,
+            )
+            return stamp, tsid
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation error: {e}")
+            return None, None
+
+    # ------------------------------------------------------------------
+    # GSPA authenticated headers
     # ------------------------------------------------------------------
 
     def _get_authenticated_headers(self, token: Token, ccs2_support: int = 0) -> dict:
-        """Headers for GSPA REST endpoints (gspa-ccs-eu.hyundai.com).
-
-        Uses the CCS token (stored as token.access_token with 'Bearer ' prefix)
-        as the Authorization bearer credential, plus the GSPA X-Stamp header
-        computed from the device_id and ccs_user_id. The X-Request-Id (tsid)
-        must be sent alongside X-Stamp — the server validates the stamp against it.
-        """
+        """Headers for GSPA REST endpoints (gspa-ccs-eu.hyundai.com)."""
         ccs_token = (token.access_token or "").removeprefix("Bearer ")
-        device_id = (token.device_id or "").replace("-", "")
         headers = {
             "Authorization": f"Bearer {ccs_token}",
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -683,41 +670,11 @@ class HyundaiCciApiEU(ApiImpl):
             "Content-Type": "application/json",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-        # Compute X-Stamp + X-Request-Id (tsid) together — the server
-        # validates the stamp against the tsid in X-Request-Id.
-        try:
-            from .gspa import compute_x_stamp, create_tsid
-
-            tsid = create_tsid(device_id)
-            epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
-            user_id = token.ccs_user_id or ""
-            stamp = compute_x_stamp(
-                region=self.region,
-                
-                tsid=tsid,
-                epoch_seconds=epoch_seconds,
-                user_id=user_id,
-            )
-            if stamp:
-                headers["X-Stamp"] = stamp
-                headers["X-Request-Id"] = tsid
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation failed")
+        stamp, tsid = self._get_stamp(token)
+        if stamp and tsid:
+            headers["X-Stamp"] = stamp
+            headers["X-Request-Id"] = tsid
         return headers
-
-    def _compute_x_stamp(self, token: Token) -> str:
-        """Compute GSPA X-Stamp header value.
-
-        Delegates to _get_stamp (function-based gspa cipher). Returns the
-        stamp string, or None if computation fails.
-        """
-        try:
-            return self._get_stamp(token)
-        except NotImplementedError:
-            raise
-        except Exception as e:
-            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation error: {e}")
-            return None
 
     def _ensure_ccs_token(self, token: Token) -> None:
         """Ensure the CCS token is still valid for GSPA requests.
