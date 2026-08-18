@@ -124,8 +124,6 @@ def test_module_encrypt_cfb_us_ca_not_implemented():
         cipher_keys.encrypt_cfb(b"iv.ccsp.stamp.us", b"x" * 16, region=4)
 
 
-
-
 def test_encrypt_block_rejects_wrong_size():
     """encrypt_block must reject non-16-byte inputs."""
     cipher = GspaCipher()

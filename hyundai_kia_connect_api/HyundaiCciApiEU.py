@@ -84,9 +84,7 @@ class HyundaiCciApiEU(ApiImpl):
     data_timezone = dt.UTC
     supports_valet_mode = True
 
-    def __init__(
-        self, region: int, brand: int, language: str
-    ) -> None:
+    def __init__(self, region: int, brand: int, language: str) -> None:
         language = language.lower()
         if len(language) > 2:
             language = language[0:2]
@@ -213,7 +211,9 @@ class HyundaiCciApiEU(ApiImpl):
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
         if not jwk.get("n") or not jwk.get("e"):
-            raise AuthenticationError("API error: certs response missing RSA key material")
+            raise AuthenticationError(
+                "API error: certs response missing RSA key material"
+            )
         n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
         e_bytes = base64.urlsafe_b64decode(jwk["e"] + "==")
         key = RSA.construct(
@@ -1297,7 +1297,9 @@ class HyundaiCciApiEU(ApiImpl):
         if dte_total is not None:
             vehicle.total_driving_range = (
                 float(dte_total),
-                DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+                DISTANCE_UNITS[
+                    get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
+                ],
             )
         fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
         if fuel_dte is not None:

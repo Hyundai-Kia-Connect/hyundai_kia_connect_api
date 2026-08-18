@@ -195,9 +195,7 @@ def encrypt_block(plaintext_16: bytes) -> bytes:
     return _get_cipher().encrypt_block(plaintext_16)
 
 
-def encrypt_cfb(
-    iv: bytes, plaintext: bytes, region: int = 1
-) -> bytes:
+def encrypt_cfb(iv: bytes, plaintext: bytes, region: int = 1) -> bytes:
     """CFB-128 encrypt for X-Stamp computation."""
     if region in (4, 5):
         raise NotImplementedError("US/CA not supported — EU-cipher regions only")
@@ -212,6 +210,4 @@ def compute_x_stamp(
     epoch_seconds: int | None = None,
     user_id: str = "",
 ) -> str:
-    return _get_cipher().compute_x_stamp(
-        region, tsid, epoch_seconds, user_id
-    )
+    return _get_cipher().compute_x_stamp(region, tsid, epoch_seconds, user_id)

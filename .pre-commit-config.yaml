@@ -18,7 +18,7 @@ repos:
                 - --skip="./.*,*.csv,*.json,*.ambr"
                 - --quiet-level=2
             exclude_types: [csv, json]
-            exclude: 'cipher_params.json'
+            exclude: "cipher_params.json"
     - repo: https://github.com/pre-commit/pre-commit-hooks
       rev: v6.0.0
       hooks:
