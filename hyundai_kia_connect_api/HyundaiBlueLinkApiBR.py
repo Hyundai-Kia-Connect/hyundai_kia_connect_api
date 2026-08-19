@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from requests import Response
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions, WindowRequestOptions
-from .ApiImplType1 import ApiImplType1
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
@@ -150,6 +150,43 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             f"(keys={sorted(data.keys())})"
         )
 
+    def _raise_api_error(self, response: Response, context: str) -> None:
+        """Surface a readable API error for non-2xx BR SPA responses.
+
+        Counterpart of ``_raise_auth_error`` for non-auth endpoints (vehicles,
+        cached status): reads the body and raises ``APIError`` — or a typed
+        subclass via the SPA-envelope classifier — instead of a raw
+        ``HTTPError``, so the config flow / logs show *why* the server rejected
+        the request (kia_uvo #1846 / #1395: ``/spa/vehicles`` returned a bare
+        ``400 Bad Request`` with the body discarded). No-op for status < 400.
+        """
+        if response.status_code < 400:
+            return
+        try:
+            data = response.json()
+        except ValueError:
+            snippet = (response.text or "")[:200]
+            raise APIError(
+                f"Brazilian Hyundai {context} failed: HTTP {response.status_code}. "
+                f"Response not JSON: {snippet!r}"
+            ) from None
+        # SPA envelope (retCode/resCode/resMsg) → reuse the typed classifier
+        # (DeviceIDError, DuplicateRequestError, ServiceTemporaryUnavailable, …)
+        # so callers keep the existing retry / re-auth semantics.
+        if any(k in data for k in ("retCode", "resCode", "resMsg")):
+            _check_response_for_errors(data)
+        err_code = data.get("errCode") or data.get("errorCode")
+        err_msg = data.get("errMsg") or data.get("errorMessage")
+        if err_code or err_msg:
+            raise APIError(
+                f"Brazilian Hyundai {context} failed: "
+                f"errCode={err_code!r}, errMsg={err_msg!r}"
+            )
+        raise APIError(
+            f"Brazilian Hyundai {context} failed: HTTP {response.status_code} "
+            f"(keys={sorted(data.keys())})"
+        )
+
     def _get_cookies(self) -> dict:
         """Request cookies from the API for authentication."""
         params = {
@@ -272,7 +309,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         headers = self._get_authenticated_headers(token)
 
         response = self.session.get(url, headers=headers)
-        response.raise_for_status()
+        self._raise_api_error(response, "get vehicles")
         response_data = response.json()
         _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
         if "resMsg" not in response_data or "vehicles" not in response_data.get(
@@ -319,7 +356,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest")
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers)
-        response.raise_for_status()
+        self._raise_api_error(response, "cached status")
         return response.json()["resMsg"]["state"]["Vehicle"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:

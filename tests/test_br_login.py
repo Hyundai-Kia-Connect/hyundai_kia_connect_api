@@ -16,7 +16,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from hyundai_kia_connect_api.const import BRAND_HYUNDAI, BRANDS, REGION_BRAZIL, REGIONS
-from hyundai_kia_connect_api.exceptions import AuthenticationError
+from hyundai_kia_connect_api.exceptions import (
+    APIError,
+    AuthenticationError,
+    DeviceIDError,
+)
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 
 _BR_REGION = next(k for k, v in REGIONS.items() if v == REGION_BRAZIL)
@@ -125,3 +129,97 @@ class TestGetAuthResponse:
         )
         with pytest.raises(AuthenticationError, match="token request"):
             br_api._get_auth_response("some-auth-code")
+
+
+class TestRaiseApiError:
+    """Unit-test the SPA-endpoint helper directly (counterpart of auth helper)."""
+
+    def test_no_op_on_success(self, br_api):
+        br_api._raise_api_error(
+            _resp(200, {"resMsg": {"vehicles": []}}), "get vehicles"
+        )
+
+    def test_400_errcode_errmsg_raises_api_error(self, br_api):
+        with pytest.raises(APIError, match="errCode=4004"):
+            br_api._raise_api_error(
+                _resp(400, {"errCode": 4004, "errMsg": "Duplicate request"}),
+                "get vehicles",
+            )
+
+    def test_400_spa_envelope_reuses_typed_classifier(self, br_api):
+        # SPA envelope with retCode F + resCode 4002 → DeviceIDError, not a
+        # generic APIError, so the device-id retry semantics stay intact.
+        with pytest.raises(DeviceIDError):
+            br_api._raise_api_error(
+                _resp(
+                    400, {"retCode": "F", "resCode": "4002", "resMsg": "bad deviceId"}
+                ),
+                "get vehicles",
+            )
+
+    def test_400_non_json_falls_back_to_snippet(self, br_api):
+        with pytest.raises(APIError, match="Response not JSON"):
+            br_api._raise_api_error(
+                _resp(400, None, text="<html>Bad Request</html>"), "get vehicles"
+            )
+
+    def test_400_unknown_shape_lists_keys_only(self, br_api):
+        with pytest.raises(APIError, match="keys="):
+            br_api._raise_api_error(_resp(400, {"foo": "bar"}), "cached status")
+
+    def test_403_raises_api_error_not_authentication_error(self, br_api):
+        # A vehicles-endpoint 403 is an API error, not an auth error: the token
+        # was accepted at login; this must not be misclassified as auth failure.
+        with pytest.raises(APIError):
+            br_api._raise_api_error(
+                _resp(403, {"errCode": 4031, "errMsg": "Forbidden"}), "get vehicles"
+            )
+
+
+class TestGetVehicles:
+    """The vehicles call-site: 4xx must surface the body, not a raw HTTPError.
+
+    Regression for kia_uvo #1846 / #1395: ``GET /spa/vehicles`` returned a bare
+    ``400 Bad Request`` (body discarded by ``raise_for_status``).
+    """
+
+    def test_400_errcode_raises_api_error_not_httperror(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(
+            400, {"errCode": 4009, "errMsg": "No vehicles enrolled"}
+        )
+        token = MagicMock()
+        with pytest.raises(APIError, match="get vehicles"):
+            br_api.get_vehicles(token)
+
+    def test_400_non_json_raises_api_error_with_snippet(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(400, None, text="<html>error</html>")
+        token = MagicMock()
+        with pytest.raises(APIError, match="Response not JSON"):
+            br_api.get_vehicles(token)
+
+    def test_200_vehicles_returned(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(
+            200,
+            {
+                "resMsg": {
+                    "vehicles": [
+                        {
+                            "vehicleId": "v1",
+                            "nickname": "My Car",
+                            "vehicleName": "Creta",
+                            "regDate": "20240101",
+                            "vin": "VIN123",
+                            "type": "GN",
+                            "ccuCCS2ProtocolSupport": 0,
+                        }
+                    ]
+                }
+            },
+        )
+        token = MagicMock()
+        vehicles = br_api.get_vehicles(token)
+        assert len(vehicles) == 1
+        assert vehicles[0].id == "v1"
