@@ -44,6 +44,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -130,6 +131,7 @@ class VehicleManager:
         for vehicle in vehicles:
             vehicle.supports_window_control = self.api.supports_window_control
             vehicle.supports_valet_mode = self.api.supports_valet_mode
+            vehicle.supports_svm = self.api.supports_svm
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -190,6 +192,26 @@ class VehicleManager:
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
+
+    def get_svm_details(self, vehicle_id: str) -> SVMDetails:
+        """Return the latest cached SVM composite image and metadata.
+
+        Delegates to the region-specific API implementation. Raises
+        NotImplementedError on regions without SVM support.
+        """
+        return self.api.get_svm_details(self.token, self.get_vehicle(vehicle_id))
+
+    def request_svm_capture(
+        self, vehicle_id: str, acknowledged_warning: bool
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image.
+
+        ``acknowledged_warning`` must be True; the caller must explicitly
+        acknowledge the safety warning before triggering a capture.
+        """
+        return self.api.request_svm_capture(
+            self.token, self.get_vehicle(vehicle_id), acknowledged_warning
+        )
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
