@@ -1,5 +1,5 @@
 """Tests for HyundaiCciApiEU._login_with_password(), login() flow, refresh_access_token(),
-_get_stamp(), and _fetch_ccs_user_id()."""
+_get_stamp(), and _fetch_user_id()."""
 
 import datetime as dt
 from contextlib import ExitStack
@@ -303,8 +303,8 @@ def test_hyundai_constants_set_correctly():
 # ── login() flow routing ────────────────────────
 
 
-def test_login_calls_register_device_and_fetch_ccs_user_id():
-    """login() calls _register_device and _fetch_ccs_user_id after password login."""
+def test_login_calls_register_device_and_fetch_user_id():
+    """login() calls _register_device and _fetch_user_id after password login."""
     api = _make_hyundai_api()
     login_info = {
         "access_token": "Bearer ccs-token",
@@ -321,7 +321,7 @@ def test_login_calls_register_device_and_fetch_ccs_user_id():
     with (
         patch.object(api, "_login_with_password", return_value=login_info),
         patch.object(api, "_register_device") as mock_reg,
-        patch.object(api, "_fetch_ccs_user_id") as mock_fetch_uid,
+        patch.object(api, "_fetch_user_id") as mock_fetch_uid,
     ):
         token = api.login("user@test.com", "MyPassword123!", pin="1234")
 
@@ -355,7 +355,7 @@ def _make_token(**overrides) -> Token:
         "non_ccs_token": "old-nonccs",
         "non_ccs_refresh_token": "old-nonccs-rt",
         "id_token": "old-id-tok",
-        "ccs_user_id": "test-uid-123",
+        "user_id": "test-uid-123",
     }
     defaults.update(overrides)
     return Token(**defaults)
@@ -458,21 +458,21 @@ def test_get_stamp_returns_valid_stamp():
     base64.b64decode(stamp + "==")  # should not raise
 
 
-def test_get_stamp_uses_ccs_user_id():
-    """_get_stamp uses token.ccs_user_id as the user_id in the X-Stamp payload."""
+def test_get_stamp_uses_user_id():
+    """_get_stamp uses token.user_id as the user_id in the X-Stamp payload."""
     api = _make_hyundai_api()
-    token = _make_token(ccs_user_id="my-test-uid")
+    token = _make_token(user_id="my-test-uid")
     # compute_x_stamp is imported inside _get_stamp from .gspa, so we patch
     # it at the source module rather than at HyundaiCciApiEU level.
     stamp, _tsid = api._get_stamp(token)
     assert stamp is not None
 
 
-# ── _fetch_ccs_user_id() JWT extraction ────────────────────
+# ── _fetch_user_id() JWT extraction ────────────────────
 
 
-def test_fetch_ccs_user_id_from_ccs_token_jwt():
-    """_fetch_ccs_user_id extracts uid from CCS token JWT."""
+def test_fetch_user_id_from_ccs_token_jwt():
+    """_fetch_user_id extracts uid from CCS token JWT."""
     api = _make_hyundai_api()
     # Create a fake JWT with uid claim in payload
     import base64
@@ -485,13 +485,13 @@ def test_fetch_ccs_user_id_from_ccs_token_jwt():
     )
     fake_jwt = f"{header}.{payload}.signature"
 
-    token = _make_token(access_token="Bearer " + fake_jwt, ccs_user_id=None)
-    api._fetch_ccs_user_id(token)
+    token = _make_token(access_token="Bearer " + fake_jwt, user_id=None)
+    api._fetch_user_id(token)
 
-    assert token.ccs_user_id == "test-uid-456"
+    assert token.user_id == "test-uid-456"
 
 
-def test_fetch_ccs_user_id_fallback_to_id_token_sub():
+def test_fetch_user_id_fallback_to_id_token_sub():
     """When CCS token has no uid, fall back to id_token's sub claim."""
     api = _make_hyundai_api()
     import base64
@@ -509,19 +509,19 @@ def test_fetch_ccs_user_id_fallback_to_id_token_sub():
     token = _make_token(
         access_token="Bearer " + ccs_jwt,
         id_token=id_jwt,
-        ccs_user_id=None,
+        user_id=None,
     )
-    api._fetch_ccs_user_id(token)
+    api._fetch_user_id(token)
 
-    assert token.ccs_user_id == "id-sub-789"
+    assert token.user_id == "id-sub-789"
 
 
-def test_fetch_ccs_user_id_preserves_existing():
-    """When ccs_user_id is already set, _fetch_ccs_user_id does not overwrite."""
+def test_fetch_user_id_preserves_existing():
+    """When user_id is already set, _fetch_user_id does not overwrite."""
     api = _make_hyundai_api()
-    token = _make_token(ccs_user_id="existing-uid")
-    api._fetch_ccs_user_id(token)
-    assert token.ccs_user_id == "existing-uid"
+    token = _make_token(user_id="existing-uid")
+    api._fetch_user_id(token)
+    assert token.user_id == "existing-uid"
 
 
 # ── test_token() ────────────────────────

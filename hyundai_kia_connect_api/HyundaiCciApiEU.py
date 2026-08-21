@@ -97,13 +97,12 @@ class HyundaiCciApiEU(ApiImpl):
         self.brand: int = brand
 
         if BRANDS[self.brand] == BRAND_HYUNDAI:
-            # Confirmed production endpoints.
             self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
             self.ONEAPP_REDIRECT_URI: str = "https://oneapp.hyundai.com/redirect"
             self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
             self.LOGIN_FORM_HOST: str = "https://idpconnect-eu.hyundai.com"
             self._cci_package_id: str = "com.hyundai.oneapp.eu"
-            self._cci_client_name: str = "hyundai"
+            self._cci_client_name: str = BRANDS[self.brand].lower()
         elif BRANDS[self.brand] == BRAND_KIA:
             raise NotImplementedError(
                 "Kia CCI EU not yet implemented — use KiaUvoApiEU for Kia EU."
@@ -113,7 +112,7 @@ class HyundaiCciApiEU(ApiImpl):
                 "Genesis CCI EU not yet implemented — use KiaUvoApiEU for Genesis EU."
             )
         else:
-            raise APIError(f"Unknown brand {BRANDS[self.brand]} for CCI EU API")
+            raise ValueError(f"Unknown brand {BRANDS[self.brand]} for CCI EU API")
 
         self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
         self.CCSP_API_URL: str = "https://gspa-ccs-eu.hyundai.com"
@@ -123,10 +122,6 @@ class HyundaiCciApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.session = ApiImplSession()
-
-    # ------------------------------------------------------------------
-    # Login
-    # ------------------------------------------------------------------
 
     def login(
         self,
@@ -142,29 +137,29 @@ class HyundaiCciApiEU(ApiImpl):
         """
         device_id = str(uuid.uuid4())
 
-        info = self._login_with_password(username, password, device_id)
+        login_result = self._login_with_password(username, password, device_id)
 
         token = Token(
             username=username,
             password=password,
-            access_token=info["access_token"],
-            refresh_token=info["refresh_token"],
+            access_token=login_result["access_token"],
+            refresh_token=login_result["refresh_token"],
             device_id=device_id,
-            valid_until=info["valid_until"],
+            valid_until=login_result["valid_until"],
             pin=pin,
-            cci_access_token=info.get("cci_access_token"),
-            exchangeable_token=info.get("exchangeable_token"),
-            exchangeable_refresh_token=info.get("exchangeable_refresh_token"),
-            non_ccs_token=info.get("non_ccs_token"),
-            non_ccs_refresh_token=info.get("non_ccs_refresh_token"),
-            id_token=info.get("id_token"),
+            cci_access_token=login_result.get("cci_access_token"),
+            exchangeable_token=login_result.get("exchangeable_token"),
+            exchangeable_refresh_token=login_result.get("exchangeable_refresh_token"),
+            non_ccs_token=login_result.get("non_ccs_token"),
+            non_ccs_refresh_token=login_result.get("non_ccs_refresh_token"),
+            id_token=login_result.get("id_token"),
         )
 
         # Register device on CCI (non-critical — best effort).
         self._register_device(token)
 
         # Extract CCS user-id for GSPA X-Stamp (best effort).
-        self._fetch_ccs_user_id(token)
+        self._fetch_user_id(token)
 
         return token
 
@@ -457,15 +452,15 @@ class HyundaiCciApiEU(ApiImpl):
     # CCS user-id extraction (for GSPA X-Stamp)
     # ------------------------------------------------------------------
 
-    def _fetch_ccs_user_id(self, token: Token) -> None:
-        """Populate token.ccs_user_id for GSPA X-Stamp computation.
+    def _fetch_user_id(self, token: Token) -> None:
+        """Populate token.user_id for GSPA X-Stamp computation.
 
         The X-Stamp payload requires the 'uid' claim from the ccs_token JWT.
         Fallback chain:
         1. Extract 'uid' from ccs_token JWT (primary)
         2. Extract 'sub' from id_token JWT (fallback)
         """
-        if token.ccs_user_id:
+        if token.user_id:
             return
 
         # Primary: uid claim from CCS token JWT
@@ -474,7 +469,7 @@ class HyundaiCciApiEU(ApiImpl):
         if ccs_token:
             uid = self._extract_jwt_claim(ccs_token, "uid")
             if uid:
-                token.ccs_user_id = uid
+                token.user_id = uid
                 _LOGGER.debug(f"{DOMAIN} - CCS user ID from ccs_token.uid: {uid}")
                 return
 
@@ -482,7 +477,7 @@ class HyundaiCciApiEU(ApiImpl):
         if token.id_token:
             sub = self._extract_jwt_claim(token.id_token, "sub")
             if sub:
-                token.ccs_user_id = sub
+                token.user_id = sub
                 _LOGGER.debug(f"{DOMAIN} - CCS user ID from id_token.sub: {sub}")
 
     @staticmethod
@@ -514,9 +509,7 @@ class HyundaiCciApiEU(ApiImpl):
         then re-exchange the CCS token. Falls back to full login if
         the refresh token is missing or the exchange fails.
         """
-        if getattr(token, "cci_access_token", None) or getattr(
-            token, "non_ccs_token", None
-        ):
+        if token.cci_access_token or getattr(token, "non_ccs_token", None):
             try:
                 return self._refresh_cci_token(token)
             except Exception:
@@ -600,7 +593,7 @@ class HyundaiCciApiEU(ApiImpl):
             non_ccs_token=non_ccs_token,
             non_ccs_refresh_token=non_ccs_refresh_token,
             id_token=id_token,
-            ccs_user_id=token.ccs_user_id,
+            user_id=token.user_id,
         )
 
     # ------------------------------------------------------------------
@@ -641,7 +634,7 @@ class HyundaiCciApiEU(ApiImpl):
             device_id = (token.device_id or "").replace("-", "")
             tsid = create_tsid(device_id)
             epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
-            user_id = token.ccs_user_id or ""
+            user_id = token.user_id or ""
             stamp = compute_x_stamp(
                 region=self.region,
                 tsid=tsid,
@@ -652,8 +645,7 @@ class HyundaiCciApiEU(ApiImpl):
         except NotImplementedError:
             raise
         except Exception as e:
-            _LOGGER.debug(f"{DOMAIN} - X-Stamp computation error: {e}")
-            return None, None
+            raise APIError(f"X-Stamp computation failed: {e}") from e
 
     # ------------------------------------------------------------------
     # GSPA authenticated headers
@@ -684,7 +676,7 @@ class HyundaiCciApiEU(ApiImpl):
             headers["X-Request-Id"] = tsid
         return headers
 
-    def _ensure_ccs_token(self, token: Token) -> None:
+    def _validate_ccs_token(self, token: Token) -> None:
         """Ensure the CCS token is still valid for GSPA requests.
 
         The destination Token stores the CCS token as access_token (with
@@ -718,7 +710,7 @@ class HyundaiCciApiEU(ApiImpl):
         Response envelope: {"data": {...}, "metaInfo": {"retCode": "S", "resCode": "200-000"}}
         Returns the data (domain payload) dict, or None on business errors.
         """
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         car_id = vehicle.id
         url = self.CCSP_API_URL + f"/gspa/v1/{endpoint.format(carId=car_id)}"
         headers = self._get_authenticated_headers(
@@ -759,7 +751,7 @@ class HyundaiCciApiEU(ApiImpl):
         The response contains vehicle state in CCS2 nested format
         (Green.BatteryManagement.*, Cabin.HVAC.*, etc.).
         """
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         try:
             return self._gspa_get(
                 token, vehicle, "status/vehicles/{carId}/stored-status"
@@ -862,7 +854,7 @@ class HyundaiCciApiEU(ApiImpl):
         Prewakeup is best-effort (car may be offline). The status read
         returns the last cached state regardless.
         """
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         try:
             self.prewakeup(token, vehicle)
         except Exception:
@@ -873,7 +865,7 @@ class HyundaiCciApiEU(ApiImpl):
         """Send a prewakeup command to bring the vehicle online."""
         car_id = vehicle.id
         url = self.CCSP_API_URL + f"/gspa/v1/remote/vehicles/{car_id}/prewakeup"
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support or 0
         )
@@ -903,7 +895,7 @@ class HyundaiCciApiEU(ApiImpl):
 
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict | None:
         """Fetch driving info from GSPA driving-info endpoint."""
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         try:
             return self._gspa_get(token, vehicle, "driving-info/vehicles/{carId}")
         except Exception:
@@ -930,7 +922,7 @@ class HyundaiCciApiEU(ApiImpl):
 
     def _get_driving_history(self, token: Token, vehicle: Vehicle) -> dict | None:
         """Fetch 30-day driving history from GSPA driving-history endpoint."""
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         try:
             return self._gspa_get(token, vehicle, "driving-history/vehicles/{carId}")
         except Exception:
@@ -939,6 +931,8 @@ class HyundaiCciApiEU(ApiImpl):
 
     def _update_vehicle_driving_history(self, vehicle: Vehicle, state: dict) -> None:
         """Parse 30-day driving history into power_consumption_30d and daily_stats."""
+        # Filter for the summary period (drivingPeriod == 0) which contains
+        # total power consumption and calculative odometer.
         driving_info_list = state.get("drivingInfo", [])
         if not driving_info_list:
             return
@@ -993,7 +987,7 @@ class HyundaiCciApiEU(ApiImpl):
 
     def get_breakdowns(self, token: Token, vehicle: Vehicle) -> dict | None:
         """Get vehicle diagnostic trouble codes (DTCs) from GSPA."""
-        self._ensure_ccs_token(token)
+        self._validate_ccs_token(token)
         try:
             return self._gspa_get(
                 token, vehicle, "diagnostics/vehicles/{carId}/breakdowns"
