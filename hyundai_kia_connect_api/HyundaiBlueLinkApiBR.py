@@ -12,7 +12,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from requests import Response
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions, WindowRequestOptions
-from .ApiImplType1 import ApiImplType1
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
@@ -271,16 +271,13 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
 
-        response = self.session.get(url, headers=headers)
-        response.raise_for_status()
-        response_data = response.json()
+        response = self.session.get(url, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
-        if "resMsg" not in response_data or "vehicles" not in response_data.get(
-            "resMsg", {}
-        ):
+        _check_response_for_errors(response)
+        if "resMsg" not in response or "vehicles" not in response.get("resMsg", {}):
             raise APIError("Missing resMsg or vehicles in response")
         result = []
-        for entry in response_data["resMsg"]["vehicles"]:
+        for entry in response["resMsg"]["vehicles"]:
             # Map vehicle type to engine type
             vehicle_type = entry["type"]
             if vehicle_type == "GN":
@@ -318,9 +315,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """
         url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest")
         headers = self._get_authenticated_headers(token)
-        response = self.session.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()["resMsg"]["state"]["Vehicle"]
+        response = self.session.get(url, headers=headers).json()
+        _check_response_for_errors(response)
+        return response["resMsg"]["state"]["Vehicle"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Update with the server-cached CCS2 state (does not wake the car)."""

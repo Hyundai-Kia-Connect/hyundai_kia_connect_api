@@ -27,6 +27,7 @@ _HYUNDAI_BRAND = next(k for k, v in BRANDS.items() if v == BRAND_HYUNDAI)
 
 def _response(json_data):
     resp = MagicMock()
+    resp.status_code = 200
     resp.json.return_value = json_data
     resp.raise_for_status.return_value = None
     return resp

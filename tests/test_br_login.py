@@ -16,7 +16,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from hyundai_kia_connect_api.const import BRAND_HYUNDAI, BRANDS, REGION_BRAZIL, REGIONS
-from hyundai_kia_connect_api.exceptions import AuthenticationError
+from hyundai_kia_connect_api.exceptions import (
+    AuthenticationError,
+    DeviceIDError,
+    InvalidAPIResponseError,
+)
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 
 _BR_REGION = next(k for k, v in REGIONS.items() if v == REGION_BRAZIL)
@@ -125,3 +129,55 @@ class TestGetAuthResponse:
         )
         with pytest.raises(AuthenticationError, match="token request"):
             br_api._get_auth_response("some-auth-code")
+
+
+class TestGetVehicles:
+    """The vehicles call-site: BR now follows the Type1 pattern (``.json()`` +
+    ``_check_response_for_errors``) instead of a bare ``raise_for_status()``,
+    so a SPA-envelope 4xx surfaces a typed error instead of a raw ``HTTPError``.
+
+    Regression for kia_uvo #1846 / #1395: ``GET /spa/vehicles`` returned a bare
+    ``400 Bad Request`` (body discarded by ``raise_for_status``).
+    """
+
+    def test_400_spa_envelope_raises_typed_error_not_httperror(self, br_api):
+        # SPA envelope (retCode F + resCode 4002) → DeviceIDError via the shared
+        # classifier, preserving device-id retry semantics — not a raw HTTPError.
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(
+            400, {"retCode": "F", "resCode": "4002", "resMsg": "Invalid deviceId"}
+        )
+        with pytest.raises(DeviceIDError):
+            br_api.get_vehicles(MagicMock())
+
+    def test_400_unknown_shape_raises_apierror_not_httperror(self, br_api):
+        # A non-SPA JSON body falls through the shared classifier to
+        # InvalidAPIResponseError — still not a raw HTTPError.
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(400, {"errCode": 4009, "errMsg": "x"})
+        with pytest.raises(InvalidAPIResponseError):
+            br_api.get_vehicles(MagicMock())
+
+    def test_200_vehicles_returned(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.get.return_value = _resp(
+            200,
+            {
+                "resMsg": {
+                    "vehicles": [
+                        {
+                            "vehicleId": "v1",
+                            "nickname": "My Car",
+                            "vehicleName": "Creta",
+                            "regDate": "20240101",
+                            "vin": "VIN123",
+                            "type": "GN",
+                            "ccuCCS2ProtocolSupport": 0,
+                        }
+                    ]
+                }
+            },
+        )
+        vehicles = br_api.get_vehicles(MagicMock())
+        assert len(vehicles) == 1
+        assert vehicles[0].id == "v1"
