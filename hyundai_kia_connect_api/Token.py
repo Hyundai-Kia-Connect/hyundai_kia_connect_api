@@ -33,6 +33,8 @@ class Token:
     non_ccs_token: str | None = None
     non_ccs_refresh_token: str | None = None
     id_token: str | None = None
+    # User ID for GSPA X-Stamp (uid claim from CCS JWT).
+    user_id: str | None = None
 
     def to_dict(self) -> dict:
         """Convert Token to a JSON‑serializable dict."""
@@ -68,4 +70,5 @@ class Token:
             non_ccs_token=data.get("non_ccs_token"),
             non_ccs_refresh_token=data.get("non_ccs_refresh_token"),
             id_token=data.get("id_token"),
+            user_id=data.get("user_id"),
         )

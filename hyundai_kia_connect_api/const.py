@@ -24,6 +24,7 @@ REGION_AUSTRALIA = "Australia"
 REGION_NZ = "New Zealand"
 REGION_INDIA = "India"
 REGION_BRAZIL = "Brazil"
+REGION_EUROPE_CCI = "Europe (CCI/GSPA)"
 
 REGIONS = {
     1: REGION_EUROPE,
@@ -34,6 +35,7 @@ REGIONS = {
     6: REGION_INDIA,
     7: REGION_NZ,
     8: REGION_BRAZIL,
+    9: REGION_EUROPE_CCI,
 }
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
