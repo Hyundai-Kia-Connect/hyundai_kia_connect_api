@@ -4,7 +4,9 @@
 
 import datetime as dt
 import logging
+import time
 import typing as ty
+import uuid
 from datetime import timedelta
 from time import sleep
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -73,9 +75,10 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self.base_url = "br-ccapi.hyundai.com.br"
         self.api_url = f"https://{self.base_url}/api/v1/"
         self.api_v2_url = f"https://{self.base_url}/api/v2/"
-        self.ccsp_device_id = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
+        self.ccsp_device_id: str | None = None
+        self._registration_uuid = str(uuid.uuid4())
         self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
-        self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
+        self.ccsp_application_id = "213a491a-0d7c-4d6a-ac03-a2df127d73b0"
         self.basic_authorization_header = (
             "Basic MDNmN2RmOWItNzYyNi00ODUzLWI3YmQtYWQxZThkNzIyYmQ1On"
             "lRejJiYzZDbjhPb3ZWT1I3UkRXd3hUcVZ3V0czeUtCWUZEZzBIc09Yc3l4eVBsSA=="
@@ -102,6 +105,74 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     def _build_api_v2_url(self, path: str) -> str:
         """Build API v2 URL from path."""
         return urljoin(self.api_v2_url, path.lstrip("/"))
+
+    def _get_device_id(self, stamp: str | None = None) -> str:
+        """Register and cache a Brazilian Bluelink device identifier.
+
+        The Android application registers a local UUID with the notification
+        endpoint before authenticating. The returned ``deviceId`` is required
+        by subsequent vehicle reads and control commands. ``stamp`` is accepted
+        for compatibility with the shared device-id retry interface; Brazil
+        does not send a Stamp header for this request.
+        """
+        del stamp
+        if self.ccsp_device_id:
+            return self.ccsp_device_id
+
+        url = self._build_api_url("/spa/notifications/register")
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json; charset=UTF-8",
+            "User-Agent": "okhttp/4.12.0",
+            "ccsp-service-id": self.ccsp_service_id,
+            "ccsp-application-id": self.ccsp_application_id,
+            "offset": "-3",
+        }
+        payload = {
+            "uuid": self._registration_uuid,
+            "pushRegId": f"dummy-push-{int(time.time() * 1000)}",
+            "pushType": "GCM",
+        }
+
+        _LOGGER.debug("%s - Registering Brazilian Bluelink device", DOMAIN)
+        response = self.session.post(url, json=payload, headers=headers)
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise APIError(
+                "Brazilian Hyundai device registration returned invalid JSON."
+            ) from exc
+        if not isinstance(data, dict):
+            raise APIError(
+                "Brazilian Hyundai device registration returned an unexpected JSON response."
+            )
+
+        if response.status_code >= 400:
+            raise APIError(
+                "Brazilian Hyundai device registration failed: "
+                f"HTTP {response.status_code}, retCode={data.get('retCode')!r}, "
+                f"resCode={data.get('resCode')!r}."
+            )
+
+        if data.get("retCode") != "S" or data.get("resCode") != "0000":
+            raise APIError(
+                "Brazilian Hyundai device registration was rejected: "
+                f"retCode={data.get('retCode')!r}, resCode={data.get('resCode')!r}."
+            )
+
+        response_message = data.get("resMsg")
+        device_id = (
+            response_message.get("deviceId")
+            if isinstance(response_message, dict)
+            else None
+        )
+        if not isinstance(device_id, str) or not device_id:
+            raise APIError(
+                "Brazilian Hyundai device registration did not return a deviceId."
+            )
+
+        self.ccsp_device_id = device_id
+        return device_id
 
     def _get_authenticated_headers(self, token: Token) -> dict:
         """Get headers with authentication."""
@@ -249,6 +320,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """Login to Brazilian Hyundai API."""
         _LOGGER.debug(f"{DOMAIN} - Logging in to Brazilian API")
 
+        device_id = self._get_device_id()
         cookies = self._get_cookies()
         authorization_code = self._get_authorization_code(cookies, username, password)
         auth_response = self._get_auth_response(authorization_code)
@@ -262,7 +334,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             valid_until=expires_at,
             username=username,
             password=password,
-            device_id=self.ccsp_device_id,
+            device_id=device_id,
             pin=pin,
         )
 

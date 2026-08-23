@@ -11,12 +11,12 @@ These tests cover ``_raise_auth_error`` across the three BR auth call-sites
 existing HTTP 200 + ``{step:N}`` path (#1239) as a regression guard.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from hyundai_kia_connect_api.const import BRAND_HYUNDAI, BRANDS, REGION_BRAZIL, REGIONS
-from hyundai_kia_connect_api.exceptions import AuthenticationError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 
 _BR_REGION = next(k for k, v in REGIONS.items() if v == REGION_BRAZIL)
@@ -125,3 +125,94 @@ class TestGetAuthResponse:
         )
         with pytest.raises(AuthenticationError, match="token request"):
             br_api._get_auth_response("some-auth-code")
+
+
+class TestDeviceRegistration:
+    def test_registers_device_with_android_contract(self, br_api):
+        br_api.session = MagicMock()
+        br_api._registration_uuid = "local-uuid"
+        br_api.session.post.return_value = _resp(
+            200,
+            {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {"deviceId": "registered-device"},
+            },
+        )
+
+        with patch(
+            "hyundai_kia_connect_api.HyundaiBlueLinkApiBR.time.time",
+            return_value=123.456,
+        ):
+            device_id = br_api._get_device_id()
+
+        assert device_id == "registered-device"
+        assert br_api.ccsp_device_id == "registered-device"
+        url, = br_api.session.post.call_args.args
+        request = br_api.session.post.call_args.kwargs
+        assert url.endswith("/api/v1/spa/notifications/register")
+        assert request["headers"] == {
+            "Accept": "application/json",
+            "Content-Type": "application/json; charset=UTF-8",
+            "User-Agent": "okhttp/4.12.0",
+            "ccsp-service-id": "03f7df9b-7626-4853-b7bd-ad1e8d722bd5",
+            "ccsp-application-id": "213a491a-0d7c-4d6a-ac03-a2df127d73b0",
+            "offset": "-3",
+        }
+        assert request["json"] == {
+            "uuid": "local-uuid",
+            "pushRegId": "dummy-push-123456",
+            "pushType": "GCM",
+        }
+
+    def test_reuses_registered_device_in_same_instance(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(
+            200,
+            {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {"deviceId": "registered-device"},
+            },
+        )
+
+        assert br_api._get_device_id() == "registered-device"
+        assert br_api._get_device_id() == "registered-device"
+        assert br_api.session.post.call_count == 1
+
+    @pytest.mark.parametrize(
+        ("status_code", "data", "message"),
+        [
+            (500, {"retCode": "F", "resCode": "5000"}, "HTTP 500"),
+            (200, {"retCode": "F", "resCode": "4002"}, "was rejected"),
+            (200, {"retCode": "S", "resCode": "0000", "resMsg": {}}, "deviceId"),
+            (200, None, "invalid JSON"),
+            (200, [], "unexpected JSON"),
+        ],
+    )
+    def test_rejects_invalid_registration_responses(
+        self, br_api, status_code, data, message
+    ):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(status_code, data)
+
+        with pytest.raises(APIError, match=message):
+            br_api._get_device_id()
+        assert br_api.ccsp_device_id is None
+
+    def test_login_uses_registered_device_id_in_token(self, br_api):
+        br_api._get_device_id = MagicMock(return_value="registered-device")
+        br_api._get_cookies = MagicMock(return_value={})
+        br_api._get_authorization_code = MagicMock(return_value="authorization-code")
+        br_api._get_auth_response = MagicMock(
+            return_value={
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "expires_in": 3600,
+            }
+        )
+
+        token = br_api.login("user@example.com", "password", pin="1234")
+
+        assert token.device_id == "registered-device"
+        br_api._get_device_id.assert_called_once_with()
