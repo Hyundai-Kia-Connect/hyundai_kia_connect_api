@@ -148,7 +148,7 @@ class TestDeviceRegistration:
 
         assert device_id == "registered-device"
         assert br_api.ccsp_device_id == "registered-device"
-        url, = br_api.session.post.call_args.args
+        (url,) = br_api.session.post.call_args.args
         request = br_api.session.post.call_args.kwargs
         assert url.endswith("/api/v1/spa/notifications/register")
         assert request["headers"] == {
