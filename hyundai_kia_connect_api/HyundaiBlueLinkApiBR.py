@@ -4,6 +4,7 @@
 
 import datetime as dt
 import logging
+import re
 import time
 import typing as ty
 import uuid
@@ -638,8 +639,6 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
 
         # Set defaults
-        if options.set_temp is None:
-            options.set_temp = 21  # 21°C default
         if options.duration is None:
             options.duration = 10  # 10 minutes default
         if options.defrost is None:
@@ -651,10 +650,18 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         if options.front_left_seat is None:
             options.front_left_seat = 0
 
-        # Convert temperature to hex code
-        # BR API uses direct Celsius value converted to hex
-        temp_celsius = int(options.set_temp)
-        temp_code = get_index_into_hex_temp(temp_celsius)
+        # Most BR vehicles use direct Celsius values. Some models expose a
+        # vehicle-specific scale (including LOW/HIGH) instead; callers that
+        # have that confirmed mapping can supply its already-encoded code.
+        if options.temp_code is not None:
+            temp_code = options.temp_code.upper()
+            if re.fullmatch(r"[0-9A-F]{2}H", temp_code) is None:
+                raise ValueError("temp_code must be a two-digit hexadecimal code ending in H")
+        else:
+            if options.set_temp is None:
+                options.set_temp = 21  # 21°C default
+            temp_celsius = int(options.set_temp)
+            temp_code = get_index_into_hex_temp(temp_celsius)
 
         # Map seat heating level (0-5 in ClimateRequestOptions to 0-8 for BR API)
         # 0=off, 1-3=heat levels, 4-5=cool levels (BR uses similar mapping)

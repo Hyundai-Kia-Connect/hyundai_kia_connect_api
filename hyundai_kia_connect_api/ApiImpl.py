@@ -35,6 +35,9 @@ _LOGGER = logging.getLogger(__name__)
 @dataclass
 class ClimateRequestOptions:
     set_temp: float = None
+    # Optional wire-format code for APIs whose temperature scale is not a
+    # direct Celsius value (for example, Brazilian LOW/HIGH endpoints).
+    temp_code: str = None
     duration: int = None
     defrost: bool = None
     climate: bool = None
