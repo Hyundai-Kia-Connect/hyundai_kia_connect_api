@@ -656,7 +656,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         if options.temp_code is not None:
             temp_code = options.temp_code.upper()
             if re.fullmatch(r"[0-9A-F]{2}H", temp_code) is None:
-                raise ValueError("temp_code must be a two-digit hexadecimal code ending in H")
+                raise ValueError(
+                    "temp_code must be a two-digit hexadecimal code ending in H"
+                )
         else:
             if options.set_temp is None:
                 options.set_temp = 21  # 21°C default
