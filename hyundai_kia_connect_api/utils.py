@@ -180,6 +180,15 @@ def get_index_into_hex_temp(value):
 
 
 def parse_datetime(value, timezone) -> datetime.datetime | None:
+    """Parse an API timestamp into an aware datetime.
+
+    The two accepted formats are not equivalent. "Tue, 24 Jun 2025 16:18:10
+    GMT" states its own zone, so it is read as UTC and converted into
+    ``timezone``. The compact "20250624161810" states no zone, so it is only
+    labelled with ``timezone``; no conversion happens. A caller whose compact
+    value is UTC must therefore pass ``datetime.UTC`` and convert itself
+    (see the CCS2 'Date' field, #1147).
+    """
     # Missing timestamp must surface as None (HA renders "unknown") rather than
     # a 2000-01-01 sentinel that renders as "27 years ago". See kia_uvo #1771.
     if value is None:

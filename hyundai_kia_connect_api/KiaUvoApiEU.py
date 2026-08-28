@@ -672,8 +672,13 @@ class KiaUvoApiEU(ApiImplType1):
             self._force_refresh_vehicle_state_ccs2(token, vehicle)
         else:
             state = self._get_forced_vehicle_state(token, vehicle)
-            state["vehicleLocation"] = self._get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
+            state["vehicleLocation"] = location
             self._update_vehicle_properties(vehicle, state)
+            # Must run after _update_vehicle_properties: that method labels
+            # vehicleLocation.time with data_timezone, which is correct for the
+            # cached feed but wrong for the GET /location payload attached above.
+            self._set_location_from_gps_detail(vehicle, location)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
@@ -1293,6 +1298,35 @@ class KiaUvoApiEU(ApiImplType1):
         except Exception as e:
             _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
             return None
+
+    def _set_location_from_gps_detail(
+        self, vehicle: Vehicle, gps_detail: dict | None
+    ) -> None:
+        """Apply the gpsDetail of GET /location, whose time is UTC.
+
+        Two feeds fill vehicle.location from the same compact YYYYMMDDHHMMSS
+        shape but on different clocks: this one is UTC, while the
+        vehicleLocation embedded in the cached status response and
+        GET /location/park are region local. parse_datetime only labels a
+        compact value, so _update_vehicle_properties leaves this feed one UTC
+        offset early. Convert here, as the CCS2 'Date' field does (#1147).
+        """
+        if not gps_detail or not get_child_value(gps_detail, "coord.lat"):
+            return
+        # A missing timestamp must stay None, which HA shows as "unknown".
+        # See kia_uvo #1771.
+        location_last_updated_at = parse_datetime(
+            get_child_value(gps_detail, "time"), dt.UTC
+        )
+        if location_last_updated_at is not None:
+            location_last_updated_at = location_last_updated_at.astimezone(
+                self.data_timezone
+            )
+        vehicle.location = (
+            get_child_value(gps_detail, "coord.lat"),
+            get_child_value(gps_detail, "coord.lon"),
+            location_last_updated_at,
+        )
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"

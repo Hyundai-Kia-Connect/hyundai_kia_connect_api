@@ -157,3 +157,14 @@ def test_parse_datetime_old_iso_format_with_separators():
 def test_parse_datetime_invalid_raises():
     with pytest.raises(ValueError):
         parse_datetime("garbage", datetime.UTC)
+
+
+def test_parse_datetime_compact_labels_while_gmt_converts():
+    """The compact form is only labelled; the GMT form is converted."""
+    tz = ZoneInfo("Europe/Warsaw")
+    assert parse_datetime("20250624161810", tz) == datetime.datetime(
+        2025, 6, 24, 16, 18, 10, tzinfo=tz
+    )
+    assert parse_datetime("Tue, 24 Jun 2025 16:18:10 GMT", tz) == datetime.datetime(
+        2025, 6, 24, 18, 18, 10, tzinfo=tz
+    )
