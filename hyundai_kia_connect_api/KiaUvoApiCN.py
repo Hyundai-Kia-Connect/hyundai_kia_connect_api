@@ -1,18 +1,69 @@
-"""KiaUvoApiCN"""
+"""KiaUvoApiCN -- China Bluelink / UVO API implementation (2026 rewrite).
+
+Reverse-engineered from the China Bluelink iOS App 5.05 (build 103, live app
+build 109) and verified end-to-end against ``prd.cn-ccapi.hyundai.com`` with a
+real account (see case notes: work/bluelink-cn-api/notes/).
+
+Major differences vs the previous KiaUvoApiCN.py implementation (which used a
+stale API surface and never worked against the current servers):
+
+1. LOGIN FLOW (completely replaced)
+   old:   /api/v1/user/oauth2/authorize  ->  /api/v1/user/signin
+          ->  /api/v1/user/oauth2/token (Basic auth code exchange)
+   new:   /api/v1/user/oauth2/authorize  (redirect_uri points at the UARS
+          callback ``uars-{k|h}.hmgmobility.com.cn/join/ccsp/loginCallback.do``
+          and carries a base64url ``state`` blob)
+          -> /api/v1/user/signin  (body now also carries ``mobileNum``)
+          -> GET the returned redirectUrl: the UARS server exchanges the code
+          SERVER-SIDE and returns an HTML page with the full token bundle
+          embedded as a JS template literal (``var x = `{...}```).  The old
+          ``/api/v1/user/oauth2/token`` endpoint is dead for this flow
+          (errCode 4002) and is no longer used.
+
+2. DEVICE REGISTRATION
+   ``pushType`` changed from ``GCM`` to ``APNS`` and ``providerDeviceId`` is
+   now mandatory in the body.  Response shape (resMsg.deviceId) unchanged.
+
+3. TOKENS
+   - access token: JWT RS256, ``Bearer`` prefix, **expiresIn 21600 s (6 h)**
+   - uarsToken: JWT HS256, ~1 year, kept for the UARS-side (PIN reset page,
+     WeChat binding) --stored per-username on the API instance, not on Token
+     (Token dataclass is shared across regions).
+   - refresh: ``POST /api/v1/user/silentsignin`` re-uses the ccapi session
+     cookie to mint a fresh UARS callback code (no password).  Falls back to
+     the full password login when the session cookie has expired.
+
+4. HEADERS
+   Business requests need ``ccsp-device-id`` (else resCode 4002 "deviceId is
+   not exist").  ``Stamp`` is NOT used by China.  APPKEY / ProviderDeviceID /
+   UD-UniqueDeviceIdentifier headers exist in the app but are optional
+   (verified: business calls succeed without them), so they are not sent.
+
+5. BUSINESS API (vehicles / status / control paths) --unchanged from the old
+   implementation and re-verified live: /api/v1/spa/vehicles,
+   .../status/latest, .../location etc. return the same schema, so the old
+   property-mapping helpers are reused as-is.
+
+Everything marked ``# CN-UNVERIFIED`` below rests on static analysis only and
+still needs a live regression pass (see case notes U1-U8).
+"""
 
 # pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,unused-argument,line-too-long,too-many-lines
 
+import base64
 import datetime as dt
+import json
 import logging
 import math
+import re
 import typing as ty
 import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
-from .ApiImpl import ApiImplSession, ClimateRequestOptions
-from .ApiImplType1 import ApiImplType1
+from .ApiImpl import ClimateRequestOptions
+from .ApiImplType1 import ApiImplType1, _check_response_for_errors
 from .const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -30,12 +81,6 @@ from .const import (
 from .exceptions import (
     APIError,
     AuthenticationError,
-    DuplicateRequestError,
-    InvalidAPIResponseError,
-    NoDataFound,
-    RateLimitingError,
-    RequestTimeoutError,
-    ServiceTemporaryUnavailable,
     UnsupportedControlError,
 )
 from .Token import Token
@@ -57,48 +102,74 @@ from .Vehicle import (
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+# Live-app User-Agent format (build 109, 2026-08).  The China app is native
+# iOS/NSURLSession -- the old okhttp/3.12.0 UA never belonged to this region.
+USER_AGENT_BLUELINK_CN: str = "BlueLink/109 CFNetwork/3896.100.1.2.1 Darwin/27.0.0"
+
+# Error handling: reuse ApiImplType1._check_response_for_errors.  Its mapping
+# treats resCode 4002 as DeviceIDError, which triggers the inherited
+# _retry_on_device_id_error decorator to re-register the device and retry
+# once -- exactly the recovery the CN servers need ("deviceId is not exist").
+# Rate limiting (resCode 5091 -> RateLimitingError) is covered by the same
+# inherited mapping.  Note: the CN gateway also sends X-Ratelimit-* headers,
+# but live observation shows they are always 0 even on success, so they carry
+# no actionable signal and are ignored here.
 
 
-def _check_response_for_errors(response: dict) -> None:
+def _extract_uars_login_bundle(html: str) -> dict:
+    """Extract the UARS login token bundle embedded in the callback HTML page.
+
+    The ``loginCallback.do`` response embeds a JSON document inside a JS
+    template literal::
+
+        var xxx = `{"code":0,"status":true,"id":"UARS-COM-040","data":{
+            "uarsToken": "...", "tokenCode": "...",
+            "ccspToken": {"accessToken": "...", "refreshToken": "...",
+                          "tokenType": "Bearer", "expiresIn": 21600},
+            "profile": {...}}}`
+
+    Returns the parsed top-level JSON (the ``data`` member carries the tokens),
+    or raises AuthenticationError when no bundle is present (e.g. the callback
+    rejected the code).
     """
-    Checks for errors in the API response.
-    If an error is found, an exception is raised.
-    retCode known values:
-    - S: success
-    - F: failure
-    resCode / resMsg known values:
-    - 0000: no error
-    - 4004: "Duplicate request"
-    - 4081: "Request timeout"
-    - 5031: "Unavailable remote control - Service Temporary Unavailable"
-    - 5091: "Exceeds number of requests"
-    - 5921: "No Data Found v2 - No Data Found v2"
-    - 9999: "Undefined Error - Response timeout"
-    :param response: the API's JSON response
-    """
-
-    error_code_mapping = {
-        "4004": DuplicateRequestError,
-        "4005": UnsupportedControlError,
-        "4081": RequestTimeoutError,
-        "5031": ServiceTemporaryUnavailable,
-        "5091": RateLimitingError,
-        "5921": NoDataFound,
-        "9999": RequestTimeoutError,
-    }
-
-    if not any(x in response for x in ["retCode", "resCode", "resMsg"]):
-        _LOGGER.error(f"Unknown API response format: {response}")
-        raise InvalidAPIResponseError()
-
-    if response["retCode"] == "F":
-        if response["resCode"] in error_code_mapping:
-            raise error_code_mapping[response["resCode"]](response["resMsg"])
-        else:
-            raise APIError(f"Server returned: '{response['resMsg']}'")
+    # Preferred: the template-literal form (live-verified).
+    for match in re.finditer(r"=\s*`(\{.*?\})\s*`", html, re.S):
+        try:
+            candidate = json.loads(match.group(1))
+        except ValueError:
+            continue
+        if candidate.get("data", {}).get("uarsToken"):
+            return candidate
+    # Fallback: brace-matched scan for any JSON containing a uarsToken.
+    # Walk outward from the nearest "{" so both the bare data object and the
+    # full wrapper are recognised (normalised to {"data": ...} on return).
+    for match in re.finditer(r'"uarsToken"', html):
+        key_at = match.start()
+        open_positions = [i for i, ch in enumerate(html[: key_at + 1]) if ch == "{"]
+        # nearest brace first, then progressively earlier ones (outer objects)
+        for start in reversed(open_positions):
+            depth = 0
+            for idx in range(start, len(html)):
+                char = html[idx]
+                if char == "{":
+                    depth += 1
+                elif char == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            candidate = json.loads(html[start : idx + 1])
+                        except ValueError:
+                            break
+                        if candidate.get("data", {}).get("uarsToken"):
+                            return candidate
+                        if candidate.get("uarsToken"):
+                            # bare data object (matched from its own "{")
+                            return {"data": candidate}
+                        break
+    raise AuthenticationError(
+        "UARS login callback did not return a token bundle. "
+        "The session may have expired --please retry the login."
+    )
 
 
 class KiaUvoApiCN(ApiImplType1):
@@ -107,30 +178,54 @@ class KiaUvoApiCN(ApiImplType1):
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
-        if BRANDS[brand] == BRAND_KIA:
+        self.LANGUAGE: str = language or "zh"
+        # Accept both the numeric BRANDS key (as VehicleManager passes it) and
+        # the literal brand string, to be forgiving about caller conventions.
+        brand_name = BRANDS.get(brand, brand)
+        # CN-UNVERIFIED: Kia constants come from the same binary (NetworkDefines)
+        # but only the Hyundai side has been live-verified.
+        if brand_name == BRAND_KIA:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.kia.com"
+            self.UARS_DOMAIN: str = "uars-k.hmgmobility.com.cn"
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
-            self.APP_ID: str = "eea8762c-adfc-4ee4-8d7a-6e2452ddf342"
-            self.BASIC_AUTHORIZATION: str = "Basic OWQ1ZGY5MmEtMDZhZS00MzVmLWI0NTktODMwNGYyZWZjYzY3OnRzWGRrVWcwOEF2MlpaelhPZ1d6Snl4VVQ2eWVTbk5OUWtYWFBSZEtXRUFOd2wxcA=="
-        elif BRANDS[brand] == BRAND_HYUNDAI:
+            self.APP_ID: str = "5519a969-295f-4c5a-a27e-9d9fab2bd50c"
+        elif brand_name == BRAND_HYUNDAI:
             self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
+            self.UARS_DOMAIN: str = "uars-h.hmgmobility.com.cn"
             self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
-            self.APP_ID: str = "ed01581a-380f-48cd-83d4-ed1490c272d0"
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic NzJiM2QwMTktNWJjNy00NDNkLWE0MzctMDhmMzA3Y2YwNmUyOnNlY3JldA=="
-            )
+            self.APP_ID: str = "b09e4d17-c30c-40f1-a1ec-8ac11d6665cf"
+        else:
+            raise ValueError(f"Unsupported brand for the China region: {brand!r}")
+        # DIFFERENCE vs old implementation: the old APP_IDs (eea8762c---for Kia,
+        # ed01581a---for Hyundai) no longer exist in the current app and both
+        # were replaced by the values above (live-verified for Hyundai).
 
         self.BASE_URL: str = self.BASE_DOMAIN
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
         self.SPA_API_URL: str = "https://" + self.BASE_URL + "/api/v1/spa/"
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
+        self.LOGIN_API_URL: str = "https://" + self.BASE_URL + "/web/v1/user/"
+        self.UARS_BASE_URL: str = "https://" + self.UARS_DOMAIN
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
-        self.GCM_SENDER_ID = 199360397125
+
+        # Per-username UARS state (uarsToken/tokenCode/profile).  Kept off the
+        # Token dataclass because Token is shared across all regions.
+        self._uars_state: dict[str, dict] = {}
+
+    # ------------------------------------------------------------------
+    # Headers
+    # ------------------------------------------------------------------
+    def _get_stamp(self) -> str:
+        """China does not use the Stamp header (EU-only).  Present so the
+        inherited ``_retry_on_device_id_error`` wrapper keeps working."""
+        return ""
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
     ) -> dict:
-        return {
+        # DIFFERENCE vs old implementation: no Stamp header, CN app UA, and the
+        # device id header is what the servers actually require.
+        headers = {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
@@ -138,22 +233,116 @@ class KiaUvoApiCN(ApiImplType1):
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
+            "User-Agent": USER_AGENT_BLUELINK_CN,
         }
+        if ccs2_support is not None:
+            headers["Ccuccs2protocolsupport"] = str(ccs2_support)
+        return headers
 
-    def _get_control_headers(self, token: Token) -> dict:
-        control_token, _ = self._get_control_token(token)
-        return {
-            "Authorization": control_token,
-            "AuthorizationCCSP": control_token,
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
+        """PIN -> control token for remote commands.  CN-UNVERIFIED.
+
+        The old ``USER_API_URL + "pin?token="`` path is confirmed to still
+        exist in the current login-page bundle (``PIN = /api/v1/user/pin``);
+        ``/user/profile/pin`` also appears in the binary.  Response keys
+        (controlToken / expiresTime) are carried over from the old code.
+        """
+        if token.control_token is not None and token.control_token_expiry > dt.datetime.now().timestamp():
+            return token.control_token, token.control_token_expiry
+        if not token.pin:
+            raise UnsupportedControlError(
+                "A PIN is required for remote control actions on China accounts."
+            )
+        url = self.USER_API_URL + "pin"
+        headers = {
+            "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
             "ccsp-device-id": token.device_id,
+            "Content-type": "application/json",
+            "Host": self.BASE_URL,
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_BLUELINK_CN,
+        }
+        data = {"deviceId": token.device_id, "pin": token.pin}
+        response = self.session.put(url, json=data, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response: {response}")
+        if response.get("controlToken") is None:
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
+        control_token = "Bearer " + response["controlToken"]
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response.get("expiresTime", 0)
+        )
+        token.control_token = control_token
+        token.control_token_expiry = control_token_expire_at
+        return control_token, control_token_expire_at
+
+    # ------------------------------------------------------------------
+    # Login (fully re-verified against live servers)
+    # ------------------------------------------------------------------
+    def _get_device_id(self, stamp: str | None = None) -> str:
+        """Register a (pseudo) push device and return the server deviceId.
+
+        DIFFERENCE vs old implementation: ``pushType`` is now ``APNS`` (the
+        China app uses the APNs + Alibaba push stack, not GCM) and
+        ``providerDeviceId`` is mandatory --without it the server answers
+        resCode 4002 "service problem".
+        """
+        registration_id = uuid.uuid4().hex
+        provider_device_id = str(uuid.uuid4())
+        url = self.SPA_API_URL + "notifications/register"
+        payload = {
+            "providerDeviceId": provider_device_id,
+            "pushRegId": registration_id,
+            "pushType": "APNS",
+            "uuid": str(uuid.uuid4()),
+        }
+        headers = {
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Content-Type": "application/json;charset=UTF-8",
             "Host": self.BASE_URL,
             "Connection": "Keep-Alive",
             "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
+            "User-Agent": USER_AGENT_BLUELINK_CN,
         }
+        response = self.session.post(url, headers=headers, json=payload).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
+        if response.get("retCode") == "F":
+            raise APIError(f"Device registration failed: {response.get('resMsg')}")
+        device_id = response["resMsg"]["deviceId"]
+        return device_id
+
+    @staticmethod
+    def _uars_state_param(device_uuid: str, interface_id: str) -> str:
+        """Build the base64url ``state`` blob the UARS callback expects."""
+        blob = {
+            "interfaceId": interface_id,
+            "accUnqNo": "",
+            "deviceUuid": device_uuid,
+            "webRedirect": "",
+        }
+        return base64.urlsafe_b64encode(
+            json.dumps(blob, separators=(",", ":")).encode()
+        ).decode().rstrip("=")
+
+    def _exchange_uars_callback(self, redirect_url: str) -> dict:
+        """Follow the UARS loginCallback.do redirect and harvest the tokens.
+
+        The UARS server performs the OAuth code exchange server-side and
+        returns the token bundle inside the response HTML.
+        """
+        response = self.session.get(
+            redirect_url,
+            headers={"User-Agent": USER_AGENT_BLUELINK_CN},
+            timeout=60,
+        )
+        if response.status_code >= 400:
+            raise AuthenticationError(
+                f"UARS login callback failed with HTTP {response.status_code}"
+            )
+        return _extract_uars_login_bundle(response.text)
 
     def login(
         self,
@@ -162,34 +351,155 @@ class KiaUvoApiCN(ApiImplType1):
         otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
-        device_id = self._get_device_id()
-        cookies = self._get_cookies()
-        self._set_session_language(cookies)
-        authorization_code = None
-        try:
-            authorization_code = self._get_authorization_code_with_redirect_url(
-                username, password, cookies
+        """Full password login.  Five-step live-verified flow (see module
+        docstring for the old-vs-new comparison)."""
+        device_uuid = str(uuid.uuid4()).upper()
+
+        # Step 1: bootstrap the UARS web session (302s into the authorize flow).
+        self.session.get(
+            f"{self.UARS_BASE_URL}/join/account/loginInit.do?cocd=H&deviceUuid={device_uuid}&redirect=",
+            headers={"User-Agent": USER_AGENT_BLUELINK_CN},
+            timeout=60,
+        )
+
+        # Step 2: authorize with the UARS callback as redirect_uri.  This is
+        # the single most important difference from the old implementation --        # the resulting authorization code belongs to the UARS service, NOT to
+        # /api/v1/user/oauth2/token (which is why the old flow got errCode
+        # 4002 "Invalid parameters").
+        state = self._uars_state_param(device_uuid, "UARS-COM-040")
+        self.session.get(
+            f"https://{self.BASE_URL}/api/v1/user/oauth2/authorize?response_type=code"
+            f"&client_id={self.CCSP_SERVICE_ID}"
+            f"&redirect_uri={self.UARS_BASE_URL}%2Fjoin%2Fccsp%2FloginCallback.do"
+            f"&state={state}&lang={self.LANGUAGE}&scope=url.login",
+            headers={"User-Agent": USER_AGENT_BLUELINK_CN},
+            timeout=60,
+        )
+
+        # Step 3: credentials.  ``mobileNum`` is new but must be present
+        # (empty string is accepted); the old {email, password} body alone
+        # also works today but the app always sends all three.
+        response = self.session.post(
+            f"https://{self.BASE_URL}/api/v1/user/signin",
+            json={"email": username, "password": password, "mobileNum": ""},
+            headers={
+                "ccsp-service-id": self.CCSP_SERVICE_ID,
+                "ccsp-application-id": self.APP_ID,
+                "Content-Type": "application/json;charset=UTF-8",
+                "User-Agent": USER_AGENT_BLUELINK_CN,
+            },
+            timeout=60,
+        )
+        if response.status_code >= 400:
+            raise AuthenticationError(f"Login failed: HTTP {response.status_code}")
+        response_json = response.json()
+        redirect_url = response_json.get("redirectUrl")
+        if not redirect_url:
+            raise AuthenticationError(
+                "Login failed: no redirectUrl in signin response "
+                "(check credentials, or the account requires SMS/WeChat login)"
             )
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - get_authorization_code_with_redirect_url failed")
 
-        if authorization_code is None:
-            raise AuthenticationError("Login Failed")
+        # Step 4: the UARS server redeems the code and hands back the tokens.
+        bundle = self._exchange_uars_callback(redirect_url)
+        data = bundle["data"]
+        ccsp_token = data["ccspToken"]
+        profile = data.get("profile", {})
+        _LOGGER.debug(
+            f"{DOMAIN} - Login OK for {profile.get('email')}, "
+            f"expires_in={ccsp_token.get('expiresIn')}"
+        )
 
-        _, access_token, authorization_code = self._get_access_token(authorization_code)
-        _, refresh_token = self._get_refresh_token(authorization_code)
-        valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
+        # Step 5: register this "device" and get the deviceId used by all
+        # business requests (ccsp-device-id header).
+        device_id = self._get_device_id()
+
+        self._uars_state[username] = {
+            "uars_token": data.get("uarsToken"),
+            "token_code": data.get("tokenCode"),
+            "profile": profile,
+        }
+
+        # DIFFERENCE vs old implementation: LOGIN_TOKEN_LIFETIME (30 days)
+        # was fiction --the real access token lives 6 hours (expiresIn
+        # 21600), so valid_until now reflects the server value.
+        expires_in = int(ccsp_token.get("expiresIn", 21600))
+        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
 
         return Token(
             username=username,
             password=password,
-            access_token=access_token,
-            refresh_token=refresh_token,
+            access_token=f"{ccsp_token.get('tokenType', 'Bearer')} {ccsp_token['accessToken']}",
+            refresh_token=ccsp_token.get("refresh_token") or ccsp_token.get("refreshToken"),
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
         )
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh via the silent re-login.
+
+        DIFFERENCE vs the inherited implementation: the old
+        ``oauth2/token`` + refresh_token grant is dead on the current China
+        servers (errCode 4002).  Instead the ccapi session cookie mints a new
+        UARS callback code via ``/api/v1/user/silentsignin`` (no password).
+        If the session cookie has expired, fall back to the full password
+        login --no worse than before.
+        """
+        try:
+            response = self.session.post(
+                f"https://{self.BASE_URL}/api/v1/user/silentsignin",
+                json={"intUserId": ""},
+                headers={
+                    "ccsp-service-id": self.CCSP_SERVICE_ID,
+                    "ccsp-application-id": self.APP_ID,
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "User-Agent": USER_AGENT_BLUELINK_CN,
+                },
+                timeout=60,
+            )
+            if response.status_code >= 400:
+                raise APIError(f"silentsignin HTTP {response.status_code}")
+            redirect_url = response.json().get("redirectUrl")
+            if not redirect_url:
+                raise APIError("silentsignin returned no redirectUrl")
+            bundle = self._exchange_uars_callback(redirect_url)
+            data = bundle["data"]
+            ccsp_token = data["ccspToken"]
+            expires_in = int(ccsp_token.get("expiresIn", 21600))
+            _LOGGER.debug(f"{DOMAIN} - Access token refreshed via silentsignin")
+            if token.username in self._uars_state:
+                self._uars_state[token.username].update(
+                    {
+                        "uars_token": data.get("uarsToken"),
+                        "token_code": data.get("tokenCode"),
+                        "profile": data.get("profile", {}),
+                    }
+                )
+            return Token(
+                username=token.username,
+                password=token.password,
+                access_token=f"{ccsp_token.get('tokenType', 'Bearer')} {ccsp_token['accessToken']}",
+                refresh_token=ccsp_token.get("refresh_token") or ccsp_token.get("refreshToken"),
+                device_id=token.device_id,
+                valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in),
+                pin=token.pin,
+                control_token=token.control_token,
+                control_token_expiry=token.control_token_expiry,
+            )
+        except Exception as e:  # fmt: skip
+            _LOGGER.warning(
+                f"{DOMAIN} - Silent refresh failed ({e}), falling back to full login"
+            )
+        if token.password:
+            return self.login(token.username, token.password, pin=token.pin)
+        raise AuthenticationError(
+            "Token refresh failed and no stored password is available."
+        )
+
+    # ------------------------------------------------------------------
+    # Vehicles / state (business surface --same schema as the old code)
+    # ------------------------------------------------------------------
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
         response = self.session.get(
@@ -216,6 +526,10 @@ class KiaUvoApiCN(ApiImplType1):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
+                # DIFFERENCE vs ApiImplType1.get_vehicles: the China vehicle
+                # list does not include ccuCCS2ProtocolSupport (verified on a
+                # 2025 Custo) --default to 0 so the legacy status path is used.
+                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
             )
             result.append(vehicle)
         return result
@@ -229,8 +543,8 @@ class KiaUvoApiCN(ApiImplType1):
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types (ex: ICE cars) provide this
-                # information. We also don't know what the API returns if
-                # the info is unavailable. So, catch any exception and move on.
+                # information. We also don't know what the API returns if the
+                # info is unavailable. So, catch any exception and move on.
                 _LOGGER.exception(
                     """Failed to parse driving info. Possible reasons:
                                     - incompatible vehicle (ICE)
@@ -251,14 +565,10 @@ class KiaUvoApiCN(ApiImplType1):
             state["vehicleLocation"] = self._get_location(token, vehicle)
             self._update_vehicle_properties(vehicle, state)
         # Only call for driving info on cars we know have a chance of supporting it.
-        # Could be expanded if other types do support it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
                 state = self._get_driving_info(token, vehicle)
             except Exception as e:
-                # we don't know if all car types provide this information.
-                # we also don't know what the API returns if the info is unavailable.
-                # so, catch any exception and move on.
                 _LOGGER.exception(
                     """Failed to parse driving info. Possible reasons:
                                     - new API format
@@ -270,16 +580,18 @@ class KiaUvoApiCN(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        # CN-UNVERIFIED for the China region (no CCS2 vehicle in the test
+        # account); path mirrors the EU implementation and the /ccs2 strings
+        # found in the China app binary.
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
         response = self.session.get(
             url,
             headers=self._get_authenticated_headers(
                 token, vehicle.ccu_ccs2_protocol_support
             ),
+            timeout=90,
         ).json()
-        _LOGGER.debug(
-            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
-        )
+        _LOGGER.debug(f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}")
         _check_response_for_errors(response)
         state = response["resMsg"]
         self._update_vehicle_properties(vehicle, state)
@@ -291,6 +603,9 @@ class KiaUvoApiCN(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
+    # The property mapping below is carried over from the previous
+    # implementation unchanged: the live /status/latest response (verified on
+    # a 2025 Custo) uses exactly the same field layout.
     def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "status.time"):
             vehicle.last_updated_at = parse_datetime(
@@ -314,21 +629,25 @@ class KiaUvoApiCN(ApiImplType1):
         vehicle.engine_is_running = get_child_value(state, "status.engine")
 
         # Converts temp to usable number. Currently only support celsius.
-        # Future to do is check unit in case the care itself is set to F.
-        if get_child_value(state, "status.airTemp.value"):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "status.airTemp.value")
-            )
-
-            vehicle.air_temperature = (
-                self.temperature_range[tempIndex],
-                TEMPERATURE_UNITS[
-                    get_child_value(
-                        state,
-                        "status.airTemp.unit",
-                    )
-                ],
-            )
+        # "FFH" is the CN sentinel for "no valid temperature" (AC off / not
+        # reported) — live-verified on a 2025 Custo.  Its decoded index falls
+        # far outside temperature_range, so skip it silently instead of
+        # raising IndexError.
+        air_temp_value = get_child_value(state, "status.airTemp.value")
+        if air_temp_value and air_temp_value != "FFH":
+            try:
+                tempIndex = get_hex_temp_into_index(air_temp_value)
+                vehicle.air_temperature = (
+                    self.temperature_range[tempIndex],
+                    TEMPERATURE_UNITS[
+                        get_child_value(
+                            state,
+                            "status.airTemp.unit",
+                        )
+                    ],
+                )
+            except (ValueError, IndexError):
+                _LOGGER.debug(f"{DOMAIN} - Unparseable airTemp value: {air_temp_value}")
         vehicle.defrost_is_on = get_child_value(state, "status.defrost")
         steer_wheel_heat = get_child_value(state, "status.steerWheelHeat")
         if steer_wheel_heat in [0, 2]:
@@ -661,7 +980,7 @@ class KiaUvoApiCN(ApiImplType1):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
 
         response = self.session.get(
-            url, headers=self._get_authenticated_headers(token)
+            url, headers=self._get_authenticated_headers(token), timeout=60
         ).json()
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
@@ -673,8 +992,10 @@ class KiaUvoApiCN(ApiImplType1):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
+            # The vehicle may need to wake up to acquire a GPS fix --the live
+            # test showed >30 s latency, so use a generous timeout.
             response = self.session.get(
-                url, headers=self._get_authenticated_headers(token)
+                url, headers=self._get_authenticated_headers(token), timeout=90
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
@@ -684,9 +1005,11 @@ class KiaUvoApiCN(ApiImplType1):
             return None
 
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+        # CN-UNVERIFIED: legacy "force refresh" path, presumed intact for
+        # non-CCS2 vehicles (the cache endpoint /status/latest is verified).
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         response = self.session.get(
-            url, headers=self._get_authenticated_headers(token)
+            url, headers=self._get_authenticated_headers(token), timeout=90
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
         _check_response_for_errors(response)
@@ -694,6 +1017,11 @@ class KiaUvoApiCN(ApiImplType1):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
+    # ------------------------------------------------------------------
+    # Remote control (paths re-verified in the app binary; header choice
+    # follows the inherited Type1 dispatch: legacy vehicles use the access
+    # token, CCS2 vehicles use the PIN-derived control token)
+    # ------------------------------------------------------------------
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
@@ -769,7 +1097,7 @@ class KiaUvoApiCN(ApiImplType1):
         }
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
         response = self.session.post(
-            url, json=payload, headers=self._get_control_headers(token)
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
@@ -791,7 +1119,7 @@ class KiaUvoApiCN(ApiImplType1):
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
 
         payload = {"action": "stop", "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request {payload}")
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request {payload}")
         response = self.session.post(
             url, json=payload, headers=self._get_authenticated_headers(token)
         ).json()
@@ -987,6 +1315,9 @@ class KiaUvoApiCN(ApiImplType1):
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
+        # CN-UNVERIFIED: on China the app also exposes a per-current limit
+        # (/ccs2/charge/chargingcurrent {"chargingCurrent": N}); the legacy
+        # targetSOClist endpoint is kept here until an EV vehicle can confirm.
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
 
         body = {
@@ -1007,143 +1338,6 @@ class KiaUvoApiCN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
-
-    def _get_device_id(self):
-        registration_id = "1"
-        provider_device_id = "59af09e554a9442ab8589c9500d04d2e"
-        url = self.SPA_API_URL + "notifications/register"
-        payload = {
-            "providerDeviceId": provider_device_id,
-            "pushRegId": registration_id,
-            "pushType": "GCM",
-            "uuid": str(uuid.uuid4()),
-        }
-
-        headers = {
-            "ccsp-service-id": self.CLIENT_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Content-Type": "application/json;charset=UTF-8",
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        response = self.session.post(url, headers=headers, json=payload)
-        response = response.json()
-        _check_response_for_errors(response)
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {headers} {payload}")
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
-
-        device_id = response["resMsg"]["deviceId"]
-        return device_id
-
-    def _get_cookies(self) -> dict:
-        # Get Cookies #
-        url = (
-            self.USER_API_URL
-            + "oauth2/authorize?response_type=code&state=test&client_id="
-            + self.CLIENT_ID
-            + "&redirect_uri="
-            + "https://"
-            + self.BASE_URL
-            + ":443/api/v1/user/"
-            + "oauth2/redirect&lang="
-        )
-
-        _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
-        session = ApiImplSession()
-        _ = session.get(url)
-        return session.cookies.get_dict()
-        # return session
-
-    def _set_session_language(self, cookies) -> None:
-        # Set Language for Session #
-        url = self.USER_API_URL
-        headers = {"Content-type": "application/json"}
-        payload = {"lang": "zh"}
-        _ = self.session.post(url, json=payload, headers=headers, cookies=cookies)
-
-    def _get_authorization_code_with_redirect_url(
-        self, username, password, cookies
-    ) -> str:
-        url = self.USER_API_URL + "signin"
-        headers = {"Content-type": "application/json"}
-        data = {"email": username, "password": password}
-        response = self.session.post(
-            url, json=data, headers=headers, cookies=cookies
-        ).json()
-        parsed_url = urlparse(response["redirectUrl"])
-        authorization_code = "".join(parse_qs(parsed_url.query)["code"])
-        return authorization_code
-
-    def _get_access_token(self, authorization_code):
-        # Get Access Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            # "Stamp": stamp,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = (
-            "grant_type=authorization_code&redirect_uri=https%3A%2F%2F"
-            + self.BASE_DOMAIN
-            + "%3A443%2Fapi%2Fv1%2Fuser%2Foauth2%2Fredirect&code="
-            + authorization_code
-        )
-        response = self.session.post(url, data=data, headers=headers)
-        response = response.json()
-
-        token_type = response["token_type"]
-        access_token = token_type + " " + response["access_token"]
-        authorization_code = response["refresh_token"]
-        return token_type, access_token, authorization_code
-
-    def _get_refresh_token(self, authorization_code):
-        # Get Refresh Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
-            + authorization_code
-        )
-        response = self.session.post(url, data=data, headers=headers)
-        response = response.json()
-        token_type = response["token_type"]
-        refresh_token = token_type + " " + response["access_token"]
-        return token_type, refresh_token
-
-    def _get_control_token(self, token: Token) -> Token:
-        url = self.USER_API_URL + "pin?token="
-        headers = {
-            "Authorization": token.access_token,
-            "Content-type": "application/json",
-            "Host": self.BASE_URL,
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = {"deviceId": token.device_id, "pin": token.pin}
-        response = self.session.put(url, json=data, headers=headers)
-        response = response.json()
-        control_token = "Bearer " + response["controlToken"]
-        control_token_expire_at = math.floor(
-            dt.datetime.now().timestamp() + response["expiresTime"]
-        )
-        return control_token, control_token_expire_at
 
     def check_action_status(
         self,
@@ -1197,6 +1391,6 @@ class KiaUvoApiCN(ApiImplType1):
                         )
                         return ORDER_STATUS.PENDING
 
-            # if iterate the whole notifications list and
+            # if we iterate the whole notifications list and
             # can't find the action, raise an exception
             raise APIError(f"No action found with ID {action_id}")
