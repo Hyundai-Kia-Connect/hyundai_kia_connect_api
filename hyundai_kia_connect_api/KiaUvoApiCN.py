@@ -59,7 +59,6 @@ import re
 import typing as ty
 import uuid
 from time import sleep
-from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ClimateRequestOptions
@@ -72,7 +71,6 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
-    LOGIN_TOKEN_LIFETIME,
     ORDER_STATUS,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -133,7 +131,7 @@ def _extract_uars_login_bundle(html: str) -> dict:
     rejected the code).
     """
     # Preferred: the template-literal form (live-verified).
-    for match in re.finditer(r"=\s*`(\{.*?\})\s*`", html, re.S):
+    for match in re.finditer(r"=\s*`(\{.*?\})\s*`", html, re.DOTALL):
         try:
             candidate = json.loads(match.group(1))
         except ValueError:
@@ -247,7 +245,10 @@ class KiaUvoApiCN(ApiImplType1):
         ``/user/profile/pin`` also appears in the binary.  Response keys
         (controlToken / expiresTime) are carried over from the old code.
         """
-        if token.control_token is not None and token.control_token_expiry > dt.datetime.now().timestamp():
+        if (
+            token.control_token is not None
+            and token.control_token_expiry > dt.datetime.now().timestamp()
+        ):
             return token.control_token, token.control_token_expiry
         if not token.pin:
             raise UnsupportedControlError(
@@ -323,9 +324,11 @@ class KiaUvoApiCN(ApiImplType1):
             "deviceUuid": device_uuid,
             "webRedirect": "",
         }
-        return base64.urlsafe_b64encode(
-            json.dumps(blob, separators=(",", ":")).encode()
-        ).decode().rstrip("=")
+        return (
+            base64.urlsafe_b64encode(json.dumps(blob, separators=(",", ":")).encode())
+            .decode()
+            .rstrip("=")
+        )
 
     def _exchange_uars_callback(self, redirect_url: str) -> dict:
         """Follow the UARS loginCallback.do redirect and harvest the tokens.
@@ -430,7 +433,8 @@ class KiaUvoApiCN(ApiImplType1):
             username=username,
             password=password,
             access_token=f"{ccsp_token.get('tokenType', 'Bearer')} {ccsp_token['accessToken']}",
-            refresh_token=ccsp_token.get("refresh_token") or ccsp_token.get("refreshToken"),
+            refresh_token=ccsp_token.get("refresh_token")
+            or ccsp_token.get("refreshToken"),
             device_id=device_id,
             valid_until=valid_until,
             pin=pin,
@@ -480,7 +484,8 @@ class KiaUvoApiCN(ApiImplType1):
                 username=token.username,
                 password=token.password,
                 access_token=f"{ccsp_token.get('tokenType', 'Bearer')} {ccsp_token['accessToken']}",
-                refresh_token=ccsp_token.get("refresh_token") or ccsp_token.get("refreshToken"),
+                refresh_token=ccsp_token.get("refresh_token")
+                or ccsp_token.get("refreshToken"),
                 device_id=token.device_id,
                 valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in),
                 pin=token.pin,
@@ -591,7 +596,9 @@ class KiaUvoApiCN(ApiImplType1):
             ),
             timeout=90,
         ).json()
-        _LOGGER.debug(f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}")
+        _LOGGER.debug(
+            f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
+        )
         _check_response_for_errors(response)
         state = response["resMsg"]
         self._update_vehicle_properties(vehicle, state)

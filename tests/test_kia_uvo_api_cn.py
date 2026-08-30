@@ -16,11 +16,7 @@ import json
 
 import pytest
 
-from hyundai_kia_connect_api.KiaUvoApiCN import (
-    USER_AGENT_BLUELINK_CN,
-    KiaUvoApiCN,
-    _extract_uars_login_bundle,
-)
+from hyundai_kia_connect_api.ApiImplType1 import _check_response_for_errors
 from hyundai_kia_connect_api.const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -32,7 +28,11 @@ from hyundai_kia_connect_api.exceptions import (
     DeviceIDError,
     RateLimitingError,
 )
-from hyundai_kia_connect_api.ApiImplType1 import _check_response_for_errors
+from hyundai_kia_connect_api.KiaUvoApiCN import (
+    USER_AGENT_BLUELINK_CN,
+    KiaUvoApiCN,
+    _extract_uars_login_bundle,
+)
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
@@ -136,7 +136,11 @@ class TestInheritedErrorMapping:
     def test_5091_is_rate_limiting(self):
         with pytest.raises(RateLimitingError):
             _check_response_for_errors(
-                {"retCode": "F", "resCode": "5091", "resMsg": "Exceeds number of requests"}
+                {
+                    "retCode": "F",
+                    "resCode": "5091",
+                    "resMsg": "Exceeds number of requests",
+                }
             )
 
     def test_success_does_not_raise(self):
@@ -257,7 +261,11 @@ class TestGetVehicles:
             captured["url"] = url
             captured["json"] = json
             return FakeResponse(
-                {"retCode": "S", "resCode": "0000", "resMsg": {"deviceId": "NEW-DEVICE"}}
+                {
+                    "retCode": "S",
+                    "resCode": "0000",
+                    "resMsg": {"deviceId": "NEW-DEVICE"},
+                }
             )
 
         monkeypatch.setattr(api.session, "post", fake_post)
