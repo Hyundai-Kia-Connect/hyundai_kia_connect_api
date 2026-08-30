@@ -21,6 +21,17 @@ This package is designed to simplify the complexity of using multiple regions.  
 
 Europe Hyundai and Kia login logic is based on the `bluelink-refresh-token <https://github.com/TMA84/bluelink-refresh-token>`_ project.  Username/password login is supported directly for Kia, Hyundai, and Genesis (EU) — no browser or manual token extraction needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
+China (Hyundai Bluelink / Kia UVO CN)
+-------------------------------------
+
+China support was rewritten in 2026 against the current China Bluelink iOS app (com.hyundai-motor.cn.bluelink).  Highlights and differences vs other regions:
+
+- Login uses a five-step flow through the UARS service (uars-{k|h}.hmgmobility.com.cn); the OAuth authorization code is exchanged server-side by UARS and the tokens are returned inside the callback page. Only the Hyundai brand has been live-verified; Kia constants are included from the app binary but are untested.
+- Access tokens live 6 hours.  There is no working refresh_token grant on the China servers, so ``refresh_access_token`` re-authenticates silently when possible and otherwise performs a full password login (same pattern as Canada).
+- Remote control on non-CCS2 vehicles uses the plain access token; a PIN is only required for CCS2-style control commands.  ``pin`` should be passed to ``VehicleManager`` as usual.
+- Push device registration uses ``pushType: APNS`` (not GCM) and requires a ``providerDeviceId`` field.
+- Control-command latency is high (1-2 minutes to reach SUCCESS); consumers should use generous polling timeouts.
+
 Python 3.12 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
     region: int
