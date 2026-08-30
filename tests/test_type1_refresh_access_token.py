@@ -162,8 +162,12 @@ class TestRegionsUseBaseRefreshAccessToken:
     def test_in_does_not_override_refresh_access_token(self):
         assert KiaUvoApiIN.refresh_access_token is ApiImplType1.refresh_access_token
 
-    def test_cn_does_not_override_refresh_access_token(self):
-        assert KiaUvoApiCN.refresh_access_token is ApiImplType1.refresh_access_token
+    def test_cn_overrides_refresh_access_token(self):
+        # 2026 rewrite: the China servers no longer accept the refresh_token
+        # grant on /api/v1/user/oauth2/token (errCode 4002 with a valid UARS
+        # refresh token, live-verified).  CN now overrides refresh_access_token
+        # with a silentsignin-based flow that falls back to a full login.
+        assert KiaUvoApiCN.refresh_access_token is not ApiImplType1.refresh_access_token
 
     def test_au_refresh_sends_stamp(self):
         # AU requires the Stamp header on the refresh_token grant — confirmed
