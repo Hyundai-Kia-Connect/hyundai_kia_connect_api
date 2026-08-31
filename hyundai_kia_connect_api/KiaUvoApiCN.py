@@ -29,7 +29,7 @@ stale API surface and never worked against the current servers):
    - uarsToken: JWT HS256, ~1 year, kept for the UARS-side (PIN reset page,
      WeChat binding) --stored per-username on the API instance, not on Token
      (Token dataclass is shared across regions).
-   - refresh: ``POST /api/v1/user/silentsignin`` re-uses the ccapi session
+   - refresh: ``POST /api/v1/user/silentsignin`` reuses the ccapi session
      cookie to mint a fresh UARS callback code (no password).  Falls back to
      the full password login when the session cookie has expired.
 
@@ -654,7 +654,7 @@ class KiaUvoApiCN(ApiImplType1):
                     ],
                 )
             except (ValueError, IndexError):
-                _LOGGER.debug(f"{DOMAIN} - Unparseable airTemp value: {air_temp_value}")
+                _LOGGER.debug(f"{DOMAIN} - Unparsable airTemp value: {air_temp_value}")
         vehicle.defrost_is_on = get_child_value(state, "status.defrost")
         steer_wheel_heat = get_child_value(state, "status.steerWheelHeat")
         if steer_wheel_heat in [0, 2]:
