@@ -25,7 +25,7 @@ from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
 from .ApiImpl import ApiImpl, ApiImplSession
-from .const import BRANDS, DOMAIN, ENGINE_TYPES
+from .const import BRANDS, DOMAIN, ENGINE_TYPES, ORDER_STATUS
 from .exceptions import (
     APIError,
     AuthenticationError,
@@ -1123,6 +1123,48 @@ class GspaApiEU(ApiImpl):
                 f"GSPA control succeeded (rc={rc!r}) but response has no SID"
             )
         return f"gspa:{sid}"
+
+    def _gspa_check_action_status(
+        self, token: Token, vehicle: Vehicle, sid: str
+    ) -> ORDER_STATUS:
+        """Poll a GSPA action's status.
+
+        GET /gspa/v1/status/vehicles/{carId}/update-status
+            ?path=gspa/v1/remote/vehicles
+        Response: {"metaInfo": {"retCode": "S"}, "data": {"pollingState":
+        "WAIT" | "SUCCESS" | "FAILURE" | "TIMEOUT"}}. Any transport/parse
+        error or non-success retCode is reported as PENDING (caller re-polls).
+        """
+        url = (
+            self.CCSP_API_URL
+            + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
+            + f"?path={self.GSPA_REMOTE_VEHICLES_PATH}"
+        )
+        self._validate_ccs_token(token)
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support or 0
+        )
+        try:
+            response = requests.get(url, headers=headers, timeout=(5, 30))
+            # Live (2026-09-04): a successful poll returns HTTP 202
+            # (resCode "202-000 Accepted"), not 200 — accept any 2xx.
+            if not 200 <= response.status_code < 300:
+                return ORDER_STATUS.PENDING
+            data: dict[str, Any] = response.json()
+            meta: dict[str, Any] = data.get("metaInfo", {})
+            if meta.get("retCode") != "S":
+                return ORDER_STATUS.PENDING
+            payload: dict[str, Any] = data.get("data", {})
+            polling_state = payload.get("pollingState", "")
+            if polling_state == "SUCCESS":
+                return ORDER_STATUS.SUCCESS
+            if polling_state == "FAILURE":
+                return ORDER_STATUS.FAILED
+            if polling_state == "TIMEOUT":
+                return ORDER_STATUS.TIMEOUT
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA action status poll failed for SID {sid}")
+        return ORDER_STATUS.PENDING
 
     # ------------------------------------------------------------------
     # GSPA GET helper

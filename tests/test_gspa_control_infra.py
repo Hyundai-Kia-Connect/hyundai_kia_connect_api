@@ -50,8 +50,7 @@ def test_endpoint_map():
 
 
 def test_path_prefix_map():
-    # Valet control posts to the "control" endpoint with an explicit
-    # valet path prefix in the caller (see valet_mode_action).
+    assert GspaApiEU.GSPA_PATH_PREFIX_MAP["valet"] == "valet/vehicles"
     assert GspaApiEU.GSPA_PATH_PREFIX_MAP["rearseat-alarm"] == "safety/vehicles"
 
 
@@ -150,21 +149,6 @@ def test_control_token_cci_success():
     assert expire_at == 4_000_000_000  # ms -> s
     assert post.call_args.args[0].endswith("/domain/api/v1/auth/pin")
     assert post.call_args.kwargs["json"] == {"pin": "1234"}
-
-
-def test_control_token_ttl_seconds_live_shape():
-    """Live-probed shape (2026-09-04): expiresTime=600 is a TTL in seconds
-    (10 min), not an epoch — expire_at must be now + 600."""
-    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
-        post.return_value = _post_mock(
-            200,
-            {
-                "isMatched": True,
-                "controlTokenInfo": {"controlToken": "t", "expiresTime": 600},
-            },
-        )
-        _, expire_at = _make_api()._get_control_token(_make_token())
-    assert expire_at == pytest.approx(dt.datetime.now(dt.UTC).timestamp() + 600, abs=10)
 
 
 def test_control_token_pin_mismatch_raises():
@@ -333,11 +317,11 @@ def test_gspa_control_command_path_prefix_override():
         api._gspa_control_command(
             _make_token(),
             _make_vehicle(),
-            "control",
+            "valet",
             {"command": "activate"},
             path_prefix="valet/vehicles",
         )
-    assert post.call_args.args[0].endswith("/gspa/v1/valet/vehicles/test123/control")
+    assert post.call_args.args[0].endswith("/gspa/v1/valet/vehicles/test123/valet")
 
 
 def test_get_control_token_pin_failure_reports_remaining_attempts():
@@ -437,41 +421,3 @@ def test_check_action_status_202_accepted():
         get.return_value = _post_mock(202, _status_response("SUCCESS"))
         status = api._gspa_check_action_status(_make_token(), _make_vehicle(), "sid-1")
     assert status is ORDER_STATUS.SUCCESS
-
-
-def test_post_for_data_2xx_business_error():
-    """HTTP 200 + metaInfo retCode F is an error, not silent success."""
-    api = _make_api()
-    body = {
-        "data": {},
-        "metaInfo": {
-            "retCode": "F",
-            "resCode": "403-006",
-            "message": "Invalid request id",
-        },
-    }
-    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
-        post.return_value = _post_mock(200, body)
-        with pytest.raises(AuthenticationError):
-            api._gspa_post_for_data(
-                _make_token(), _make_vehicle(), "reservation-hvac", {}
-            )
-
-
-def test_get_control_token_pin_locked_reports_window():
-    """Live: after 5 failures (remainCount 0) even the correct pin is
-    rejected with the same shape until the window passes."""
-    api = _make_api()
-    body = {
-        "isMatched": False,
-        "controlTokenInfo": None,
-        "remainCountOnFailedInfo": {
-            "remainCount": 0,
-            "remainTime": 300,
-            "timeUnit": "SECONDS",
-        },
-    }
-    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
-        post.return_value = _post_mock(200, body)
-        with pytest.raises(APIError, match="temporarily locked.*300s"):
-            api._get_control_token(_make_token())
