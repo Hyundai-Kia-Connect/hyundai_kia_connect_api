@@ -368,6 +368,39 @@ def test_schedule_reservation_charge_body():
     assert body["reservEndTime"] == {"time": "0600", "timeSection": 0}
     assert body["command"] == "set"
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_schedule_reservation_hvac_body_shape():
+    options = ScheduleChargingClimateRequestOptions()
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.first_departure.days = [1]
+    options.first_departure.time = dt.time(7, 5)
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
+    assert call.args[0].endswith("/reservation-hvac")
+    body = call.kwargs["json"]
+    assert body["command"] == "set"
+    assert body["reservedHVACInfo1"]["reservHVACflag"] == 1
+    assert body["reservedHVACInfo2"]["reservHVACflag"] == 0
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_schedule_reservation_engine_body_shape():
+    options = ScheduleChargingClimateRequestOptions()
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.first_departure.days = [1]
+    options.first_departure.time = dt.time(7, 5)
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_engine, options)
+    assert call.args[0].endswith("/reservation-engine")
+    body = call.kwargs["json"]
+    assert body["reservInfo"]["scheduleEnable"] is True
+    assert body["reservInfo"]["day"] == [1]
+    assert body["reservInfo2"]["scheduleEnable"] is False
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
 def test_schedule_charging_and_climate_body_shape():
