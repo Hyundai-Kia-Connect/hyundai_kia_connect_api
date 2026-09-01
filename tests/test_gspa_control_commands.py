@@ -476,3 +476,28 @@ def test_control_command_retry_exhausted_raises_auth_error():
         with pytest.raises(AuthenticationError):
             HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
     assert post.call_count == 2
+
+
+def test_control_command_spring_404_raises_unsupported():
+    """Spring "No static resource" body classifies as UnsupportedControlError."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(
+            status_code=404,
+            json=lambda: {
+                "timestamp": "2026-09-01T00:00:00.000+00:00",
+                "status": 404,
+                "error": "Not Found",
+                "message": ("No static resource gspa/v1/remote/vehicles/test123/door."),
+                "path": "/gspa/v1/remote/vehicles/test123/door",
+            },
+        )
+        with pytest.raises(UnsupportedControlError) as exc_info:
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+    assert "No static resource" in str(exc_info.value)
