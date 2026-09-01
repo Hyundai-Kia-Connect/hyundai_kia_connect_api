@@ -1085,7 +1085,7 @@ class GspaApiEU(ApiImpl):
             action_value = body["action"]
             body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
             body["command"] = action_value
-        body = {k: v for k, v in body.items() if k != "deviceId"}
+        body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
 
         url = self.CCSP_API_URL + f"/gspa/v1/{prefix}/{vehicle.id}/{gspa_endpoint}"
         self._validate_ccs_token(token)
@@ -1112,6 +1112,8 @@ class GspaApiEU(ApiImpl):
             raise InvalidAPIResponseError(
                 f"GSPA control returned non-JSON body: {response.text[:200]!r}"
             ) from e
+        if not isinstance(data, dict):
+            raise InvalidAPIResponseError("GSPA control returned non-object JSON")
         rc = data.get("rc")
         if rc and rc != "0000":
             self._raise_gspa_error(response.status_code, data)
@@ -1163,7 +1165,10 @@ class GspaApiEU(ApiImpl):
             if polling_state == "TIMEOUT":
                 return ORDER_STATUS.TIMEOUT
         except Exception:
-            _LOGGER.debug(f"{DOMAIN} - GSPA action status poll failed for SID {sid}")
+            _LOGGER.debug(
+                f"{DOMAIN} - GSPA action status poll failed for SID {sid}",
+                exc_info=True,
+            )
         return ORDER_STATUS.PENDING
 
     # ------------------------------------------------------------------

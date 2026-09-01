@@ -1116,6 +1116,12 @@ class HyundaiCciApiEU(GspaApiEU):
         rl = options.rear_left_window
         rr = options.rear_right_window
         seats = (drv, psg, rl, rr)
+        if (
+            all(s is None for s in seats)
+            and options.rear_left_curtain is None
+            and options.rear_right_curtain is None
+        ):
+            raise UnsupportedControlError("No window state requested")
         front = (drv, psg)
         command: str | None = None
         if all(s == WINDOW_STATE.CLOSED for s in seats):
