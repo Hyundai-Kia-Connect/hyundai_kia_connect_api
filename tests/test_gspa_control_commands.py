@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
@@ -167,3 +168,72 @@ def test_control_command_pre_ccs2_raises_unsupported():
         api._control_command(
             _make_token(), _make_vehicle(ccs2=0), "door", {"command": "close"}
         )
+
+
+def test_start_climate_full_options():
+    options = ClimateRequestOptions(
+        set_temp=21.5,
+        defrost=True,
+        heating=1,
+        duration=10,
+        steering_wheel=True,
+        front_left_seat=1,
+        front_right_seat=0,
+        rear_left_seat=2,
+    )
+    _, call = _run_command(HyundaiCciApiEU.start_climate, options)
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/temperature")
+    body = call.kwargs["json"]
+    assert body["command"] == "start"
+    assert body["hvacTemp"] == "21.5"
+    assert body["windshieldFrontDefogState"] is True
+    assert body["heating1"] == 1
+    assert body["ignitionDuration"] == 10
+    assert body["strgWhlHeating"] is True
+    assert body["seatClimateInfo"] == {
+        "drvSeatClimateState": 1,
+        "psgSeatClimateState": 0,
+        "rlSeatClimateState": 2,
+    }
+    assert call.kwargs["headers"]["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
+
+
+def test_start_climate_minimal():
+    _, call = _run_command(HyundaiCciApiEU.start_climate, ClimateRequestOptions())
+    body = call.kwargs["json"]
+    assert body == {"command": "start"}
+
+
+def test_stop_climate():
+    _, call = _run_command(HyundaiCciApiEU.stop_climate)
+    assert call.args[0].endswith("/temperature")
+    assert call.kwargs["json"] == {"command": "stop"}
+
+
+def test_start_engine_maps_climate_field():
+    options = ClimateRequestOptions(set_temp=22.0, climate=True)
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
+    body = call.kwargs["json"]
+    assert call.args[0].endswith("/engine")
+    assert body["command"] == "start"
+    assert body["hvacTemp"] == "22.0"
+    assert body["hvacCtrl"] == 1
+
+
+def test_stop_engine():
+    _, call = _run_command(HyundaiCciApiEU.stop_engine)
+    assert call.kwargs["json"] == {"command": "stop"}
+
+
+def test_pet_care_start_stop():
+    _, start = _run_command(HyundaiCciApiEU.start_pet_care)
+    assert start.kwargs["json"] == {"hvacTemp": "21", "tempUnit": "F"}
+    _, stop = _run_command(HyundaiCciApiEU.stop_pet_care)
+    assert stop.kwargs["json"] == {"hvacTemp": "21", "tempUnit": "C"}
+
+
+def test_pet_care_start_with_temp():
+    _, call = _run_command(
+        HyundaiCciApiEU.start_pet_care, ClimateRequestOptions(set_temp=23.0)
+    )
+    assert call.kwargs["json"] == {"hvacTemp": "23.0", "tempUnit": "F"}

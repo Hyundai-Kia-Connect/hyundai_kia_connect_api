@@ -15,6 +15,7 @@ from typing import Any
 
 import requests
 
+from .ApiImpl import ClimateRequestOptions
 from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -980,3 +981,94 @@ class HyundaiCciApiEU(GspaApiEU):
             {"command": command},
             path_prefix="valet/vehicles",
         )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — climate / engine / pet care
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_seat_climate_info(
+        options: ClimateRequestOptions,
+    ) -> dict[str, Any] | None:
+        """Map ClimateRequestOptions seat fields to the seatClimateInfo shape."""
+        info: dict[str, Any] = {}
+        if options.front_left_seat is not None:
+            info["drvSeatClimateState"] = options.front_left_seat
+        if options.front_right_seat is not None:
+            info["psgSeatClimateState"] = options.front_right_seat
+        if options.rear_left_seat is not None:
+            info["rlSeatClimateState"] = options.rear_left_seat
+        if options.rear_right_seat is not None:
+            info["rrSeatClimateState"] = options.rear_right_seat
+        return info if info else None
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        body: dict[str, Any] = {"command": "start"}
+        if options.set_temp is not None:
+            body["hvacTemp"] = str(options.set_temp)
+        if options.defrost is not None:
+            body["windshieldFrontDefogState"] = options.defrost
+        if options.heating is not None:
+            body["heating1"] = options.heating
+        if options.duration is not None:
+            body["ignitionDuration"] = options.duration
+        if options.steering_wheel is not None:
+            body["strgWhlHeating"] = options.steering_wheel
+        seat_info = self._build_seat_climate_info(options)
+        if seat_info:
+            body["seatClimateInfo"] = seat_info
+        return self._control_command(token, vehicle, "temperature", body)
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "temperature", {"command": "stop"})
+
+    def start_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        """Remote start via the engine endpoint.
+
+        Accepts the same climate fields as start_climate plus hvacCtrl
+        (options.climate) — confirmed endpoint shape.
+        """
+        body: dict[str, Any] = {"command": "start"}
+        if options:
+            if options.set_temp is not None:
+                body["hvacTemp"] = str(options.set_temp)
+            if options.defrost is not None:
+                body["windshieldFrontDefogState"] = options.defrost
+            if options.climate is not None:
+                body["hvacCtrl"] = 1 if options.climate else 0
+            if options.heating is not None:
+                body["heating1"] = options.heating
+            if options.duration is not None:
+                body["ignitionDuration"] = options.duration
+            if options.steering_wheel is not None:
+                body["strgWhlHeating"] = options.steering_wheel
+            seat_info = self._build_seat_climate_info(options)
+            if seat_info:
+                body["seatClimateInfo"] = seat_info
+        return self._control_command(token, vehicle, "engine", body)
+
+    def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "engine", {"command": "stop"})
+
+    def start_pet_care(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        # tempUnit values ported verbatim from the confirmed protocol tables —
+        # awaiting live validation.
+        temp = options.set_temp if options and options.set_temp else 21
+        body = {"hvacTemp": str(temp), "tempUnit": "F"}
+        return self._control_command(token, vehicle, "pet-care", body)
+
+    def stop_pet_care(self, token: Token, vehicle: Vehicle) -> str:
+        body = {"hvacTemp": "21", "tempUnit": "C"}
+        return self._control_command(token, vehicle, "pet-care", body)
