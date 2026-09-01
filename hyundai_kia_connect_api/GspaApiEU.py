@@ -1001,8 +1001,13 @@ class GspaApiEU(ApiImpl):
                 "PIN is not configured — remote control requires a PIN"
             )
         url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
-        headers = self._get_cci_headers(token.device_id or "")
-        headers["Content-Type"] = "application/json"
+        headers = self._get_cci_headers(
+            token.device_id or "",
+            cci_access_token=token.cci_access_token,
+            non_ccs_token=token.non_ccs_token,
+            exchangeable_token=token.exchangeable_token,
+            content_type="application/json",
+        )
         try:
             response = requests.post(
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
