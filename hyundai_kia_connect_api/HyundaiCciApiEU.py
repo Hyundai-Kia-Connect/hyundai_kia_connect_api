@@ -15,7 +15,7 @@ from typing import Any
 
 import requests
 
-from .ApiImpl import ClimateRequestOptions
+from .ApiImpl import ClimateRequestOptions, WindowRequestOptions
 from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -27,6 +27,7 @@ from .const import (
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
     PressureUnit,
 )
 from .exceptions import APIError, AuthenticationError, UnsupportedControlError
@@ -68,6 +69,9 @@ class HyundaiCciApiEU(GspaApiEU):
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.
     supports_svm: bool = True
+
+    # CCS2 EU vehicles support GSPA window control.
+    supports_window_control: bool = True
 
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)
@@ -1088,3 +1092,82 @@ class HyundaiCciApiEU(GspaApiEU):
     def stop_pet_care(self, token: Token, vehicle: Vehicle) -> str:
         body = {"hvacTemp": "21", "tempUnit": "C"}
         return self._control_command(token, vehicle, "pet-care", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — windows
+    # ------------------------------------------------------------------
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set window state via the scope-based window-curtain endpoint.
+
+        GSPA supports scope commands only (all windows or front windows);
+        a mixed per-window request raises UnsupportedControlError.
+        """
+        if not self.supports_window_control:
+            raise APIError("Window control not supported")
+        drv = options.driver_seat_window
+        psg = options.passenger_seat_window
+        rl = options.rear_left_window
+        rr = options.rear_right_window
+        seats = (drv, psg, rl, rr)
+        front = (drv, psg)
+        command: str | None = None
+        if all(s == WINDOW_STATE.CLOSED for s in seats):
+            command = "window-close"
+        elif all(s == WINDOW_STATE.OPEN for s in seats):
+            command = "window-open"
+        elif all(s == WINDOW_STATE.VENTILATION for s in seats):
+            command = "vent"
+        elif rl is None and rr is None:
+            if all(s == WINDOW_STATE.CLOSED for s in front):
+                command = "front-close"
+            elif all(s == WINDOW_STATE.OPEN for s in front):
+                command = "front-open"
+            elif all(s == WINDOW_STATE.VENTILATION for s in front):
+                command = "front-vent"
+        if command is None:
+            raise UnsupportedControlError(
+                "Mixed per-window state is not supported via GSPA — use "
+                "set_window_curtain for per-seat windows/curtains"
+            )
+        front_val = drv.value if drv is not None else None
+        rear_val = (
+            front_val if command in ("window-close", "window-open", "vent") else None
+        )
+        body: dict[str, Any] = {
+            "command": command,
+            "drvSeatWindow": front_val,
+            "psgSeatWindow": front_val,
+            "rlSeatWindow": rear_val,
+            "rrSeatWindow": rear_val,
+            "rlSeatWindowCurtain": None,
+            "rrSeatWindowCurtain": None,
+            "drvSeatLoc": options.driver_seat_location,
+        }
+        return self._control_command(token, vehicle, "windowcurtain", body)
+
+    def set_window_curtain(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set per-seat windows/curtains via the window-curtain endpoint.
+
+        Values: 0 = close, 1 = open, 2 = vent (WINDOW_STATE IntEnum).
+        """
+        body: dict[str, Any] = {"command": "open"}
+        if options.driver_seat_window is not None:
+            body["drvSeatWindow"] = options.driver_seat_window.value
+        if options.passenger_seat_window is not None:
+            body["psgSeatWindow"] = options.passenger_seat_window.value
+        if options.rear_left_window is not None:
+            body["rlSeatWindow"] = options.rear_left_window.value
+        if options.rear_right_window is not None:
+            body["rrSeatWindow"] = options.rear_right_window.value
+        if options.rear_left_curtain is not None:
+            body["rlSeatWindowCurtain"] = options.rear_left_curtain.value
+        if options.rear_right_curtain is not None:
+            body["rrSeatWindowCurtain"] = options.rear_right_curtain.value
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
+        return self._control_command(token, vehicle, "window-curtain", body)
