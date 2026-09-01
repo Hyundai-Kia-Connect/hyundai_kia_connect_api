@@ -17,7 +17,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -30,7 +30,10 @@ from .exceptions import (
     APIError,
     AuthenticationError,
     ConsentRequiredError,
+    DuplicateRequestError,
     InvalidAPIResponseError,
+    ServiceTemporaryUnavailable,
+    UnsupportedControlError,
 )
 from .gspa import create_tsid
 from .svm import (
@@ -181,6 +184,41 @@ class GspaApiEU(ApiImpl):
     # stamps are computed with the EU stamp region (1), matching the
     # live-verified pre-rework mapping (region 9 -> EU IV).
     STAMP_REGION = 1
+
+    # ------------------------------------------------------------------
+    # GSPA control constants (brand-neutral)
+    # ------------------------------------------------------------------
+
+    # CCSP endpoint names that differ from their GSPA endpoint names.
+    GSPA_ENDPOINT_MAP: ClassVar[dict[str, str]] = {
+        "hornlight": "horn-light",
+        "windowcurtain": "window-curtain",
+    }
+
+    # Endpoints NOT under /gspa/v1/remote/vehicles/{carId}/.
+    GSPA_PATH_PREFIX_MAP: ClassVar[dict[str, str]] = {
+        "valet": "valet/vehicles",
+        "rearseat-alarm": "safety/vehicles",
+    }
+
+    # Endpoints authenticated with standard GSPA headers (bearer) instead of
+    # the PIN-derived control token. Everything else is PIN-gated.
+    GSPA_BEARER_ENDPOINTS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "charge-target",
+            "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
+            "reservation-hvac",
+            "reservation-charge-hvac",
+            "reservation-engine",
+            "lock-and-start-toggle",
+        }
+    )
+
+    # Path constant used for action status polling (?path=...).
+    GSPA_REMOTE_VEHICLES_PATH = "gspa/v1/remote/vehicles"
 
     @property
     def CCI_DOMAIN_API_URL(self) -> str:
@@ -878,6 +916,43 @@ class GspaApiEU(ApiImpl):
             valid_until = valid_until.replace(tzinfo=dt.UTC)
         if valid_until - dt.timedelta(seconds=60) <= dt.datetime.now(dt.UTC):
             raise AuthenticationError("CCS token expired — refresh required")
+
+    def _raise_gspa_error(self, status_code: int, data: dict[str, Any]) -> None:
+        """Raise a typed exception from a GSPA failure response.
+
+        Classification (HTTP status / resCode / rc -> typed exception):
+          401                       -> AuthenticationError
+          "400-004"/"4004"          -> DuplicateRequestError (queued duplicate)
+          resCode "403-*"           -> AuthenticationError (stamp/auth failure)
+          "no update info" in msg   -> APIError (no pending OTA — business state)
+          resCode "404-*"           -> UnsupportedControlError
+          5xx HTTP / resCode "5-*"  -> ServiceTemporaryUnavailable
+          else                      -> APIError with the raw server message
+
+        Handles both response shapes: the control-command envelope
+        ({"rc": ..., "msg": ...}) and the REST envelope
+        ({"metaInfo": {"resCode": ..., "message": ...}}).
+        """
+        if status_code == 401:
+            raise AuthenticationError("GSPA: token expired or invalid")
+        meta: dict[str, Any] = (
+            data.get("metaInfo", {}) if isinstance(data, dict) else {}
+        )
+        res_code = meta.get("resCode") or data.get("rc")
+        msg = meta.get("message") or data.get("msg", "")
+        if res_code in ("400-004", "4004"):
+            raise DuplicateRequestError(f"GSPA duplicate: {res_code} {msg}")
+        if isinstance(res_code, str) and res_code.startswith("403"):
+            raise AuthenticationError(f"GSPA auth/stamp: {res_code} {msg}")
+        if "update info" in str(msg).lower():
+            raise APIError(f"No pending OTA update: {res_code} {msg}".strip())
+        if isinstance(res_code, str) and res_code.startswith("404"):
+            raise UnsupportedControlError(f"GSPA not supported: {res_code} {msg}")
+        if status_code >= 500 or (
+            isinstance(res_code, str) and res_code.startswith("5")
+        ):
+            raise ServiceTemporaryUnavailable(f"GSPA transient: {res_code} {msg}")
+        raise APIError(f"GSPA error: rc={res_code}, msg={msg}")
 
     # ------------------------------------------------------------------
     # GSPA GET helper
