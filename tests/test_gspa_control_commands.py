@@ -18,7 +18,11 @@ from hyundai_kia_connect_api.const import (
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
-from hyundai_kia_connect_api.exceptions import UnsupportedControlError
+from hyundai_kia_connect_api.exceptions import (
+    APIError,
+    AuthenticationError,
+    UnsupportedControlError,
+)
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -319,12 +323,16 @@ def test_set_charging_current():
     _, call = _run_command(HyundaiCciApiEU.set_charging_current, 2)
     assert call.args[0].endswith("/charging-current")
     assert call.kwargs["json"] == {"chargingCurrent": 2, "command": "set"}
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
 def test_set_v2l_discharge_limit():
     _, call = _run_command(HyundaiCciApiEU.set_vehicle_to_load_discharge_limit, 50)
     assert call.args[0].endswith("/discharge-limit")
     assert call.kwargs["json"] == {"dischargingLimit": 50, "command": "set"}
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
 def test_set_charge_alarm_enabled_and_disabled():
@@ -336,9 +344,13 @@ def test_set_charge_alarm_enabled_and_disabled():
         "alarmBefore30": 1,
         "command": "set",
     }
+    assert "AuthorizationCCSP" not in on.kwargs["headers"]
+    assert on.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
     _, off = _run_command(HyundaiCciApiEU.set_charge_alarm, False)
     assert off.kwargs["json"]["alarmOff"] == 1
     assert off.kwargs["json"]["alarmBefore10"] == 0
+    assert "AuthorizationCCSP" not in off.kwargs["headers"]
+    assert off.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
 def test_schedule_reservation_charge_body():
@@ -384,9 +396,50 @@ def test_schedule_charging_and_climate_body_shape():
     assert info1["reservInfo"]["time"] == {"time": "0705", "timeSection": 0}
     assert info1["reservFatcSet"]["airTemp"]["value"] == "21.5"
     assert "offPeakPowerInfo" in body
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
 def test_lock_and_start_toggle():
     _, call = _run_command(HyundaiCciApiEU.lock_and_start_toggle, True)
     assert call.args[0].endswith("/lock-and-start-toggle")
     assert call.kwargs["json"] == {"lockAndStartEnable": True}
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_control_command_rc_not_0000_raises_api_error():
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"rc": "500-001", "msg": "internal error"},
+        )
+        with pytest.raises(APIError) as exc_info:
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+    assert "500-001" in str(exc_info.value)
+    assert "internal error" in str(exc_info.value)
+    # only one POST — rc != "0000" on a 200 must not retry
+    assert post.call_count == 1
+
+
+def test_control_command_retry_exhausted_raises_auth_error():
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    err = MagicMock(status_code=401, json=dict)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.side_effect = [err, err]
+        with pytest.raises(AuthenticationError):
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+    assert post.call_count == 2
