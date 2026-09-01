@@ -175,8 +175,12 @@ def test_start_climate_full_options():
         set_temp=21.5,
         defrost=True,
         heating=1,
+        temp_unit=0,
+        hvac_temp_type=1,
+        driver_seat_location="L",
         duration=10,
         steering_wheel=True,
+        side_rear_mirror_heating=True,
         front_left_seat=1,
         front_right_seat=0,
         rear_left_seat=2,
@@ -188,8 +192,12 @@ def test_start_climate_full_options():
     assert body["hvacTemp"] == "21.5"
     assert body["windshieldFrontDefogState"] is True
     assert body["heating1"] == 1
+    assert body["tempUnit"] == 0
+    assert body["hvacTempType"] == 1
+    assert body["drvSeatLoc"] == "L"
     assert body["ignitionDuration"] == 10
     assert body["strgWhlHeating"] is True
+    assert body["sideRearMirrorHeating"] is True
     assert body["seatClimateInfo"] == {
         "drvSeatClimateState": 1,
         "psgSeatClimateState": 0,

@@ -1012,10 +1012,18 @@ class HyundaiCciApiEU(GspaApiEU):
             body["windshieldFrontDefogState"] = options.defrost
         if options.heating is not None:
             body["heating1"] = options.heating
+        if options.temp_unit is not None:
+            body["tempUnit"] = options.temp_unit
+        if options.hvac_temp_type is not None:
+            body["hvacTempType"] = options.hvac_temp_type
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
         if options.duration is not None:
             body["ignitionDuration"] = options.duration
         if options.steering_wheel is not None:
             body["strgWhlHeating"] = options.steering_wheel
+        if options.side_rear_mirror_heating is not None:
+            body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
         seat_info = self._build_seat_climate_info(options)
         if seat_info:
             body["seatClimateInfo"] = seat_info
@@ -1045,10 +1053,18 @@ class HyundaiCciApiEU(GspaApiEU):
                 body["hvacCtrl"] = 1 if options.climate else 0
             if options.heating is not None:
                 body["heating1"] = options.heating
+            if options.temp_unit is not None:
+                body["tempUnit"] = options.temp_unit
+            if options.hvac_temp_type is not None:
+                body["hvacTempType"] = options.hvac_temp_type
+            if options.driver_seat_location is not None:
+                body["drvSeatLoc"] = options.driver_seat_location
             if options.duration is not None:
                 body["ignitionDuration"] = options.duration
             if options.steering_wheel is not None:
                 body["strgWhlHeating"] = options.steering_wheel
+            if options.side_rear_mirror_heating is not None:
+                body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
             seat_info = self._build_seat_climate_info(options)
             if seat_info:
                 body["seatClimateInfo"] = seat_info
