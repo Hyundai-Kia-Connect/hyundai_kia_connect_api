@@ -15,7 +15,11 @@ from typing import Any
 
 import requests
 
-from .ApiImpl import ClimateRequestOptions, WindowRequestOptions
+from .ApiImpl import (
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
 from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -1171,3 +1175,317 @@ class HyundaiCciApiEU(GspaApiEU):
         if options.driver_seat_location is not None:
             body["drvSeatLoc"] = options.driver_seat_location
         return self._control_command(token, vehicle, "window-curtain", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — charge settings and reservations (bearer)
+    # ------------------------------------------------------------------
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        body = {
+            "targetSOClist": [
+                {"plugType": 0, "targetSOClevel": int(dc)},
+                {"plugType": 1, "targetSOClevel": int(ac)},
+            ],
+            "command": "set",
+        }
+        return self._control_command(token, vehicle, "charge-target", body)
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        body = {"chargingCurrent": level, "command": "set"}
+        return self._control_command(token, vehicle, "charging-current", body)
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        body = {"dischargingLimit": int(limit), "command": "set"}
+        return self._control_command(token, vehicle, "discharge-limit", body)
+
+    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+        if enabled:
+            body = {
+                "alarmOff": 0,
+                "alarmBefore10": 1,
+                "alarmBefore20": 1,
+                "alarmBefore30": 1,
+                "command": "set",
+            }
+        else:
+            body = {
+                "alarmOff": 1,
+                "alarmBefore10": 0,
+                "alarmBefore20": 0,
+                "alarmBefore30": 0,
+                "command": "set",
+            }
+        return self._control_command(token, vehicle, "charge-alarm", body)
+
+    def schedule_reservation_charge(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone charging reservation (flat DTO shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+
+        def _make_time(t: dt.time) -> dict[str, Any]:
+            return {
+                "time": t.strftime("%I%M"),
+                "timeSection": 1 if t >= dt.time(12, 0) else 0,
+            }
+
+        body = {
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "offpeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            "reservStartTime": _make_time(options.off_peak_start_time or dt.time()),
+            "reservEndTime": _make_time(
+                options.off_peak_end_time or options.off_peak_start_time or dt.time()
+            ),
+            "command": "set",
+        }
+        return self._control_command(token, vehicle, "reservation-charge", body)
+
+    def schedule_reservation_hvac(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        def _make_hvac_set() -> dict[str, Any]:
+            return {
+                "airCtrl": 1 if options.climate_enabled else 0,
+                "defrost": options.defrost or False,
+                "airTemp": {
+                    "value": f"{temperature:.1f}",
+                    "hvacTempType": 1,
+                    "unit": options.temperature_unit,
+                },
+                "heating1": 0,
+                "airPurifierControl": 0,
+            }
+
+        body = {
+            "reservedHVACInfo1": {
+                "reservHVACflag": 1 if options.first_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.first_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "reservedHVACInfo2": {
+                "reservHVACflag": 1 if options.second_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.second_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "command": "set",
+        }
+        return self._control_command(token, vehicle, "reservation-hvac", body)
+
+    def schedule_reservation_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule ICE engine remote-start reservation (reservInfo/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_engine_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        body = {
+            "reservInfo": _make_engine_reserv_info(options.first_departure),
+            "reservInfo2": _make_engine_reserv_info(options.second_departure),
+        }
+        return self._control_command(token, vehicle, "reservation-engine", body)
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        body = self._build_reservation_body(options)
+        return self._control_command(token, vehicle, "reservation-charge-hvac", body)
+
+    def _build_reservation_body(
+        self,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> dict[str, Any]:
+        """Build the reservation-charge-hvac body from options."""
+
+        def set_default_departure_options(
+            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> None:
+            if departure_options.enabled is None:
+                departure_options.enabled = False
+            if departure_options.days is None:
+                departure_options.days = [0]
+            if departure_options.time is None:
+                departure_options.time = dt.time()
+
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+
+        set_default_departure_options(options.first_departure)
+        set_default_departure_options(options.second_departure)
+        departures = [options.first_departure, options.second_departure]
+
+        if options.off_peak_start_time is None:
+            options.off_peak_start_time = dt.time()
+        if options.off_peak_end_time is None:
+            options.off_peak_end_time = options.off_peak_start_time
+        if options.off_peak_charge_only_enabled is None:
+            options.off_peak_charge_only_enabled = False
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            if temperature > 27.0:
+                temperature = 27.0
+            elif temperature < 17.0:
+                temperature = 17.0
+
+        return {
+            "reservChargeInfo": {
+                f"reservChargeInfo{i + 1}": {
+                    "reservChargeSet": departures[i].enabled,
+                    "reservInfo": {
+                        "day": departures[i].days,
+                        "time": {
+                            "time": departures[i].time.strftime("%I%M"),
+                            "timeSection": (
+                                1 if departures[i].time >= dt.time(12, 0) else 0
+                            ),
+                        },
+                    },
+                    "reservFatcSet": {
+                        "airCtrl": 1 if options.climate_enabled else 0,
+                        "airTemp": {
+                            "value": f"{temperature:.1f}",
+                            "hvacTempType": 1,
+                            "unit": options.temperature_unit,
+                        },
+                        "heating1": 0,
+                        "defrost": options.defrost,
+                    },
+                }
+                for i in range(2)
+            },
+            "offPeakPowerInfo": {
+                "offPeakPowerTime1": {
+                    "endtime": {
+                        "timeSection": (
+                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_end_time.strftime("%I%M"),
+                    },
+                    "starttime": {
+                        "timeSection": (
+                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_start_time.strftime("%I%M"),
+                    },
+                },
+                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            },
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "command": "set",
+        }
+
+    def lock_and_start_toggle(
+        self, token: Token, vehicle: Vehicle, enable: bool = True
+    ) -> str:
+        body = {"lockAndStartEnable": enable}
+        return self._control_command(token, vehicle, "lock-and-start-toggle", body)
