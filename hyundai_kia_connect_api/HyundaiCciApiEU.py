@@ -16,15 +16,19 @@ from typing import Any
 import requests
 
 from .const import (
+    CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
     PressureUnit,
 )
-from .exceptions import APIError, AuthenticationError
+from .exceptions import APIError, AuthenticationError, UnsupportedControlError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
 from .utils import (
@@ -855,3 +859,124 @@ class HyundaiCciApiEU(GspaApiEU):
                     self._update_vehicle_driving_history(vehicle, history)
             except Exception:
                 _LOGGER.debug(f"{DOMAIN} - Driving history fetch failed")
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — dispatcher
+    # ------------------------------------------------------------------
+
+    def _control_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        body: dict[str, Any],
+        path_prefix: str | None = None,
+    ) -> str:
+        """Send a control command via the vehicle's canonical control path.
+
+        CCS2 vehicles (ccu_ccs2_protocol_support) go through GSPA.
+        Pre-CCS2 EU vehicles are handled by the legacy EU region (region 1);
+        the CCI region rejects them with UnsupportedControlError.
+        """
+        if vehicle.ccu_ccs2_protocol_support:
+            return self._gspa_control_command(
+                token, vehicle, endpoint, body, path_prefix=path_prefix
+            )
+        raise UnsupportedControlError(
+            "Pre-CCS2 EU vehicles are not supported by the CCI region — "
+            "use region 1 (Europe) for remote control"
+        )
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        """Poll the status of a previously issued control action.
+
+        The CCI region only issues "gspa:" action ids; anything else cannot
+        be polled here.
+        """
+        if action_id.startswith("gspa:"):
+            return self._gspa_check_action_status(
+                token, vehicle, action_id[len("gspa:") :]
+            )
+        raise UnsupportedControlError(
+            f"Cannot poll action {action_id!r}: the CCI region only issues "
+            "'gspa:' action ids"
+        )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — simple commands
+    # ------------------------------------------------------------------
+
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
+        return self._control_command(token, vehicle, "door", {"command": command})
+
+    def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(
+            token, vehicle, "door-power-off", {"command": "CLOSE"}
+        )
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "charge", {"command": "start"})
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "charge", {"command": "stop"})
+
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
+        command = "open" if action == CHARGE_PORT_ACTION.OPEN else "close"
+        return self._control_command(token, vehicle, "portdoor", {"command": command})
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "frunk", {"command": "open"})
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "light", {"command": "on"})
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(token, vehicle, "hornlight", {"command": "on"})
+
+    def turn_off_lamp(
+        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+    ) -> str:
+        return self._control_command(token, vehicle, "lamp", {"command": mode})
+
+    def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(
+            token, vehicle, "battery-conditioning", {"command": "start"}
+        )
+
+    def stop_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(
+            token, vehicle, "battery-conditioning", {"command": "stop"}
+        )
+
+    def stop_rear_seat_alarm(self, token: Token, vehicle: Vehicle) -> str:
+        return self._control_command(
+            token,
+            vehicle,
+            "rearseat-alarm",
+            {"command": "stop"},
+            path_prefix="safety/vehicles",
+        )
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        command = "activate" if action == VALET_MODE_ACTION.ACTIVATE else "deactivate"
+        return self._control_command(
+            token,
+            vehicle,
+            "valet",
+            {"command": command},
+            path_prefix="valet/vehicles",
+        )
