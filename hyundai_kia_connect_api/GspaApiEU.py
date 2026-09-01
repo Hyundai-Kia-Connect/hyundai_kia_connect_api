@@ -933,15 +933,41 @@ class GspaApiEU(ApiImpl):
           5xx HTTP / resCode "5-*"  -> ServiceTemporaryUnavailable
           else                      -> APIError with the raw server message
 
-        Handles both response shapes: the control-command envelope
-        ({"rc": ..., "msg": ...}) and the REST envelope
-        ({"metaInfo": {"resCode": ..., "message": ...}}).
+        Handles three response shapes: the control-command envelope
+        ({"rc": ..., "msg": ...}), the REST envelope
+        ({"metaInfo": {"resCode": ..., "message": ...}}), and the Spring
+        Boot default error body ({"status": 404, "error": "Not Found",
+        "message": ...}) emitted when a GSPA route does not exist.
         """
         if status_code == 401:
             raise AuthenticationError("GSPA: token expired or invalid")
         meta: dict[str, Any] = (
             data.get("metaInfo", {}) if isinstance(data, dict) else {}
         )
+        # Spring Boot default error body ({"status": 404, "error": "Not
+        # Found", "message": "No static resource ...", "path": ...}) — used
+        # when a GSPA route does not exist for this vehicle/server.
+        if (
+            not meta
+            and not data.get("rc")
+            and isinstance(data.get("status"), int)
+            and data.get("error")
+        ):
+            spring_code = data["status"]
+            spring_msg = data.get("message", "")
+            if spring_code == 404:
+                raise UnsupportedControlError(
+                    f"GSPA not supported: {spring_code} {spring_msg}"
+                )
+            if spring_code == 403:
+                raise AuthenticationError(
+                    f"GSPA auth/stamp: {spring_code} {spring_msg}"
+                )
+            if spring_code >= 500:
+                raise ServiceTemporaryUnavailable(
+                    f"GSPA transient: {spring_code} {spring_msg}"
+                )
+            raise APIError(f"GSPA error: rc={spring_code}, msg={spring_msg}")
         res_code = meta.get("resCode") or data.get("rc")
         msg = meta.get("message") or data.get("msg", "")
         if res_code in ("400-004", "4004"):
