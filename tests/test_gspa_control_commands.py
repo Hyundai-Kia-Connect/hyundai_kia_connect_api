@@ -6,7 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions, WindowRequestOptions
+from hyundai_kia_connect_api.ApiImpl import (
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
@@ -295,3 +299,94 @@ def test_window_curtain_per_seat():
     assert body["rlSeatWindowCurtain"] == WINDOW_STATE.OPEN.value
     assert body["rrSeatWindowCurtain"] == WINDOW_STATE.CLOSED.value
     assert body["drvSeatLoc"] == "L"
+
+
+def test_set_charge_limits_bearer_auth():
+    _, call = _run_command(HyundaiCciApiEU.set_charge_limits, 80, 60)
+    body = call.kwargs["json"]
+    assert call.args[0].endswith("/charge-target")
+    assert body["targetSOClist"] == [
+        {"plugType": 0, "targetSOClevel": 60},
+        {"plugType": 1, "targetSOClevel": 80},
+    ]
+    assert body["command"] == "set"
+    # bearer endpoint: no AuthorizationCCSP, standard ccs token auth
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_set_charging_current():
+    _, call = _run_command(HyundaiCciApiEU.set_charging_current, 2)
+    assert call.args[0].endswith("/charging-current")
+    assert call.kwargs["json"] == {"chargingCurrent": 2, "command": "set"}
+
+
+def test_set_v2l_discharge_limit():
+    _, call = _run_command(HyundaiCciApiEU.set_vehicle_to_load_discharge_limit, 50)
+    assert call.args[0].endswith("/discharge-limit")
+    assert call.kwargs["json"] == {"dischargingLimit": 50, "command": "set"}
+
+
+def test_set_charge_alarm_enabled_and_disabled():
+    _, on = _run_command(HyundaiCciApiEU.set_charge_alarm, True)
+    assert on.kwargs["json"] == {
+        "alarmOff": 0,
+        "alarmBefore10": 1,
+        "alarmBefore20": 1,
+        "alarmBefore30": 1,
+        "command": "set",
+    }
+    _, off = _run_command(HyundaiCciApiEU.set_charge_alarm, False)
+    assert off.kwargs["json"]["alarmOff"] == 1
+    assert off.kwargs["json"]["alarmBefore10"] == 0
+
+
+def test_schedule_reservation_charge_body():
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = True
+    options.off_peak_charge_only_enabled = False
+    options.off_peak_start_time = dt.time(1, 30)
+    options.off_peak_end_time = dt.time(6, 0)
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_charge, options)
+    assert call.args[0].endswith("/reservation-charge")
+    body = call.kwargs["json"]
+    assert body["reservFlag"] == 1
+    assert body["offpeakPowerFlag"] == 1
+    assert body["reservStartTime"] == {"time": "0130", "timeSection": 0}
+    assert body["reservEndTime"] == {"time": "0600", "timeSection": 0}
+    assert body["command"] == "set"
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+
+
+def test_schedule_charging_and_climate_body_shape():
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = True
+    options.climate_enabled = False
+    options.temperature = 21.5
+    options.temperature_unit = 0
+    options.defrost = False
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.first_departure.days = [1]
+    options.first_departure.time = dt.time(7, 5)
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.off_peak_start_time = dt.time(1, 0)
+    options.off_peak_end_time = dt.time(5, 0)
+    options.off_peak_charge_only_enabled = False
+    _, call = _run_command(HyundaiCciApiEU.schedule_charging_and_climate, options)
+    assert call.args[0].endswith("/reservation-charge-hvac")
+    body = call.kwargs["json"]
+    assert body["reservFlag"] == 1
+    assert body["command"] == "set"
+    info1 = body["reservChargeInfo"]["reservChargeInfo1"]
+    assert info1["reservChargeSet"] is True
+    assert info1["reservInfo"]["day"] == [1]
+    assert info1["reservInfo"]["time"] == {"time": "0705", "timeSection": 0}
+    assert info1["reservFatcSet"]["airTemp"]["value"] == "21.5"
+    assert "offPeakPowerInfo" in body
+
+
+def test_lock_and_start_toggle():
+    _, call = _run_command(HyundaiCciApiEU.lock_and_start_toggle, True)
+    assert call.args[0].endswith("/lock-and-start-toggle")
+    assert call.kwargs["json"] == {"lockAndStartEnable": True}
