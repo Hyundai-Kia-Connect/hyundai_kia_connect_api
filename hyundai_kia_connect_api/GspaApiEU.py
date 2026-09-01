@@ -255,6 +255,10 @@ class GspaApiEU(ApiImpl):
         else:
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
 
+        # PIN-derived control token cache (D5: per API instance, not Token).
+        self._control_token: str | None = None
+        self._control_token_expiry: float = 0.0
+
         self.session = ApiImplSession()
 
     def login(
@@ -953,6 +957,172 @@ class GspaApiEU(ApiImpl):
         ):
             raise ServiceTemporaryUnavailable(f"GSPA transient: {res_code} {msg}")
         raise APIError(f"GSPA error: rc={res_code}, msg={msg}")
+
+    # ------------------------------------------------------------------
+    # GSPA control: PIN-derived control token + control commands
+    # ------------------------------------------------------------------
+
+    def _get_control_token(self, token: Token) -> tuple[str, int]:
+        """Verify the PIN and return (control_token, expiry_epoch_seconds).
+
+        Uses the CCI PIN endpoint (confirmed endpoint shape):
+          POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
+        Response: {"isMatched": true, "controlTokenInfo":
+                   {"controlToken": "...", "expiresTime": <ms epoch>}}
+        """
+        if not token.pin:
+            raise UnsupportedControlError(
+                "PIN is not configured — remote control requires a PIN"
+            )
+        url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
+        headers = self._get_cci_headers(token.device_id or "")
+        headers["Content-Type"] = "application/json"
+        try:
+            response = requests.post(
+                url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
+            )
+            resp: dict[str, Any] = response.json()
+        except ValueError as e:
+            raise APIError("CCI PIN endpoint returned a non-JSON body") from e
+        if resp.get("isMatched") is not True:
+            # 2xx business error (live-probed 2026-09-04: HTTP 200 with
+            # isMatched false and controlTokenInfo null). After 5 failed
+            # attempts the server locks PIN entry for a window: remainCount
+            # drops 4->0 per failure, and while locked even the CORRECT pin
+            # returns isMatched false until the window passes. remainTime
+            # is the constant window length (SECONDS), not a countdown.
+            failed = resp.get("remainCountOnFailedInfo") or {}
+            remaining = failed.get("remainCount")
+            if remaining == 0:
+                window = failed.get("remainTime")
+                raise APIError(
+                    "PIN is temporarily locked by the server "
+                    f"(lockout window: {window}s). Wait for the lockout "
+                    "to expire, then the correct PIN will work again."
+                )
+            if remaining is not None:
+                raise APIError(
+                    "PIN verification failed, ensure PIN is entered "
+                    f"correctly. ({remaining} attempts remaining)"
+                )
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
+        info: dict[str, Any] = resp.get("controlTokenInfo", {})
+        control_token = info.get("controlToken")
+        if not control_token:
+            raise InvalidAPIResponseError("CCI PIN response missing controlToken")
+        try:
+            expires_ms = int(info.get("expiresTime", 0))
+        except (TypeError, ValueError) as e:
+            raise InvalidAPIResponseError("CCI PIN response missing expiresTime") from e
+        # expiresTime is a ms epoch timestamp; tolerate a plain-seconds value.
+        expire_at = expires_ms // 1000 if expires_ms > 1e12 else expires_ms
+        return f"Bearer {control_token}", expire_at
+
+    def _get_control_token_cached(self, token: Token) -> str:
+        """Return the cached control token, verifying the PIN once per cycle."""
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if self._control_token and now < self._control_token_expiry - 30:
+            return self._control_token
+        control_token, expire_at = self._get_control_token(token)
+        self._control_token = control_token
+        self._control_token_expiry = float(expire_at)
+        return control_token
+
+    def _invalidate_control_token(self) -> None:
+        self._control_token = None
+        self._control_token_expiry = 0.0
+
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        """Headers for PIN-gated GSPA control commands.
+
+        Same base as _get_authenticated_headers, but Authorization carries the
+        PIN-derived control token (mirrored in AuthorizationCCSP).
+        """
+        control_token = self._get_control_token_cached(token)
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support or 0
+        )
+        headers["Authorization"] = control_token
+        headers["AuthorizationCCSP"] = control_token
+        return headers
+
+    def _get_control_request_headers(
+        self, token: Token, vehicle: Vehicle, endpoint: str
+    ) -> dict[str, Any]:
+        """Dispatch request headers by endpoint auth class (bearer vs PIN)."""
+        if endpoint in self.GSPA_BEARER_ENDPOINTS:
+            return self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support or 0
+            )
+        return self._get_control_headers(token, vehicle)
+
+    def _gspa_control_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        body: dict[str, Any],
+        path_prefix: str | None = None,
+    ) -> str:
+        """Send a control command via a GSPA endpoint.
+
+        POST {CCSP_API_URL}/gspa/v1/{prefix}/{carId}/{endpoint}; prefix
+        defaults to "remote/vehicles" unless the endpoint map says otherwise.
+        Body keys follow the confirmed protocol tables ("command", not
+        "action"; no "deviceId").
+
+        Response envelope: {"rt": ..., "rc": "0000", "rs": {"SID": ...},
+        "SID": ..., "msg": ...}. Returns "gspa:{SID}" for action status
+        polling. On a 401 for a PIN-gated endpoint the control token cache is
+        invalidated and the command is retried exactly once.
+        """
+        gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
+        prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
+            endpoint, "remote/vehicles"
+        )
+        # Normalize legacy bodies: GSPA uses "command"; no deviceId.
+        if "action" in body and "command" not in body:
+            action_value = body["action"]
+            body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
+            body["command"] = action_value
+        body = {k: v for k, v in body.items() if k != "deviceId"}
+
+        url = self.CCSP_API_URL + f"/gspa/v1/{prefix}/{vehicle.id}/{gspa_endpoint}"
+        self._validate_ccs_token(token)
+        pin_gated = endpoint not in self.GSPA_BEARER_ENDPOINTS
+        response: requests.Response | None = None
+        for attempt in (1, 2):
+            headers = self._get_control_request_headers(token, vehicle, endpoint)
+            response = requests.post(url, headers=headers, json=body, timeout=(5, 30))
+            if response.status_code == 401 and pin_gated and attempt == 1:
+                self._invalidate_control_token()
+                continue
+            break
+        assert response is not None  # loop always runs at least once
+
+        if response.status_code >= 400:
+            try:
+                data: dict[str, Any] = response.json()
+            except ValueError:
+                data = {}
+            self._raise_gspa_error(response.status_code, data)
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise InvalidAPIResponseError(
+                f"GSPA control returned non-JSON body: {response.text[:200]!r}"
+            ) from e
+        rc = data.get("rc")
+        if rc and rc != "0000":
+            self._raise_gspa_error(response.status_code, data)
+        rs = data.get("rs")
+        rs_sid = rs.get("SID") if isinstance(rs, dict) else None
+        sid = data.get("SID") or rs_sid or ""
+        if not sid:
+            raise InvalidAPIResponseError(
+                f"GSPA control succeeded (rc={rc!r}) but response has no SID"
+            )
+        return f"gspa:{sid}"
 
     # ------------------------------------------------------------------
     # GSPA GET helper
