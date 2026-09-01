@@ -1,16 +1,18 @@
 """HyundaiCciApiEU GSPA control commands — path/body/auth per endpoint."""
 
 import datetime as dt
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
+from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions, WindowRequestOptions
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
 )
 from hyundai_kia_connect_api.exceptions import UnsupportedControlError
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
@@ -245,3 +247,51 @@ def test_pet_care_start_with_temp():
         HyundaiCciApiEU.start_pet_care, ClimateRequestOptions(set_temp=23.0)
     )
     assert call.kwargs["json"] == {"hvacTemp": "23.0", "tempUnit": "F"}
+
+
+def test_windows_all_close_scope_command():
+    options = WindowRequestOptions(
+        driver_seat_window=WINDOW_STATE.CLOSED,
+        passenger_seat_window=WINDOW_STATE.CLOSED,
+        rear_left_window=WINDOW_STATE.CLOSED,
+        rear_right_window=WINDOW_STATE.CLOSED,
+    )
+    _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/window-curtain")
+    body: dict[str, Any] = call.kwargs["json"]
+    assert body["command"] == "window-close"
+    assert body["rlSeatWindow"] == WINDOW_STATE.CLOSED.value
+
+
+def test_windows_front_open_scope():
+    options = WindowRequestOptions(
+        driver_seat_window=WINDOW_STATE.OPEN,
+        passenger_seat_window=WINDOW_STATE.OPEN,
+    )
+    _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
+    assert call.kwargs["json"]["command"] == "front-open"
+
+
+def test_windows_mixed_state_raises():
+    options = WindowRequestOptions(
+        driver_seat_window=WINDOW_STATE.OPEN,
+        passenger_seat_window=WINDOW_STATE.CLOSED,
+    )
+    api = _make_api()
+    with pytest.raises(UnsupportedControlError):
+        api.set_windows_state(_make_token(), _make_vehicle(), options)
+
+
+def test_window_curtain_per_seat():
+    options = WindowRequestOptions(
+        rear_left_curtain=WINDOW_STATE.OPEN,
+        rear_right_curtain=WINDOW_STATE.CLOSED,
+        driver_seat_location="L",
+    )
+    _, call = _run_command(HyundaiCciApiEU.set_window_curtain, options)
+    body: dict[str, Any] = call.kwargs["json"]
+    assert call.args[0].endswith("/window-curtain")
+    assert body["command"] == "open"
+    assert body["rlSeatWindowCurtain"] == WINDOW_STATE.OPEN.value
+    assert body["rrSeatWindowCurtain"] == WINDOW_STATE.CLOSED.value
+    assert body["drvSeatLoc"] == "L"
