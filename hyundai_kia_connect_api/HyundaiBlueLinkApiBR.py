@@ -315,6 +315,61 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             pin=pin,
         )
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh the access token with BR's oauth2 refresh_token grant.
+
+        ``ApiImplType1.refresh_access_token`` targets ``USER_API_URL`` /
+        ``BASE_URL`` / ``BASIC_AUTHORIZATION``, none of which BR defines, so it
+        raised ``AttributeError`` on every call, swallowed it in its
+        ``except Exception`` and fell back to a full login on *every* poll. It
+        also prefixes the token type onto ``access_token``, while BR builds its
+        own ``Bearer`` prefix in ``_get_authenticated_headers``, so the
+        inherited implementation could not have worked here even if the
+        attributes existed.
+
+        Falls back to a full login when there is no refresh token or the
+        exchange fails (an expired refresh token is the normal case).
+        """
+        if token.refresh_token:
+            try:
+                url = self._build_api_url("/user/oauth2/token")
+                body = {
+                    "client_id": self.ccsp_service_id,
+                    "grant_type": "refresh_token",
+                    "refresh_token": token.refresh_token,
+                }
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                    "User-Agent": self.api_headers["User-Agent"],
+                    "Authorization": self.basic_authorization_header,
+                }
+
+                response = self.session.post(url, data=body, headers=headers)
+                self._raise_auth_error(response, "token refresh")
+                auth_response = response.json()
+
+                expires_at = dt.datetime.now(dt.UTC) + timedelta(
+                    seconds=auth_response["expires_in"]
+                )
+                _LOGGER.debug(f"{DOMAIN} - Access token refreshed")
+                return Token(
+                    access_token=auth_response["access_token"],
+                    refresh_token=auth_response.get(
+                        "refresh_token", token.refresh_token
+                    ),
+                    valid_until=expires_at,
+                    username=token.username,
+                    password=token.password,
+                    device_id=token.device_id,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, pin=token.pin)
+
     @_retry_on_device_id_error
     def get_vehicles(self, token: Token) -> list:
         """Get list of vehicles."""

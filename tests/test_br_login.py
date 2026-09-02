@@ -280,3 +280,60 @@ class TestDeviceIdRegistration:
         assert [v.id for v in vehicles] == ["v1"]
         assert token.device_id == "srv-2"
         br_api._get_device_id.assert_called_once()
+
+
+class TestRefreshAccessToken:
+    """BR must not inherit the Type1 refresh, which cannot work here.
+
+    ``ApiImplType1.refresh_access_token`` reads ``USER_API_URL`` /
+    ``BASE_URL`` / ``BASIC_AUTHORIZATION``; BR defines none of them, so every
+    refresh raised ``AttributeError``, was swallowed by the helper's
+    ``except Exception`` and degraded into a full login on every poll.
+    """
+
+    def test_refresh_uses_br_endpoint_and_preserves_device_id(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(
+            200, {"access_token": "at2", "refresh_token": "rt2", "expires_in": 3600}
+        )
+        token = Token(
+            username="user@example.com",
+            password="pass",
+            access_token="at1",
+            refresh_token="rt1",
+            device_id="srv-1",
+            pin="1234",
+        )
+
+        new_token = br_api.refresh_access_token(token)
+
+        url = br_api.session.post.call_args.args[0]
+        assert url == "https://br-ccapi.hyundai.com.br/api/v1/user/oauth2/token"
+        assert br_api.session.post.call_args.kwargs["data"]["grant_type"] == (
+            "refresh_token"
+        )
+        # BR adds its own "Bearer " prefix in _get_authenticated_headers, so the
+        # stored token must stay unprefixed (Type1 prepends token_type).
+        assert new_token.access_token == "at2"
+        assert new_token.refresh_token == "rt2"
+        assert new_token.device_id == "srv-1"
+        assert new_token.pin == "1234"
+
+    def test_refresh_without_refresh_token_falls_back_to_login(self, br_api):
+        br_api.login = MagicMock(return_value="logged-in")
+        token = Token(username="user@example.com", password="pass", refresh_token=None)
+
+        assert br_api.refresh_access_token(token) == "logged-in"
+        # pin must be passed as a keyword; Type1 passed it positionally into
+        # login()'s otp_handler slot.
+        br_api.login.assert_called_once_with("user@example.com", "pass", pin=None)
+
+    def test_refresh_failure_falls_back_to_login(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(
+            400, {"errCode": 4001, "errMsg": "Invalid grant"}
+        )
+        br_api.login = MagicMock(return_value="logged-in")
+        token = Token(username="user@example.com", password="pass", refresh_token="rt1")
+
+        assert br_api.refresh_access_token(token) == "logged-in"
