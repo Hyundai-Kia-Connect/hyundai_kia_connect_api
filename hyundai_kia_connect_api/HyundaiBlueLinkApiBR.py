@@ -4,7 +4,9 @@
 
 import datetime as dt
 import logging
+import random
 import typing as ty
+import uuid
 from datetime import timedelta
 from time import sleep
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -12,7 +14,11 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from requests import Response
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions, WindowRequestOptions
-from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .ApiImplType1 import (
+    ApiImplType1,
+    _check_response_for_errors,
+    _retry_on_device_id_error,
+)
 from .const import (
     BRAND_HYUNDAI,
     BRANDS,
@@ -73,7 +79,6 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self.base_url = "br-ccapi.hyundai.com.br"
         self.api_url = f"https://{self.base_url}/api/v1/"
         self.api_v2_url = f"https://{self.base_url}/api/v2/"
-        self.ccsp_device_id = "c6e5815b-3057-4e5e-95d5-e3d5d1d2093e"
         self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
         self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
         self.basic_authorization_header = (
@@ -94,6 +99,10 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         self.session = ApiImplSession()
         self.temperature_range = range(62, 82)
+        # Registered with /spa/notifications/register on first use and
+        # reused for the lifetime of this object, so a full login does not
+        # register a new push device every time.
+        self._registered_device_id: str | None = None
 
     def _build_api_url(self, path: str) -> str:
         """Build full API URL from path."""
@@ -103,10 +112,50 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """Build API v2 URL from path."""
         return urljoin(self.api_v2_url, path.lstrip("/"))
 
+    def _get_stamp(self) -> None:
+        """BR does not use the Stamp header; required by the shared retry helper."""
+
+    def _get_device_id(self, stamp: str | None = None) -> str:
+        """Register a push device and return the server-issued device id.
+
+        The BR backend validates ``ccsp-device-id`` against its own device
+        registry: it rejects both client-generated UUIDs and ids it has since
+        invalidated, answering ``resCode 4002`` ("Invalid deviceId") on every
+        authenticated SPA call. The id therefore has to be obtained from
+        ``/spa/notifications/register``, the same way EU and IN do it.
+
+        Always registers a fresh id and caches it, so the retry path can
+        recover from a server-side invalidation.
+        """
+        registration_id = f"{random.randrange(10**80):064x}"[:64]
+        url = self._build_api_url("/spa/notifications/register")
+        payload = {
+            "pushRegId": registration_id,
+            "pushType": "APNS",
+            "uuid": str(uuid.uuid4()),
+        }
+        headers = dict(self.api_headers)
+        headers["ccsp-service-id"] = self.ccsp_service_id
+        headers["ccsp-application-id"] = self.ccsp_application_id
+
+        _LOGGER.debug(f"{DOMAIN} - Registering device at {url}")
+        response = self.session.post(url, headers=headers, json=payload)
+        self._raise_auth_error(response, "device registration")
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+
+        device_id = response_json["resMsg"]["deviceId"]
+        self._registered_device_id = device_id
+        return device_id
+
+    def _ensure_device_id(self) -> str:
+        """Return this session's registered device id, registering one if needed."""
+        return self._registered_device_id or self._get_device_id()
+
     def _get_authenticated_headers(self, token: Token) -> dict:
         """Get headers with authentication."""
         headers = dict(self.api_headers)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
         headers["ccsp-device-id"] = device_id
         headers["ccsp-application-id"] = self.ccsp_application_id
         headers["Authorization"] = f"Bearer {token.access_token}"
@@ -262,10 +311,11 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             valid_until=expires_at,
             username=username,
             password=password,
-            device_id=self.ccsp_device_id,
+            device_id=self._ensure_device_id(),
             pin=pin,
         )
 
+    @_retry_on_device_id_error
     def get_vehicles(self, token: Token) -> list:
         """Get list of vehicles."""
         url = self._build_api_url("/spa/vehicles")
@@ -319,6 +369,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         _check_response_for_errors(response)
         return response["resMsg"]["state"]["Vehicle"]
 
+    @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Update with the server-cached CCS2 state (does not wake the car)."""
         state = self._get_cached_vehicle_state(token, vehicle)
@@ -374,7 +425,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         if not token.pin:
             raise APIError("PIN is required for remote commands.")
 
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
         token.device_id = device_id
 
         url = self._build_api_url("/user/pin")
@@ -401,7 +452,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     ) -> str:
         """Lock or unlock the vehicle."""
         control_token = self._ensure_control_token(token)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
 
         url = self._build_api_v2_url(
             f"spa/vehicles/{vehicle.id}/control/door",
@@ -481,7 +532,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     ) -> str:
         """Open or close all windows (BR API controls all windows together)."""
         control_token = self._ensure_control_token(token)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
 
         url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/window")
 
@@ -519,7 +570,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         """Turn on hazard lights (lights only, no horn)."""
         control_token = self._ensure_control_token(token)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
 
         url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/light")
         headers = self._get_authenticated_headers(token)
@@ -558,7 +609,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     ) -> str:
         """Start climate control with temperature and seat heating settings."""
         control_token = self._ensure_control_token(token)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
 
         url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
 
@@ -622,7 +673,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         """Stop climate control."""
         control_token = self._ensure_control_token(token)
-        device_id = token.device_id or self.ccsp_device_id
+        device_id = token.device_id or self._ensure_device_id()
 
         url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
 

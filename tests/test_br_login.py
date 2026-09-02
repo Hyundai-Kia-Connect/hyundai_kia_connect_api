@@ -22,6 +22,7 @@ from hyundai_kia_connect_api.exceptions import (
     InvalidAPIResponseError,
 )
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+from hyundai_kia_connect_api.Token import Token
 
 _BR_REGION = next(k for k, v in REGIONS.items() if v == REGION_BRAZIL)
 _HYUNDAI_BRAND = next(k for k, v in BRANDS.items() if v == BRAND_HYUNDAI)
@@ -143,10 +144,13 @@ class TestGetVehicles:
     def test_400_spa_envelope_raises_typed_error_not_httperror(self, br_api):
         # SPA envelope (retCode F + resCode 4002) → DeviceIDError via the shared
         # classifier, preserving device-id retry semantics — not a raw HTTPError.
+        # get_vehicles re-registers and retries once; when the retry fails the
+        # same way, the typed error still surfaces.
         br_api.session = MagicMock()
         br_api.session.get.return_value = _resp(
             400, {"retCode": "F", "resCode": "4002", "resMsg": "Invalid deviceId"}
         )
+        br_api._get_device_id = MagicMock(return_value="srv-1")
         with pytest.raises(DeviceIDError):
             br_api.get_vehicles(MagicMock())
 
@@ -181,3 +185,98 @@ class TestGetVehicles:
         vehicles = br_api.get_vehicles(MagicMock())
         assert len(vehicles) == 1
         assert vehicles[0].id == "v1"
+
+
+class TestDeviceIdRegistration:
+    """BR must use a server-issued device id, not a hardcoded/random one.
+
+    Regression for kia_uvo #1861: the device id hardcoded in #962 was
+    eventually invalidated server-side, so every authenticated SPA call
+    answered ``resCode 4002`` ("Invalid deviceId") and the integration was
+    stuck in ``setup_retry`` with all entities unavailable.
+    """
+
+    def test_no_hardcoded_device_id(self, br_api):
+        assert not hasattr(br_api, "ccsp_device_id")
+        assert br_api._registered_device_id is None
+
+    def test_get_device_id_returns_server_issued_id(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(
+            200, {"retCode": "S", "resCode": "0000", "resMsg": {"deviceId": "srv-1"}}
+        )
+        assert br_api._get_device_id() == "srv-1"
+
+        url = br_api.session.post.call_args.args[0]
+        assert url.endswith("/spa/notifications/register")
+        payload = br_api.session.post.call_args.kwargs["json"]
+        assert set(payload) == {"pushRegId", "pushType", "uuid"}
+        assert len(payload["pushRegId"]) == 64
+
+    def test_get_device_id_caches_for_reuse(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(
+            200, {"retCode": "S", "resCode": "0000", "resMsg": {"deviceId": "srv-1"}}
+        )
+        assert br_api._ensure_device_id() == "srv-1"
+        # Second call must not register another push device.
+        assert br_api._ensure_device_id() == "srv-1"
+        assert br_api.session.post.call_count == 1
+
+    def test_get_device_id_surfaces_registration_failure(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.post.return_value = _resp(403, None, text="<html>blocked</html>")
+        with pytest.raises(AuthenticationError, match="device registration"):
+            br_api._get_device_id()
+
+    def test_login_uses_registered_device_id(self, br_api):
+        br_api.session = MagicMock()
+        br_api._get_cookies = MagicMock(return_value={})
+        br_api._get_authorization_code = MagicMock(return_value="code")
+        br_api._get_auth_response = MagicMock(
+            return_value={
+                "access_token": "at",
+                "refresh_token": "rt",
+                "expires_in": 3600,
+            }
+        )
+        br_api._get_device_id = MagicMock(return_value="srv-1")
+
+        token = br_api.login("user@example.com", "pass")
+        assert token.device_id == "srv-1"
+
+    def test_get_vehicles_reregisters_and_retries_on_4002(self, br_api):
+        """A device id invalidated mid-session must self-heal, not strand the
+        integration until the next restart."""
+        br_api.session = MagicMock()
+        br_api.session.get.side_effect = [
+            _resp(
+                400, {"retCode": "F", "resCode": "4002", "resMsg": "Invalid deviceId"}
+            ),
+            _resp(
+                200,
+                {
+                    "resMsg": {
+                        "vehicles": [
+                            {
+                                "vehicleId": "v1",
+                                "nickname": "My Car",
+                                "vehicleName": "Creta",
+                                "regDate": "20240101",
+                                "vin": "VIN123",
+                                "type": "GN",
+                                "ccuCCS2ProtocolSupport": 0,
+                            }
+                        ]
+                    }
+                },
+            ),
+        ]
+        br_api._get_device_id = MagicMock(return_value="srv-2")
+
+        token = Token(access_token="at", device_id="stale-id")
+        vehicles = br_api.get_vehicles(token)
+
+        assert [v.id for v in vehicles] == ["v1"]
+        assert token.device_id == "srv-2"
+        br_api._get_device_id.assert_called_once()
