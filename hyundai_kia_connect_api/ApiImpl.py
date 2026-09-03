@@ -4,6 +4,7 @@
 import datetime as dt
 import logging
 from dataclasses import dataclass
+from typing import TypeVar
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -21,6 +22,8 @@ from .const import (
     OPENSTREETMAP,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
+    TEMPERATURE_C,
+    TEMPERATURE_F,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
@@ -90,6 +93,211 @@ class ScheduleChargingClimateRequestOptions:
     temperature: float = None
     temperature_unit: int = None
     defrost: bool = None
+
+    @classmethod
+    def from_vehicle(cls, vehicle: Vehicle) -> "ScheduleChargingClimateRequestOptions":
+        """Options representing the vehicle's current schedule settings.
+
+        Unknown vehicle state falls back to the documented defaults
+        (with warnings) — see ``_fill_schedule_options_from_vehicle``.
+        """
+        options = cls()
+        _fill_schedule_options_from_vehicle(
+            options, vehicle, scopes=("charge", "climate")
+        )
+        return options
+
+
+_T = TypeVar("_T")
+
+
+def _schedule_charging_scopes(
+    options: ScheduleChargingClimateRequestOptions,
+) -> tuple[bool, bool]:
+    """Return (charge_scope_active, climate_scope_active) from raw options.
+
+    A scope is active when at least one of its fields was explicitly provided
+    (not None). Departures count toward the climate scope.
+    """
+    charge_active = any(
+        value is not None
+        for value in (
+            options.charging_enabled,
+            options.off_peak_start_time,
+            options.off_peak_end_time,
+            options.off_peak_charge_only_enabled,
+        )
+    )
+    climate_active = (
+        any(
+            value is not None
+            for value in (
+                options.climate_enabled,
+                options.temperature,
+                options.temperature_unit,
+                options.defrost,
+            )
+        )
+        or options.first_departure is not None
+        or options.second_departure is not None
+    )
+    return charge_active, climate_active
+
+
+def _fill_option_value(  # noqa: UP047  # TypeVar required for py3.10 floor
+    current: _T | None,
+    source: _T | None,
+    default: _T,
+    label: str,
+    vehicle_id: str,
+    warn_unknown: bool,
+) -> _T:
+    """None = leave unchanged: explicit value, else vehicle value, else default."""
+    if current is not None:
+        return current
+    if source is not None:
+        return source
+    if warn_unknown:
+        _LOGGER.warning(
+            f"{DOMAIN} - {vehicle_id}: schedule option {label} not reported by "
+            "vehicle; using default"
+        )
+    return default
+
+
+def _fill_departure_options(
+    departure: ScheduleChargingClimateRequestOptions.DepartureOptions,
+    vehicle: Vehicle,
+    number: int,
+    *,
+    warn_unknown: bool,
+) -> None:
+    """Fill a departure's None fields from the matching vehicle state."""
+    if number == 1:
+        v_enabled = vehicle.ev_first_departure_enabled
+        v_days = vehicle.ev_first_departure_days
+        v_time = vehicle.ev_first_departure_time
+        prefix = "first_departure"
+    else:
+        v_enabled = vehicle.ev_second_departure_enabled
+        v_days = vehicle.ev_second_departure_days
+        v_time = vehicle.ev_second_departure_time
+        prefix = "second_departure"
+    departure.enabled = _fill_option_value(
+        departure.enabled,
+        v_enabled,
+        False,
+        f"{prefix}.enabled",
+        vehicle.id,
+        warn_unknown,
+    )
+    departure.days = _fill_option_value(
+        departure.days, v_days, [0], f"{prefix}.days", vehicle.id, warn_unknown
+    )
+    departure.time = _fill_option_value(
+        departure.time, v_time, dt.time(), f"{prefix}.time", vehicle.id, warn_unknown
+    )
+
+
+def _fill_schedule_options_from_vehicle(
+    options: ScheduleChargingClimateRequestOptions,
+    vehicle: Vehicle,
+    *,
+    scopes: tuple[str, ...],
+    warn_unknown: bool = True,
+) -> None:
+    """Fill None option fields with the vehicle's current settings.
+
+    Implements "None = leave unchanged": fields already set are preserved,
+    unset fields take the vehicle's reported value, and unknown vehicle state
+    falls back to the documented default with a warning (so a known value is
+    never silently reset). Only the requested scopes are filled; an inactive
+    scope is skipped (its endpoint is not called).
+    """
+    if "charge" in scopes:
+        options.charging_enabled = _fill_option_value(
+            options.charging_enabled,
+            vehicle.ev_schedule_charge_enabled,
+            False,
+            "charging_enabled",
+            vehicle.id,
+            warn_unknown,
+        )
+        options.off_peak_start_time = _fill_option_value(
+            options.off_peak_start_time,
+            vehicle.ev_off_peak_start_time,
+            dt.time(),
+            "off_peak_start_time",
+            vehicle.id,
+            warn_unknown,
+        )
+        options.off_peak_end_time = _fill_option_value(
+            options.off_peak_end_time,
+            vehicle.ev_off_peak_end_time,
+            dt.time(),
+            "off_peak_end_time",
+            vehicle.id,
+            warn_unknown,
+        )
+        options.off_peak_charge_only_enabled = _fill_option_value(
+            options.off_peak_charge_only_enabled,
+            vehicle.ev_off_peak_charge_only_enabled,
+            False,
+            "off_peak_charge_only_enabled",
+            vehicle.id,
+            warn_unknown,
+        )
+    if "climate" in scopes:
+        for number, departure in (
+            (1, options.first_departure),
+            (2, options.second_departure),
+        ):
+            if departure is None:
+                departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+                if number == 1:
+                    options.first_departure = departure
+                else:
+                    options.second_departure = departure
+            _fill_departure_options(
+                departure, vehicle, number, warn_unknown=warn_unknown
+            )
+        # One climate set models both departures (known limitation, #1302).
+        options.climate_enabled = _fill_option_value(
+            options.climate_enabled,
+            vehicle.ev_first_departure_climate_enabled,
+            False,
+            "climate_enabled",
+            vehicle.id,
+            warn_unknown,
+        )
+        options.temperature = _fill_option_value(
+            options.temperature,
+            vehicle.ev_first_departure_climate_temperature,
+            21.0,
+            "temperature",
+            vehicle.id,
+            warn_unknown,
+        )
+        if options.temperature_unit is None:
+            unit_map = {TEMPERATURE_C: 0, TEMPERATURE_F: 1}
+            source_unit = vehicle.ev_first_departure_climate_temperature_unit
+            if source_unit in unit_map:
+                options.temperature_unit = unit_map[source_unit]
+            else:
+                if warn_unknown:
+                    _LOGGER.warning(
+                        f"{DOMAIN} - {vehicle.id}: schedule option "
+                        "temperature_unit not reported by vehicle; using default"
+                    )
+                options.temperature_unit = 0
+        options.defrost = _fill_option_value(
+            options.defrost,
+            vehicle.ev_first_departure_climate_defrost,
+            False,
+            "defrost",
+            vehicle.id,
+            warn_unknown,
+        )
 
 
 @dataclass
