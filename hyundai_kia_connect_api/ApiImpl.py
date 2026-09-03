@@ -77,6 +77,15 @@ class OTPRequest:
 
 @dataclass
 class ScheduleChargingClimateRequestOptions:
+    """Options for scheduled charging and climate writes.
+
+    ``None`` on any field means "leave unchanged": the library resolves it
+    from the vehicle's current settings. An explicit value (including
+    ``False``) is written to the car. On the flat EV5 path a scope with all
+    fields ``None`` skips its endpoint entirely; the combined
+    ``/reservation/chargehvac`` path always sends both scopes.
+    """
+
     @dataclass
     class DepartureOptions:
         enabled: bool = None
