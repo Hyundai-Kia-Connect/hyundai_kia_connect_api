@@ -537,6 +537,9 @@ def test_schedule_charging_off_peak_flag_not_inverted(ccs2_api, vehicle):
     ccs2_api._get_control_headers = lambda token, vehicle: {}
     ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
     vehicle.id = "test-vehicle-id"
+    # The flat dispatch writes the climate scope too (departures are set):
+    # report a temperature so the unresolvable-temperature guard passes.
+    vehicle.ev_first_departure_climate_temperature = (21.0, "°C")
 
     ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
     assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 1
@@ -574,6 +577,9 @@ def test_schedule_charging_off_peak_flag_target_priority(ccs2_api, vehicle):
     ccs2_api._get_control_headers = lambda token, vehicle: {}
     ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
     vehicle.id = "test-vehicle-id"
+    # The flat dispatch writes the climate scope too (departures are set):
+    # report a temperature so the unresolvable-temperature guard passes.
+    vehicle.ev_first_departure_climate_temperature = (21.0, "°C")
 
     ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
     assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 2

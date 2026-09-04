@@ -355,6 +355,13 @@ class VehicleManager:
     def schedule_charging_and_climate(
         self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
     ) -> str:
+        """Set scheduled charging and/or climate for the vehicle.
+
+        ``None`` option fields mean "leave unchanged": the library resolves
+        them from the vehicle's current settings. On ccNC/EV5-appMode EVs a
+        scope whose options are all ``None`` skips its endpoint entirely;
+        calling with no field set raises ``ValueError``.
+        """
         return self.api.schedule_charging_and_climate(
             self.token, self.get_vehicle(vehicle_id), options
         )

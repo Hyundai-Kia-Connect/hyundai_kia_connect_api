@@ -15,6 +15,10 @@ from .ApiImpl import (
     POIInfo,
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
+    _fill_schedule_options_from_vehicle,
+    _guard_schedule_temperature,
+    _schedule_charging_scopes,
+    _vehicle_temperature_unit,
 )
 from .const import (
     DISTANCE_UNITS,
@@ -822,6 +826,10 @@ class ApiImplType1(ApiImpl):
 
         # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
         # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
+        # Until parsed, CCS2 vehicles report no departure-climate state; a
+        # schedule write that activates the climate scope then requires an
+        # explicit temperature (ValueError otherwise — see
+        # _guard_schedule_temperature in ApiImpl).
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1095,54 +1103,33 @@ class ApiImplType1(ApiImpl):
         url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
         url = url + "/reservation/chargehvac"
 
-        def set_default_departure_options(
-            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
-        ) -> None:
-            if departure_options.enabled is None:
-                departure_options.enabled = False
-            if departure_options.days is None:
-                departure_options.days = [0]
-            if departure_options.time is None:
-                departure_options.time = dt.time()
-
-        if options.first_departure is None:
-            options.first_departure = (
-                ScheduleChargingClimateRequestOptions.DepartureOptions()
-            )
-        if options.second_departure is None:
-            options.second_departure = (
-                ScheduleChargingClimateRequestOptions.DepartureOptions()
-            )
-
-        set_default_departure_options(options.first_departure)
-        set_default_departure_options(options.second_departure)
-        departures = [options.first_departure, options.second_departure]
-
-        if options.charging_enabled is None:
-            options.charging_enabled = False
-        if options.off_peak_start_time is None:
-            options.off_peak_start_time = dt.time()
-        if options.off_peak_end_time is None:
-            options.off_peak_end_time = options.off_peak_start_time
-        if options.off_peak_charge_only_enabled is None:
-            options.off_peak_charge_only_enabled = False
-        if options.climate_enabled is None:
-            options.climate_enabled = False
-        if options.temperature is None:
-            options.temperature = 21.0
-        if options.temperature_unit is None:
-            options.temperature_unit = 0
-        if options.defrost is None:
-            options.defrost = False
-
         # ccNC/EV5-appMode EVs (EV6/EV9) use two flat endpoints instead of the
         # combined /ccs2/reservation/chargehvac, which is a no-op for them.
         # Dispatch by ccu_ccs2_protocol_support (== ccNC head unit) + EV type.
         if vehicle.ccu_ccs2_protocol_support and vehicle.engine_type == ENGINE_TYPES.EV:
-            return self._schedule_ev5_flat(token, vehicle, options)
+            charge_active, climate_active = _schedule_charging_scopes(options)
+            if not (charge_active or climate_active):
+                raise ValueError("no schedule changes requested")
+            return self._schedule_ev5_flat(
+                token,
+                vehicle,
+                options,
+                charge_active=charge_active,
+                climate_active=climate_active,
+            )
 
+        # Combined path: both scopes are always sent in one payload; None
+        # fields are filled from the vehicle's current settings (None = leave
+        # unchanged).
+        _guard_schedule_temperature(options, vehicle)
+        _fill_schedule_options_from_vehicle(
+            options, vehicle, scopes=("charge", "climate")
+        )
+        departures = [options.first_departure, options.second_departure]
+
+        temperature_unit = _vehicle_temperature_unit(vehicle) or 0
         temperature: float = options.temperature
-        if options.temperature_unit == 0:
+        if temperature_unit == 0:
             # Round to nearest 0.5
             temperature = round(temperature * 2.0) / 2.0
             # Cap at 27, floor at 17
@@ -1166,7 +1153,7 @@ class ApiImplType1(ApiImpl):
                     "airTemp": {
                         "value": f"{temperature:.1f}",
                         "hvacTempType": 1,
-                        "unit": options.temperature_unit,
+                        "unit": temperature_unit,
                     },
                     "heating1": 0,
                     "defrost": options.defrost,
@@ -1209,87 +1196,105 @@ class ApiImplType1(ApiImpl):
         token: Token,
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
+        *,
+        charge_active: bool,
+        climate_active: bool,
     ) -> str:
         """Set scheduled charging + climate for ccNC/EV5-appMode EVs.
 
         EV5-appMode vehicles (ccNC EV6/EV9) use two flat endpoints instead of
         the combined /ccs2/reservation/chargehvac: charge settings go to
         /ccs2/reservation/charge (flat body, lowercase ``offpeakPowerFlag``),
-        departure-climate presets to /ccs2/reservation/hvac. Options defaults
-        are already applied by ``schedule_charging_and_climate``.
+        departure-climate presets to /ccs2/reservation/hvac.
+
+        ``None`` option fields mean "leave unchanged": active-scope fields are
+        filled from the vehicle's current settings, and a scope with no
+        requested change skips its endpoint entirely.
         """
-        departures = [options.first_departure, options.second_departure]
+        charge_payload: dict[str, object] | None = None
+        hvac_payload: dict[str, object] | None = None
 
-        temperature: float = options.temperature
-        if options.temperature_unit == 0:
-            temperature = round(temperature * 2.0) / 2.0
-            if temperature > 27.0:
-                temperature = 27.0
-            elif temperature < 17.0:
-                temperature = 17.0
-
-        charge_payload = {
-            "reservFlag": 1 if options.charging_enabled else 0,
-            "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
-            "reservStartTime": {
-                "time": options.off_peak_start_time.strftime("%I%M"),
-                "timeSection": (
-                    1 if options.off_peak_start_time >= dt.time(12, 0) else 0
-                ),
-            },
-            "reservEndTime": {
-                "time": options.off_peak_end_time.strftime("%I%M"),
-                "timeSection": (
-                    1 if options.off_peak_end_time >= dt.time(12, 0) else 0
-                ),
-            },
-        }
-
-        hvac_payload = {
-            "reservedHVACInfo" + str(i + 1): {
-                "reservHVACflag": 1 if departures[i].enabled else 0,
-                "reservInfo": {
-                    "day": departures[i].days,
-                    "time": {
-                        "time": departures[i].time.strftime("%I%M"),
-                        "timeSection": (
-                            1 if departures[i].time >= dt.time(12, 0) else 0
-                        ),
-                    },
+        if charge_active:
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
+            charge_payload = {
+                "reservFlag": 1 if options.charging_enabled else 0,
+                "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
+                "reservStartTime": {
+                    "time": options.off_peak_start_time.strftime("%I%M"),
+                    "timeSection": (
+                        1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                    ),
                 },
-                "reservHVACSet": {
-                    "airCtrl": 1 if options.climate_enabled else 0,
-                    "airTemp": {
-                        "value": f"{temperature:.1f}",
-                        "hvacTempType": 1,
-                        "unit": options.temperature_unit,
-                    },
-                    "defrost": options.defrost,
+                "reservEndTime": {
+                    "time": options.off_peak_end_time.strftime("%I%M"),
+                    "timeSection": (
+                        1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                    ),
                 },
             }
-            for i in range(2)
-        }
+
+        if climate_active:
+            _guard_schedule_temperature(options, vehicle)
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
+            departures = [options.first_departure, options.second_departure]
+            temperature: float = options.temperature
+            temperature_unit = _vehicle_temperature_unit(vehicle) or 0
+            if temperature_unit == 0:
+                temperature = round(temperature * 2.0) / 2.0
+                if temperature > 27.0:
+                    temperature = 27.0
+                elif temperature < 17.0:
+                    temperature = 17.0
+            hvac_payload = {
+                "reservedHVACInfo" + str(i + 1): {
+                    "reservHVACflag": 1 if departures[i].enabled else 0,
+                    "reservInfo": {
+                        "day": departures[i].days,
+                        "time": {
+                            "time": departures[i].time.strftime("%I%M"),
+                            "timeSection": (
+                                1 if departures[i].time >= dt.time(12, 0) else 0
+                            ),
+                        },
+                    },
+                    "reservHVACSet": {
+                        "airCtrl": 1 if options.climate_enabled else 0,
+                        "airTemp": {
+                            "value": f"{temperature:.1f}",
+                            "hvacTempType": 1,
+                            "unit": temperature_unit,
+                        },
+                        "defrost": options.defrost,
+                    },
+                }
+                for i in range(2)
+            }
 
         base_url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/reservation"
-        _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge request: {charge_payload}")
-        charge_response = self.session.post(
-            base_url + "/charge",
-            json=charge_payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge response: {charge_response}")
-        _check_response_for_errors(charge_response)
+        charge_msg_id = ""
+        hvac_msg_id = ""
+        if charge_payload is not None:
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge request: {charge_payload}")
+            charge_response = self.session.post(
+                base_url + "/charge",
+                json=charge_payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge response: {charge_response}")
+            _check_response_for_errors(charge_response)
+            charge_msg_id = charge_response["msgId"]
+        if hvac_payload is not None:
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac request: {hvac_payload}")
+            hvac_response = self.session.post(
+                base_url + "/hvac",
+                json=hvac_payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac response: {hvac_response}")
+            _check_response_for_errors(hvac_response)
+            hvac_msg_id = hvac_response["msgId"]
 
-        _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac request: {hvac_payload}")
-        hvac_response = self.session.post(
-            base_url + "/hvac",
-            json=hvac_payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac response: {hvac_response}")
-        _check_response_for_errors(hvac_response)
-
-        return charge_response["msgId"]
+        return charge_msg_id if charge_active else hvac_msg_id
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
         """Return the driver seat location for CCS2 climate payloads.

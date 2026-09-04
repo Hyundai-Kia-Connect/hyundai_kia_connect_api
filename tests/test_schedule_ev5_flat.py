@@ -79,7 +79,6 @@ def _options(**kw) -> ScheduleChargingClimateRequestOptions:
         off_peak_charge_only_enabled=kw.get("off_peak_charge_only_enabled", True),
         climate_enabled=kw.get("climate_enabled", False),
         temperature=kw.get("temperature", 21.0),
-        temperature_unit=kw.get("temperature_unit", 0),
         defrost=kw.get("defrost", False),
         first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
             enabled=kw.get("first_departure_enabled", False),
@@ -270,3 +269,194 @@ class TestEV5Return:
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         msg_id = api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
         assert msg_id == "charge-xyz"
+
+
+def _raw_options(**kw) -> ScheduleChargingClimateRequestOptions:
+    """Options with ONLY the listed fields set (all others None)."""
+    opts = ScheduleChargingClimateRequestOptions(
+        charging_enabled=kw.get("charging_enabled"),
+        off_peak_start_time=kw.get("off_peak_start_time"),
+        off_peak_end_time=kw.get("off_peak_end_time"),
+        off_peak_charge_only_enabled=kw.get("off_peak_charge_only_enabled"),
+        climate_enabled=kw.get("climate_enabled"),
+        temperature=kw.get("temperature"),
+        defrost=kw.get("defrost"),
+        first_departure=kw.get("first_departure"),
+        second_departure=kw.get("second_departure"),
+    )
+    return opts
+
+
+class TestEV5ScopeSkip:
+    def test_charge_only_skips_hvac(self, api):
+        # The #1298 case: only charging changed -> single POST.
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_schedule_charge_enabled = True
+        v.ev_off_peak_start_time = dt.time(23, 0)
+        v.ev_off_peak_end_time = dt.time(5, 0)
+        v.ev_off_peak_charge_only_enabled = True
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+        )
+        urls = [c["url"] for c in calls]
+        assert any(u.endswith("/reservation/charge") for u in urls)
+        assert not any(u.endswith("/reservation/hvac") for u in urls)
+
+    def test_climate_only_skips_charge(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_first_departure_enabled = True
+        v.ev_first_departure_days = [0]
+        v.ev_first_departure_time = dt.time(7, 0)
+        v.ev_first_departure_climate_enabled = True
+        v.ev_first_departure_climate_temperature = (21.0, "°C")
+        v.ev_first_departure_climate_defrost = False
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(temperature=24.0)
+        )
+        urls = [c["url"] for c in calls]
+        assert any(u.endswith("/reservation/hvac") for u in urls)
+        assert not any(u.endswith("/reservation/charge") for u in urls)
+        hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["value"] == "24.0"
+
+    def test_both_scopes_two_posts(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token),
+            v,
+            _raw_options(charging_enabled=True, temperature=21.0),
+        )
+        urls = [c["url"] for c in calls]
+        assert any(u.endswith("/reservation/charge") for u in urls)
+        assert any(u.endswith("/reservation/hvac") for u in urls)
+
+    def test_all_none_raises_no_post(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(ValueError, match="no schedule changes requested"):
+            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _raw_options())
+        assert calls == []
+
+    def test_explicit_off_still_posts_both(self, api):
+        # Explicit False is a WRITE (not a skip): both endpoints are called.
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_schedule_charge_enabled = True
+        v.ev_first_departure_climate_temperature = (21.0, "°C")
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token),
+            v,
+            _raw_options(charging_enabled=False, climate_enabled=False),
+        )
+        urls = [c["url"] for c in calls]
+        assert any(u.endswith("/reservation/charge") for u in urls)
+        assert any(u.endswith("/reservation/hvac") for u in urls)
+
+
+class TestEV5AutoFill:
+    def test_vehicle_state_reaches_charge_payload(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_schedule_charge_enabled = True
+        v.ev_off_peak_start_time = dt.time(23, 30)
+        v.ev_off_peak_end_time = dt.time(1, 30)
+        v.ev_off_peak_charge_only_enabled = True
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+        )
+        charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
+        assert charge["reservFlag"] == 0  # explicit
+        assert charge["reservStartTime"] == {"time": "1130", "timeSection": 1}
+        assert charge["reservEndTime"] == {"time": "0130", "timeSection": 0}
+        assert charge["offpeakPowerFlag"] == 1  # from vehicle state
+
+    def test_vehicle_state_reaches_hvac_payload(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_first_departure_enabled = True
+        v.ev_first_departure_days = [2, 4]
+        v.ev_first_departure_time = dt.time(8, 15)
+        v.ev_first_departure_climate_enabled = False
+        v.ev_first_departure_climate_temperature = (21.5, "°C")
+        v.ev_first_departure_climate_defrost = False
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+        )
+        hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
+        assert hvac["reservedHVACInfo1"]["reservHVACflag"] == 1
+        assert hvac["reservedHVACInfo1"]["reservInfo"]["day"] == [2, 4]
+        assert hvac["reservedHVACInfo1"]["reservInfo"]["time"] == {
+            "time": "0815",
+            "timeSection": 0,
+        }
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airCtrl"] == 1  # explicit
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["value"] == "21.5"
+
+
+class TestCombinedAutoFill:
+    def test_combined_fills_none_from_vehicle(self, api):
+        """Combined path cannot skip: None fields resolved from vehicle state."""
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=0, engine_type=ENGINE_TYPES.EV)
+        v.ev_schedule_charge_enabled = True
+        v.ev_off_peak_start_time = dt.time(23, 30)
+        v.ev_off_peak_end_time = dt.time(1, 30)
+        v.ev_off_peak_charge_only_enabled = False
+        v.ev_first_departure_enabled = True
+        v.ev_first_departure_days = [0]
+        v.ev_first_departure_time = dt.time(7, 0)
+        v.ev_first_departure_climate_enabled = False
+        v.ev_first_departure_climate_temperature = (21.0, "°C")
+        v.ev_first_departure_climate_defrost = False
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+        )
+        payload = next(c["json"] for c in calls if c["url"].endswith("/chargehvac"))
+        assert payload["reservFlag"] == 0  # explicit write
+        assert payload["offPeakPowerInfo"]["offPeakPowerTime1"]["starttime"] == {
+            "time": "1130",
+            "timeSection": 1,
+        }
+        assert payload["reservChargeInfo1"]["reservChargeSet"] is True  # from vehicle
+
+
+class TestCCS2TemperatureGuard:
+    """CCS2 vehicles report no departure-climate temperature yet: a climate
+    write without an explicit temperature must fail loudly instead of
+    silently resetting the car's setting to the 21.0 default."""
+
+    def test_raises_without_posts(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(ValueError, match="departure climate temperature"):
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+            )
+        assert calls == []
+
+    def test_explicit_temperature_posts_hvac(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token),
+            v,
+            _raw_options(climate_enabled=True, temperature=24.0),
+        )
+        hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["value"] == "24.0"
+        # unit: vehicle reports none -> °C (0) fallback
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["unit"] == 0
+
+    def test_unit_derived_from_vehicle(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_first_departure_climate_temperature = (21.5, "°C")
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+        )
+        hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["unit"] == 0
+        assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["value"] == "21.5"
