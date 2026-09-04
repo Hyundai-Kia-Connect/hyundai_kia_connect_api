@@ -981,11 +981,18 @@ class HyundaiCciApiEU(GspaApiEU):
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:
+        """Activate/deactivate valet mode via the valet control endpoint.
+
+        The app posts ValetControlApiRequest{command} to the ``control``
+        endpoint on the valet path (ValetRemoteDataSource passes
+        getGspaValetVehiclesPath = "gspa/v1/valet/vehicles"):
+        POST /gspa/v1/valet/vehicles/{carId}/control.
+        """
         command = "activate" if action == VALET_MODE_ACTION.ACTIVATE else "deactivate"
         return self._control_command(
             token,
             vehicle,
-            "valet",
+            "control",
             {"command": command},
             path_prefix="valet/vehicles",
         )

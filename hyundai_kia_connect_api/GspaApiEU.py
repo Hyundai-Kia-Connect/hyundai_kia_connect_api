@@ -196,8 +196,9 @@ class GspaApiEU(ApiImpl):
     }
 
     # Endpoints NOT under /gspa/v1/remote/vehicles/{carId}/.
+    # (Valet control posts to the "control" endpoint on the valet path —
+    # callers pass path_prefix="valet/vehicles" explicitly.)
     GSPA_PATH_PREFIX_MAP: ClassVar[dict[str, str]] = {
-        "valet": "valet/vehicles",
         "rearseat-alarm": "safety/vehicles",
     }
 
@@ -1103,9 +1104,11 @@ class GspaApiEU(ApiImpl):
         "action"; no "deviceId").
 
         Response envelope: {"rt": ..., "rc": "0000", "rs": {"SID": ...},
-        "SID": ..., "msg": ...}. Returns "gspa:{SID}" for action status
-        polling. On a 401 for a PIN-gated endpoint the control token cache is
-        invalidated and the command is retried exactly once.
+        "SID": ..., "msg": ...} (CarRemoteControlApiResponse carries SID as
+        the primary polling handle and svcSID as the alternate). Returns
+        "gspa:{SID}" for action status polling. On a 401 for a PIN-gated
+        endpoint the control token cache is invalidated and the command is
+        retried exactly once.
         """
         gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
         prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
@@ -1149,8 +1152,16 @@ class GspaApiEU(ApiImpl):
         if rc and rc != "0000":
             self._raise_gspa_error(response.status_code, data)
         rs = data.get("rs")
-        rs_sid = rs.get("SID") if isinstance(rs, dict) else None
-        sid = data.get("SID") or rs_sid or ""
+        rs_payload = rs if isinstance(rs, dict) else {}
+        # SID is the primary polling handle; svcSID the alternate (some
+        # commands return only svcSID).
+        sid = (
+            data.get("SID")
+            or rs_payload.get("SID")
+            or data.get("svcSID")
+            or rs_payload.get("svcSID")
+            or ""
+        )
         if not sid:
             raise InvalidAPIResponseError(
                 f"GSPA control succeeded (rc={rc!r}) but response has no SID"
