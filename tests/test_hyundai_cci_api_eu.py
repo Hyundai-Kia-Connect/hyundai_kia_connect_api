@@ -11,6 +11,7 @@ import pytest
 
 from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import (
+    APIError,
     AuthenticationError,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
@@ -675,6 +676,10 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
         ),
         patch.object(api, "_get_driving_info", return_value=None),
         patch.object(api, "_get_driving_history", return_value=None),
+        # the cached-update path also runs the GSPA query reads
+        # (software-version / OTA / valet) — keep them out of this
+        # stored-status test so no live HTTP is attempted
+        patch.object(api, "_update_vehicle_gspa_data", MagicMock()),
     ):
         api.update_vehicle_with_cached_state(token, vehicle)
 
@@ -783,3 +788,44 @@ def test_refresh_4111_logs_info_not_warning(caplog):
     assert any(
         r.levelno == logging.INFO and "4111" in r.message for r in caplog.records
     )
+
+
+# ── _update_vehicle_gspa_data() — sw/ota reads on cached path ──
+
+
+def test_update_vehicle_gspa_data_populates_sw_ota():
+    """GSPA query reads populate software_version / ota_update_available
+    on the cached-update path."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    with (
+        patch.object(
+            api, "get_software_version", return_value={"softwareVersion": "ABC123"}
+        ),
+        patch.object(
+            api,
+            "get_ota_updates",
+            return_value={"otaUpdateList": [{"id": "x"}]},
+        ),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+    assert vehicle.software_version == "ABC123"
+    assert vehicle.ota_update_available is True
+
+
+def test_update_vehicle_gspa_data_failure_sets_unknown():
+    """HA convention: a failed sw/ota read leaves the field as unknown
+    (None), not stale."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    with (
+        patch.object(api, "get_software_version", side_effect=APIError("boom")),
+        patch.object(api, "get_ota_updates", side_effect=APIError("boom")),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+    assert vehicle.ota_update_available is None
+    assert vehicle._ota_checked is True  # checked — don't retry until force refresh
