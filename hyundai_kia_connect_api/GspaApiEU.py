@@ -783,8 +783,19 @@ class GspaApiEU(ApiImpl):
         if token.cci_access_token or getattr(token, "non_ccs_token", None):
             try:
                 return self._refresh_cci_token(token)
-            except Exception:
-                _LOGGER.warning("CCI token refresh failed, falling back to full login")
+            except Exception as ex:
+                if "4111" in str(ex):
+                    # 4111 = credentials expired; the refresh_token itself is
+                    # expired. Full login is the expected recovery — INFO, not
+                    # WARNING.
+                    _LOGGER.info(
+                        f"{DOMAIN} - CCI credentials expired (4111), "
+                        "falling back to full login"
+                    )
+                else:
+                    _LOGGER.warning(
+                        "CCI token refresh failed, falling back to full login"
+                    )
                 return self.login(token.username, token.password, token.pin)
 
         # No CCI tokens — fall back to full login
