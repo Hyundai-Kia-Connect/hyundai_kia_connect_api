@@ -316,6 +316,25 @@ class TestMqttProperties:
         vm._mqtt_client = mock_client
         assert vm.is_mqtt_connected is False
 
+    def test_get_mqtt_connection_state_passes_through(self):
+        """get_mqtt_connection_state delegates to the API impl method."""
+        vm = _make_vm()
+        vm.api.get_mqtt_connection_state = MagicMock(return_value="ONLINE")
+        assert vm.get_mqtt_connection_state() == "ONLINE"
+        vm.api.get_mqtt_connection_state.assert_called_once_with(vm.token)
+
+    def test_api_impl_provides_get_mqtt_connection_state(self):
+        """Regression: the CCI/EU API impl must implement connstate lookup.
+
+        VehicleManager.get_mqtt_connection_state calls
+        self.api.get_mqtt_connection_state — an API impl without the
+        method raises AttributeError at runtime.
+        """
+        from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+
+        api = HyundaiCciApiEU(region=9, brand=2, language="en")
+        assert callable(getattr(api, "get_mqtt_connection_state", None))
+
 
 # ---------------------------------------------------------------------------
 # CarStatus callback tests
