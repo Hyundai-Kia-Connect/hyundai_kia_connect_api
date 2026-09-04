@@ -16,7 +16,9 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
     _fill_schedule_options_from_vehicle,
+    _guard_schedule_temperature,
     _schedule_charging_scopes,
+    _vehicle_temperature_unit,
 )
 from .const import (
     DISTANCE_UNITS,
@@ -824,6 +826,10 @@ class ApiImplType1(ApiImpl):
 
         # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
         # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
+        # Until parsed, CCS2 vehicles report no departure-climate state; a
+        # schedule write that activates the climate scope then requires an
+        # explicit temperature (ValueError otherwise — see
+        # _guard_schedule_temperature in ApiImpl).
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1115,13 +1121,15 @@ class ApiImplType1(ApiImpl):
         # Combined path: both scopes are always sent in one payload; None
         # fields are filled from the vehicle's current settings (None = leave
         # unchanged).
+        _guard_schedule_temperature(options, vehicle)
         _fill_schedule_options_from_vehicle(
             options, vehicle, scopes=("charge", "climate")
         )
         departures = [options.first_departure, options.second_departure]
 
+        temperature_unit = _vehicle_temperature_unit(vehicle) or 0
         temperature: float = options.temperature
-        if options.temperature_unit == 0:
+        if temperature_unit == 0:
             # Round to nearest 0.5
             temperature = round(temperature * 2.0) / 2.0
             # Cap at 27, floor at 17
@@ -1145,7 +1153,7 @@ class ApiImplType1(ApiImpl):
                     "airTemp": {
                         "value": f"{temperature:.1f}",
                         "hvacTempType": 1,
-                        "unit": options.temperature_unit,
+                        "unit": temperature_unit,
                     },
                     "heating1": 0,
                     "defrost": options.defrost,
@@ -1230,10 +1238,12 @@ class ApiImplType1(ApiImpl):
             }
 
         if climate_active:
+            _guard_schedule_temperature(options, vehicle)
             _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
             departures = [options.first_departure, options.second_departure]
             temperature: float = options.temperature
-            if options.temperature_unit == 0:
+            temperature_unit = _vehicle_temperature_unit(vehicle) or 0
+            if temperature_unit == 0:
                 temperature = round(temperature * 2.0) / 2.0
                 if temperature > 27.0:
                     temperature = 27.0
@@ -1256,7 +1266,7 @@ class ApiImplType1(ApiImpl):
                         "airTemp": {
                             "value": f"{temperature:.1f}",
                             "hvacTempType": 1,
-                            "unit": options.temperature_unit,
+                            "unit": temperature_unit,
                         },
                         "defrost": options.defrost,
                     },

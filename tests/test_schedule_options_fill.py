@@ -2,9 +2,12 @@
 
 import datetime as dt
 
+import pytest
+
 from hyundai_kia_connect_api.ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     _fill_schedule_options_from_vehicle,
+    _guard_schedule_temperature,
     _schedule_charging_scopes,
 )
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -86,7 +89,6 @@ class TestFill:
         assert options.second_departure.enabled is False
         assert options.climate_enabled is True
         assert options.temperature == 22.0
-        assert options.temperature_unit == 0  # "°C" converted to 0
         assert options.defrost is False
 
     def test_fill_preserves_explicit_values(self):
@@ -115,7 +117,8 @@ class TestFill:
         assert options.temperature is None
         assert "climate_enabled" not in caplog.text
 
-    def test_fill_unknown_state_defaults_and_warns(self, caplog):
+    def test_fill_unknown_state_defaults_and_warns_once(self, caplog):
+        """Unknown vehicle state: defaults + a single warning for all options."""
         v = Vehicle()
         v.id = "vid-123"  # nothing reported
         options = ScheduleChargingClimateRequestOptions(charging_enabled=True)
@@ -125,8 +128,31 @@ class TestFill:
         assert options.off_peak_start_time == dt.time()  # default 00:00
         assert options.off_peak_end_time == dt.time()
         assert options.off_peak_charge_only_enabled is False
-        assert "off_peak_start_time" in caplog.text
-        assert "vid-123" in caplog.text
+        warnings = [
+            r
+            for r in caplog.records
+            if r.levelname == "WARNING" and "vid-123" in r.message
+        ]
+        assert len(warnings) == 1
+        assert "off_peak_start_time" in warnings[0].message
+        assert "off_peak_charge_only_enabled" in warnings[0].message
+
+    def test_fill_days_fallback_is_not_selected_sentinel(self):
+        """days None with unknown vehicle state -> [9] (NOT_SELECTED_DAY), not [0]."""
+        options = ScheduleChargingClimateRequestOptions()
+        _fill_schedule_options_from_vehicle(options, Vehicle(), scopes=("climate",))
+        assert options.first_departure.days == [9]
+        assert options.second_departure.days == [9]
+
+    def test_fill_empty_days_normalized_to_sentinel(self):
+        """Explicit empty day list is normalized to the [9] sentinel like the apps."""
+        options = ScheduleChargingClimateRequestOptions(
+            first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+                days=[]
+            )
+        )
+        _fill_schedule_options_from_vehicle(options, _vehicle(), scopes=("climate",))
+        assert options.first_departure.days == [9]
 
     def test_fill_partial_departure(self):
         """Provided departure with None fields is filled from vehicle state."""
@@ -149,14 +175,36 @@ class TestFromVehicle:
         options = ScheduleChargingClimateRequestOptions.from_vehicle(_vehicle())
         assert options.charging_enabled is True
         assert options.first_departure.days == [1, 3]
-        assert options.temperature_unit == 0
         assert options.temperature == 22.0
 
     def test_from_vehicle_unknown_state_defaults(self):
         options = ScheduleChargingClimateRequestOptions.from_vehicle(Vehicle())
         assert options.charging_enabled is False
         assert options.temperature == 21.0
-        assert options.temperature_unit == 0
         assert options.first_departure.enabled is False
-        assert options.first_departure.days == [0]
+        assert options.first_departure.days == [9]
         assert options.first_departure.time == dt.time()
+
+
+class TestGuardTemperature:
+    """_guard_schedule_temperature: refuse unresolvable climate-scope writes."""
+
+    def test_raises_when_unresolvable(self):
+        v = Vehicle()
+        v.id = "vid-123"  # no reported temperature (e.g. CCS2)
+        options = ScheduleChargingClimateRequestOptions(climate_enabled=True)
+        with pytest.raises(ValueError, match="departure climate temperature"):
+            _guard_schedule_temperature(options, v)
+
+    def test_explicit_temperature_passes(self):
+        v = Vehicle()
+        v.id = "vid-123"
+        options = ScheduleChargingClimateRequestOptions(
+            climate_enabled=True, temperature=24.0
+        )
+        _guard_schedule_temperature(options, v)  # no raise
+
+    def test_vehicle_reported_temperature_passes(self):
+        v = _vehicle()  # reports 22.0
+        options = ScheduleChargingClimateRequestOptions(climate_enabled=True)
+        _guard_schedule_temperature(options, v)  # no raise
