@@ -995,7 +995,7 @@ class GspaApiEU(ApiImpl):
         Uses the CCI PIN endpoint (confirmed endpoint shape):
           POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
         Response: {"isMatched": true, "controlTokenInfo":
-                   {"controlToken": "...", "expiresTime": <ms epoch>}}
+                   {"controlToken": "...", "expiresTime": <ttl seconds>}}
         """
         if not token.pin:
             raise UnsupportedControlError(
@@ -1046,8 +1046,18 @@ class GspaApiEU(ApiImpl):
             expires_ms = int(info.get("expiresTime", 0))
         except (TypeError, ValueError) as e:
             raise InvalidAPIResponseError("CCI PIN response missing expiresTime") from e
-        # expiresTime is a ms epoch timestamp; tolerate a plain-seconds value.
-        expire_at = expires_ms // 1000 if expires_ms > 1e12 else expires_ms
+        # expiresTime semantics live-probed (2026-09-04): a relative TTL in
+        # seconds (600 = 10 min) — the same field name the CCS token-exchange
+        # and legacy Type1 PIN endpoints use for a TTL. Fall back through
+        # ms/seconds epoch timestamps in case the server ever switches
+        # (values > 1e12 are implausible as a TTL).
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if expires_ms > 1e12:
+            expire_at = expires_ms // 1000  # ms epoch
+        elif expires_ms > 1e9:
+            expire_at = expires_ms  # seconds epoch
+        else:
+            expire_at = int(now) + expires_ms  # TTL seconds
         return f"Bearer {control_token}", expire_at
 
     def _get_control_token_cached(self, token: Token) -> str:

@@ -152,6 +152,21 @@ def test_control_token_cci_success():
     assert post.call_args.kwargs["json"] == {"pin": "1234"}
 
 
+def test_control_token_ttl_seconds_live_shape():
+    """Live-probed shape (2026-09-04): expiresTime=600 is a TTL in seconds
+    (10 min), not an epoch — expire_at must be now + 600."""
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(
+            200,
+            {
+                "isMatched": True,
+                "controlTokenInfo": {"controlToken": "t", "expiresTime": 600},
+            },
+        )
+        _, expire_at = _make_api()._get_control_token(_make_token())
+    assert expire_at == pytest.approx(dt.datetime.now(dt.UTC).timestamp() + 600, abs=10)
+
+
 def test_control_token_pin_mismatch_raises():
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(200, PIN_RESPONSE_NOT_MATCHED)
