@@ -164,6 +164,15 @@ class Vehicle:
     _ota_checked: bool = False
     _valet_failed: bool = False
 
+    # MQTT capability fields (populated from MQTTCacheResponse)
+    mqtt_client_id: str | None = None
+    hu_client_id: str | None = None
+    has_hvac_close_remote: bool = False
+    has_media_close_remote: bool = False
+    is_support_speed_event: bool = False
+    is_support_ota_progress: bool = False
+    is_support_schedule_update: bool = False
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None
