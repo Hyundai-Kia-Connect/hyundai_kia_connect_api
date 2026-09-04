@@ -18,10 +18,10 @@ from urllib.parse import quote
 import requests
 
 from .const import (
-    BRANDS,
     BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
+    BRANDS,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
@@ -194,6 +194,42 @@ class HyundaiCciApiEU(GspaApiEU, MqttServiceHubMixin):
             return ""
 
         return f"https://{host_port}"
+
+    def get_mqtt_connection_state(self, token: Token) -> str | None:
+        """GET api/v3/vstatus/connstate — check MQTT connection state.
+
+        The app sends: @Query("clientId") — no tid or client-id headers.
+        Returns: "ONLINE", "OFFLINE", or "UNKNOWN".
+        """
+        url = self._get_service_hub_url()
+        if not url:
+            return None
+        url += "/api/v3/vstatus/connstate"
+        headers = self._get_service_hub_headers(token)
+
+        params = {
+            "clientId": token.mqtt_client_id or token.client_device_id or "",
+        }
+        try:
+            full_url = self._build_service_hub_url(url, params)
+            response = requests.get(full_url, headers=headers, timeout=(5, 30))
+            if response.status_code == 200:
+                data = response.json()
+                state = (
+                    data.get("connState")
+                    or data.get("state")
+                    or data.get("status")
+                    or "UNKNOWN"
+                )
+                _LOGGER.debug(f"{DOMAIN} - MQTT connection state: {state}")
+                return state.upper()
+            _LOGGER.warning(
+                f"{DOMAIN} - Service Hub connstate failed: "
+                f"HTTP {response.status_code} — {response.text[:300]}"
+            )
+        except Exception as ex:
+            _LOGGER.error(f"{DOMAIN} - Service Hub connstate error: {ex}")
+        return None
 
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)
