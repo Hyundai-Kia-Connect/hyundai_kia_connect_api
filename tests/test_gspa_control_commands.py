@@ -143,7 +143,7 @@ def test_valet_mode_action_uses_valet_prefix():
     _, activate = _run_command(
         HyundaiCciApiEU.valet_mode_action, VALET_MODE_ACTION.ACTIVATE
     )
-    assert "/gspa/v1/valet/vehicles/test123/valet" in activate.args[0]
+    assert "/gspa/v1/valet/vehicles/test123/control" in activate.args[0]
     assert activate.kwargs["json"] == {"command": "activate"}
     _, deactivate = _run_command(
         HyundaiCciApiEU.valet_mode_action, VALET_MODE_ACTION.DEACTIVATE

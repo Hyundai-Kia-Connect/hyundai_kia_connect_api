@@ -50,7 +50,8 @@ def test_endpoint_map():
 
 
 def test_path_prefix_map():
-    assert GspaApiEU.GSPA_PATH_PREFIX_MAP["valet"] == "valet/vehicles"
+    # Valet control posts to the "control" endpoint with an explicit
+    # valet path prefix in the caller (see valet_mode_action).
     assert GspaApiEU.GSPA_PATH_PREFIX_MAP["rearseat-alarm"] == "safety/vehicles"
 
 
@@ -317,11 +318,11 @@ def test_gspa_control_command_path_prefix_override():
         api._gspa_control_command(
             _make_token(),
             _make_vehicle(),
-            "valet",
+            "control",
             {"command": "activate"},
             path_prefix="valet/vehicles",
         )
-    assert post.call_args.args[0].endswith("/gspa/v1/valet/vehicles/test123/valet")
+    assert post.call_args.args[0].endswith("/gspa/v1/valet/vehicles/test123/control")
 
 
 def test_get_control_token_pin_failure_reports_remaining_attempts():
