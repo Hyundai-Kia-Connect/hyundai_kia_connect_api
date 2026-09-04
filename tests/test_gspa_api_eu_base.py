@@ -144,3 +144,207 @@ def test_base_gspa_get_500_json_meta_raises_api_error():
         pytest.raises(APIError, match="HTTP 500 500-999"),
     ):
         api._gspa_get(token, vehicle, "status/vehicles/{carId}/stored-status")
+
+
+EXTENDED_READS = {
+    "get_location_update_status": "location/vehicles/test123/update-status",
+    "get_location_routes": "location/vehicles/test123/routes",
+    "get_valet_status": "valet/vehicles/test123/status",
+    "get_valet_history": "valet/vehicles/test123/history",
+    "get_safety_data": "safety/vehicles/test123/alert-setting",
+    "get_stored_status_widget": "status/vehicles/test123/stored-status-widget",
+}
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    sorted(EXTENDED_READS.items()),
+    ids=[name for name, _ in sorted(EXTENDED_READS.items())],
+)
+def test_extended_read_url_construction(method, path):
+    """Each extended read requests CCSP_API_URL + /gspa/v1/{path}."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        getattr(api, method)(token, vehicle)
+
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + f"/gspa/v1/{path}"
+
+
+def test_get_gspa_vehicles_url_and_payload():
+    """get_gspa_vehicles GETs /gspa/v1/vehicles (no carId) and returns the
+    data list."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    vehicles = [{"vin": "VIN1"}, {"vin": "VIN2"}]
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": vehicles,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_gspa_vehicles(token)
+
+    assert result == vehicles
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + "/gspa/v1/vehicles"
+
+
+def test_get_gspa_vehicles_returns_none_on_business_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "F", "resCode": "404-001", "message": "none"},
+        "data": None,
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
+        assert api.get_gspa_vehicles(token) is None
+
+
+def test_get_weather_url_and_payload():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    rs_data = {"temperature": 21}
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": rs_data,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_weather(token)
+
+    assert result == rs_data
+    assert mock_get.call_args[0][0].endswith("/gspa/v1/contents/wts/weathers")
+
+
+def test_spa_api_url_built_from_ccapi_base():
+    """The legacy /tripinfo host is derived from CCAPI_BASE_URL."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    assert api.SPA_API_URL == "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/"
+
+
+def _trip_token() -> Token:
+    return _make_base_token()
+
+
+def test_update_month_trip_info_parses():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _trip_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resMsg": {
+            "monthTripDayCnt": 2,
+            "tripDrvTime": 100,
+            "tripIdleTime": 20,
+            "tripDist": 150.5,
+            "tripAvgSpeed": 40,
+            "tripMaxSpeed": 90,
+            "tripDayList": [
+                {"tripDayInMonth": 5, "tripCntDay": 2},
+                {"tripDayInMonth": 6, "tripCntDay": 3},
+            ],
+        },
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp
+    ) as mock_post:
+        api.update_month_trip_info(token, vehicle, "202608")
+
+    call_url = mock_post.call_args[0][0]
+    assert call_url == (
+        "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/test123/tripinfo"
+    )
+    assert mock_post.call_args[1]["json"] == {
+        "tripPeriodType": 0,
+        "setTripMonth": "202608",
+    }
+    info = vehicle.month_trip_info
+    assert info is not None
+    assert info.yyyymm == "202608"
+    assert info.summary.drive_time == 100
+    assert info.summary.distance == 150.5
+    assert [d.yyyymmdd for d in info.day_list] == [5, 6]
+    assert [d.trip_count for d in info.day_list] == [2, 3]
+
+
+def test_update_month_trip_info_empty_sets_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _trip_token()
+    vehicle = _make_base_vehicle()
+    resp = MagicMock()
+    resp.json.return_value = {"retCode": "S", "resMsg": {"monthTripDayCnt": 0}}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp):
+        api.update_month_trip_info(token, vehicle, "202608")
+    assert vehicle.month_trip_info is None
+
+
+def test_update_day_trip_info_parses():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _trip_token()
+    vehicle = _make_base_vehicle()
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resMsg": {
+            "dayTripList": [
+                {
+                    "tripDrvTime": 30,
+                    "tripIdleTime": 5,
+                    "tripDist": 12.3,
+                    "tripAvgSpeed": 25,
+                    "tripMaxSpeed": 60,
+                    "tripList": [
+                        {
+                            "tripTime": "081230",
+                            "tripDrvTime": 10,
+                            "tripIdleTime": 1,
+                            "tripDist": 4.5,
+                            "tripAvgSpeed": 20,
+                            "tripMaxSpeed": 45,
+                        }
+                    ],
+                }
+            ]
+        },
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp):
+        api.update_day_trip_info(token, vehicle, "20260904")
+
+    info = vehicle.day_trip_info
+    assert info is not None
+    assert info.yyyymmdd == "20260904"
+    assert info.summary.drive_time == 30
+    assert info.trip_list[0].hhmmss == "081230"
+    assert info.trip_list[0].distance == 4.5
+
+
+def test_get_location_stored_status_path():
+    """Location stored-status read — D7 companion endpoint."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        api.get_location_stored_status(token, vehicle)
+
+    assert mock_get.call_args[0][0] == (
+        api.CCSP_API_URL + "/gspa/v1/location/vehicles/test123/stored-status"
+    )
