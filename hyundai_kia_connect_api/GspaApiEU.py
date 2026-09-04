@@ -31,6 +31,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
@@ -77,7 +78,13 @@ from .utils import (
     parse_datetime,
     pressure_or_none,
 )
-from .Vehicle import Vehicle
+from .Vehicle import (
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -212,6 +219,9 @@ class GspaApiEU(ApiImpl):
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
     LOGIN_FORM_HOST: str = ""
+    # v1 CCAPI host (prd.eu-ccapi.<brand>.com:8080) — used only by the legacy
+    # /tripinfo read; empty when a subclass does not support it.
+    CCAPI_BASE_URL: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
     DEVICE_ID_HEADER: str = ""
@@ -263,10 +273,6 @@ class GspaApiEU(ApiImpl):
             "reservation-charge-hvac",
             "reservation-engine",
             "lock-and-start-toggle",
-            # OTA commands: the app sends these with the standard
-            # authenticated headers — no PIN-derived control token.
-            "ota-updates",
-            "ota-updates-reservation",
         }
     )
 
@@ -297,6 +303,8 @@ class GspaApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
+        if self.CCAPI_BASE_URL:
+            self.SPA_API_URL: str = f"https://{self.CCAPI_BASE_URL}/api/v1/spa/"
         if self.CIPHER_BRAND == "hyundai":
             from .gspa.cipher_keys import hyundai_cipher
 
@@ -787,19 +795,8 @@ class GspaApiEU(ApiImpl):
         if token.cci_access_token or getattr(token, "non_ccs_token", None):
             try:
                 return self._refresh_cci_token(token)
-            except Exception as ex:
-                if "4111" in str(ex):
-                    # 4111 = credentials expired; the refresh_token itself is
-                    # expired. Full login is the expected recovery — INFO, not
-                    # WARNING.
-                    _LOGGER.info(
-                        f"{DOMAIN} - CCI credentials expired (4111), "
-                        "falling back to full login"
-                    )
-                else:
-                    _LOGGER.warning(
-                        "CCI token refresh failed, falling back to full login"
-                    )
+            except Exception:
+                _LOGGER.warning("CCI token refresh failed, falling back to full login")
                 return self.login(token.username, token.password, token.pin)
 
         # No CCI tokens — fall back to full login
@@ -1194,57 +1191,8 @@ class GspaApiEU(ApiImpl):
         alternate; the legacy {"rt", "rc", "rs"} keys stay as a fallback.
         Returns "gspa:{SID}" for action status polling — or the bare
         "gspa:" when the command is accepted with an empty "data" object
-        (no polling handle). Shared request path lives in
-        _gspa_post_for_data.
-        """
-        data = self._gspa_post_for_data(
-            token, vehicle, endpoint, body, path_prefix=path_prefix
-        )
-        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
-        rs = data.get("rs")
-        rs_payload = rs if isinstance(rs, dict) else {}
-        # SID is the primary polling handle; svcSID the alternate (some
-        # commands return only svcSID).
-        sid = (
-            data_payload.get("SID")
-            or data_payload.get("svcSID")
-            or data.get("SID")
-            or rs_payload.get("SID")
-            or data.get("svcSID")
-            or rs_payload.get("svcSID")
-            or ""
-        )
-        if not sid:
-            # Live-probed 2026-09-05 (rearseat-alarm): some commands are
-            # accepted (HTTP 202, retCode "S", resCode "202-000") with an
-            # EMPTY "data" object — no SID and no svcSID. The server has
-            # accepted the command, so raising here would report a failure
-            # for a command that was in fact executed. Return the bare
-            # "gspa:" prefix: the action-status dispatcher still routes it,
-            # and callers that poll get PENDING until they give up.
-            _LOGGER.debug(
-                f"{DOMAIN} - GSPA control accepted without a polling SID "
-                f"(rc={data.get('rc') or 'S'}); status polling has no handle"
-            )
-            return "gspa:"
-        return f"gspa:{sid}"
-
-    def _gspa_post_for_data(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        endpoint: str,
-        body: dict[str, Any],
-        path_prefix: str | None = None,
-    ) -> dict[str, Any]:
-        """POST a GSPA command and return the parsed response body.
-
-        Shared request path of _gspa_control_command and the OTA commands:
-        POST {CCSP_API_URL}/gspa/v1/{prefix}/{carId}/{endpoint}, body
-        normalization ("command", not "action"; no "deviceId"), bearer/PIN
-        header dispatch, and on a 401 for a PIN-gated endpoint the control
+        (no polling handle). On a 401 for a PIN-gated endpoint the control
         token cache is invalidated and the command is retried exactly once.
-        Transport/parse/business-envelope errors raise typed exceptions.
 
         Pre-CCS2 EU vehicles are rejected with UnsupportedControlError
         (region 1 handles them), and commands not live-verified on this
@@ -1313,7 +1261,35 @@ class GspaApiEU(ApiImpl):
         rc = data.get("rc") or meta_payload.get("retCode")
         if rc and rc not in ("0000", "S"):
             self._raise_gspa_error(response.status_code, data)
-        return data
+        rs = data.get("rs")
+        rs_payload = rs if isinstance(rs, dict) else {}
+        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        # SID is the primary polling handle; svcSID the alternate (some
+        # commands return only svcSID). The response DTO
+        # (CarRemoteControlApiResponse) sits under "data".
+        sid = (
+            data_payload.get("SID")
+            or data_payload.get("svcSID")
+            or data.get("SID")
+            or rs_payload.get("SID")
+            or data.get("svcSID")
+            or rs_payload.get("svcSID")
+            or ""
+        )
+        if not sid:
+            # Live-probed 2026-09-05 (rearseat-alarm): some commands are
+            # accepted (HTTP 202, retCode "S", resCode "202-000") with an
+            # EMPTY "data" object — no SID and no svcSID. The server has
+            # accepted the command, so raising here would report a failure
+            # for a command that was in fact executed. Return the bare
+            # "gspa:" prefix: the action-status dispatcher still routes it,
+            # and callers that poll get PENDING until they give up.
+            _LOGGER.debug(
+                f"{DOMAIN} - GSPA control accepted without a polling SID "
+                f"(rc={rc!r}); status polling has no handle"
+            )
+            return "gspa:"
+        return f"gspa:{sid}"
 
     def _gspa_check_action_status(
         self, token: Token, vehicle: Vehicle, sid: str
@@ -2944,78 +2920,269 @@ class GspaApiEU(ApiImpl):
         body = {"lockAndStartEnable": enable}
         return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
 
-    def set_ota_reservation(
-        self, token: Token, vehicle: Vehicle, settings: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Schedule or cancel an OTA update reservation via GSPA.
+    # ------------------------------------------------------------------
+    # GSPA extended reads (brand-neutral paths)
+    # ------------------------------------------------------------------
 
-        POST /gspa/v1/mru/vehicles/{carId}/ota-updates-reservation with
-        CCUSoftwareUpdateReservationApiRequest (operation,
-        targetReservationTime, originReservationTime). ``settings`` is
-        passed through — callers build the body per the app's model.
-        The OTA response (CCUSoftwareUpdateReservationApiResponse) carries
-        no polling SID — the parsed response body is returned; poll
-        progress via get_ota_updates().
-        """
-        return self._gspa_post_for_data(
-            token,
-            vehicle,
-            "ota-updates-reservation",
-            settings,
-            path_prefix="mru/vehicles",
-        )
-
-    def set_ota_update(
-        self, token: Token, vehicle: Vehicle, start: bool
-    ) -> dict[str, Any]:
-        """Start or cancel a CCU OTA update via GSPA.
-
-        POST /gspa/v1/mru/vehicles/{carId}/ota-updates with
-        CCUSoftwareUpdateStartApiRequest body {"updateStart": 1|2}
-        (1 = start, 2 = cancel). The OTA response
-        (CCUSoftwareUpdateStartApiResponse) carries no polling SID — the
-        parsed response body is returned; progress is reported via
-        get_ota_updates() and the CCU's MQTT push, not action polling.
-        """
-        return self._gspa_post_for_data(
-            token,
-            vehicle,
-            "ota-updates",
-            {"updateStart": 1 if start else 2},
-            path_prefix="mru/vehicles",
-        )
-
-    def get_ota_updates(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
-        """Get CCU OTA update status from GSPA.
-
-        GET /gspa/v1/mru/vehicles/{carId}/ota-updates returns the update
-        list (needUpdate detection + install/reservation progress).
-        Returns the data dict, or None on failure.
-        """
-        self._validate_ccs_token(token)
-        try:
-            return self._gspa_get(token, vehicle, "mru/vehicles/{carId}/ota-updates")
-        except AuthenticationError:
-            raise
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - GSPA ota-updates GET failed")
-            return None
-
-    def get_software_version(
+    def get_location_update_status(
         self, token: Token, vehicle: Vehicle
     ) -> dict[str, Any] | None:
-        """Get vehicle software version from GSPA (needUpdate detection).
+        """Poll fresh parked location from GSPA (location update-status).
 
-        GET /gspa/v1/device-info/vehicles/{carId}/software-version.
-        Returns the data dict, or None on failure.
+        Live probe (2026-09-04, Hyundai EU Santa Fe): HTTP 400 400-004.
+        The path matches the app (plain GET, app holds it as a 140s
+        long-poll). Probed with the car in an underground garage (no GPS
+        fix), so the 400 may simply mean "no location available" —
+        re-probe outdoors before assuming a wire-shape mismatch.
         """
         self._validate_ccs_token(token)
         try:
             return self._gspa_get(
-                token, vehicle, "device-info/vehicles/{carId}/software-version"
+                token, vehicle, "location/vehicles/{carId}/update-status"
             )
         except AuthenticationError:
             raise
         except Exception:
-            _LOGGER.debug(f"{DOMAIN} - GSPA software-version GET failed")
+            _LOGGER.debug(f"{DOMAIN} - GSPA location update-status failed")
             return None
+
+    def get_location_stored_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get cached location + vehicle status from GSPA (read-only)."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "location/vehicles/{carId}/stored-status"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
+            return None
+
+    def get_location_routes(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get POI/route history from GSPA."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "location/vehicles/{carId}/routes")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location routes failed")
+            return None
+
+    def get_valet_status(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Get valet mode status from GSPA."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "valet/vehicles/{carId}/status")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA valet status failed")
+            return None
+
+    def get_valet_history(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get valet mode history from GSPA."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "valet/vehicles/{carId}/history")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA valet history failed")
+            return None
+
+    def get_safety_data(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Get vehicle safety alert settings from GSPA.
+
+        Uses the app's alert-setting path (D6 naming).
+        """
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "safety/vehicles/{carId}/alert-setting"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA safety_data failed")
+            return None
+
+    def get_stored_status_widget(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get cached vehicle status in widget format from GSPA."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "status/vehicles/{carId}/stored-status-widget"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA stored-status-widget failed")
+            return None
+
+    def get_gspa_vehicles(self, token: Token) -> list[dict[str, Any]] | None:
+        """Get the enrolled vehicle list from GSPA.
+
+        GET /gspa/v1/vehicles (not vehicle-bound, no carId substitution).
+        """
+        self._validate_ccs_token(token)
+        headers = self._get_authenticated_headers(token, 0)
+        url = self.CCSP_API_URL + "/gspa/v1/vehicles"
+        try:
+            response = requests.get(url, headers=headers, timeout=(5, 30))
+            if response.status_code == 401:
+                raise AuthenticationError("GSPA: Token expired or invalid")
+            data: dict[str, Any] = response.json()
+            meta: dict[str, Any] = data.get("metaInfo", {})
+            if meta.get("retCode") != "S":
+                _LOGGER.debug(
+                    f"{DOMAIN} - GSPA vehicles list: {meta.get('resCode', '')} "
+                    f"{meta.get('message', '')}"
+                )
+                return None
+            result: list[dict[str, Any]] = data.get("data", [])
+            return result
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA vehicles list failed")
+            return None
+
+    def get_weather(self, token: Token) -> dict[str, Any] | None:
+        """Get weather at vehicle location from GSPA.
+
+        Live probe (2026-09-04): HTTP 400 400-007. Two candidate
+        causes, unproven: (1) the car was in an underground garage at
+        probe time (no GPS fix — weather is location-based), (2) in the
+        app the weather annotation is an orphan (no method body calls
+        it), so the real wire shape was never captured. Returns None
+        either way.
+        """
+        self._validate_ccs_token(token)
+        headers = self._get_authenticated_headers(token, 0)
+        url = self.CCSP_API_URL + "/gspa/v1/contents/wts/weathers"
+        try:
+            response = requests.get(url, headers=headers, timeout=(5, 30))
+            if response.status_code == 401:
+                raise AuthenticationError("GSPA: Token expired or invalid")
+            data: dict[str, Any] = response.json()
+            meta: dict[str, Any] = data.get("metaInfo", {})
+            if meta.get("retCode") != "S":
+                _LOGGER.debug(
+                    f"{DOMAIN} - GSPA weather: {meta.get('resCode', '')} "
+                    f"{meta.get('message', '')}"
+                )
+                return None
+            result: dict[str, Any] = data.get("data", {})
+            return result
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA weather failed")
+            return None
+
+    # ------------------------------------------------------------------
+    # Trip info (v1 CCAPI — the app keeps /tripinfo on the legacy host)
+    # ------------------------------------------------------------------
+
+    def _get_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip_period_type: int,
+    ) -> dict[str, Any]:
+        """Fetch trip info from the v1 CCAPI /tripinfo endpoint.
+
+        Live probe (2026-09-04, Hyundai EU): the CCI token authenticates
+        on the legacy host (no 401) but returns 4002 "invalid deviceId" —
+        the device_id issued in the CCI flow is not registered on the v1
+        CCAPI backend (legacy logins register it there). Until a
+        registration step is validated, this raises DeviceIDError.
+        """
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
+        if trip_period_type == 0:  # month
+            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
+        else:
+            payload = {"tripPeriodType": 1, "setTripDay": date_string}
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support or 0
+            ),
+            timeout=(5, 30),
+        )
+        data: dict[str, Any] = response.json()
+        _check_response_for_errors(data)
+        return data
+
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        """Update vehicle.month_trip_info for the specified month."""
+        vehicle.month_trip_info = None
+        json_result = self._get_trip_info(token, vehicle, yyyymm_string, 0)
+        msg = json_result["resMsg"]
+        if msg["monthTripDayCnt"] > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for day in msg["tripDayList"]:
+                result.day_list.append(
+                    DayTripCounts(
+                        yyyymmdd=day["tripDayInMonth"],
+                        trip_count=day["tripCntDay"],
+                    )
+                )
+            vehicle.month_trip_info = result
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        """Update vehicle.day_trip_info for the specified day."""
+        vehicle.day_trip_info = None
+        json_result = self._get_trip_info(token, vehicle, yyyymmdd_string, 1)
+        day_trip_list = json_result["resMsg"]["dayTripList"]
+        if day_trip_list and len(day_trip_list) > 0:
+            msg = day_trip_list[0]
+            result = DayTripInfo(
+                yyyymmdd=yyyymmdd_string,
+                trip_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for trip in msg["tripList"]:
+                result.trip_list.append(
+                    TripInfo(
+                        hhmmss=trip["tripTime"],
+                        drive_time=trip["tripDrvTime"],
+                        idle_time=trip["tripIdleTime"],
+                        distance=trip["tripDist"],
+                        avg_speed=trip["tripAvgSpeed"],
+                        max_speed=trip["tripMaxSpeed"],
+                    )
+                )
+            vehicle.day_trip_info = result
