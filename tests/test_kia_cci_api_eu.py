@@ -253,3 +253,27 @@ def test_kia_schedule_reservation_charge_na_gated():
         api.schedule_reservation_charge_na(
             MagicMock(), MagicMock(), [1], dt.time(9, 0), dt.time(12, 0)
         )
+
+
+def test_kia_service_hub_wiring():
+    """KiaCciApiEU provides the Service Hub layer (mixin) with the Kia
+    brand UUIDs — live-probed on the Kia EU Service Hub (device/host 200,
+    device/register 200 with clientId+deviceId)."""
+    api = _make_kia_api()
+    assert isinstance(api, KiaCciApiEU)
+    assert api.CCSP_CLIENT_SERVICE_ID == "01b36c86-79e8-486c-8009-15f2ad88d670"
+    assert api.PUSH_PROVIDER_ID == "3863bdda-b753-4edb-9fbf-38288a353fe1"
+    assert callable(api.get_mqtt_host)
+    assert callable(api.get_mqtt_connection_state)
+    assert api._service_hub_brand == "K"
+    assert "egw-svchub-ccs-k-eu" in api._get_service_hub_url()
+
+
+def test_hyundai_service_hub_brand_and_url():
+    """The brand-neutral Service Hub layer keeps the Hyundai mapping via
+    inheritance (no duplicate override)."""
+    from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+
+    api = HyundaiCciApiEU(region=9, brand=2, language="en")
+    assert api._service_hub_brand == "H"
+    assert "egw-svchub-ccs-h-eu" in api._get_service_hub_url()

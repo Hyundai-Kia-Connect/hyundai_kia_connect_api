@@ -33,7 +33,7 @@ _PAHO_V2 = _PAHO_AVAILABLE and hasattr(mqtt, "CallbackAPIVersion")
 DOMAIN = "hyundai_kia_connect_api"
 
 # ---------------------------------------------------------------------------
-# MQTT topic constants (resolved from the official EU app, v1.1.4)
+# MQTT topic constants (app-confirmed)
 # ---------------------------------------------------------------------------
 
 # Topic prefixes (prefix + infix + postfix = full topic)
@@ -99,7 +99,7 @@ class MqttHVACCommand(str, Enum):
     UNMUTE = "UNMUTE"
 
 
-# Service Hub URL patterns (from the official EU app, v1.1.4)
+# Service Hub URL patterns (app-confirmed)
 # Production URLs are used for real connections; staging for testing.
 # Both use port 31010 (HTTPS for REST, same host serves MQTT on port 443/8883).
 SERVICE_HUB_PRODUCTION_BASES = {
@@ -158,7 +158,7 @@ MQTT_PROTOCOL_ID_RC_CONNECTCHECK = "vehicle.remotecontroller.connectcheck"
 MQTT_PROTOCOL_ID_RC_CLOSE_MOBILE = "vehicle.remotecontroller.mobileclose"
 MQTT_PROTOCOL_ID_RC_CLOSE_CAR = "vehicle.remotecontroller.vehicleclose"
 # Device RC protocols (DeviceRemote topics use device/ prefix)
-# The app's protocol registration includes BOTH device.* AND vehicle.* variants
+# Protocol registration includes BOTH device.* AND vehicle.* variants (app-confirmed)
 MQTT_PROTOCOL_ID_DEVICE_RC_CONNECT = "device.remotecontroller.connect"
 MQTT_PROTOCOL_ID_DEVICE_RC_COMMAND = "device.remotecontroller.command"
 MQTT_PROTOCOL_ID_DEVICE_RC_CONNECTCHECK = "device.remotecontroller.connectcheck"
@@ -557,7 +557,7 @@ class HyundaiMqttClient:
             self._client.tls_set()  # Default CA certs
             self._client.tls_insecure_set(False)
 
-        # Match the app's MQTT client: connectionTimeout=10, keepAliveInterval=15
+        # App-confirmed client tuning: connectionTimeout=10, keepAliveInterval=15
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
         if hasattr(self._client, "connect_timeout"):
             # paho-mqtt v2: property, default 5.0
@@ -620,7 +620,7 @@ class HyundaiMqttClient:
         # authorized for the head unit itself, not for phone clients.
 
         # 4. DeviceCloseRemote EXCLUDED — broker rejects with rc=128.
-        # The app does NOT register any "closeremote" protocols in device/protocol,
+        # No "closeremote" protocols are registered in device/protocol (app-confirmed),
         # so the broker does not authorize subscriptions to
         # device/{clientId}/closeremote/* topics.
         # all_topics.extend(build_device_close_remote_topics(client_id, caps))
@@ -632,10 +632,10 @@ class HyundaiMqttClient:
         # The Hyundai CCI broker does NOT authorize QoS 1 subscriptions — it
         # disconnects with rc=128 immediately after receiving a QoS 1 SUBSCRIBE.
         # QoS 0 subscriptions are accepted with SUBACK and remain stable.
-        # The app requests QoS 1 but the broker downgrades to 0
+        # Subscribe requests QoS 1; the broker downgrades to 0 (live-probed)
         # for native Android clients. For paho-mqtt clients the broker rejects QoS 1
         # outright, so we must request QoS 0.
-        # The app sends all topics in a single batch SUBSCRIBE (like paho-mqtt subscribe()
+        # All topics go out in a single batch SUBSCRIBE, like paho-mqtt subscribe()
         # with topic list), not one-by-one. This matches the broker's expectations.
         if all_topics:
             qos_list = [0] * len(all_topics)

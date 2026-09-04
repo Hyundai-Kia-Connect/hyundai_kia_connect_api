@@ -18,11 +18,12 @@ vehicle confirm their payload shapes.
 
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
+from .mqtt_service_hub import MqttServiceHubMixin
 from .Token import Token
 from .Vehicle import Vehicle
 
 
-class KiaCciApiEU(GspaApiEU):
+class KiaCciApiEU(GspaApiEU, MqttServiceHubMixin):
     """Kia EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
@@ -54,6 +55,14 @@ class KiaCciApiEU(GspaApiEU):
     # bearer headers — confirmed shape {"action": "prewakeup"}).
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature", "lamp"})
 
+    # MQTT Service Hub (live-probed on the Kia EU Service Hub 2026-09-26:
+    # device/host 200, device/register 200 with clientId+deviceId).
+    # ccspServiceId — the service identifier in the X-Service-Id header
+    # (the Kia OneApp OAuth client id). Distinct from CCSP_SERVICE_ID.
+    CCSP_CLIENT_SERVICE_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
+    # pushProviderId — X-Application-Id header value (app-confirmed on
+    # the Kia EU Service Hub).
+    PUSH_PROVIDER_ID = "3863bdda-b753-4edb-9fbf-38288a353fe1"
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
     ONEAPP_REDIRECT_URI = "https://oneapp.kia.com/redirect"

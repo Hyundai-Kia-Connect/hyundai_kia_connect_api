@@ -26,8 +26,7 @@ def _make_vm() -> VehicleManager:
     )
     vm.token = Token(access_token="at", refresh_token="rt", device_id="did")
     vehicle = Vehicle(id="vid123", name="Test Car")
-    vehicle.has_hvac_close_remote = True
-    vehicle.is_support_speed_event = True
+    vehicle.hu_client_id = "hu-123"
     vm.vehicles["vid123"] = vehicle
     return vm
 
@@ -77,22 +76,22 @@ class TestStartMqtt:
             result = vm.start_mqtt("vid123")
             assert result is None
 
-    @patch("hyundai_kia_connect_api.VehicleManager.HyundaiMqttClient", create=True)
+    @patch("hyundai_kia_connect_api.mqtt_client.HyundaiMqttClient")
     def test_full_flow_success(self, mock_client_cls):
-        """Full Service Hub → connect → subscribe flow succeeds."""
-        from hyundai_kia_connect_api.mqtt_client import HyundaiMqttClient
-
+        """Service Hub steps 1-5 wire the client: configure() with the
+        registration credentials (client_id as username fallback, access
+        token as password fallback), connect(), and the identity fields
+        prepared for subscribe-on-connect."""
         vm = _make_vm()
-        mock_client = MagicMock(spec=HyundaiMqttClient)
-        mock_client.is_connected = True
-        mock_client.subscribed_topics = []
+        mock_client = mock_client_cls.return_value
+        mock_client.is_connected = False
 
         with (
             patch.object(
                 vm,
                 "get_mqtt_host",
                 return_value={
-                    "mqtt_host": "egw-svchub-ccs-h-eu.eu-central.hmgmobility.com:31010",
+                    "mqtt_host": "egw.example.com:31010",
                     "mqtt_port": 8883,
                     "use_ssl": True,
                 },
@@ -100,21 +99,75 @@ class TestStartMqtt:
             patch.object(
                 vm,
                 "register_mqtt_client",
-                return_value={
-                    "client_id": "client-abc",
-                    "username": "user1",
-                    "password": "pass1",
-                },
+                return_value={"client_id": "client-abc"},
             ),
             patch.object(vm, "register_mqtt_protocol"),
-            patch.object(vm, "start_mqtt", create=True, return_value=None),
+            patch.object(vm, "get_mqtt_metadata", return_value=None),
+            patch.object(vm, "get_mqtt_vehicle_id", return_value="mqtt-vid-1"),
         ):
-            # Manually set up the mqtt_client to test the flow
-            vm._mqtt_client = mock_client
-            _ = vm.mqtt_client  # access property
+            result = vm.start_mqtt("vid123")
 
-        # Verify mqtt_client attribute exists
-        assert hasattr(vm, "_mqtt_client")
+        assert result is mock_client
+        mock_client_cls.assert_called_once()
+        mock_client.configure.assert_called_once_with(
+            broker_host="egw.example.com",  # :31010 stripped for MQTT
+            broker_port=8883,
+            use_ssl=True,
+            client_id="client-abc",
+            username="client-abc",  # fallback: clientId as username
+            password="at",  # fallback: access token, "Bearer " stripped
+        )
+        mock_client.connect.assert_called_once()
+        assert vm._mqtt_vehicle_id == "mqtt-vid-1"
+        # Not connected yet — subscribe is deferred to the on_connect
+        # callback, not called inline.
+        mock_client.subscribe_topics.assert_not_called()
+        # The deferred subscription carries the identity fields.
+        deferred = vm._mqtt_client._on_connect
+        assert callable(deferred)
+
+    @patch("hyundai_kia_connect_api.mqtt_client.HyundaiMqttClient")
+    def test_subscribe_caps_carry_identity_fields(self, mock_client_cls):
+        """The capabilities handed to subscribe_topics carry the real
+        identity sources (registration client_id, vehicle metadata
+        hu_client_id, mqtt_vid infix); the capability flags stay False
+        until the MQTTCacheResponse wiring lands."""
+        vm = _make_vm()
+        mock_client = mock_client_cls.return_value
+        mock_client.is_connected = True
+
+        with (
+            patch.object(
+                vm,
+                "get_mqtt_host",
+                return_value={
+                    "mqtt_host": "egw.example.com",
+                    "mqtt_port": 8883,
+                    "use_ssl": True,
+                },
+            ),
+            patch.object(
+                vm,
+                "register_mqtt_client",
+                return_value={"client_id": "client-abc"},
+            ),
+            patch.object(vm, "register_mqtt_protocol"),
+            patch.object(vm, "get_mqtt_metadata", return_value=None),
+            patch.object(vm, "get_mqtt_vehicle_id", return_value="mqtt-vid-1"),
+        ):
+            vm.start_mqtt("vid123")
+
+        kwargs = mock_client.subscribe_topics.call_args.kwargs
+        caps = kwargs["capabilities"]
+        assert kwargs["vehicle_id"] == "mqtt-vid-1"
+        assert kwargs["client_id"] == "client-abc"
+        assert kwargs["hu_client_id"] == "hu-123"
+        assert caps.ccu_client_id == "client-abc"
+        assert caps.client_id == "client-abc"
+        assert caps.hu_client_id == "hu-123"
+        assert caps.vehicle_id == "mqtt-vid-1"
+        assert caps.has_hvac_close_remote is False
+        assert caps.is_support_ota_progress is False
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +368,25 @@ class TestMqttProperties:
         mock_client.is_connected = False
         vm._mqtt_client = mock_client
         assert vm.is_mqtt_connected is False
+
+    def test_get_mqtt_connection_state_passes_through(self):
+        """get_mqtt_connection_state delegates to the API impl method."""
+        vm = _make_vm()
+        vm.api.get_mqtt_connection_state = MagicMock(return_value="ONLINE")
+        assert vm.get_mqtt_connection_state() == "ONLINE"
+        vm.api.get_mqtt_connection_state.assert_called_once_with(vm.token)
+
+    def test_api_impl_provides_get_mqtt_connection_state(self):
+        """Regression: the CCI/EU API impl must implement connstate lookup.
+
+        VehicleManager.get_mqtt_connection_state calls
+        self.api.get_mqtt_connection_state — an API impl without the
+        method raises AttributeError at runtime.
+        """
+        from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+
+        api = HyundaiCciApiEU(region=9, brand=2, language="en")
+        assert callable(getattr(api, "get_mqtt_connection_state", None))
 
 
 # ---------------------------------------------------------------------------

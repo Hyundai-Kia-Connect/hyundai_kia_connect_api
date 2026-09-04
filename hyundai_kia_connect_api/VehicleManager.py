@@ -571,11 +571,9 @@ class VehicleManager:
             )
         if not mqtt_password:
             # Fallback: use access token (stripped of "Bearer " prefix) as
-            # MQTT password. The app's MQTT repository resolves it as:
-            #   String accessToken = SDKAuthenticationContract.INSTANCE.getAccessToken();
-            #   return accessToken.replace("Bearer ", "");
-            # Previously tried ccId which caused rc=128 (broker disconnect).
-            # Access token with "Bearer " stripped matches the app behavior.
+            # MQTT password (app-confirmed): the access token with the
+            # "Bearer " prefix stripped. Previously tried ccId, which the
+            # broker rejected with rc=128.
             access_token = self.token.ccs_token or self.token.access_token or ""
             access_token = access_token.removeprefix("Bearer ").strip()
             if access_token:
@@ -643,13 +641,10 @@ class VehicleManager:
         # as the topic infix, NOT the carId (app's vehicle-id cache).
         topic_vehicle_id = mqtt_vid or vehicle_id
 
-        # Build capabilities from vehicle fields
+        # Subscription capabilities (hvac/media/speed/ota/schedule flags)
+        # come from the MQTTCacheResponse wiring — until that lands the
+        # conditional topic groups stay unsubscribed (defaults False).
         caps = MqttCacheCapabilities(
-            has_hvac_close_remote=vehicle.has_hvac_close_remote,
-            has_media_close_remote=vehicle.has_media_close_remote,
-            is_support_speed_event=vehicle.is_support_speed_event,
-            is_support_ota_progress=vehicle.is_support_ota_progress,
-            is_support_schedule_update=vehicle.is_support_schedule_update,
             ccu_client_id=mqtt_client_id,
             hu_client_id=hu_client_id,
             vehicle_id=topic_vehicle_id,
@@ -836,7 +831,7 @@ class VehicleManager:
         if self._mqtt_vehicle_id and mqtt_vehicle_id == self._mqtt_vehicle_id:
             for vid in self.vehicles:
                 return vid
-        # future: multi-vehicle reverse map via Vehicle.mqtt field if added
+        # future: multi-vehicle lookup map via Vehicle.mqtt field if added
         return None
 
     def _on_mqtt_message(self, message):

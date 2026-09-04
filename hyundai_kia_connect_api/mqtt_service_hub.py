@@ -43,7 +43,8 @@ class MqttServiceHubMixin:
         Returns dict with keys: http_host, http_port, mqtt_host, mqtt_port, ssl.
         Stores broker info on the token for later MQTT connection.
 
-        The app: no extra @Header params, uses CCS SDK interceptor chain for auth.
+        No extra @Header params; auth via the CCS SDK HTTP client
+        header chain (app-confirmed).
         Uses requests.Session to maintain cookies/connection state like OkHttp.
         """
         url = self._get_service_hub_url()
@@ -75,7 +76,7 @@ class MqttServiceHubMixin:
 
                 # Extract session tid from response headers — used for ALL
                 # subsequent Service Hub requests (device/register, metadatalist,
-                # vehicleId, device/protocol). The app stores this from
+                # vehicleId, device/protocol). The device id comes from
                 # the "tid" response header after device/host responds.
                 tid = response.headers.get("tid")
                 if tid:
@@ -118,7 +119,7 @@ class MqttServiceHubMixin:
     def register_mqtt_client(self, token: Token) -> dict | None:
         """POST api/v3/servicehub/device/register — register device for MQTT push.
 
-        The app sends: @Header("tid") + @Body {unit: "mobile", uuid: ccId}.
+        Wire shape (app-confirmed): @Header("tid") + @Body {unit: "mobile", uuid: ccId}.
         Returns clientId and deviceId.
 
         The 'unit' field is the fixed string "mobile".
@@ -195,7 +196,8 @@ class MqttServiceHubMixin:
         @Header.
         Sending them as query params causes HTTP 400 "Invalid Parameter (client-id)".
 
-        Note: CCSHeaderInterceptor is NOT in the MQTT OkHttp interceptor chain,
+        Note: the CCI header interceptor is not part of the MQTT HTTP
+        client chain (app-confirmed),
         so X-MQTT-Client-Id, X-MQTT-Vehicle-Id, X-Ccu-Ccs2-Protocol-Support
         are NOT added by interceptors. The server may not require them, but we
         send them for compatibility.
@@ -248,8 +250,8 @@ class MqttServiceHubMixin:
             MQTT_PROTOCOL_ID_CONNECTION,
             MQTT_PROTOCOL_ID_RES,
         ]
-        # RC protocols — the app includes BOTH device.* AND vehicle.* variants
-        # (the app adds both groups when remoteControllerOption == 1)
+        # RC protocols — BOTH device.* AND vehicle.* variants are
+        # registered (app-confirmed when remoteControllerOption == 1)
         protocols.extend(
             [
                 MQTT_PROTOCOL_ID_DEVICE_RC_CONNECT,
@@ -307,7 +309,7 @@ class MqttServiceHubMixin:
             )
             if response.status_code == 200:
                 # device/protocol returns empty body (content-length: 0).
-                # The app's empty-body interceptor handles this. Just return success.
+                # An empty body is treated as success (app-confirmed).
                 try:
                     data = response.json() if response.text.strip() else {}
                 except (ValueError, json.JSONDecodeError):
@@ -327,7 +329,7 @@ class MqttServiceHubMixin:
     def get_mqtt_metadata(self, token: Token, vehicle: Vehicle) -> dict | None:
         """GET api/v3/servicehub/vehicles/metadatalist — vehicle MQTT metadata.
 
-        The app sends: @Header("tid") + @Header("client-id") +
+        Wire shape (app-confirmed): @Header("tid") + @Header("client-id") +
                    @Query("carId") + @Query("brand").
         Returns MQTT cache response with vehicle capabilities and IDs.
 
@@ -362,7 +364,7 @@ class MqttServiceHubMixin:
                 data = response.json()
                 _LOGGER.debug(f"{DOMAIN} - MQTT metadatalist FULL response: {data}")
                 # Extract hu clientId from metadatalist for CarRemote topics.
-                # The app distinguishes ccu clientId vs hu clientId here
+                # ccu vs hu clientId are distinguished here (app-confirmed)
                 vehicles_list = data.get("vehicles", [])
                 for v in vehicles_list:
                     unit = v.get("unit", "")
@@ -385,7 +387,7 @@ class MqttServiceHubMixin:
     def get_mqtt_vehicle_id(self, token: Token, vehicle: Vehicle) -> str | None:
         """POST api/v3/servicehub/vehicleId — get vehicle MQTT ID.
 
-        The app sends: @Header("tid") + @Header("client-id") +
+        Wire shape (app-confirmed): @Header("tid") + @Header("client-id") +
                    @Query("carId") + @Query("brand").
         Returns the MQTT vehicle ID used as infix in CarStatus topics.
 
