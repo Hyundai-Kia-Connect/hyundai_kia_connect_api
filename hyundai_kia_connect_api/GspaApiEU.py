@@ -1158,15 +1158,26 @@ class GspaApiEU(ApiImpl):
             ) from e
         if not isinstance(data, dict):
             raise InvalidAPIResponseError("GSPA control returned non-object JSON")
-        rc = data.get("rc")
-        if rc and rc != "0000":
+        # Standardized envelope (live-probed 2026-09-05): a successful
+        # command returns {"data": {...}, "metaInfo": {"retCode": "S",
+        # "resCode": "202-000", "msgId": ...}}; a 2xx business failure
+        # carries retCode "F". Legacy {"rt", "rc", "rs"} keys stay as a
+        # fallback.
+        meta = data.get("metaInfo")
+        meta_payload: dict[str, Any] = meta if isinstance(meta, dict) else {}
+        rc = data.get("rc") or meta_payload.get("retCode")
+        if rc and rc not in ("0000", "S"):
             self._raise_gspa_error(response.status_code, data)
         rs = data.get("rs")
         rs_payload = rs if isinstance(rs, dict) else {}
+        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
         # SID is the primary polling handle; svcSID the alternate (some
-        # commands return only svcSID).
+        # commands return only svcSID). The response DTO
+        # (CarRemoteControlApiResponse) sits under "data".
         sid = (
-            data.get("SID")
+            data_payload.get("SID")
+            or data_payload.get("svcSID")
+            or data.get("SID")
             or rs_payload.get("SID")
             or data.get("svcSID")
             or rs_payload.get("svcSID")

@@ -501,3 +501,65 @@ def test_control_command_spring_404_raises_unsupported():
         with pytest.raises(UnsupportedControlError) as exc_info:
             HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
     assert "No static resource" in str(exc_info.value)
+
+
+def test_control_command_success_standardized_envelope():
+    """Live-probed 2026-09-05: a successful command returns the
+    standardized {"data", "metaInfo"} envelope (HTTP 202); the polling SID
+    sits in "data" (CarRemoteControlApiResponse) and metaInfo.retCode
+    gates success."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    body = {
+        "data": {"SID": "sid-std", "svcSID": "svc-std", "svcTime": "0"},
+        "metaInfo": {"retCode": "S", "resCode": "202-000", "msgId": "x"},
+    }
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=202, json=lambda: body)
+        action_id = api.stop_rear_seat_alarm(token, vehicle)
+    assert action_id == "gspa:sid-std"
+
+
+def test_control_command_svc_sid_only_standardized_envelope():
+    """Some commands return only svcSID in the standardized envelope."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    body = {
+        "data": {"svcSID": "svc-only", "svcTime": "0"},
+        "metaInfo": {"retCode": "S", "resCode": "202-000"},
+    }
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=202, json=lambda: body)
+        action_id = api.stop_rear_seat_alarm(token, vehicle)
+    assert action_id == "gspa:svc-only"
+
+
+def test_control_command_2xx_business_error_raises():
+    """A 2xx response with metaInfo.retCode "F" is a business error and
+    raises a typed exception instead of parsing as a success (live-observed
+    shape: retCode "F" + resCode "403-006")."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    body = {
+        "data": {},
+        "metaInfo": {"retCode": "F", "resCode": "403-006", "msgId": "x"},
+    }
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: body)
+        with pytest.raises(AuthenticationError):
+            api.stop_rear_seat_alarm(token, vehicle)
