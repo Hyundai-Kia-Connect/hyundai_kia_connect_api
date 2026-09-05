@@ -1113,12 +1113,15 @@ class GspaApiEU(ApiImpl):
         Body keys follow the confirmed protocol tables ("command", not
         "action"; no "deviceId").
 
-        Response envelope: {"rt": ..., "rc": "0000", "rs": {"SID": ...},
-        "SID": ..., "msg": ...} (CarRemoteControlApiResponse carries SID as
-        the primary polling handle and svcSID as the alternate). Returns
-        "gspa:{SID}" for action status polling. On a 401 for a PIN-gated
-        endpoint the control token cache is invalidated and the command is
-        retried exactly once.
+        Response envelopes (standardized shape live-probed 2026-09-05):
+        success is {"data": {...}, "metaInfo": {"retCode": "S",
+        "resCode": "202-000"}} where "data" (CarRemoteControlApiResponse)
+        carries SID as the primary polling handle and svcSID as the
+        alternate; the legacy {"rt", "rc", "rs"} keys stay as a fallback.
+        Returns "gspa:{SID}" for action status polling — or the bare
+        "gspa:" when the command is accepted with an empty "data" object
+        (no polling handle). On a 401 for a PIN-gated endpoint the control
+        token cache is invalidated and the command is retried exactly once.
         """
         gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
         prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
@@ -1184,9 +1187,18 @@ class GspaApiEU(ApiImpl):
             or ""
         )
         if not sid:
-            raise InvalidAPIResponseError(
-                f"GSPA control succeeded (rc={rc!r}) but response has no SID"
+            # Live-probed 2026-09-05 (rearseat-alarm): some commands are
+            # accepted (HTTP 202, retCode "S", resCode "202-000") with an
+            # EMPTY "data" object — no SID and no svcSID. The server has
+            # accepted the command, so raising here would report a failure
+            # for a command that was in fact executed. Return the bare
+            # "gspa:" prefix: the action-status dispatcher still routes it,
+            # and callers that poll get PENDING until they give up.
+            _LOGGER.debug(
+                f"{DOMAIN} - GSPA control accepted without a polling SID "
+                f"(rc={rc!r}); status polling has no handle"
             )
+            return "gspa:"
         return f"gspa:{sid}"
 
     def _gspa_check_action_status(
