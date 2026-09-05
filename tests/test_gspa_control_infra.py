@@ -272,7 +272,10 @@ def test_gspa_control_command_sid_fallback_to_rs():
         )
 
 
-def test_gspa_control_command_missing_sid_raises():
+def test_gspa_control_command_missing_sid_returns_bare_prefix():
+    """Live-probed 2026-09-05: a command can be accepted (retCode S)
+    with no SID at all — the bare "gspa:" prefix is returned instead of
+    raising, because the server has accepted the command."""
     api = _make_api()
     with (
         patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
@@ -280,10 +283,12 @@ def test_gspa_control_command_missing_sid_raises():
     ):
         get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
         post.return_value = _post_mock(200, {"rc": "0000", "rs": {}})
-        with pytest.raises(InvalidAPIResponseError):
+        assert (
             api._gspa_control_command(
                 _make_token(), _make_vehicle(), "charge", {"command": "start"}
             )
+            == "gspa:"
+        )
 
 
 def test_gspa_control_command_rc_error_raises_typed():

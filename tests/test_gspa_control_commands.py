@@ -544,6 +544,28 @@ def test_control_command_svc_sid_only_standardized_envelope():
     assert action_id == "gspa:svc-only"
 
 
+def test_control_command_accepted_without_sid():
+    """Live-probed 2026-09-05 (rearseat-alarm): an accepted command can
+    return HTTP 202 with an EMPTY "data" object — no SID, no svcSID. The
+    command was accepted, so the bare "gspa:" prefix is returned instead
+    of raising."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    body = {
+        "data": {},
+        "metaInfo": {"retCode": "S", "resCode": "202-000", "msgId": "x"},
+    }
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=202, json=lambda: body)
+        action_id = api.stop_rear_seat_alarm(token, vehicle)
+    assert action_id == "gspa:"
+
+
 def test_control_command_2xx_business_error_raises():
     """A 2xx response with metaInfo.retCode "F" is a business error and
     raises a typed exception instead of parsing as a success (live-observed
