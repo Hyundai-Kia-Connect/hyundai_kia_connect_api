@@ -27,7 +27,10 @@ class KiaCciApiEU(GspaApiEU):
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
     production endpoints. Login, token lifecycle, and the GSPA
-    secure-request layer are inherited from ``GspaApiEU``.
+    secure-request layer are inherited from ``GspaApiEU``. GSPA remote
+    control is inherited too but stays gated (GSPA_REMOTE_CONTROL_VERIFIED
+    stays False): every control command raises NotImplementedError until
+    live verification on a real Kia vehicle (D6).
     """
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).

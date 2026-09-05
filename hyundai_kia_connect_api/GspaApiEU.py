@@ -24,8 +24,23 @@ import requests
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
-from .ApiImpl import ApiImpl, ApiImplSession
-from .const import BRANDS, DOMAIN, ENGINE_TYPES, ORDER_STATUS
+from .ApiImpl import (
+    ApiImpl,
+    ApiImplSession,
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
+from .const import (
+    BRANDS,
+    CHARGE_PORT_ACTION,
+    DOMAIN,
+    ENGINE_TYPES,
+    ORDER_STATUS,
+    VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
+)
 from .exceptions import (
     APIError,
     AuthenticationError,
@@ -166,6 +181,10 @@ class GspaApiEU(ApiImpl):
 
     data_timezone = dt.UTC
     supports_valet_mode = True
+
+    # Remote control ships per brand only after live verification of the
+    # GSPA command layer on that brand. Subclasses flip this to True.
+    GSPA_REMOTE_CONTROL_VERIFIED = False
 
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""
@@ -1122,7 +1141,22 @@ class GspaApiEU(ApiImpl):
         "gspa:" when the command is accepted with an empty "data" object
         (no polling handle). On a 401 for a PIN-gated endpoint the control
         token cache is invalidated and the command is retried exactly once.
+
+        Pre-CCS2 EU vehicles are rejected with UnsupportedControlError
+        (region 1 handles them), and brands with
+        GSPA_REMOTE_CONTROL_VERIFIED=False raise NotImplementedError before
+        any request is sent.
         """
+        if not self.GSPA_REMOTE_CONTROL_VERIFIED:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} GSPA remote control awaits "
+                "live verification"
+            )
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "Pre-CCS2 EU vehicles are not supported by the CCI region — "
+                "use region 1 (Europe) for remote control"
+            )
         gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
         prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
             endpoint, "remote/vehicles"
@@ -1363,3 +1397,628 @@ class GspaApiEU(ApiImpl):
             f"{DOMAIN} - get_svm_details response: {redact_svm_metadata(scs_detail)}"
         )
         return parse_svm_detail(scs_detail)
+    # Remote control (GSPA) — dispatcher
+    # ------------------------------------------------------------------
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        """Poll the status of a previously issued control action.
+
+        The CCI region only issues "gspa:" action ids; anything else cannot
+        be polled here. Brands with GSPA_REMOTE_CONTROL_VERIFIED=False raise
+        NotImplementedError (they never issue action ids to poll).
+        """
+        if not self.GSPA_REMOTE_CONTROL_VERIFIED:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} GSPA remote control awaits "
+                "live verification"
+            )
+        if action_id.startswith("gspa:"):
+            return self._gspa_check_action_status(
+                token, vehicle, action_id[len("gspa:") :]
+            )
+        raise UnsupportedControlError(
+            f"Cannot poll action {action_id!r}: the CCI region only issues "
+            "'gspa:' action ids"
+        )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — simple commands
+    # ------------------------------------------------------------------
+
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
+        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+
+    def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "door-power-off", {"command": "CLOSE"}
+        )
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "charge", {"command": "start"}
+        )
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "charge", {"command": "stop"})
+
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
+        command = "open" if action == CHARGE_PORT_ACTION.OPEN else "close"
+        return self._gspa_control_command(
+            token, vehicle, "portdoor", {"command": command}
+        )
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "frunk", {"command": "open"})
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "light", {"command": "on"})
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "hornlight", {"command": "on"}
+        )
+
+    def turn_off_lamp(
+        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+    ) -> str:
+        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+
+    def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "battery-conditioning", {"command": "start"}
+        )
+
+    def stop_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "battery-conditioning", {"command": "stop"}
+        )
+
+    def stop_rear_seat_alarm(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token,
+            vehicle,
+            "rearseat-alarm",
+            {"command": "stop"},
+            path_prefix="safety/vehicles",
+        )
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        """Activate/deactivate valet mode via the valet control endpoint.
+
+        The app posts ValetControlApiRequest{command} to the ``control``
+        endpoint on the valet path (ValetRemoteDataSource passes
+        getGspaValetVehiclesPath = "gspa/v1/valet/vehicles"):
+        POST /gspa/v1/valet/vehicles/{carId}/control.
+        """
+        command = "activate" if action == VALET_MODE_ACTION.ACTIVATE else "deactivate"
+        return self._gspa_control_command(
+            token,
+            vehicle,
+            "control",
+            {"command": command},
+            path_prefix="valet/vehicles",
+        )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — climate / engine / pet care
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_seat_climate_info(
+        options: ClimateRequestOptions,
+    ) -> dict[str, Any] | None:
+        """Map ClimateRequestOptions seat fields to the seatClimateInfo shape."""
+        info: dict[str, Any] = {}
+        if options.front_left_seat is not None:
+            info["drvSeatClimateState"] = options.front_left_seat
+        if options.front_right_seat is not None:
+            info["psgSeatClimateState"] = options.front_right_seat
+        if options.rear_left_seat is not None:
+            info["rlSeatClimateState"] = options.rear_left_seat
+        if options.rear_right_seat is not None:
+            info["rrSeatClimateState"] = options.rear_right_seat
+        return info if info else None
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        body: dict[str, Any] = {"command": "start"}
+        if options.set_temp is not None:
+            body["hvacTemp"] = str(options.set_temp)
+        if options.defrost is not None:
+            body["windshieldFrontDefogState"] = options.defrost
+        if options.heating is not None:
+            body["heating1"] = options.heating
+        if options.temp_unit is not None:
+            body["tempUnit"] = options.temp_unit
+        if options.hvac_temp_type is not None:
+            body["hvacTempType"] = options.hvac_temp_type
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
+        if options.duration is not None:
+            body["ignitionDuration"] = options.duration
+        if options.steering_wheel is not None:
+            body["strgWhlHeating"] = options.steering_wheel
+        if options.side_rear_mirror_heating is not None:
+            body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
+        seat_info = self._build_seat_climate_info(options)
+        if seat_info:
+            body["seatClimateInfo"] = seat_info
+        return self._gspa_control_command(token, vehicle, "temperature", body)
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "temperature", {"command": "stop"}
+        )
+
+    def start_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        """Remote start via the engine endpoint.
+
+        Accepts the same climate fields as start_climate plus hvacCtrl
+        (options.climate) — confirmed endpoint shape.
+        """
+        body: dict[str, Any] = {"command": "start"}
+        if options:
+            if options.set_temp is not None:
+                body["hvacTemp"] = str(options.set_temp)
+            if options.defrost is not None:
+                body["windshieldFrontDefogState"] = options.defrost
+            if options.climate is not None:
+                body["hvacCtrl"] = 1 if options.climate else 0
+            if options.heating is not None:
+                body["heating1"] = options.heating
+            if options.temp_unit is not None:
+                body["tempUnit"] = options.temp_unit
+            if options.hvac_temp_type is not None:
+                body["hvacTempType"] = options.hvac_temp_type
+            if options.driver_seat_location is not None:
+                body["drvSeatLoc"] = options.driver_seat_location
+            if options.duration is not None:
+                body["ignitionDuration"] = options.duration
+            if options.steering_wheel is not None:
+                body["strgWhlHeating"] = options.steering_wheel
+            if options.side_rear_mirror_heating is not None:
+                body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
+            seat_info = self._build_seat_climate_info(options)
+            if seat_info:
+                body["seatClimateInfo"] = seat_info
+        return self._gspa_control_command(token, vehicle, "engine", body)
+
+    def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "engine", {"command": "stop"})
+
+    def start_pet_care(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        # tempUnit values ported verbatim from the confirmed protocol tables —
+        # awaiting live validation.
+        temp = options.set_temp if options and options.set_temp else 21
+        body = {"hvacTemp": str(temp), "tempUnit": "F"}
+        return self._gspa_control_command(token, vehicle, "pet-care", body)
+
+    def stop_pet_care(self, token: Token, vehicle: Vehicle) -> str:
+        body = {"hvacTemp": "21", "tempUnit": "C"}
+        return self._gspa_control_command(token, vehicle, "pet-care", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — windows
+    # ------------------------------------------------------------------
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set window state via the scope-based window-curtain endpoint.
+
+        GSPA supports scope commands only (all windows or front windows);
+        a mixed per-window request raises UnsupportedControlError.
+        """
+        if not self.supports_window_control:
+            raise APIError("Window control not supported")
+        drv = options.driver_seat_window
+        psg = options.passenger_seat_window
+        rl = options.rear_left_window
+        rr = options.rear_right_window
+        seats = (drv, psg, rl, rr)
+        if (
+            all(s is None for s in seats)
+            and options.rear_left_curtain is None
+            and options.rear_right_curtain is None
+        ):
+            raise UnsupportedControlError("No window state requested")
+        front = (drv, psg)
+        command: str | None = None
+        if all(s == WINDOW_STATE.CLOSED for s in seats):
+            command = "window-close"
+        elif all(s == WINDOW_STATE.OPEN for s in seats):
+            command = "window-open"
+        elif all(s == WINDOW_STATE.VENTILATION for s in seats):
+            command = "vent"
+        elif rl is None and rr is None:
+            if all(s == WINDOW_STATE.CLOSED for s in front):
+                command = "front-close"
+            elif all(s == WINDOW_STATE.OPEN for s in front):
+                command = "front-open"
+            elif all(s == WINDOW_STATE.VENTILATION for s in front):
+                command = "front-vent"
+        if command is None:
+            raise UnsupportedControlError(
+                "Mixed per-window state is not supported via GSPA — use "
+                "set_window_curtain for per-seat windows/curtains"
+            )
+        front_val = drv.value if drv is not None else None
+        rear_val = (
+            front_val if command in ("window-close", "window-open", "vent") else None
+        )
+        body: dict[str, Any] = {
+            "command": command,
+            "drvSeatWindow": front_val,
+            "psgSeatWindow": front_val,
+            "rlSeatWindow": rear_val,
+            "rrSeatWindow": rear_val,
+            "rlSeatWindowCurtain": None,
+            "rrSeatWindowCurtain": None,
+            "drvSeatLoc": options.driver_seat_location,
+        }
+        return self._gspa_control_command(token, vehicle, "windowcurtain", body)
+
+    def set_window_curtain(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set per-seat windows/curtains via the window-curtain endpoint.
+
+        Values: 0 = close, 1 = open, 2 = vent (WINDOW_STATE IntEnum).
+        """
+        body: dict[str, Any] = {"command": "open"}
+        if options.driver_seat_window is not None:
+            body["drvSeatWindow"] = options.driver_seat_window.value
+        if options.passenger_seat_window is not None:
+            body["psgSeatWindow"] = options.passenger_seat_window.value
+        if options.rear_left_window is not None:
+            body["rlSeatWindow"] = options.rear_left_window.value
+        if options.rear_right_window is not None:
+            body["rrSeatWindow"] = options.rear_right_window.value
+        if options.rear_left_curtain is not None:
+            body["rlSeatWindowCurtain"] = options.rear_left_curtain.value
+        if options.rear_right_curtain is not None:
+            body["rrSeatWindowCurtain"] = options.rear_right_curtain.value
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
+        return self._gspa_control_command(token, vehicle, "window-curtain", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — charge settings and reservations (bearer)
+    # ------------------------------------------------------------------
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        body = {
+            "targetSOClist": [
+                {"plugType": 0, "targetSOClevel": int(dc)},
+                {"plugType": 1, "targetSOClevel": int(ac)},
+            ],
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "charge-target", body)
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        body = {"chargingCurrent": level, "command": "set"}
+        return self._gspa_control_command(token, vehicle, "charging-current", body)
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        body = {"dischargingLimit": int(limit), "command": "set"}
+        return self._gspa_control_command(token, vehicle, "discharge-limit", body)
+
+    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+        if enabled:
+            body = {
+                "alarmOff": 0,
+                "alarmBefore10": 1,
+                "alarmBefore20": 1,
+                "alarmBefore30": 1,
+                "command": "set",
+            }
+        else:
+            body = {
+                "alarmOff": 1,
+                "alarmBefore10": 0,
+                "alarmBefore20": 0,
+                "alarmBefore30": 0,
+                "command": "set",
+            }
+        return self._gspa_control_command(token, vehicle, "charge-alarm", body)
+
+    def schedule_reservation_charge(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone charging reservation (flat DTO shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+
+        def _make_time(t: dt.time) -> dict[str, Any]:
+            return {
+                "time": t.strftime("%I%M"),
+                "timeSection": 1 if t >= dt.time(12, 0) else 0,
+            }
+
+        body = {
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "offpeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            "reservStartTime": _make_time(options.off_peak_start_time or dt.time()),
+            "reservEndTime": _make_time(
+                options.off_peak_end_time or options.off_peak_start_time or dt.time()
+            ),
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-charge", body)
+
+    def schedule_reservation_hvac(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        def _make_hvac_set() -> dict[str, Any]:
+            return {
+                "airCtrl": 1 if options.climate_enabled else 0,
+                "defrost": options.defrost or False,
+                "airTemp": {
+                    "value": f"{temperature:.1f}",
+                    "hvacTempType": 1,
+                    "unit": options.temperature_unit,
+                },
+                "heating1": 0,
+                "airPurifierControl": 0,
+            }
+
+        body = {
+            "reservedHVACInfo1": {
+                "reservHVACflag": 1 if options.first_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.first_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "reservedHVACInfo2": {
+                "reservHVACflag": 1 if options.second_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.second_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-hvac", body)
+
+    def schedule_reservation_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule ICE engine remote-start reservation (reservInfo/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_engine_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        body = {
+            "reservInfo": _make_engine_reserv_info(options.first_departure),
+            "reservInfo2": _make_engine_reserv_info(options.second_departure),
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-engine", body)
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        body = self._build_reservation_body(options)
+        return self._gspa_control_command(
+            token, vehicle, "reservation-charge-hvac", body
+        )
+
+    def _build_reservation_body(
+        self,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> dict[str, Any]:
+        """Build the reservation-charge-hvac body from options."""
+
+        def set_default_departure_options(
+            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> None:
+            if departure_options.enabled is None:
+                departure_options.enabled = False
+            if departure_options.days is None:
+                departure_options.days = [0]
+            if departure_options.time is None:
+                departure_options.time = dt.time()
+
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+
+        set_default_departure_options(options.first_departure)
+        set_default_departure_options(options.second_departure)
+        departures = [options.first_departure, options.second_departure]
+
+        if options.off_peak_start_time is None:
+            options.off_peak_start_time = dt.time()
+        if options.off_peak_end_time is None:
+            options.off_peak_end_time = options.off_peak_start_time
+        if options.off_peak_charge_only_enabled is None:
+            options.off_peak_charge_only_enabled = False
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            if temperature > 27.0:
+                temperature = 27.0
+            elif temperature < 17.0:
+                temperature = 17.0
+
+        return {
+            "reservChargeInfo": {
+                f"reservChargeInfo{i + 1}": {
+                    "reservChargeSet": departures[i].enabled,
+                    "reservInfo": {
+                        "day": departures[i].days,
+                        "time": {
+                            "time": departures[i].time.strftime("%I%M"),
+                            "timeSection": (
+                                1 if departures[i].time >= dt.time(12, 0) else 0
+                            ),
+                        },
+                    },
+                    "reservFatcSet": {
+                        "airCtrl": 1 if options.climate_enabled else 0,
+                        "airTemp": {
+                            "value": f"{temperature:.1f}",
+                            "hvacTempType": 1,
+                            "unit": options.temperature_unit,
+                        },
+                        "heating1": 0,
+                        "defrost": options.defrost,
+                    },
+                }
+                for i in range(2)
+            },
+            "offPeakPowerInfo": {
+                "offPeakPowerTime1": {
+                    "endtime": {
+                        "timeSection": (
+                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_end_time.strftime("%I%M"),
+                    },
+                    "starttime": {
+                        "timeSection": (
+                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_start_time.strftime("%I%M"),
+                    },
+                },
+                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            },
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "command": "set",
+        }
+
+    def lock_and_start_toggle(
+        self, token: Token, vehicle: Vehicle, enable: bool = True
+    ) -> str:
+        body = {"lockAndStartEnable": enable}
+        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)

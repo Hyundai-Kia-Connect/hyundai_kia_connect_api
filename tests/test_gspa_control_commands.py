@@ -175,9 +175,26 @@ def test_check_action_status_rejects_foreign_prefixes():
 def test_control_command_pre_ccs2_raises_unsupported():
     api = _make_api()
     with pytest.raises(UnsupportedControlError):
-        api._control_command(
+        api._gspa_control_command(
             _make_token(), _make_vehicle(ccs2=0), "door", {"command": "close"}
         )
+
+
+def test_kia_remote_control_gated_not_implemented():
+    """Kia EU CCI inherits the GSPA control layer but ships gated: every
+    control command raises NotImplementedError before any request."""
+    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+
+    api = KiaCciApiEU(9, 2, "en")
+    post = patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
+    with post as p:
+        with pytest.raises(NotImplementedError):
+            api.lock_action(_make_token(), _make_vehicle(), VEHICLE_LOCK_ACTION.LOCK)
+        with pytest.raises(NotImplementedError):
+            api.check_action_status(_make_token(), _make_vehicle(), "gspa:noop")
+        p.assert_not_called()
+    assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
+    assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
 
 
 def test_start_climate_full_options():
