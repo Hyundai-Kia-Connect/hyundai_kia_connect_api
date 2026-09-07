@@ -31,7 +31,13 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .svm import SVMDetails, _parse_bool, _parse_int, redact_svm_metadata
+from .svm import (
+    SVMDetails,
+    _parse_bool,
+    _parse_door_open,
+    _parse_int,
+    redact_svm_metadata,
+)
 from .Token import Token
 from .utils import (
     float_or_none,
@@ -115,21 +121,6 @@ def _safe_parse_json(response, action_name: str):
     return response.json()
 
 
-def _parse_door_open(door_open: dict | None) -> dict[str, bool] | None:
-    if not door_open:
-        return None
-    mapping = {
-        "frontLeft": "frontLeft",
-        "frontRight": "frontRight",
-        "backLeft": "backLeft",
-        "backRight": "backRight",
-    }
-    result = {}
-    for our_key, api_key in mapping.items():
-        result[our_key] = _parse_bool(door_open.get(api_key))
-    return result
-
-
 def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
     """Parse a getSVMDetails response into SVMDetails.
 
@@ -142,7 +133,10 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
     """
     detail = get_child_value(response, "svmDetails.0.svmDetail") or {}
     image_b64 = detail.get("svmImage", "")
-    image_bytes = base64.b64decode(image_b64) if image_b64 else b""
+    try:
+        image_bytes = base64.b64decode(image_b64) if image_b64 else b""
+    except (ValueError, TypeError):
+        image_bytes = b""
 
     captured_at_raw = get_child_value(detail, "gpsDetail.time")
     captured_at = None

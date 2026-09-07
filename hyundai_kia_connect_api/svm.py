@@ -35,6 +35,21 @@ def _parse_int(value: str | int | None) -> int | None:
         return None
 
 
+def _parse_door_open(door_open: dict | None) -> dict[str, bool | None] | None:
+    """Map an SVM doorOpen object onto the shared door keys.
+
+    Both the USA and EU GSPA responses carry the same door keys; door
+    values are booleans in the USA response and 0/1 ints in the EU
+    response — ``_parse_bool`` normalizes both.
+    """
+    if not isinstance(door_open, dict) or not door_open:
+        return None
+    return {
+        key: _parse_bool(door_open.get(key))
+        for key in ("frontLeft", "frontRight", "backLeft", "backRight")
+    }
+
+
 @dataclass
 class SVMDetails:
     image_bytes: bytes

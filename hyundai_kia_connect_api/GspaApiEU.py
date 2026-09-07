@@ -26,9 +26,22 @@ from Crypto.PublicKey import RSA
 
 from .ApiImpl import ApiImpl, ApiImplSession
 from .const import BRANDS, DOMAIN, ENGINE_TYPES
-from .exceptions import APIError, AuthenticationError, ConsentRequiredError
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    ConsentRequiredError,
+    InvalidAPIResponseError,
+)
 from .gspa import create_tsid
+from .svm import (
+    SVMDetails,
+    _parse_bool,
+    _parse_door_open,
+    _parse_int,
+    redact_svm_metadata,
+)
 from .Token import Token
+from .utils import float_or_none
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,6 +69,92 @@ SUPPORTED_LANGUAGES_LIST = [
     "fi",
     "pt",
 ]
+
+
+def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
+    """Parse a GSPA SVM timestamp (media-set ``date`` or ``gpsDetail.time``).
+
+    Shapes seen in the EU response: 14-digit ``yyyyMMddHHmmss`` strings
+    (assumed UTC) and epoch-millisecond numbers. ISO 8601 strings are
+    accepted as a fallback. Returns None for anything unparsable.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            seconds = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if seconds > 1e12:  # epoch ms — checked by magnitude, not by field name
+            seconds //= 1000
+        try:
+            return dt.datetime.fromtimestamp(seconds, tz=dt.UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
+    if isinstance(value, str):
+        if len(value) == 14 and value.isdigit():
+            try:
+                return dt.datetime.strptime(value, "%Y%m%d%H%M%S").replace(
+                    tzinfo=dt.UTC
+                )
+            except ValueError:
+                return None
+        try:
+            return dt.datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    return None
+
+
+def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
+    """Parse a GSPA SVM ``scsDetail`` object into SVMDetails.
+
+    The GSPA response shape mirrors the USA SVM response (gpsDetail with
+    coord/head/speed/time, doorOpen, trunkOpen, imageSize). Fields without
+    a typed slot on SVMDetails (installAngle, boundaryArea,
+    validAngleofView, sideMirrorOpen) stay available through raw_metadata
+    with the base64 image redacted.
+    """
+    gps = detail.get("gpsDetail")
+    if not isinstance(gps, dict):
+        gps = {}
+    speed = gps.get("speed")
+    if not isinstance(speed, dict):
+        speed = {}
+    coord = gps.get("coord")
+    if not isinstance(coord, dict):
+        coord = {}
+
+    image_b64 = detail.get("svmImage") or ""
+    try:
+        image_bytes = base64.b64decode(image_b64) if image_b64 else b""
+    except (ValueError, TypeError):
+        image_bytes = b""
+
+    image_size = None
+    image_size_raw = detail.get("imageSize")
+    if isinstance(image_size_raw, list) and len(image_size_raw) >= 2:
+        width = _parse_int(image_size_raw[0])
+        height = _parse_int(image_size_raw[1])
+        if width is not None and height is not None:
+            image_size = (width, height)
+
+    captured_at_raw = gps.get("time")
+    return SVMDetails(
+        image_bytes=image_bytes,
+        captured_at=_parse_gspa_svm_timestamp(captured_at_raw),
+        captured_at_raw=captured_at_raw if isinstance(captured_at_raw, str) else None,
+        latitude=float_or_none(coord.get("lat")),
+        longitude=float_or_none(coord.get("lon")),
+        heading=_parse_int(gps.get("head")),
+        speed=(float_or_none(speed.get("value")), speed.get("unit")),
+        door_open=_parse_door_open(detail.get("doorOpen")),
+        trunk_open=_parse_bool(detail.get("trunkOpen")),
+        image_size=image_size,
+        # Coordinates are deliberately preserved here (gps=False): the typed
+        # fields above already carry them, advanced consumers get the rest.
+        raw_metadata=redact_svm_metadata(detail, gps=False),
+    )
 
 
 class GspaApiEU(ApiImpl):
@@ -856,3 +955,44 @@ class GspaApiEU(ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
+
+    # ------------------------------------------------------------------
+    # SVM (Surround View Monitor) — read side
+    # ------------------------------------------------------------------
+
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
+        """Return the latest stored SVM image and metadata.
+
+        GSPA keeps SVM captures in a media library: GET
+        ``svm/vehicles/{carId}/na-images`` lists the stored sets and GET
+        ``svm/vehicles/{carId}/na-images/{tvId}`` returns one set's detail.
+        This returns the newest set (by ``date``) parsed into SVMDetails.
+        """
+        self._validate_ccs_token(token)
+        list_data = self._gspa_get(token, vehicle, "svm/vehicles/{carId}/na-images")
+        items = list_data.get("scsList") if isinstance(list_data, dict) else None
+        candidates: list[tuple[dt.datetime, str]] = []
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                tv_id = item.get("tvid")
+                created_at = _parse_gspa_svm_timestamp(item.get("date"))
+                if tv_id and created_at is not None:
+                    candidates.append((created_at, tv_id))
+        if not candidates:
+            raise APIError("No SVM media available for this vehicle")
+
+        _, latest_tv_id = max(candidates)
+        detail_data = self._gspa_get(
+            token, vehicle, f"svm/vehicles/{{carId}}/na-images/{latest_tv_id}"
+        )
+        scs_detail = (
+            detail_data.get("scsDetail") if isinstance(detail_data, dict) else None
+        )
+        if not isinstance(scs_detail, dict):
+            raise InvalidAPIResponseError("SVM media detail: missing scsDetail")
+        _LOGGER.debug(
+            f"{DOMAIN} - get_svm_details response: {redact_svm_metadata(scs_detail)}"
+        )
+        return parse_svm_detail(scs_detail)
