@@ -13,7 +13,12 @@ import requests
 
 from .ApiImpl import ClimateRequestOptions
 from .const import DOMAIN, ENGINE_TYPES, VEHICLE_LOCK_ACTION
-from .exceptions import APIError, AuthenticationError, PINMissingError
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    PINMissingError,
+    ServiceTemporaryUnavailable,
+)
 from .gspa import create_tsid
 from .GspaApiEU import USER_AGENT_OK_HTTP
 from .HyundaiCciApiEU import HyundaiCciApiEU
@@ -262,6 +267,11 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         try:
             payload: dict[str, Any] = response.json()
         except ValueError as exc:
+            if response.status_code >= 500:
+                raise ServiceTemporaryUnavailable(
+                    "Hyundai Korea API temporarily unavailable: "
+                    f"HTTP {response.status_code} with no JSON"
+                ) from exc
             raise APIError(
                 f"Hyundai Korea API returned HTTP {response.status_code} with no JSON"
             ) from exc
@@ -270,7 +280,14 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if ret_code == "F":
             code = meta.get("resCode") or meta.get("rspCode") or "unknown"
             message = meta.get("message", "request failed")
-            raise APIError(f"Hyundai Korea API error: {code} {message}")
+            error = f"Hyundai Korea API error: {code} {message}"
+            if response.status_code >= 500:
+                raise ServiceTemporaryUnavailable(error)
+            raise APIError(error)
+        if response.status_code >= 500:
+            raise ServiceTemporaryUnavailable(
+                f"Hyundai Korea API temporarily unavailable: HTTP {response.status_code}"
+            )
         if response.status_code >= 400:
             raise APIError(f"Hyundai Korea API error: HTTP {response.status_code}")
         data = payload.get("data", payload.get("resMsg", payload))
@@ -380,9 +397,19 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         )
         # The refresh endpoint only acknowledges the asynchronous request.
         # Korea has no REST polling endpoint for this operation; the app waits
-        # for MQTT. Give the car time to answer, then read the updated cache.
-        time.sleep(25)
-        self.update_vehicle_with_cached_state(token, vehicle)
+        # for MQTT. The cached endpoint may return HTTP 500 while the vehicle's
+        # response is being stored, so retry that read without waking the car
+        # again.
+        readback_delays = (25, 10, 10)
+        for attempt, delay in enumerate(readback_delays):
+            time.sleep(delay)
+            try:
+                self.update_vehicle_with_cached_state(token, vehicle)
+            except ServiceTemporaryUnavailable:
+                if attempt == len(readback_delays) - 1:
+                    raise
+            else:
+                return
 
     def _get_control_token(self, token: Token) -> str:
         now = time.time()

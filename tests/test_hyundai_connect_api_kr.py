@@ -12,6 +12,7 @@ from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationError,
     PINMissingError,
+    ServiceTemporaryUnavailable,
 )
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -363,6 +364,65 @@ def test_force_refresh_waits_for_async_response_then_reads_cache():
     )
     sleep.assert_called_once_with(25)
     api.update_vehicle_with_cached_state.assert_called_once_with(token, vehicle)
+
+
+def test_force_refresh_retries_transient_http_500_from_cached_readback():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    api._update_vehicle_properties_ccs2 = MagicMock()
+    responses = [
+        _response({"RetCode": "S", "svcSID": "refresh-request"}),
+        _response({}, status_code=500),
+        _response(
+            {
+                "RetCode": "S",
+                "state": {"Vehicle": {"Date": "20260909133833.000"}},
+            }
+        ),
+    ]
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+            side_effect=responses,
+        ) as request,
+        patch("hyundai_kia_connect_api.HyundaiConnectApiKR.time.sleep") as sleep,
+    ):
+        api.force_refresh_vehicle_state(token, vehicle)
+
+    assert request.call_count == 3
+    assert request.call_args_list[1].args[0].endswith("/recentcarstatus_ccs2.do")
+    assert request.call_args_list[2].args[0].endswith("/recentcarstatus_ccs2.do")
+    assert [call.args[0] for call in sleep.call_args_list] == [25, 10]
+    api._update_vehicle_properties_ccs2.assert_called_once_with(
+        vehicle, {"Date": "20260909133833.000"}
+    )
+
+
+def test_force_refresh_stops_after_three_transient_readback_failures():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    responses = [
+        _response({"RetCode": "S", "svcSID": "refresh-request"}),
+        _response({}, status_code=500),
+        _response({}, status_code=500),
+        _response({}, status_code=500),
+    ]
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+            side_effect=responses,
+        ) as request,
+        patch("hyundai_kia_connect_api.HyundaiConnectApiKR.time.sleep") as sleep,
+        pytest.raises(ServiceTemporaryUnavailable, match="HTTP 500"),
+    ):
+        api.force_refresh_vehicle_state(token, vehicle)
+
+    assert request.call_count == 4
+    assert [call.args[0] for call in sleep.call_args_list] == [25, 10, 10]
 
 
 def test_korean_ccs2_status_date_is_utc_and_displayed_in_vehicle_timezone():
