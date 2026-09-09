@@ -60,6 +60,10 @@ class HyundaiCciApiEU(GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
+    # SVM reads confirmed live on the EU GSPA endpoints (na-images);
+    # KiaCciApiEU keeps the inherited False until verified there too.
+    supports_svm: bool = True
+
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)
     # ------------------------------------------------------------------

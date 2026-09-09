@@ -2,6 +2,7 @@
 
 # pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
 
+import base64
 import datetime as dt
 import logging
 import time
@@ -14,6 +15,9 @@ from urllib3.util.ssl_ import create_urllib3_context
 from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationError,
+    DuplicateRequestError,
+    RequestTimeoutError,
+    SafetyAcknowledgmentError,
     ServiceTemporaryUnavailable,
 )
 
@@ -26,6 +30,13 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+)
+from .svm import (
+    SVMDetails,
+    _parse_bool,
+    _parse_door_open,
+    _parse_int,
+    redact_svm_metadata,
 )
 from .Token import Token
 from .utils import (
@@ -110,6 +121,61 @@ def _safe_parse_json(response, action_name: str):
     return response.json()
 
 
+def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
+    """Parse a getSVMDetails response into SVMDetails.
+
+    Args:
+        response: parsed JSON from `GET /ac/v2/svm/getSVMDetails`.
+        timezone: timezone to use when parsing the capture timestamp.
+
+    Returns:
+        SVMDetails with decoded image bytes and metadata.
+    """
+    detail = get_child_value(response, "svmDetails.0.svmDetail") or {}
+    image_b64 = detail.get("svmImage", "")
+    try:
+        image_bytes = base64.b64decode(image_b64) if image_b64 else b""
+    except (ValueError, TypeError):
+        image_bytes = b""
+
+    captured_at_raw = get_child_value(detail, "gpsDetail.time")
+    captured_at = None
+    if captured_at_raw:
+        try:
+            captured_at = parse_datetime(captured_at_raw, timezone)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Unable to parse SVM capture timestamp: %s", captured_at_raw)
+
+    image_size_raw = detail.get("imageSize")
+    image_size = None
+    if isinstance(image_size_raw, list) and len(image_size_raw) >= 2:
+        width = _parse_int(image_size_raw[0])
+        height = _parse_int(image_size_raw[1])
+        if width is not None and height is not None:
+            image_size = (width, height)
+
+    speed_value = float_or_none(get_child_value(detail, "gpsDetail.speed.value"))
+    speed_unit = get_child_value(detail, "gpsDetail.speed.unit")
+
+    # Store the full response for advanced consumers, but redact the base64
+    # image so we don't duplicate the image bytes in memory.
+    raw_metadata = redact_svm_metadata(response, gps=False)
+
+    return SVMDetails(
+        image_bytes=image_bytes,
+        captured_at=captured_at,
+        captured_at_raw=captured_at_raw,
+        latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
+        longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
+        heading=_parse_int(get_child_value(detail, "gpsDetail.head")),
+        speed=(speed_value, speed_unit),
+        door_open=_parse_door_open(detail.get("doorOpen")),
+        trunk_open=_parse_bool(detail.get("trunkOpen")),
+        image_size=image_size,
+        raw_metadata=raw_metadata,
+    )
+
+
 class cipherAdapter(HTTPAdapter):
     """
     A HTTPAdapter that re-enables poor ciphers required by Hyundai.
@@ -137,6 +203,16 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     # initialize with a timestamp which will allow the first fetch to occur
     last_loc_timestamp = dt.datetime.now(dt.UTC) - dt.timedelta(hours=3)
+
+    # SVM/Find My Car polling constants
+    _SVM_POLL_INTERVAL_SECONDS = 15
+    _SVM_POLL_TIMEOUT_SECONDS = 120
+    _SVM_INITIAL_WAIT_SECONDS = 15
+
+    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
+    # Capability is declared per-region (like supports_window_control); the
+    # actual image is fetched on demand via get_svm_details / request_svm_capture.
+    supports_svm: bool = True
 
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
@@ -928,6 +1004,125 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 )
 
         self._update_vehicle_properties(vehicle, state)
+
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
+        """Return the latest SVM composite image and metadata."""
+        url = self.API_URL + "svm/getSVMDetails"
+        headers = self._get_vehicle_headers(token, vehicle)
+
+        response = self.session.get(url, headers=headers)
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+        _LOGGER.debug(
+            f"{DOMAIN} - get_svm_details response: {redact_svm_metadata(response_json)}"
+        )
+
+        return parse_svm_response(response_json, self.data_timezone)
+
+    def request_svm_capture(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        acknowledged_warning: bool = False,
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image.
+
+        Args:
+            token: valid Token.
+            vehicle: target Vehicle.
+            acknowledged_warning: must be True; the caller must explicitly
+                acknowledge the safety warning before requesting a capture.
+
+        Returns:
+            SVMDetails for the newly captured image.
+
+        Raises:
+            SafetyAcknowledgmentError: if acknowledged_warning is False.
+            DuplicateRequestError: if a previous SVM request is still pending.
+            RequestTimeoutError: if the image does not refresh within the
+                configured timeout.
+        """
+        if not acknowledged_warning:
+            raise SafetyAcknowledgmentError(
+                "request_svm_capture requires acknowledged_warning=True"
+            )
+
+        # Establish a baseline timestamp so we can detect a fresh capture.
+        baseline = self.get_svm_details(token, vehicle)
+        baseline_time = baseline.captured_at
+        baseline_raw = baseline.captured_at_raw
+
+        url = self.API_URL + "svm/findMyCarSVM"
+        headers = self._get_vehicle_headers(token, vehicle)
+        data = {
+            "vin": vehicle.VIN,
+            "username": token.username,
+            "gen": str(vehicle.generation),
+            "blueLinkServicePin": token.pin,
+        }
+
+        response = self.session.post(url, headers=headers, json=data)
+        if response.status_code == 502:
+            try:
+                response_json = response.json()
+            except Exception:  # pylint: disable=broad-exception-caught
+                raise APIError("SVM request failed with HTTP 502")
+            if response_json.get("errorSubCode") == "HT_533":
+                raise DuplicateRequestError(
+                    response_json.get(
+                        "errorMessage",
+                        "A previous SVM request is still pending.",
+                    )
+                )
+            # For findMyCarSVM, a generic 502 is a transient server-side
+            # failure rather than an authentication problem. Mapping it to
+            # AuthenticationError would mislead callers, so surface it as a
+            # plain APIError using the message the server returned.
+            if response_json.get("errorCode") == "502":
+                raise APIError(
+                    response_json.get(
+                        "errorMessage",
+                        "findMyCarSVM failed with HTTP 502",
+                    )
+                )
+            _check_response_for_errors(response_json)
+
+        response_json = _safe_parse_json(response, "request_svm_capture")
+        if response_json is not None:
+            _check_response_for_errors(response_json)
+            _LOGGER.debug(
+                f"{DOMAIN} - request_svm_capture response: "
+                f"tid={response_json.get('tid')}"
+            )
+
+        time.sleep(self._SVM_INITIAL_WAIT_SECONDS)
+
+        elapsed = self._SVM_INITIAL_WAIT_SECONDS
+        while elapsed < self._SVM_POLL_TIMEOUT_SECONDS:
+            details = self.get_svm_details(token, vehicle)
+            if self._svm_is_fresh(details, baseline_time, baseline_raw):
+                return details
+            time.sleep(self._SVM_POLL_INTERVAL_SECONDS)
+            elapsed += self._SVM_POLL_INTERVAL_SECONDS
+
+        raise RequestTimeoutError(
+            "SVM capture did not produce a new image within "
+            f"{self._SVM_POLL_TIMEOUT_SECONDS} seconds"
+        )
+
+    @staticmethod
+    def _svm_is_fresh(
+        details: SVMDetails,
+        baseline_time: dt.datetime | None,
+        baseline_raw: str | None,
+    ) -> bool:
+        """Return True if `details` is newer than the baseline capture."""
+        if details.captured_at is not None and baseline_time is not None:
+            return details.captured_at > baseline_time
+        if details.captured_at_raw is not None and baseline_raw is not None:
+            return details.captured_at_raw != baseline_raw
+        # Without any timestamp we cannot determine freshness.
+        return False
 
     def get_vehicles(self, token: Token):
         response = self._get_enrollment_details(token, force_refresh=True)

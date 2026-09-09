@@ -25,6 +25,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
+from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
 from .Vehicle import Vehicle
@@ -164,6 +165,7 @@ class ApiImpl:
     previous_longitude: float = None
     supports_window_control: bool = False
     supports_valet_mode: bool = False
+    supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -443,4 +445,19 @@ class ApiImpl:
         # login() signatures (some accept a `token` positional arg).
         return self.login(
             username=token.username, password=token.password, pin=token.pin
+        )
+
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
+        """Return the latest SVM composite image and metadata."""
+        raise NotImplementedError("get_svm_details is not implemented for this region")
+
+    def request_svm_capture(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        acknowledged_warning: bool = False,
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image."""
+        raise NotImplementedError(
+            "request_svm_capture is not implemented for this region"
         )
