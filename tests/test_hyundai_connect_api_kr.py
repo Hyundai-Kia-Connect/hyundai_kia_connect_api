@@ -56,6 +56,7 @@ def test_vehicle_manager_routes_hyundai_korea():
     api = VehicleManager.get_implementation_by_region_brand(10, 2, "ko")
 
     assert isinstance(api, HyundaiConnectApiKR)
+    assert api.supports_window_control is True
 
 
 def test_vehicle_manager_rejects_non_hyundai_korea():
@@ -507,6 +508,39 @@ def test_korean_level_four_window_capability_omits_rear_status():
     assert vehicle.back_right_window_is_open is None
 
 
+def test_korean_windows_are_unknown_without_status_capability():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    vehicle.window_status_capabilities_loaded = True
+    response = _response(
+        {
+            "RetCode": "S",
+            "state": {
+                "Vehicle": {
+                    "Date": "20260909182542",
+                    "Cabin": {
+                        "Window": {
+                            "Row1": {"Driver": {"Open": 1}},
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        return_value=response,
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    assert vehicle.front_left_window_is_open is None
+    assert vehicle.front_right_window_is_open is None
+    assert vehicle.back_left_window_is_open is None
+    assert vehicle.back_right_window_is_open is None
+
+
 def test_vehicle_capabilities_fetches_missing_profile_id():
     api = _api()
     token = _token(user_id=None)
@@ -800,6 +834,7 @@ def test_gen2_engine_start_uses_engine_endpoint_and_service_number():
     vehicle.hvac_temperature_type = 1
     vehicle.steering_wheel_heater_option = 1
     vehicle.supports_steering_wheel_heater = True
+    vehicle.front_left_seat_climate_capability = 6
     response = _response(
         {"metaInfo": {"retCode": "S"}, "data": {"SID": "engine-request"}}
     )
@@ -978,6 +1013,32 @@ def test_remote_start_rejects_unsupported_passenger_ventilation():
 
     with pytest.raises(APIError, match="front_right_seat state 5"):
         api.start_climate(_token(), vehicle, ClimateRequestOptions(front_right_seat=5))
+
+
+def test_remote_start_rejects_seat_request_when_capability_is_unknown():
+    api = _api()
+    vehicle = _vehicle()
+    vehicle.remote_control_generation = "GEN2"
+    vehicle.supports_remote_start = True
+    api._remote_control_post = MagicMock()
+
+    with pytest.raises(APIError, match="front_left_seat capability is unavailable"):
+        api.start_climate(_token(), vehicle, ClimateRequestOptions(front_left_seat=6))
+
+    api._remote_control_post.assert_not_called()
+
+
+def test_remote_start_rejects_steering_heat_when_capability_is_unknown():
+    api = _api()
+    vehicle = _vehicle()
+    vehicle.remote_control_generation = "GEN2"
+    vehicle.supports_remote_start = True
+    api._remote_control_post = MagicMock()
+
+    with pytest.raises(APIError, match="steering-wheel capability is unavailable"):
+        api.start_climate(_token(), vehicle, ClimateRequestOptions(steering_wheel=1))
+
+    api._remote_control_post.assert_not_called()
 
 
 def test_vehicle_manager_completes_browser_login_and_initializes_vehicles():

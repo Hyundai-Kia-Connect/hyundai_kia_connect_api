@@ -430,6 +430,18 @@ def test_refresh_cci_token_uses_v2_endpoint():
     first_call_url = mock_post.call_args_list[0].args[0]
     assert "v2/auth/token-refresh" in first_call_url
     assert "v1/auth/token-refresh" not in first_call_url
+    first_call = mock_post.call_args_list[0]
+    assert first_call.kwargs["headers"]["authorization"] == "Bearer old-cci-at"
+    assert first_call.kwargs["headers"]["exchangeable-token"] == "old-exch-at"
+    assert first_call.kwargs["json"] == {
+        "accessToken": "old-cci-at",
+        "refreshToken": "OLDCCIREFRESHTOKEN1234567890123456789012345678901234567",
+        "exchangeableAccessToken": "old-exch-at",
+        "exchangeableRefreshToken": "old-exch-rt",
+        "nonCcsToken": "old-nonccs",
+        "nonCcsRefreshToken": "old-nonccs-rt",
+        "idToken": "old-id-tok",
+    }
     assert result.access_token == "Bearer new-ccs-token"
 
 
