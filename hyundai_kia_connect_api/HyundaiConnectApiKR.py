@@ -341,7 +341,15 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Update a vehicle from MyHyundai Korea's most recent cached status."""
         if not getattr(vehicle, "window_status_capabilities_loaded", False):
-            self.get_vehicle_capabilities(token, vehicle)
+            try:
+                self.get_vehicle_capabilities(token, vehicle)
+            except ServiceTemporaryUnavailable as exc:
+                _LOGGER.warning(
+                    "%s - Korea capability discovery unavailable; continuing "
+                    "without window status: %s",
+                    DOMAIN,
+                    exc,
+                )
         data = self._domestic_post(
             token,
             f"{self.STATUS_PATH}/recentcarstatus_ccs2.do",
