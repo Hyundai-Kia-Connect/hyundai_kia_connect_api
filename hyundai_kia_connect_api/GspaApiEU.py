@@ -741,13 +741,12 @@ class GspaApiEU(ApiImpl):
         the app, not JSON.
         """
         device_id = token.device_id or ""
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
-        )
+        # The native CCI client excludes the stale Authorization and
+        # exchangeable-token headers from token refresh. The non-CCS token is
+        # the only authentication token sent as a header; all renewable tokens
+        # are carried in the request body.
+        headers = self._get_cci_headers(device_id, content_type="application/json")
+        headers["non-ccs-token"] = token.non_ccs_token or ""
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -755,7 +754,6 @@ class GspaApiEU(ApiImpl):
             "exchangeableRefreshToken": token.exchangeable_refresh_token or "",
             "nonCcsToken": token.non_ccs_token or "",
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
-            "idToken": token.id_token or "",
         }
         resp = requests.post(
             f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",

@@ -160,6 +160,14 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         self._fetch_user_id(token)
         return token
 
+    def refresh_access_token(self, token: Token) -> Token:
+        """Renew a Pleos session without falling back to password login."""
+        if token.cci_access_token or token.non_ccs_token:
+            return self._refresh_cci_token(token)
+        raise AuthenticationError(
+            "Hyundai Korea Pleos session cannot be renewed; sign in again"
+        )
+
     def _get_cci_headers(
         self,
         device_id: str,
