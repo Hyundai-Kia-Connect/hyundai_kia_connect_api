@@ -38,6 +38,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     """
 
     data_timezone = dt.timezone(dt.timedelta(hours=9))
+    supports_window_control = True
     supports_valet_mode = False
     SUPPORTED_LANGUAGES = ("ko", "en")
 
@@ -55,6 +56,8 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     LOGIN_COUNTRY = ""
     LOGIN_LANGUAGE = None
     LOGIN_STATE = "hmgoneapp"
+    CCI_REFRESH_SEND_AUTH_HEADERS = False
+    CCI_REFRESH_SEND_ID_TOKEN = False
     # Keep this aligned with the production loginUrl shipped in the Korean
     # MyHyundai app. In particular, ``offline`` requests the renewable token
     # set needed to restore a session without another browser login.
@@ -81,8 +84,31 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         8: frozenset((2, 8)),
         9: frozenset((2, 5, 8)),
     }
+    SEAT_CLIMATE_FIELDS: ClassVar[tuple[tuple[str, str, str], ...]] = (
+        (
+            "drvSeatHeatState",
+            "front_left_seat",
+            "front_left_seat_climate_capability",
+        ),
+        (
+            "astSeatHeatState",
+            "front_right_seat",
+            "front_right_seat_climate_capability",
+        ),
+        (
+            "rlSeatHeatState",
+            "rear_left_seat",
+            "rear_left_seat_climate_capability",
+        ),
+        (
+            "rrSeatHeatState",
+            "rear_right_seat",
+            "rear_right_seat_climate_capability",
+        ),
+    )
 
     def __init__(self, region: int, brand: int, language: str) -> None:
+        """Initialize the Korea API with MyHyundai Android client metadata."""
         super().__init__(region, brand, language)
         self._cci_client_version = "1.6.0"
         self._cci_client_os_version = "16"
@@ -176,6 +202,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         exchangeable_token: str | None = None,
         content_type: str | None = None,
     ) -> dict[str, Any]:
+        """Build CCI headers that identify the Korea Android application."""
         headers = super()._get_cci_headers(
             device_id,
             cci_access_token=cci_access_token,
@@ -223,6 +250,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             _LOGGER.debug("%s - CCI profile request failed", DOMAIN)
 
     def _ensure_cc_id(self, token: Token) -> str:
+        """Return the connected-car customer ID, fetching it when absent."""
         if not token.cc_id:
             self._fetch_user_id(token)
         if not token.cc_id:
@@ -230,6 +258,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         return token.cc_id
 
     def _ensure_user_id(self, token: Token) -> str:
+        """Return the Pleos profile ID, fetching it when absent."""
         if not token.user_id:
             self._fetch_user_id(token)
         if not token.user_id:
@@ -265,6 +294,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         authorization: str | None = None,
         ccs2_support: int | None = None,
     ) -> dict[str, Any]:
+        """Send one authenticated request to the Korea connected-car API."""
         headers = self._get_authenticated_headers(token, ccs2_support)
         if authorization is not None:
             headers["Authorization"] = authorization
@@ -302,6 +332,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         return data if isinstance(data, dict) else {}
 
     def _status_body(self, token: Token, vehicle: Vehicle, service_no: str) -> dict:
+        """Build the shared identity fields for a Korea vehicle request."""
         return {
             "CCID": f"{self._ensure_cc_id(token).removesuffix('_BLU')}_BLU",
             "carID": vehicle.id,
@@ -309,6 +340,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         }
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Update a vehicle from MyHyundai Korea's most recent cached status."""
         if vehicle.supports_window_control is True and not getattr(
             vehicle, "window_status_capabilities_loaded", False
         ):
@@ -330,17 +362,20 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     def _update_korean_window_properties(
         vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
+        """Interpret Korea window fields according to native capability flags."""
         use_open_level = getattr(vehicle, "window_safety_option2", None) in (3, 4)
         use_open_flag = getattr(vehicle, "window_safety_option", None) == 1
-        if not use_open_level and not use_open_flag:
-            return
-
         windows = (
             ("front_left_window_is_open", "Cabin.Window.Row1.Driver"),
             ("front_right_window_is_open", "Cabin.Window.Row1.Passenger"),
             ("back_left_window_is_open", "Cabin.Window.Row2.Left"),
             ("back_right_window_is_open", "Cabin.Window.Row2.Right"),
         )
+        if not use_open_level and not use_open_flag:
+            for attribute, _path in windows:
+                setattr(vehicle, attribute, None)
+            return
+
         for attribute, path in windows:
             if vehicle.window_safety_option2 == 4 and attribute.startswith("back_"):
                 setattr(vehicle, attribute, None)
@@ -397,15 +432,10 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         seat_info = data.get("seatHeaterVentInfo")
         if isinstance(seat_info, list) and seat_info and isinstance(seat_info[0], dict):
             seats = seat_info[0]
-            vehicle.front_left_seat_climate_capability = seats.get("drvSeatHeatState")
-            vehicle.front_right_seat_climate_capability = seats.get("astSeatHeatState")
-            vehicle.rear_left_seat_climate_capability = seats.get("rlSeatHeatState")
-            vehicle.rear_right_seat_climate_capability = seats.get("rrSeatHeatState")
         else:
-            vehicle.front_left_seat_climate_capability = data.get("drvSeatHeatState")
-            vehicle.front_right_seat_climate_capability = data.get("astSeatHeatState")
-            vehicle.rear_left_seat_climate_capability = data.get("rlSeatHeatState")
-            vehicle.rear_right_seat_climate_capability = data.get("rrSeatHeatState")
+            seats = data
+        for api_field, _option_field, capability_field in self.SEAT_CLIMATE_FIELDS:
+            setattr(vehicle, capability_field, seats.get(api_field))
 
         steering_option = data.get("strgWhlHeatOption")
         stepped_steering_option = data.get("strgWhlHeatingOption")
@@ -428,6 +458,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     def _update_vehicle_properties_ccs2(
         self, vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
+        """Apply shared CCS2 status parsing plus the Korea status timestamp."""
         super()._update_vehicle_properties_ccs2(vehicle, state)
         status_date = get_child_value(state, "Date")
         if status_date:
@@ -436,6 +467,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                 vehicle.last_updated_at = utc_date.astimezone(vehicle.timezone)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wake a vehicle and wait until its cached status becomes fresh."""
         previous_updated_at = vehicle.last_updated_at
         self._domestic_post(
             token,
@@ -469,6 +501,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                     )
 
     def _get_control_token(self, token: Token) -> str:
+        """Return a short-lived PIN-authorized token for protected controls."""
         now = time.time()
         if token.control_token and token.control_token_expiry > now:
             return token.control_token
@@ -503,27 +536,17 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         token.control_token_expiry = now + 240
         return token.control_token
 
-    @staticmethod
+    @classmethod
     def _seat_climate_payload(
-        vehicle: Vehicle, options: ClimateRequestOptions
+        cls, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> list[dict] | None:
+        """Build requested seat states and turn omitted supported seats off."""
         seats = {
-            "drvSeatHeatState": (
-                options.front_left_seat,
-                getattr(vehicle, "front_left_seat_climate_capability", None),
-            ),
-            "astSeatHeatState": (
-                options.front_right_seat,
-                getattr(vehicle, "front_right_seat_climate_capability", None),
-            ),
-            "rlSeatHeatState": (
-                options.rear_left_seat,
-                getattr(vehicle, "rear_left_seat_climate_capability", None),
-            ),
-            "rrSeatHeatState": (
-                options.rear_right_seat,
-                getattr(vehicle, "rear_right_seat_climate_capability", None),
-            ),
+            api_field: (
+                getattr(options, option_field),
+                getattr(vehicle, capability_field, None),
+            )
+            for api_field, option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
         }
         requested = {
             key: value if value is not None else 2
@@ -534,11 +557,13 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
 
     @staticmethod
     def _drop_none(body: dict[str, Any]) -> dict[str, Any]:
+        """Remove optional fields that the Korea API does not accept as null."""
         return {key: value for key, value in body.items() if value is not None}
 
     def _ensure_gen2_control(
         self, token: Token, vehicle: Vehicle, require_start: bool
     ) -> None:
+        """Require GEN2 control and, when needed, remote-start eligibility."""
         if getattr(vehicle, "remote_control_generation", None) is None or (
             require_start and getattr(vehicle, "supports_remote_start", None) is None
         ):
@@ -559,37 +584,17 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     def _validate_climate_options(
         self, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> None:
-        seats = (
-            (
-                "front_left_seat",
-                options.front_left_seat,
-                getattr(vehicle, "front_left_seat_climate_capability", None),
-            ),
-            (
-                "front_right_seat",
-                options.front_right_seat,
-                getattr(vehicle, "front_right_seat_climate_capability", None),
-            ),
-            (
-                "rear_left_seat",
-                options.rear_left_seat,
-                getattr(vehicle, "rear_left_seat_climate_capability", None),
-            ),
-            (
-                "rear_right_seat",
-                options.rear_right_seat,
-                getattr(vehicle, "rear_right_seat_climate_capability", None),
-            ),
-        )
-        for name, requested, capability in seats:
+        """Reject seat and steering requests unsupported by the vehicle."""
+        for _api_field, option_field, capability_field in self.SEAT_CLIMATE_FIELDS:
+            requested = getattr(options, option_field)
+            capability = getattr(vehicle, capability_field, None)
             allowed = self.SEAT_CLIMATE_STATES.get(capability)
-            if (
-                requested is not None
-                and allowed is not None
-                and requested not in allowed
-            ):
+            if requested is not None and allowed is None:
+                raise APIError(f"{option_field} capability is unavailable")
+            if requested is not None and requested not in allowed:
                 raise APIError(
-                    f"{name} state {requested} is unsupported by capability {capability}"
+                    f"{option_field} state {requested} is unsupported by capability "
+                    f"{capability}"
                 )
         if options.steering_wheel not in (None, 0, 1, 2):
             raise APIError("steering_wheel must be 0 (off), 1 (on), or 2 (high)")
@@ -600,14 +605,18 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             raise APIError(
                 "steering_wheel state 2 requires two-level steering-wheel control"
             )
-        if (
-            options.steering_wheel not in (None, 0)
-            and getattr(vehicle, "supports_steering_wheel_heater", None) is False
-        ):
-            raise APIError("This vehicle does not support a heated steering wheel")
+        if options.steering_wheel not in (None, 0):
+            steering_supported = getattr(
+                vehicle, "supports_steering_wheel_heater", None
+            )
+            if steering_supported is None:
+                raise APIError("steering-wheel capability is unavailable")
+            if steering_supported is False:
+                raise APIError("This vehicle does not support a heated steering wheel")
 
     @staticmethod
     def _combined_heating_state(options: ClimateRequestOptions) -> int:
+        """Map rear-window and steering choices to the legacy heating code."""
         heating = options.heating if options.heating is not None else 0
         rear_on = heating in (1, 2, 4)
         wheel_on = (
@@ -623,6 +632,14 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             return 3
         return 0
 
+    @staticmethod
+    def _control_request_id(data: dict[str, Any]) -> str:
+        """Return the request identifier from any Korea control response."""
+        request_id = data.get("svcSID") or data.get("SID") or data.get("ServiceNo")
+        if not request_id:
+            raise APIError("Hyundai Korea control response contained no request ID")
+        return str(request_id)
+
     def _remote_control_post(
         self,
         token: Token,
@@ -630,6 +647,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         operation: str,
         body: dict[str, Any],
     ) -> str:
+        """Send a GEN2 control request and return its asynchronous request ID."""
         if token.pin:
             endpoint = f"api/v2/{self.REMOTE_PATH}/ccsp/pin/{operation}.do"
             authorization = f"Bearer {self._get_control_token(token)}"
@@ -643,26 +661,14 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             authorization=authorization,
             ccs2_support=vehicle.ccu_ccs2_protocol_support,
         )
-        request_id = data.get("svcSID") or data.get("SID") or data.get("ServiceNo")
-        if not request_id:
-            raise APIError("Hyundai Korea control response contained no request ID")
-        return str(request_id)
+        return self._control_request_id(data)
 
-    @staticmethod
-    def _seat_off_payload(vehicle: Vehicle) -> list[dict] | None:
+    @classmethod
+    def _seat_off_payload(cls, vehicle: Vehicle) -> list[dict] | None:
+        """Build off states for every seat with an advertised capability."""
         seats = {
-            "drvSeatHeatState": getattr(
-                vehicle, "front_left_seat_climate_capability", None
-            ),
-            "astSeatHeatState": getattr(
-                vehicle, "front_right_seat_climate_capability", None
-            ),
-            "rlSeatHeatState": getattr(
-                vehicle, "rear_left_seat_climate_capability", None
-            ),
-            "rrSeatHeatState": getattr(
-                vehicle, "rear_right_seat_climate_capability", None
-            ),
+            api_field: getattr(vehicle, capability_field, None)
+            for api_field, _option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
         }
         off = {
             key: 2
@@ -678,6 +684,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         command: str,
         options: ClimateRequestOptions | None = None,
     ) -> tuple[str, dict[str, Any]]:
+        """Build the Korea engine or EV climate endpoint and request body."""
         body: dict[str, Any] = {
             "CCID": f"{self._ensure_cc_id(token).removesuffix('_BLU')}_BLU",
             "carID": vehicle.id,
@@ -778,6 +785,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
+        """Lock or unlock a Korea GEN2 vehicle and return the request ID."""
         body = self._status_body(
             token,
             vehicle,
@@ -804,7 +812,4 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         else:
             raise APIError(f"Unsupported lock action: {action}")
 
-        request_id = data.get("svcSID") or data.get("SID") or data.get("ServiceNo")
-        if not request_id:
-            raise APIError("Hyundai Korea control response contained no request ID")
-        return str(request_id)
+        return self._control_request_id(data)

@@ -181,6 +181,8 @@ class GspaApiEU(ApiImpl):
     LOGIN_LANGUAGE: str | None = "en"
     LOGIN_SCOPE: str = ""
     LOGIN_STATE: str = "ccsp"
+    CCI_REFRESH_SEND_AUTH_HEADERS: bool = True
+    CCI_REFRESH_SEND_ID_TOKEN: bool = True
 
     # Library region id (REGIONS enum, e.g. 9 = Europe CCI) is a DIFFERENT
     # namespace from the stamp-region code the SDK cipher expects. EU CCI
@@ -503,6 +505,7 @@ class GspaApiEU(ApiImpl):
 
     def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
         def is_true(value: Any) -> bool:
+            """Parse the boolean-like values returned by CCI vehicle metadata."""
             if isinstance(value, bool):
                 return value
             if isinstance(value, int):
@@ -741,12 +744,17 @@ class GspaApiEU(ApiImpl):
         the app, not JSON.
         """
         device_id = token.device_id or ""
-        # The native CCI client excludes the stale Authorization and
-        # exchangeable-token headers from token refresh. The non-CCS token is
-        # the only authentication token sent as a header; all renewable tokens
-        # are carried in the request body.
-        headers = self._get_cci_headers(device_id, content_type="application/json")
-        headers["non-ccs-token"] = token.non_ccs_token or ""
+        if self.CCI_REFRESH_SEND_AUTH_HEADERS:
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+        else:
+            headers = self._get_cci_headers(device_id, content_type="application/json")
+            headers["non-ccs-token"] = token.non_ccs_token or ""
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -755,6 +763,8 @@ class GspaApiEU(ApiImpl):
             "nonCcsToken": token.non_ccs_token or "",
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
         }
+        if self.CCI_REFRESH_SEND_ID_TOKEN:
+            body["idToken"] = token.id_token or ""
         resp = requests.post(
             f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
             headers=headers,
