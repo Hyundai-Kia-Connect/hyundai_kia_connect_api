@@ -469,6 +469,31 @@ def test_korean_cached_status_fetches_missing_window_capabilities():
     assert vehicle.front_left_window_is_open is False
 
 
+def test_korean_cached_status_survives_transient_capability_failure():
+    manager = VehicleManager(10, 2, "", "", "", token=_token(), language="ko")
+    vehicle = _vehicle()
+    manager.vehicles[vehicle.id] = vehicle
+    capability_failure = _response({}, status_code=500)
+    status = _response(
+        {
+            "RetCode": "S",
+            "state": {"Vehicle": {"Date": "20260909182542"}},
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        side_effect=[capability_failure, status],
+    ):
+        manager.update_vehicle_with_cached_state(vehicle.id)
+
+    assert vehicle.last_updated_at == dt.datetime(
+        2026, 9, 10, 3, 25, 42, tzinfo=dt.timezone(dt.timedelta(hours=9))
+    )
+    assert getattr(vehicle, "window_status_capabilities_loaded", False) is False
+    assert vehicle.front_left_window_is_open is None
+
+
 def test_korean_level_four_window_capability_omits_rear_status():
     api = _api()
     token = _token()
