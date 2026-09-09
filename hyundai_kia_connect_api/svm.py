@@ -35,6 +35,53 @@ def _parse_int(value: str | int | None) -> int | None:
         return None
 
 
+def _parse_float(value: str | float | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_image_sizes(
+    raw: Any,
+) -> tuple[tuple[int, int] | None, tuple[int, ...] | None]:
+    """Parse an SVM ``imageSize`` array.
+
+    Returns ``(image_size, image_sizes)``: ``image_size`` is the first two
+    elements as the ``(width, height)`` panorama size; ``image_sizes`` is
+    the full array — panorama followed by the individual camera segments —
+    and is only returned when every element parses as an integer, since
+    consumers use it to compute segment crop offsets.
+    """
+    if not isinstance(raw, list) or len(raw) < 2:
+        return None, None
+    width = _parse_int(raw[0])
+    height = _parse_int(raw[1])
+    image_size = (width, height) if width is not None and height is not None else None
+    parsed: list[int] = []
+    for value in raw:
+        item = _parse_int(value)
+        if item is None:
+            return image_size, None
+        parsed.append(item)
+    return image_size, tuple(parsed)
+
+
+def _parse_float_list(raw: Any) -> tuple[float, ...] | None:
+    """Parse a float array (e.g. ``validAngleofView``); None if malformed."""
+    if not isinstance(raw, list):
+        return None
+    parsed: list[float] = []
+    for value in raw:
+        item = _parse_float(value)
+        if item is None:
+            return None
+        parsed.append(item)
+    return tuple(parsed)
+
+
 def _parse_door_open(door_open: dict | None) -> dict[str, bool | None] | None:
     """Map an SVM doorOpen object onto the shared door keys.
 
@@ -62,6 +109,12 @@ class SVMDetails:
     door_open: dict[str, bool] | None = None
     trunk_open: bool | None = None
     image_size: tuple[int, int] | None = None
+    # Full imageSize array: panorama size followed by the width of each
+    # camera segment. Consumers use it to crop individual views.
+    image_sizes: tuple[int, ...] | None = None
+    # GSPA responses carry a per-camera field-of-view array; present only
+    # on some regions, None when absent or malformed.
+    valid_angle_of_view: tuple[float, ...] | None = None
     raw_metadata: dict | None = None
 
 

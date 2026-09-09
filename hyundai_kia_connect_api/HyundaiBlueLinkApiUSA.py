@@ -35,6 +35,8 @@ from .svm import (
     SVMDetails,
     _parse_bool,
     _parse_door_open,
+    _parse_float_list,
+    _parse_image_sizes,
     _parse_int,
     redact_svm_metadata,
 )
@@ -146,13 +148,7 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         except (ValueError, TypeError):
             _LOGGER.debug("Unable to parse SVM capture timestamp: %s", captured_at_raw)
 
-    image_size_raw = detail.get("imageSize")
-    image_size = None
-    if isinstance(image_size_raw, list) and len(image_size_raw) >= 2:
-        width = _parse_int(image_size_raw[0])
-        height = _parse_int(image_size_raw[1])
-        if width is not None and height is not None:
-            image_size = (width, height)
+    image_size, image_sizes = _parse_image_sizes(detail.get("imageSize"))
 
     speed_value = float_or_none(get_child_value(detail, "gpsDetail.speed.value"))
     speed_unit = get_child_value(detail, "gpsDetail.speed.unit")
@@ -172,6 +168,8 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
         image_size=image_size,
+        image_sizes=image_sizes,
+        valid_angle_of_view=_parse_float_list(detail.get("validAngleofView")),
         raw_metadata=raw_metadata,
     )
 

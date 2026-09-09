@@ -37,6 +37,8 @@ from .svm import (
     SVMDetails,
     _parse_bool,
     _parse_door_open,
+    _parse_float_list,
+    _parse_image_sizes,
     _parse_int,
     redact_svm_metadata,
 )
@@ -110,10 +112,10 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     """Parse a GSPA SVM ``scsDetail`` object into SVMDetails.
 
     The GSPA response shape mirrors the USA SVM response (gpsDetail with
-    coord/head/speed/time, doorOpen, trunkOpen, imageSize). Fields without
-    a typed slot on SVMDetails (installAngle, boundaryArea,
-    validAngleofView, sideMirrorOpen) stay available through raw_metadata
-    with the base64 image redacted.
+    coord/head/speed/time, doorOpen, trunkOpen, imageSize, and
+    validAngleofView). Fields without a typed slot on SVMDetails
+    (installAngle, boundaryArea, sideMirrorOpen) stay available through
+    raw_metadata with the base64 image redacted.
     """
     gps = detail.get("gpsDetail")
     if not isinstance(gps, dict):
@@ -131,13 +133,7 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     except (ValueError, TypeError):
         image_bytes = b""
 
-    image_size = None
-    image_size_raw = detail.get("imageSize")
-    if isinstance(image_size_raw, list) and len(image_size_raw) >= 2:
-        width = _parse_int(image_size_raw[0])
-        height = _parse_int(image_size_raw[1])
-        if width is not None and height is not None:
-            image_size = (width, height)
+    image_size, image_sizes = _parse_image_sizes(detail.get("imageSize"))
 
     captured_at_raw = gps.get("time")
     return SVMDetails(
@@ -151,6 +147,8 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
         image_size=image_size,
+        image_sizes=image_sizes,
+        valid_angle_of_view=_parse_float_list(detail.get("validAngleofView")),
         # Coordinates are deliberately preserved here (gps=False): the typed
         # fields above already carry them, advanced consumers get the rest.
         raw_metadata=redact_svm_metadata(detail, gps=False),
