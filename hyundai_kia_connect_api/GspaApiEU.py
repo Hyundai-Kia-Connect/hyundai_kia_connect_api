@@ -32,6 +32,7 @@ from .exceptions import (
     AuthenticationError,
     ConsentRequiredError,
     InvalidAPIResponseError,
+    ServiceTemporaryUnavailable,
 )
 from .gspa import create_tsid
 from .svm import (
@@ -765,16 +766,27 @@ class GspaApiEU(ApiImpl):
         }
         if self.CCI_REFRESH_SEND_ID_TOKEN:
             body["idToken"] = token.id_token or ""
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
-            headers=headers,
-            json=body,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
+        try:
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+                headers=headers,
+                json=body,
+                timeout=(5, 30),
+            )
+        except requests.RequestException as exc:
+            raise ServiceTemporaryUnavailable(
+                "CCI token refresh temporarily unavailable: network request failed"
+            ) from exc
+        if resp.status_code in (401, 403):
             raise AuthenticationError(
                 f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
             )
+        if resp.status_code == 429 or resp.status_code >= 500:
+            raise ServiceTemporaryUnavailable(
+                f"CCI token refresh temporarily unavailable: HTTP {resp.status_code}"
+            )
+        if resp.status_code != 200:
+            raise APIError(f"CCI token refresh failed: HTTP {resp.status_code}")
         data = resp.json()
         cci_access_token = data.get("accessToken", token.cci_access_token or "")
         cci_refresh_token = data.get("refreshToken", token.refresh_token or "")
@@ -825,7 +837,7 @@ class GspaApiEU(ApiImpl):
     # ------------------------------------------------------------------
 
     def test_token(self, token: Token) -> bool:
-        """Test if the CCS token is still valid via CCI API."""
+        """Return false only when CCI conclusively rejects the current token."""
         url = self.CCI_DOMAIN_API_URL + "v1/vehicle/available-vehicles?detail=false"
         headers = self._get_cci_headers(
             token.device_id or "",
@@ -835,10 +847,21 @@ class GspaApiEU(ApiImpl):
         )
         try:
             response = requests.get(url, headers=headers, timeout=(5, 30))
-            return bool(response.status_code == 200)
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - CCS token freshness check failed")
+        except requests.RequestException:
+            _LOGGER.debug(f"{DOMAIN} - CCS token freshness check was inconclusive")
+            return True
+        if response.status_code == 200:
+            return True
+        if response.status_code in (401, 403):
             return False
+        if response.status_code == 429 or response.status_code >= 500:
+            _LOGGER.debug(
+                "%s - CCS token freshness check was inconclusive: HTTP %s",
+                DOMAIN,
+                response.status_code,
+            )
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # GSPA X-Stamp computation

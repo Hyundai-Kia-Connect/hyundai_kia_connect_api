@@ -242,7 +242,7 @@ class HyundaiCciApiEU(GspaApiEU):
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
         vehicle.outside_temperature = (
             outside_temp,
-            TEMPERATURE_UNITS[outside_temp_unit],
+            TEMPERATURE_UNITS.get(outside_temp_unit),
         )
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
@@ -263,18 +263,18 @@ class HyundaiCciApiEU(GspaApiEU):
         elif defrost_rear_is_on == 1:
             vehicle.back_window_heater_is_on = True
 
-        vehicle.front_left_seat_status = SEAT_STATUS[
+        vehicle.front_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
-        ]
-        vehicle.front_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.front_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
-        ]
-        vehicle.rear_left_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
-        ]
-        vehicle.rear_right_seat_status = SEAT_STATUS[
+        )
+        vehicle.rear_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
-        ]
+        )
 
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
@@ -476,9 +476,9 @@ class HyundaiCciApiEU(GspaApiEU):
         if dte_total is not None:
             vehicle.total_driving_range = (
                 float(dte_total),
-                DISTANCE_UNITS[
+                DISTANCE_UNITS.get(
                     get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
-                ],
+                ),
             )
         fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
         if fuel_dte is not None:
@@ -527,11 +527,15 @@ class HyundaiCciApiEU(GspaApiEU):
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Standard"),
-            DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+            DISTANCE_UNITS.get(
+                get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
+            ),
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Quick"),
-            DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+            DISTANCE_UNITS.get(
+                get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
+            ),
         )
         departure1_enable = get_child_value(
             state, "Green.Reservation.Departure.Schedule1.Enable"
