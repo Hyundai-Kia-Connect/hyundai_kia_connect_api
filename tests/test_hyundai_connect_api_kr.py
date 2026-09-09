@@ -382,6 +382,131 @@ def test_vehicle_capabilities_uses_current_myhyundai_infolist_request():
     assert vehicle.supports_steering_wheel_heater is True
 
 
+def test_korean_cached_status_uses_window_level_capability():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    capabilities = _response(
+        {
+            "RetCode": "S",
+            "windowSafetyOption": 1,
+            "windowSafetyOption2": 3,
+        }
+    )
+    closed_windows = {
+        "Row1": {
+            "Driver": {"Open": 1, "OpenLevel": 0},
+            "Passenger": {"Open": 1, "OpenLevel": 0},
+        },
+        "Row2": {
+            "Left": {"Open": 1, "OpenLevel": 0},
+            "Right": {"Open": 1, "OpenLevel": 0},
+        },
+    }
+    status = _response(
+        {
+            "RetCode": "S",
+            "state": {
+                "Vehicle": {
+                    "Date": "20260909182542",
+                    "Cabin": {"Window": closed_windows},
+                }
+            },
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        side_effect=[capabilities, status],
+    ):
+        api.get_vehicle_capabilities(token, vehicle)
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    assert vehicle.front_left_window_is_open is False
+    assert vehicle.front_right_window_is_open is False
+    assert vehicle.back_left_window_is_open is False
+    assert vehicle.back_right_window_is_open is False
+
+
+def test_korean_cached_status_fetches_missing_window_capabilities():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    vehicle.supports_window_control = True
+    capabilities = _response(
+        {
+            "RetCode": "S",
+            "windowSafetyOption": 1,
+            "windowSafetyOption2": 3,
+        }
+    )
+    status = _response(
+        {
+            "RetCode": "S",
+            "state": {
+                "Vehicle": {
+                    "Date": "20260909182542",
+                    "Cabin": {
+                        "Window": {
+                            "Row1": {
+                                "Driver": {"Open": 1, "OpenLevel": 0},
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        side_effect=[capabilities, status],
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    assert vehicle.front_left_window_is_open is False
+
+
+def test_korean_level_four_window_capability_omits_rear_status():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    vehicle.window_safety_option2 = 4
+    vehicle.window_status_capabilities_loaded = True
+    open_windows = {
+        "Row1": {
+            "Driver": {"OpenLevel": 1},
+            "Passenger": {"OpenLevel": 1},
+        },
+        "Row2": {
+            "Left": {"OpenLevel": 1},
+            "Right": {"OpenLevel": 1},
+        },
+    }
+    response = _response(
+        {
+            "RetCode": "S",
+            "state": {
+                "Vehicle": {
+                    "Date": "20260909182542",
+                    "Cabin": {"Window": open_windows},
+                }
+            },
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        return_value=response,
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    assert vehicle.front_left_window_is_open is True
+    assert vehicle.front_right_window_is_open is True
+    assert vehicle.back_left_window_is_open is None
+    assert vehicle.back_right_window_is_open is None
+
+
 def test_vehicle_capabilities_fetches_missing_profile_id():
     api = _api()
     token = _token(user_id=None)

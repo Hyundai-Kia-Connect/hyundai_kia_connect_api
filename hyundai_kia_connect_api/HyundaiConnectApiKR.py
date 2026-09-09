@@ -309,6 +309,10 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         }
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        if vehicle.supports_window_control is True and not getattr(
+            vehicle, "window_status_capabilities_loaded", False
+        ):
+            self.get_vehicle_capabilities(token, vehicle)
         data = self._domestic_post(
             token,
             f"{self.STATUS_PATH}/recentcarstatus_ccs2.do",
@@ -320,6 +324,34 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if not isinstance(state, dict) or not state:
             raise APIError("Hyundai Korea status response contained no vehicle state")
         self._update_vehicle_properties_ccs2(vehicle, state)
+        self._update_korean_window_properties(vehicle, state)
+
+    @staticmethod
+    def _update_korean_window_properties(
+        vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        use_open_level = getattr(vehicle, "window_safety_option2", None) in (3, 4)
+        use_open_flag = getattr(vehicle, "window_safety_option", None) == 1
+        if not use_open_level and not use_open_flag:
+            return
+
+        windows = (
+            ("front_left_window_is_open", "Cabin.Window.Row1.Driver"),
+            ("front_right_window_is_open", "Cabin.Window.Row1.Passenger"),
+            ("back_left_window_is_open", "Cabin.Window.Row2.Left"),
+            ("back_right_window_is_open", "Cabin.Window.Row2.Right"),
+        )
+        for attribute, path in windows:
+            if vehicle.window_safety_option2 == 4 and attribute.startswith("back_"):
+                setattr(vehicle, attribute, None)
+                continue
+            if use_open_level:
+                raw_value = get_child_value(state, f"{path}.OpenLevel")
+                is_open = raw_value in (1, 2, 3) if raw_value is not None else None
+            else:
+                raw_value = get_child_value(state, f"{path}.Open")
+                is_open = raw_value == 1 if raw_value is not None else None
+            setattr(vehicle, attribute, is_open)
 
     def get_vehicle_capabilities(
         self, token: Token, vehicle: Vehicle
@@ -354,6 +386,13 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         hvac_temp_type = data.get("hvacTempType")
         if isinstance(hvac_temp_type, int):
             vehicle.hvac_temperature_type = hvac_temp_type
+        window_safety_option = data.get("windowSafetyOption")
+        if isinstance(window_safety_option, int):
+            vehicle.window_safety_option = window_safety_option
+        window_safety_option2 = data.get("windowSafetyOption2")
+        if isinstance(window_safety_option2, int):
+            vehicle.window_safety_option2 = window_safety_option2
+        vehicle.window_status_capabilities_loaded = True
 
         seat_info = data.get("seatHeaterVentInfo")
         if isinstance(seat_info, list) and seat_info and isinstance(seat_info[0], dict):
