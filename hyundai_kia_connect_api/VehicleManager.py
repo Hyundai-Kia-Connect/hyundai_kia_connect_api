@@ -30,6 +30,7 @@ from .const import (
     REGION_EUROPE,
     REGION_EUROPE_CCI,
     REGION_INDIA,
+    REGION_KOREA,
     REGION_NZ,
     REGION_USA,
     REGIONS,
@@ -40,6 +41,7 @@ from .exceptions import APIError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
+from .HyundaiConnectApiKR import HyundaiConnectApiKR
 from .KiaCciApiEU import KiaCciApiEU
 from .KiaUvoApiAU import KiaUvoApiAU
 from .KiaUvoApiCA import KiaUvoApiCA
@@ -111,6 +113,22 @@ class VehicleManager:
         if isinstance(result, OTPRequest):
             self.otp_request = result
             return result
+
+    def get_authorization_url(self) -> str:
+        """Return an interactive browser-login URL when the region supports it."""
+        login_url = getattr(self.api, "get_authorization_url", None)
+        if login_url is None:
+            raise APIError("Interactive browser login is unavailable for this region")
+        return login_url()
+
+    def login_with_redirect_url(self, redirect_url: str) -> bool:
+        """Complete browser login and initialize vehicles from its final URL."""
+        complete_login = getattr(self.api, "login_with_redirect_url", None)
+        if complete_login is None:
+            raise APIError("Interactive browser login is unavailable for this region")
+        self.token = complete_login(redirect_url, pin=self.pin)
+        self.initialize_vehicles()
+        return True
 
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
         self.api.send_otp(self.otp_request, notify_type)
@@ -260,6 +278,13 @@ class VehicleManager:
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
+
+    def get_vehicle_capabilities(self, vehicle_id: str) -> dict:
+        """Return region-specific vehicle capabilities when available."""
+        get_capabilities = getattr(self.api, "get_vehicle_capabilities", None)
+        if get_capabilities is None:
+            raise APIError("Vehicle capabilities are unavailable for this region")
+        return get_capabilities(self.token, self.get_vehicle(vehicle_id))
 
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
@@ -418,6 +443,12 @@ class VehicleManager:
             if BRANDS[brand] == BRAND_GENESIS:
                 raise APIError("Genesis EU CCI/GSPA is not supported yet")
             return HyundaiCciApiEU(region, brand, language)
+        elif REGIONS[region] == REGION_KOREA:
+            if BRANDS[brand] != BRAND_HYUNDAI:
+                raise APIError(
+                    f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
+                )
+            return HyundaiConnectApiKR(region, brand, language)
         elif REGIONS[region] == REGION_USA and (
             BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
         ):

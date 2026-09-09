@@ -18,10 +18,11 @@ import logging
 import re
 import uuid
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import requests
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
 from .ApiImpl import ApiImpl, ApiImplSession
@@ -163,6 +164,7 @@ class GspaApiEU(ApiImpl):
 
     data_timezone = dt.UTC
     supports_valet_mode = True
+    SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES_LIST
 
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""
@@ -175,6 +177,10 @@ class GspaApiEU(ApiImpl):
     REQUEST_ID_HEADER: str = ""
     DEVICE_ID_HEADER: str = ""
     CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+    LOGIN_COUNTRY: str = "de"
+    LOGIN_LANGUAGE: str | None = "en"
+    LOGIN_SCOPE: str = ""
+    LOGIN_STATE: str = "ccsp"
 
     # Library region id (REGIONS enum, e.g. 9 = Europe CCI) is a DIFFERENT
     # namespace from the stamp-region code the SDK cipher expects. EU CCI
@@ -192,7 +198,7 @@ class GspaApiEU(ApiImpl):
         language = language.lower()
         if len(language) > 2:
             language = language[0:2]
-        if language not in SUPPORTED_LANGUAGES_LIST:
+        if language not in self.SUPPORTED_LANGUAGES:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"
 
@@ -283,8 +289,15 @@ class GspaApiEU(ApiImpl):
         auth_url = (
             f"{host}/auth/api/v2/user/oauth2/authorize"
             f"?response_type=code&client_id={client_id}"
-            f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
+            f"&redirect_uri={redirect_uri}"
         )
+        if self.LOGIN_LANGUAGE:
+            auth_url += f"&lang={self.LOGIN_LANGUAGE}"
+        auth_url += f"&state={self.LOGIN_STATE}"
+        if self.LOGIN_COUNTRY:
+            auth_url += f"&country={self.LOGIN_COUNTRY}"
+        if self.LOGIN_SCOPE:
+            auth_url += f"&scope={quote(self.LOGIN_SCOPE, safe='')}"
         auth_resp = s.get(auth_url, allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
             raise AuthenticationError(
@@ -310,7 +323,11 @@ class GspaApiEU(ApiImpl):
         key = RSA.construct(
             (int.from_bytes(n_bytes, "big"), int.from_bytes(e_bytes, "big"))
         )
-        encrypted_pw = PKCS1_v1_5.new(key).encrypt(password.encode("utf-8")).hex()
+        if jwk.get("alg") == "RSA-OAEP-256":
+            cipher = PKCS1_OAEP.new(key, hashAlgo=SHA256)
+        else:
+            cipher = PKCS1_v1_5.new(key)
+        encrypted_pw = cipher.encrypt(password.encode("utf-8")).hex()
 
         # Step 3: signin with RSA-encrypted password
         resp = s.post(
@@ -320,9 +337,9 @@ class GspaApiEU(ApiImpl):
                 "encryptedPassword": "true",
                 "password": encrypted_pw,
                 "redirect_uri": redirect_uri,
-                "scope": "",
+                "scope": self.LOGIN_SCOPE,
                 "nonce": "",
-                "state": "ccsp",
+                "state": self.LOGIN_STATE,
                 "username": username,
                 "connector_session_key": "",
                 "kid": kid,
@@ -485,6 +502,15 @@ class GspaApiEU(ApiImpl):
         return self._parse_vehicles_from_cci(data)
 
     def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
+        def is_true(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, int):
+                return value == 1
+            if isinstance(value, str):
+                return value.strip().upper() in {"1", "TRUE", "Y", "YES"}
+            return False
+
         vehicles: list[Vehicle] = []
         vehicle_list = (
             data
@@ -505,14 +531,16 @@ class GspaApiEU(ApiImpl):
                 "ccs2ProtocolSupport", entry.get("ccu_ccs2_protocol_support", 0)
             )
             if not ccs2_support:
-                is_ccs = entry.get("isCcs", False)
-                is_ccs_open = entry.get("isCcsOpen", False)
+                is_ccs = is_true(entry.get("isCcs", False))
+                is_ccs_open = is_true(entry.get("isCcsOpen", False))
                 if is_ccs and is_ccs_open:
                     ccs2_support = 2
 
-            car_type = (ccsp.get("carType") if ccsp else "") or ""
-            is_ev = entry.get("isEv", False)
-            fuel_type = entry.get("fuelType", entry.get("engineFuelCode", ""))
+            car_type = str((ccsp.get("carType") if ccsp else "") or "").upper()
+            is_ev = is_true(entry.get("isEv", False))
+            fuel_type = str(
+                entry.get("fuelType", entry.get("engineFuelCode", "")) or ""
+            ).upper()
             if is_ev or fuel_type == "EV" or car_type in ("EV", "ELEC"):
                 entry_engine_type = ENGINE_TYPES.EV
             elif fuel_type in ("PHEV", "HEV+PHEV") or car_type in ("PHEV",):
@@ -781,6 +809,7 @@ class GspaApiEU(ApiImpl):
             non_ccs_refresh_token=non_ccs_refresh_token,
             id_token=id_token,
             user_id=token.user_id,
+            cc_id=token.cc_id,
         )
 
     # ------------------------------------------------------------------
