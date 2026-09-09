@@ -38,7 +38,6 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     """
 
     data_timezone = dt.timezone(dt.timedelta(hours=9))
-    supports_window_control = True
     supports_valet_mode = False
     SUPPORTED_LANGUAGES = ("ko", "en")
 
@@ -341,9 +340,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Update a vehicle from MyHyundai Korea's most recent cached status."""
-        if vehicle.supports_window_control is True and not getattr(
-            vehicle, "window_status_capabilities_loaded", False
-        ):
+        if not getattr(vehicle, "window_status_capabilities_loaded", False):
             self.get_vehicle_capabilities(token, vehicle)
         data = self._domestic_post(
             token,

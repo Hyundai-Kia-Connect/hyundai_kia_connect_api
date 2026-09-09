@@ -56,7 +56,7 @@ def test_vehicle_manager_routes_hyundai_korea():
     api = VehicleManager.get_implementation_by_region_brand(10, 2, "ko")
 
     assert isinstance(api, HyundaiConnectApiKR)
-    assert api.supports_window_control is True
+    assert api.supports_window_control is False
 
 
 def test_vehicle_manager_rejects_non_hyundai_korea():
@@ -294,6 +294,7 @@ def test_cached_status_uses_domestic_ccs2_endpoint_and_payload():
     api = _api()
     token = _token()
     vehicle = _vehicle()
+    vehicle.window_status_capabilities_loaded = True
     response = _response(
         {
             "RetCode": "S",
@@ -433,7 +434,7 @@ def test_korean_cached_status_fetches_missing_window_capabilities():
     api = _api()
     token = _token()
     vehicle = _vehicle()
-    vehicle.supports_window_control = True
+    vehicle.supports_window_control = False
     capabilities = _response(
         {
             "RetCode": "S",
@@ -589,6 +590,7 @@ def test_force_refresh_retries_transient_http_500_from_cached_readback():
     api = _api()
     token = _token()
     vehicle = _vehicle()
+    vehicle.window_status_capabilities_loaded = True
     api._update_vehicle_properties_ccs2 = MagicMock()
     responses = [
         _response({"RetCode": "S", "svcSID": "refresh-request"}),
@@ -664,6 +666,7 @@ def test_force_refresh_stops_after_three_transient_readback_failures():
     api = _api()
     token = _token()
     vehicle = _vehicle()
+    vehicle.window_status_capabilities_loaded = True
     responses = [
         _response({"RetCode": "S", "svcSID": "refresh-request"}),
         _response({}, status_code=500),
