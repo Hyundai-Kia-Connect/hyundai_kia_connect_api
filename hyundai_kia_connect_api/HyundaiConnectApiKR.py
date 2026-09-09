@@ -389,6 +389,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                 vehicle.last_updated_at = utc_date.astimezone(vehicle.timezone)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        previous_updated_at = vehicle.last_updated_at
         self._domestic_post(
             token,
             f"{self.STATUS_PATH}/carstatus_ccs2.do",
@@ -409,7 +410,16 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                 if attempt == len(readback_delays) - 1:
                     raise
             else:
-                return
+                if (
+                    previous_updated_at is None
+                    or vehicle.last_updated_at != previous_updated_at
+                ):
+                    return
+                if attempt == len(readback_delays) - 1:
+                    raise ServiceTemporaryUnavailable(
+                        "Hyundai Korea force refresh completed, but cached vehicle "
+                        "status did not update"
+                    )
 
     def _get_control_token(self, token: Token) -> str:
         now = time.time()

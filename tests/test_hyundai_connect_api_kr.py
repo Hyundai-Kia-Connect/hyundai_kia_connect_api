@@ -400,6 +400,47 @@ def test_force_refresh_retries_transient_http_500_from_cached_readback():
     )
 
 
+def test_force_refresh_retries_successful_but_stale_cached_readback():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    previous_update = dt.datetime(2026, 9, 9, 13, 38, 33, tzinfo=dt.UTC)
+    refreshed_update = dt.datetime(2026, 9, 9, 13, 39, 14, tzinfo=dt.UTC)
+    vehicle.last_updated_at = previous_update
+    api._domestic_post = MagicMock(return_value={"svcSID": "refresh-request"})
+
+    def update_cached_state(_token, updated_vehicle):
+        if api.update_vehicle_with_cached_state.call_count == 2:
+            updated_vehicle.last_updated_at = refreshed_update
+
+    api.update_vehicle_with_cached_state = MagicMock(side_effect=update_cached_state)
+
+    with patch("hyundai_kia_connect_api.HyundaiConnectApiKR.time.sleep") as sleep:
+        api.force_refresh_vehicle_state(token, vehicle)
+
+    assert api.update_vehicle_with_cached_state.call_count == 2
+    assert [call.args[0] for call in sleep.call_args_list] == [25, 10]
+    assert vehicle.last_updated_at == refreshed_update
+
+
+def test_force_refresh_rejects_stale_cache_after_all_readback_attempts():
+    api = _api()
+    token = _token()
+    vehicle = _vehicle()
+    vehicle.last_updated_at = dt.datetime(2026, 9, 9, 13, 38, 33, tzinfo=dt.UTC)
+    api._domestic_post = MagicMock(return_value={"svcSID": "refresh-request"})
+    api.update_vehicle_with_cached_state = MagicMock()
+
+    with (
+        patch("hyundai_kia_connect_api.HyundaiConnectApiKR.time.sleep") as sleep,
+        pytest.raises(ServiceTemporaryUnavailable, match="status did not update"),
+    ):
+        api.force_refresh_vehicle_state(token, vehicle)
+
+    assert api.update_vehicle_with_cached_state.call_count == 3
+    assert [call.args[0] for call in sleep.call_args_list] == [25, 10, 10]
+
+
 def test_force_refresh_stops_after_three_transient_readback_failures():
     api = _api()
     token = _token()
