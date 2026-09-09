@@ -196,6 +196,66 @@ def test_korean_browser_redirect_exchanges_code_without_storing_password():
     api._fetch_user_id.assert_called_once_with(token)
 
 
+def test_korean_refresh_matches_myhyundai_request_shape():
+    api = _api()
+    token = _token(
+        refresh_token="cci-refresh-token",
+        exchangeable_refresh_token="exchangeable-refresh-token",
+        non_ccs_refresh_token="non-ccs-refresh-token",
+        id_token="id-token-not-sent-during-refresh",
+    )
+    response = _response(
+        {
+            "accessToken": "new-cci-token",
+            "refreshToken": "new-cci-refresh-token",
+            "exchangeableAccessToken": "new-exchangeable-token",
+            "exchangeableRefreshToken": "new-exchangeable-refresh-token",
+            "nonCcsToken": "new-non-ccs-token",
+            "nonCcsRefreshToken": "new-non-ccs-refresh-token",
+            "expiresIn": 3600,
+        }
+    )
+    response.headers = {}
+    api._exchange_ccs_token = MagicMock(
+        return_value=(
+            "new-ccs-token",
+            dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        )
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=response
+    ) as request:
+        api._refresh_cci_token(token)
+
+    assert request.call_args.kwargs["json"] == {
+        "accessToken": "cci-token",
+        "refreshToken": "cci-refresh-token",
+        "exchangeableAccessToken": "exchangeable-token",
+        "exchangeableRefreshToken": "exchangeable-refresh-token",
+        "nonCcsToken": "non-ccs-token",
+        "nonCcsRefreshToken": "non-ccs-refresh-token",
+    }
+    headers = request.call_args.kwargs["headers"]
+    assert "authorization" not in headers
+    assert "exchangeable-token" not in headers
+    assert "Authentication" not in headers
+    assert headers["non-ccs-token"] == "non-ccs-token"
+
+
+def test_korean_refresh_never_falls_back_to_missing_password():
+    api = _api()
+    api._refresh_cci_token = MagicMock(
+        side_effect=AuthenticationError("CCI token refresh failed: HTTP 401")
+    )
+    api.login = MagicMock()
+
+    with pytest.raises(AuthenticationError, match="HTTP 401"):
+        api.refresh_access_token(_token(username=None, password=None))
+
+    api.login.assert_not_called()
+
+
 def test_korean_browser_redirect_rejects_wrong_state():
     with pytest.raises(AuthenticationError, match="state"):
         _api().login_with_redirect_url(
