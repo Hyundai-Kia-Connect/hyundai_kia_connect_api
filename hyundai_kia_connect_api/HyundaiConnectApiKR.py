@@ -465,15 +465,33 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         return token.control_token
 
     @staticmethod
-    def _seat_climate_payload(options: ClimateRequestOptions) -> list[dict] | None:
+    def _seat_climate_payload(
+        vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> list[dict] | None:
         seats = {
-            "drvSeatHeatState": options.front_left_seat,
-            "astSeatHeatState": options.front_right_seat,
-            "rlSeatHeatState": options.rear_left_seat,
-            "rrSeatHeatState": options.rear_right_seat,
+            "drvSeatHeatState": (
+                options.front_left_seat,
+                getattr(vehicle, "front_left_seat_climate_capability", None),
+            ),
+            "astSeatHeatState": (
+                options.front_right_seat,
+                getattr(vehicle, "front_right_seat_climate_capability", None),
+            ),
+            "rlSeatHeatState": (
+                options.rear_left_seat,
+                getattr(vehicle, "rear_left_seat_climate_capability", None),
+            ),
+            "rrSeatHeatState": (
+                options.rear_right_seat,
+                getattr(vehicle, "rear_right_seat_climate_capability", None),
+            ),
         }
-        seats = {key: value for key, value in seats.items() if value is not None}
-        return [seats] if seats else None
+        requested = {
+            key: value if value is not None else 2
+            for key, (value, capability) in seats.items()
+            if value is not None or capability not in (None, 0, 7)
+        }
+        return [requested] if requested else None
 
     @staticmethod
     def _drop_none(body: dict[str, Any]) -> dict[str, Any]:
@@ -642,7 +660,9 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                         ),
                         "hvacTempType": getattr(vehicle, "hvac_temperature_type", None)
                         or 1,
-                        "seatHeaterVentInfo": self._seat_climate_payload(options),
+                        "seatHeaterVentInfo": self._seat_climate_payload(
+                            vehicle, options
+                        ),
                         "heating1": (
                             None
                             if separate_heating
@@ -683,7 +703,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                         if separate_heating
                         else [{"heating1": str(self._combined_heating_state(options))}]
                     ),
-                    "seatHeaterVentInfo": self._seat_climate_payload(options),
+                    "seatHeaterVentInfo": self._seat_climate_payload(vehicle, options),
                     "sideRearMirrorHeating": (
                         (1 if heating in (1, 2, 4) else 0) if separate_heating else None
                     ),

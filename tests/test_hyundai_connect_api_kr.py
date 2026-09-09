@@ -713,6 +713,35 @@ def test_gen2_engine_start_uses_engine_endpoint_and_service_number():
     }
 
 
+def test_gen2_engine_start_turns_omitted_supported_seats_off():
+    api = _api()
+    token = _token(pin=None)
+    vehicle = _vehicle()
+    vehicle.engine_type = ENGINE_TYPES.ICE
+    vehicle.remote_control_generation = "GEN2"
+    vehicle.supports_remote_start = True
+    vehicle.front_left_seat_climate_capability = 6
+    vehicle.front_right_seat_climate_capability = 2
+    response = _response(
+        {"metaInfo": {"retCode": "S"}, "data": {"SID": "engine-request"}}
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        return_value=response,
+    ) as request:
+        result = api.start_climate(
+            token,
+            vehicle,
+            ClimateRequestOptions(front_right_seat=6),
+        )
+
+    assert result == "engine-request"
+    assert request.call_args.kwargs["json"]["seatHeaterVentInfo"] == [
+        {"drvSeatHeatState": 2, "astSeatHeatState": 6}
+    ]
+
+
 def test_gen2_ev_climate_stop_sends_minimal_stop_request():
     api = _api()
     token = _token(pin=None)
