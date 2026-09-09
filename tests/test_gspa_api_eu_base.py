@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import APIError
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -70,6 +71,46 @@ def test_base_cci_domain_api_url():
     """CCI_DOMAIN_API_URL is derived from CCI_API_URL."""
     api = HyundaiCciApiEU(9, 2, "en")
     assert api.CCI_DOMAIN_API_URL == "https://cci-api-eu.hyundai.com/domain/api/"
+
+
+@pytest.mark.parametrize("not_ev", [False, 0, "0", "N", "false", "no", None])
+def test_parse_vehicles_does_not_treat_false_like_is_ev_values_as_true(not_ev):
+    api = HyundaiCciApiEU(9, 2, "en")
+
+    vehicle = api._parse_vehicles_from_cci(
+        {"contents": [{"vehicleId": "car-id", "isEv": not_ev}]}
+    )[0]
+
+    assert vehicle.engine_type == ENGINE_TYPES.ICE
+
+
+@pytest.mark.parametrize("is_ev", [True, 1, "1", "Y", "true", "yes"])
+def test_parse_vehicles_accepts_boolean_like_is_ev_values(is_ev):
+    api = HyundaiCciApiEU(9, 2, "en")
+
+    vehicle = api._parse_vehicles_from_cci(
+        {"contents": [{"vehicleId": "car-id", "isEv": is_ev}]}
+    )[0]
+
+    assert vehicle.engine_type == ENGINE_TYPES.EV
+
+
+def test_parse_vehicles_does_not_infer_ccs2_from_false_like_strings():
+    api = HyundaiCciApiEU(9, 2, "en")
+
+    vehicle = api._parse_vehicles_from_cci(
+        {
+            "contents": [
+                {
+                    "vehicleId": "car-id",
+                    "isCcs": "N",
+                    "isCcsOpen": "N",
+                }
+            ]
+        }
+    )[0]
+
+    assert vehicle.ccu_ccs2_protocol_support == 0
 
 
 def test_base_gspa_get_url_construction():

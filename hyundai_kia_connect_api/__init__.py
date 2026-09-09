@@ -15,6 +15,7 @@ from .Vehicle import Vehicle
 from .VehicleManager import VehicleManager
 
 from .HyundaiCciApiEU import HyundaiCciApiEU
+from .HyundaiConnectApiKR import HyundaiConnectApiKR
 from .KiaCciApiEU import KiaCciApiEU
 
 from .const import WINDOW_STATE
