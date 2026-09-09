@@ -56,10 +56,13 @@ password. The callback page immediately forwards desktop browsers to the
 Hyundai website, so capture its URL from the browser network log:
 
 1. Open browser developer tools, select **Network**, and enable **Preserve log**.
-2. Run the wizard and sign in normally in the browser it opens.
-3. After the browser reaches the Hyundai website, filter the preserved requests
+2. Run the wizard and open the authorization link in the browser.
+3. The Hyundai page initially shows its older integrated-account form. Turn on
+   the **Pleos account login** (``Pleos 계정 로그인``) switch at the bottom,
+   then enter the Pleos credentials.
+4. After the browser reaches the Hyundai website, filter the preserved requests
    for ``oneapp.hyundai.com/redirect``.
-4. Select that document request, copy its complete **Request URL**, and paste it
+5. Select that document request, copy its complete **Request URL**, and paste it
    into the wizard.
 
 ::

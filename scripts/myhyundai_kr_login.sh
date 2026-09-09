@@ -224,8 +224,9 @@ print(manager.get_authorization_url())
 PY
 )
   step "Open browser developer tools, select Network, and enable Preserve log."
-  step "Keep developer tools open, then sign in with Pleos in the browser that opens."
   open_url "$AUTHORIZATION_URL"
+  step "On the Hyundai login form, turn on the Pleos account login switch at the bottom."
+  step "Keep developer tools open, then sign in with your Pleos credentials."
   step "After the browser reaches hyundai.com, filter Network for oneapp.hyundai.com/redirect."
   step "Open that document request and copy its complete Request URL."
   note "The callback page forwards immediately in a normal browser. Preserve log keeps the one-time code available."
