@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from typing import Any, ClassVar
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -115,16 +115,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
 
     def get_authorization_url(self) -> str:
         """Return the Pleos URL used for interactive browser login."""
-        query = urlencode(
-            {
-                "response_type": "code",
-                "client_id": self.ONEAPP_CLIENT_ID,
-                "redirect_uri": self.ONEAPP_REDIRECT_URI,
-                "state": self.LOGIN_STATE,
-                "scope": self.LOGIN_SCOPE,
-            }
-        )
-        return f"{self.LOGIN_FORM_HOST}/auth/api/v2/user/oauth2/authorize?{query}"
+        return self._build_authorization_url()
 
     def login_with_redirect_url(
         self,
@@ -161,25 +152,11 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if not auth_code:
             raise AuthenticationError("Pleos authorization code is empty")
         device_id = device_id or str(uuid.uuid4())
-        cci = self._exchange_auth_code_for_cci_tokens(device_id, auth_code)
-        cci_access_token = cci.get("accessToken", "")
-        exchangeable_token = cci.get("exchangeableAccessToken", "")
-        non_ccs_token = cci.get("nonCcsToken", "")
-        ccs_token, valid_until = self._exchange_ccs_token(
-            device_id, cci_access_token, non_ccs_token, exchangeable_token
-        )
-        token = Token(
-            access_token=f"Bearer {ccs_token}",
-            refresh_token=cci.get("refreshToken", ""),
-            device_id=device_id,
-            valid_until=valid_until,
+        login_result = self._exchange_authorization_code(device_id, auth_code)
+        token = self._token_from_login_result(
+            login_result,
+            device_id,
             pin=pin,
-            cci_access_token=cci_access_token,
-            exchangeable_token=exchangeable_token,
-            exchangeable_refresh_token=cci.get("exchangeableRefreshToken", ""),
-            non_ccs_token=non_ccs_token,
-            non_ccs_refresh_token=cci.get("nonCcsRefreshToken", ""),
-            id_token=cci.get("idToken", ""),
         )
         self._register_device(token)
         self._fetch_user_id(token)
@@ -298,25 +275,14 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if authorization is not None:
             headers["Authorization"] = authorization
         url = f"{self.CCSP_API_URL}/{endpoint.lstrip('/')}"
-        try:
-            response = requests.post(url, headers=headers, json=body, timeout=(5, 60))
-        except requests.RequestException as exc:
-            raise ServiceTemporaryUnavailable(
-                "Hyundai Korea API temporarily unavailable: network request failed"
-            ) from exc
-        if response.status_code == 401:
-            raise AuthenticationError("Hyundai Korea token expired or invalid")
-        try:
-            payload: dict[str, Any] = response.json()
-        except ValueError as exc:
-            if response.status_code >= 500:
-                raise ServiceTemporaryUnavailable(
-                    "Hyundai Korea API temporarily unavailable: "
-                    f"HTTP {response.status_code} with no JSON"
-                ) from exc
-            raise APIError(
-                f"Hyundai Korea API returned HTTP {response.status_code} with no JSON"
-            ) from exc
+        response, payload = self._post_json(
+            url,
+            headers,
+            body,
+            timeout=(5, 60),
+            context="Hyundai Korea API",
+            authentication_error="Hyundai Korea token expired or invalid",
+        )
         meta = payload.get("metaInfo", payload)
         ret_code = meta.get("retCode", meta.get("RetCode"))
         if ret_code == "F":
@@ -326,20 +292,65 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             if response.status_code >= 500:
                 raise ServiceTemporaryUnavailable(error)
             raise APIError(error)
-        if response.status_code >= 500:
-            raise ServiceTemporaryUnavailable(
-                f"Hyundai Korea API temporarily unavailable: HTTP {response.status_code}"
-            )
-        if response.status_code >= 400:
-            raise APIError(f"Hyundai Korea API error: HTTP {response.status_code}")
+        self._raise_for_http_status(response, "Hyundai Korea API")
         data = payload.get("data", payload.get("resMsg", payload))
         return data if isinstance(data, dict) else {}
 
-    def _status_body(self, token: Token, vehicle: Vehicle, service_no: str) -> dict:
-        """Build the shared identity fields for a Korea vehicle request."""
+    @staticmethod
+    def _post_json(
+        url: str,
+        headers: dict[str, Any],
+        body: dict[str, Any],
+        *,
+        timeout: tuple[int, int],
+        context: str,
+        authentication_error: str,
+    ) -> tuple[requests.Response, dict[str, Any]]:
+        """POST JSON and apply consistent transport and decoding handling."""
+        try:
+            response = requests.post(url, headers=headers, json=body, timeout=timeout)
+        except requests.RequestException as exc:
+            raise ServiceTemporaryUnavailable(
+                f"{context} temporarily unavailable: network request failed"
+            ) from exc
+        if response.status_code == 401:
+            raise AuthenticationError(authentication_error)
+        try:
+            payload: dict[str, Any] = response.json()
+        except ValueError as exc:
+            if response.status_code >= 500:
+                raise ServiceTemporaryUnavailable(
+                    f"{context} temporarily unavailable: HTTP "
+                    f"{response.status_code} with no JSON"
+                ) from exc
+            raise APIError(
+                f"{context} returned HTTP {response.status_code} with no JSON"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise APIError(f"{context} returned a non-object JSON response")
+        return response, payload
+
+    @staticmethod
+    def _raise_for_http_status(response: requests.Response, context: str) -> None:
+        """Map an unsuccessful JSON response to the public API exceptions."""
+        if response.status_code >= 500:
+            raise ServiceTemporaryUnavailable(
+                f"{context} temporarily unavailable: HTTP {response.status_code}"
+            )
+        if response.status_code >= 400:
+            raise APIError(f"{context} failed: HTTP {response.status_code}")
+
+    def _vehicle_request_body(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        """Build the identity fields shared by Korea vehicle requests."""
         return {
             "CCID": f"{self._ensure_cc_id(token).removesuffix('_BLU')}_BLU",
             "carID": vehicle.id,
+        }
+
+    def _status_body(self, token: Token, vehicle: Vehicle, service_no: str) -> dict:
+        """Build a Korea vehicle request carrying a service number."""
+        return {
+            **self._vehicle_request_body(token, vehicle),
             "ServiceNo": service_no,
         }
 
@@ -408,9 +419,8 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             token,
             f"{self.STATUS_PATH}/infolist_v2.do",
             {
-                "CCID": f"{self._ensure_cc_id(token).removesuffix('_BLU')}_BLU",
+                **self._vehicle_request_body(token, vehicle),
                 "autoLoginYn": "Y",
-                "carID": vehicle.id,
                 "profileIndex": "1",
                 "userID": self._ensure_user_id(token),
                 "ServiceNo": "C3",
@@ -527,19 +537,15 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             exchangeable_token=token.exchangeable_token,
             content_type="application/json",
         )
-        response = requests.post(
+        response, data = self._post_json(
             self.CCI_DOMAIN_API_URL + "v1/auth/pin",
-            headers=headers,
-            json={"pin": token.pin},
+            headers,
+            {"pin": token.pin},
             timeout=(5, 30),
+            context="Hyundai Korea PIN authorization",
+            authentication_error="Hyundai Korea PIN authorization failed",
         )
-        if response.status_code == 401:
-            raise AuthenticationError("Hyundai Korea PIN authorization failed")
-        if response.status_code >= 400:
-            raise APIError(
-                f"Hyundai Korea PIN authorization failed: HTTP {response.status_code}"
-            )
-        data = response.json()
+        self._raise_for_http_status(response, "Hyundai Korea PIN authorization")
         control_info = data.get("controlTokenInfo", {})
         control_token = control_info.get("controlToken")
         if not control_token:
@@ -549,21 +555,24 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         return token.control_token
 
     @classmethod
+    def _supported_seat_fields(cls, vehicle: Vehicle) -> tuple[str, ...]:
+        """Return API fields for seats with an advertised climate capability."""
+        return tuple(
+            api_field
+            for api_field, _option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
+            if getattr(vehicle, capability_field, None) not in (None, 0, 7)
+        )
+
+    @classmethod
     def _seat_climate_payload(
         cls, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> list[dict] | None:
         """Build requested seat states and turn omitted supported seats off."""
-        seats = {
-            api_field: (
-                getattr(options, option_field),
-                getattr(vehicle, capability_field, None),
-            )
-            for api_field, option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
-        }
+        supported = cls._supported_seat_fields(vehicle)
         requested = {
             key: value if value is not None else 2
-            for key, (value, capability) in seats.items()
-            if value is not None or capability not in (None, 0, 7)
+            for key, option_field, _capability_field in cls.SEAT_CLIMATE_FIELDS
+            if (value := getattr(options, option_field)) is not None or key in supported
         }
         return [requested] if requested else None
 
@@ -678,15 +687,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     @classmethod
     def _seat_off_payload(cls, vehicle: Vehicle) -> list[dict] | None:
         """Build off states for every seat with an advertised capability."""
-        seats = {
-            api_field: getattr(vehicle, capability_field, None)
-            for api_field, _option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
-        }
-        off = {
-            key: 2
-            for key, capability in seats.items()
-            if capability not in (None, 0, 7)
-        }
+        off = {key: 2 for key in cls._supported_seat_fields(vehicle)}
         return [off] if off else None
 
     def _climate_body(
@@ -698,41 +699,39 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
     ) -> tuple[str, dict[str, Any]]:
         """Build the Korea engine or EV climate endpoint and request body."""
         body: dict[str, Any] = {
-            "CCID": f"{self._ensure_cc_id(token).removesuffix('_BLU')}_BLU",
-            "carID": vehicle.id,
+            **self._vehicle_request_body(token, vehicle),
             "CMD": command,
         }
+        if options is not None:
+            temperature = options.set_temp if options.set_temp is not None else 21.0
+            heating = options.heating if options.heating is not None else 0
+            separate_heating = (
+                getattr(vehicle, "steering_wheel_heater_option", None) is not None
+            )
+            shared_options = {
+                "hvacTempType": getattr(vehicle, "hvac_temperature_type", None) or 1,
+                "seatHeaterVentInfo": self._seat_climate_payload(vehicle, options),
+                "sideRearMirrorHeating": (
+                    (1 if heating in (1, 2, 4) else 0) if separate_heating else None
+                ),
+                "wheelHeating": (options.steering_wheel if separate_heating else None),
+            }
+
         if vehicle.engine_type == ENGINE_TYPES.EV:
             body["ServiceNo"] = self.CLIMATE_SERVICE_NO
             if options is not None:
                 duration = options.duration if options.duration is not None else 10
-                heating = options.heating if options.heating is not None else 0
-                separate_heating = (
-                    getattr(vehicle, "steering_wheel_heater_option", None) is not None
-                )
                 body.update(
                     {
-                        "airTemp": f"{options.set_temp if options.set_temp is not None else 21.0:.1f}",
+                        **shared_options,
+                        "airTemp": f"{temperature:.1f}",
                         "defrost": (
                             options.defrost if options.defrost is not None else False
-                        ),
-                        "hvacTempType": getattr(vehicle, "hvac_temperature_type", None)
-                        or 1,
-                        "seatHeaterVentInfo": self._seat_climate_payload(
-                            vehicle, options
                         ),
                         "heating1": (
                             None
                             if separate_heating
                             else str(self._combined_heating_state(options))
-                        ),
-                        "sideRearMirrorHeating": (
-                            (1 if heating in (1, 2, 4) else 0)
-                            if separate_heating
-                            else None
-                        ),
-                        "wheelHeating": (
-                            options.steering_wheel if separate_heating else None
                         ),
                         "ignitionDuration": str(duration),
                     }
@@ -742,31 +741,19 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         body["ServiceNo"] = self.ENGINE_SERVICE_NO
         if options is not None:
             duration = options.duration if options.duration is not None else 2
-            heating = options.heating if options.heating is not None else 0
-            separate_heating = (
-                getattr(vehicle, "steering_wheel_heater_option", None) is not None
-            )
             body.update(
                 {
+                    **shared_options,
                     "AirCon": (
                         "1" if options.climate is None or options.climate else "0"
                     ),
                     "defrost": "1" if options.defrost else "2",
                     "Remain": str(duration),
-                    "temp": f"{options.set_temp if options.set_temp is not None else 21.0:.1f}",
-                    "hvacTempType": getattr(vehicle, "hvac_temperature_type", None)
-                    or 1,
+                    "temp": f"{temperature:.1f}",
                     "HeatingList": (
                         None
                         if separate_heating
                         else [{"heating1": str(self._combined_heating_state(options))}]
-                    ),
-                    "seatHeaterVentInfo": self._seat_climate_payload(vehicle, options),
-                    "sideRearMirrorHeating": (
-                        (1 if heating in (1, 2, 4) else 0) if separate_heating else None
-                    ),
-                    "wheelHeating": (
-                        options.steering_wheel if separate_heating else None
                     ),
                 }
             )
