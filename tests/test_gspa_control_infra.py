@@ -198,10 +198,25 @@ def test_control_token_cache_hit_and_invalidate():
         assert post.call_count == 1  # refetched after invalidation
 
 
+def test_control_token_cache_is_per_source_token():
+    """One-to-one mapping: a different Token (new credentials) must not
+    reuse the cached control token derived from the old one."""
+    api = _make_api()
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
+        api._get_control_token_cached(_make_token())
+        assert post.call_count == 1
+        new_token = _make_token()
+        new_token.access_token = "Bearer fresh-ccs-token"
+        api._get_control_token_cached(new_token)
+        assert post.call_count == 2  # source changed -> PIN verified again
+
+
 def test_control_headers_carry_authorization_ccsp():
     api = _make_api()
     api._control_token = "Bearer ctrl-token-abc"
     api._control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
+    api._control_token_source = "Bearer ccs-token"
     headers = api._get_control_headers(_make_token(), _make_vehicle())
     assert headers["Authorization"] == "Bearer ctrl-token-abc"
     assert headers["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
@@ -212,6 +227,7 @@ def test_control_request_headers_bearer_endpoint_has_no_ccsp():
     api = _make_api()
     api._control_token = "Bearer ctrl-token-abc"
     api._control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
+    api._control_token_source = "Bearer ccs-token"
     headers = api._get_control_request_headers(
         _make_token(), _make_vehicle(), "charge-target"
     )

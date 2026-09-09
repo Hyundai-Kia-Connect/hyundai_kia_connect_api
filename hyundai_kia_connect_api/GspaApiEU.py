@@ -221,6 +221,15 @@ class GspaApiEU(ApiImpl):
         "rearseat-alarm": "safety/vehicles",
     }
 
+    # resCode -> (exception class, message label), keyed by exact code
+    # ("400-004") or 3-char prefix ("403" matches "403-001").
+    GSPA_RES_CODE_MAPPING: ClassVar[dict[str, tuple[type[Exception], str]]] = {
+        "400-004": (DuplicateRequestError, "GSPA duplicate"),
+        "4004": (DuplicateRequestError, "GSPA duplicate"),
+        "403": (AuthenticationError, "GSPA auth/stamp"),
+        "404": (UnsupportedControlError, "GSPA not supported"),
+    }
+
     # Endpoints authenticated with standard GSPA headers (bearer) instead of
     # the PIN-derived control token. Everything else is PIN-gated.
     GSPA_BEARER_ENDPOINTS: ClassVar[frozenset[str]] = frozenset(
@@ -276,8 +285,13 @@ class GspaApiEU(ApiImpl):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
 
         # PIN-derived control token cache (D5: per API instance, not Token).
+        # _control_token_source tracks which Token the cached control token
+        # was derived from (one-to-one mapping): if a different Token is
+        # passed (e.g. after a re-login), the cache is stale and the PIN is
+        # verified again against the new Token.
         self._control_token: str | None = None
         self._control_token_expiry: float = 0.0
+        self._control_token_source: str | None = None
 
         self.session = ApiImplSession()
 
@@ -990,14 +1004,23 @@ class GspaApiEU(ApiImpl):
             raise APIError(f"GSPA error: rc={spring_code}, msg={spring_msg}")
         res_code = meta.get("resCode") or data.get("rc")
         msg = meta.get("message") or data.get("msg", "")
-        if res_code in ("400-004", "4004"):
-            raise DuplicateRequestError(f"GSPA duplicate: {res_code} {msg}")
-        if isinstance(res_code, str) and res_code.startswith("403"):
-            raise AuthenticationError(f"GSPA auth/stamp: {res_code} {msg}")
+        # Business-state message takes precedence over the resCode mapping:
+        # live-probed OTA check returns 404-007 "No update info found by vin"
+        # — a normal "nothing pending" state, not an unsupported control.
         if "update info" in str(msg).lower():
             raise APIError(f"No pending OTA update: {res_code} {msg}".strip())
-        if isinstance(res_code, str) and res_code.startswith("404"):
-            raise UnsupportedControlError(f"GSPA not supported: {res_code} {msg}")
+        if isinstance(res_code, str):
+            # Exact codes and 3-char prefixes ("403-001") in one mapping,
+            # KiaUvoApiCA error_code_mapping style. Range checks that cannot
+            # be a dict (>= 500) stay below.
+            mapped = self.GSPA_RES_CODE_MAPPING.get(res_code) or (
+                self.GSPA_RES_CODE_MAPPING.get(res_code[:3])
+                if len(res_code) > 3
+                else None
+            )
+            if mapped is not None:
+                exc_class, label = mapped
+                raise exc_class(f"{label}: {res_code} {msg}")
         if status_code >= 500 or (
             isinstance(res_code, str) and res_code.startswith("5")
         ):
@@ -1080,18 +1103,35 @@ class GspaApiEU(ApiImpl):
         return f"Bearer {control_token}", expire_at
 
     def _get_control_token_cached(self, token: Token) -> str:
-        """Return the cached control token, verifying the PIN once per cycle."""
+        """Return the cached control token, verifying the PIN once per cycle.
+
+        The cache is one-to-one with the Token it was derived from: a cache
+        entry is only reused when the same Token instance identity (by its
+        CCI credential) is presented again.
+        """
         now = dt.datetime.now(dt.UTC).timestamp()
-        if self._control_token and now < self._control_token_expiry - 30:
+        source = (
+            token.cci_access_token
+            or token.non_ccs_token
+            or token.exchangeable_token
+            or token.access_token
+        )
+        if (
+            self._control_token
+            and self._control_token_source == source
+            and now < self._control_token_expiry - 30
+        ):
             return self._control_token
         control_token, expire_at = self._get_control_token(token)
         self._control_token = control_token
         self._control_token_expiry = float(expire_at)
+        self._control_token_source = source
         return control_token
 
     def _invalidate_control_token(self) -> None:
         self._control_token = None
         self._control_token_expiry = 0.0
+        self._control_token_source = None
 
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         """Headers for PIN-gated GSPA control commands.
@@ -1397,6 +1437,8 @@ class GspaApiEU(ApiImpl):
             f"{DOMAIN} - get_svm_details response: {redact_svm_metadata(scs_detail)}"
         )
         return parse_svm_detail(scs_detail)
+
+    # ------------------------------------------------------------------
     # Remote control (GSPA) — dispatcher
     # ------------------------------------------------------------------
 
