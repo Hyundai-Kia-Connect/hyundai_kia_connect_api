@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+import requests
 
 from hyundai_kia_connect_api import ClimateRequestOptions, HyundaiConnectApiKR
 from hyundai_kia_connect_api.const import ENGINE_TYPES, VEHICLE_LOCK_ACTION
@@ -492,6 +493,99 @@ def test_korean_cached_status_survives_transient_capability_failure():
     )
     assert getattr(vehicle, "window_status_capabilities_loaded", False) is False
     assert vehicle.front_left_window_is_open is None
+
+
+@pytest.mark.parametrize(
+    "capability_failure",
+    [
+        _response({}, status_code=404),
+        requests.Timeout("capability request timed out"),
+    ],
+    ids=("http-404", "timeout"),
+)
+def test_korean_cached_status_survives_other_capability_failures(capability_failure):
+    manager = VehicleManager(10, 2, "", "", "", token=_token(), language="ko")
+    vehicle = _vehicle()
+    manager.vehicles[vehicle.id] = vehicle
+    status = _response(
+        {
+            "RetCode": "S",
+            "state": {"Vehicle": {"Date": "20260909182542"}},
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        side_effect=[capability_failure, status],
+    ):
+        manager.update_vehicle_with_cached_state(vehicle.id)
+
+    assert vehicle.last_updated_at == dt.datetime(
+        2026, 9, 10, 3, 25, 42, tzinfo=dt.timezone(dt.timedelta(hours=9))
+    )
+    assert getattr(vehicle, "window_status_capabilities_loaded", False) is False
+
+
+def test_korean_cached_status_propagates_capability_authentication_failure():
+    manager = VehicleManager(10, 2, "", "", "", token=_token(), language="ko")
+    vehicle = _vehicle()
+    manager.vehicles[vehicle.id] = vehicle
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+            return_value=_response({}, status_code=401),
+        ) as request,
+        pytest.raises(AuthenticationError, match="token expired or invalid"),
+    ):
+        manager.update_vehicle_with_cached_state(vehicle.id)
+
+    request.assert_called_once()
+
+
+def test_korean_cached_status_tolerates_unknown_ccs2_enum_values():
+    manager = VehicleManager(10, 2, "", "", "", token=_token(), language="ko")
+    vehicle = _vehicle()
+    vehicle.window_status_capabilities_loaded = True
+    manager.vehicles[vehicle.id] = vehicle
+    status = _response(
+        {
+            "RetCode": "S",
+            "state": {
+                "Vehicle": {
+                    "Date": "20260909182542",
+                    "Cabin": {
+                        "HVAC": {"OutsideTemperature": {"Value": 18, "Unit": 99}},
+                        "Seat": {
+                            "Row1": {
+                                "Driver": {"Climate": {"State": 99}},
+                                "Passenger": {"Climate": {"State": 99}},
+                            },
+                            "Row2": {
+                                "Left": {"Climate": {"State": 99}},
+                                "Right": {"Climate": {"State": 99}},
+                            },
+                        },
+                    },
+                    "Drivetrain": {"FuelSystem": {"DTE": {"Total": 500, "Unit": 99}}},
+                }
+            },
+        }
+    )
+
+    with patch(
+        "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+        return_value=status,
+    ):
+        manager.update_vehicle_with_cached_state(vehicle.id)
+
+    assert vehicle.outside_temperature == 18
+    assert vehicle.front_left_seat_status is None
+    assert vehicle.front_right_seat_status is None
+    assert vehicle.rear_left_seat_status is None
+    assert vehicle.rear_right_seat_status is None
+    assert vehicle.total_driving_range == 500
+    assert vehicle.total_driving_range_unit is None
 
 
 def test_korean_level_four_window_capability_omits_rear_status():

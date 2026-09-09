@@ -298,7 +298,12 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if authorization is not None:
             headers["Authorization"] = authorization
         url = f"{self.CCSP_API_URL}/{endpoint.lstrip('/')}"
-        response = requests.post(url, headers=headers, json=body, timeout=(5, 60))
+        try:
+            response = requests.post(url, headers=headers, json=body, timeout=(5, 60))
+        except requests.RequestException as exc:
+            raise ServiceTemporaryUnavailable(
+                "Hyundai Korea API temporarily unavailable: network request failed"
+            ) from exc
         if response.status_code == 401:
             raise AuthenticationError("Hyundai Korea token expired or invalid")
         try:
@@ -343,7 +348,9 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if not getattr(vehicle, "window_status_capabilities_loaded", False):
             try:
                 self.get_vehicle_capabilities(token, vehicle)
-            except ServiceTemporaryUnavailable as exc:
+            except AuthenticationError:
+                raise
+            except Exception as exc:  # pylint: disable=broad-except
                 _LOGGER.warning(
                     "%s - Korea capability discovery unavailable; continuing "
                     "without window status: %s",
