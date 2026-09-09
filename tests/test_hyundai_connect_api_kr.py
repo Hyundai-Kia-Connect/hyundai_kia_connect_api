@@ -891,6 +891,19 @@ def test_unlock_without_pin_fails_before_remote_request():
         api.lock_action(_token(pin=None), _vehicle(), VEHICLE_LOCK_ACTION.UNLOCK)
 
 
+def test_unlock_reports_temporary_pin_authorization_failure():
+    api = _api()
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.HyundaiConnectApiKR.requests.post",
+            side_effect=requests.ConnectionError("offline"),
+        ),
+        pytest.raises(ServiceTemporaryUnavailable, match="temporarily unavailable"),
+    ):
+        api.lock_action(_token(), _vehicle(), VEHICLE_LOCK_ACTION.UNLOCK)
+
+
 def test_gen2_ev_climate_start_sends_seats_and_steering_wheel():
     api = _api()
     token = _token()
