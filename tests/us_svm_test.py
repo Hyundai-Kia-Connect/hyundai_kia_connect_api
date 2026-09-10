@@ -83,6 +83,8 @@ def test_parse_svm_response_decodes_image_and_metadata():
     }
     assert details.trunk_open is False
     assert details.image_size == (4472, 720)
+    assert details.image_sizes == (4472, 720, 960, 720, 632, 720)
+    assert details.valid_angle_of_view is None
 
 
 def test_parse_svm_response_unknown_timestamp_does_not_crash():
@@ -95,6 +97,38 @@ def test_parse_svm_response_unknown_timestamp_does_not_crash():
     assert details.image_bytes == image
     assert details.captured_at is None
     assert details.captured_at_raw == "not-a-date"
+
+
+def test_parse_svm_response_malformed_image_size_segment():
+    from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import parse_svm_response
+
+    image = b"\xff\xd8\xff\xe0fakejpg"
+    response = _make_svm_response(image, "2026-06-23T12:34:56Z")
+    response["svmDetails"][0]["svmDetail"]["imageSize"] = [
+        "4472",
+        "720",
+        "960",
+        "bogus",
+    ]
+    details = parse_svm_response(response, dt.UTC)
+
+    assert details.image_size == (4472, 720)
+    assert details.image_sizes is None
+
+
+def test_parse_svm_response_valid_angle_of_view_when_present():
+    from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import parse_svm_response
+
+    image = b"\xff\xd8\xff\xe0fakejpg"
+    response = _make_svm_response(image, "2026-06-23T12:34:56Z")
+    response["svmDetails"][0]["svmDetail"]["validAngleofView"] = [
+        76.0,
+        59.28,
+        78.0,
+    ]
+    details = parse_svm_response(response, dt.UTC)
+
+    assert details.valid_angle_of_view == (76.0, 59.28, 78.0)
 
 
 def test_redact_svm_response_for_log_strips_image_and_gps():

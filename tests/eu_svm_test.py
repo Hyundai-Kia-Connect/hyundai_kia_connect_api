@@ -91,6 +91,8 @@ def test_parse_svm_detail_full():
     }
     assert detail.trunk_open is False
     assert detail.image_size == (4472, 720)
+    assert detail.image_sizes == (4472, 720)
+    assert detail.valid_angle_of_view == (1.5, 2.5)
 
 
 def test_parse_svm_detail_raw_metadata_keeps_coords_redacts_image():
@@ -104,7 +106,6 @@ def test_parse_svm_detail_raw_metadata_keeps_coords_redacts_image():
     # Fields without a typed slot on SVMDetails stay reachable here.
     assert raw["installAngle"] == [1.0, 2.0]
     assert raw["boundaryArea"] == [10, 20, 30, 40]
-    assert raw["validAngleofView"] == [1.5, 2.5]
     assert raw["sidemirrorOpen"] is True
 
 
@@ -120,6 +121,8 @@ def test_parse_svm_detail_missing_fields_graceful():
     assert detail.door_open is None
     assert detail.trunk_open is None
     assert detail.image_size is None
+    assert detail.image_sizes is None
+    assert detail.valid_angle_of_view is None
 
 
 def test_parse_svm_detail_malformed_gps_no_crash():
