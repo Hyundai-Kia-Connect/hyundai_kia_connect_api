@@ -32,6 +32,145 @@ China support was rewritten in 2026 against the current China Bluelink iOS app (
 - Push device registration uses ``pushType: APNS`` (not GCM) and requires a ``providerDeviceId`` field.
 - Control-command latency is high (1-2 minutes to reach SUCCESS); consumers should use generous polling timeouts.
 
+Korea (Hyundai MyHyundai)
+-------------------------
+
+Hyundai Korea is available as region ``10`` (``REGION_KOREA``). It uses the
+current unified MyHyundai account service and the Korean domestic connected-car
+API. Pleos accounts may require interactive browser authentication because its
+sign-in service rejects scripted password submissions. The browser exchange,
+vehicle discovery, cached and forced CCS2 status, door lock/unlock, GEN2 remote
+engine/climate start and stop, front-seat heat and ventilation, and heated
+steering-wheel control have been live-tested on a Korean ICE vehicle. Rear-seat
+climate settings are implemented from the same current MyHyundai request model,
+but the live-test vehicle did not advertise rear-seat support.
+Korea support should still be considered experimental until it receives broader
+live-account testing. EV charge controls, Kia Korea, and Genesis Korea are not
+yet supported.
+
+Pleos browser login
+~~~~~~~~~~~~~~~~~~~
+
+Pleos login is interactive the first time. This flow does not store the account
+password. The callback page immediately forwards desktop browsers to the
+Hyundai website, so capture its URL from the browser network log:
+
+1. Open browser developer tools, select **Network**, and enable **Preserve log**.
+2. Run the wizard and open the authorization link in the browser.
+3. The Hyundai page initially shows its older integrated-account form. Turn on
+   the **Pleos account login** (``Pleos 계정 로그인``) switch at the bottom,
+   then enter the Pleos credentials.
+4. After the browser reaches the Hyundai website, filter the preserved requests
+   for ``oneapp.hyundai.com/redirect``.
+5. Select that document request, copy its complete **Request URL**, and paste it
+   into the wizard.
+
+::
+
+    ./scripts/myhyundai_kr_login.sh
+
+The wizard is the simplest setup path. It saves renewable credentials under
+``~/.local/state/hyundai-kia-connect-api/`` and verifies them with a read-only
+status query. The equivalent Python flow is shown below::
+
+    import getpass
+    import webbrowser
+    from pathlib import Path
+
+    from hyundai_kia_connect_api import VehicleManager
+
+    pin = getpass.getpass("MyHyundai PIN: ")
+    manager = VehicleManager(
+        region=10,
+        brand=2,
+        username="",
+        password="",
+        pin=pin,
+        language="ko",
+    )
+
+    login_url = manager.get_authorization_url()
+    print("If the browser does not open, visit:", login_url)
+    webbrowser.open(login_url)
+    redirect_url = input("Paste the final redirect URL: ").strip()
+    manager.login_with_redirect_url(redirect_url)
+
+    # Save all refresh credentials atomically. Password, PIN, and the temporary
+    # vehicle-control token are omitted. The file is created with mode 0600.
+    token_file = (
+        Path.home()
+        / ".local/state/hyundai-kia-connect-api/myhyundai-kr.json"
+    )
+    manager.token.save(token_file)
+
+For later API sessions, load the saved refresh credentials and call
+``check_and_refresh_token()``. A browser is only needed again if Hyundai expires
+or revokes the refresh credentials::
+
+    import getpass
+    from pathlib import Path
+
+    from hyundai_kia_connect_api import Token, VehicleManager
+
+    token_file = (
+        Path.home()
+        / ".local/state/hyundai-kia-connect-api/myhyundai-kr.json"
+    )
+    token = Token.load(token_file)
+    pin = getpass.getpass("MyHyundai PIN: ")
+    token.pin = pin
+    manager = VehicleManager(
+        region=10,
+        brand=2,
+        username="",
+        password="",
+        pin=pin,
+        token=token,
+        language="ko",
+    )
+    manager.check_and_refresh_token()
+    # Hyundai may rotate refresh credentials, so persist the current set after
+    # every successful refresh or API session.
+    manager.token.save(token_file)
+
+The saved refresh credentials are bearer secrets. Keep the file private and do
+not commit, copy, or log it. This avoids repeated Pleos browser login while the
+refresh credentials remain valid. If Hyundai revokes or expires them, repeat
+the interactive login once and overwrite the saved session.
+
+GEN2 climate options
+~~~~~~~~~~~~~~~~~~~~
+
+``get_vehicle_capabilities(vehicle_id)`` populates normalized fields such as
+``supports_remote_start``, ``remote_control_generation``, the four
+``*_seat_climate_capability`` values, and
+``supports_steering_wheel_heater``. ``start_climate`` checks those capabilities
+before sending a command. For seat requests, use ``2`` for off, ``3``/``4``/``5``
+for low/medium/high ventilation, and ``6``/``7``/``8`` for low/medium/high heat.
+Not every seat supports every state. Heated steering-wheel values are ``0``
+(off), ``1`` (on/low), and ``2`` (high when
+``steering_wheel_heater_option == 2``)::
+
+    from hyundai_kia_connect_api import ClimateRequestOptions
+
+    vehicle_id = next(iter(manager.vehicles))
+    capabilities = manager.get_vehicle_capabilities(vehicle_id)
+    print(capabilities["appMode"], manager.get_vehicle(vehicle_id).supports_remote_start)
+
+    # This call sends the command immediately.
+    request_id = manager.start_climate(
+        vehicle_id,
+        ClimateRequestOptions(
+            set_temp=21.5,
+            duration=10,
+            defrost=False,
+            climate=True,
+            front_left_seat=6,
+            front_right_seat=6,
+            steering_wheel=1,
+        ),
+    )
+
 Python 3.12 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
     region: int
@@ -49,7 +188,7 @@ Python 3.12 or newer is required to use this package. Vehicle manager is the key
 
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL, 9: REGION_EUROPE_CCI, 10: REGION_KOREA}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
 

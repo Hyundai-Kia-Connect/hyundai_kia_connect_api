@@ -18,10 +18,11 @@ import logging
 import re
 import uuid
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 import requests
-from Crypto.Cipher import PKCS1_v1_5
+from Crypto.Cipher import PKCS1_OAEP, PKCS1_v1_5
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
 from .ApiImpl import ApiImpl, ApiImplSession
@@ -31,6 +32,7 @@ from .exceptions import (
     AuthenticationError,
     ConsentRequiredError,
     InvalidAPIResponseError,
+    ServiceTemporaryUnavailable,
 )
 from .gspa import create_tsid
 from .svm import (
@@ -161,6 +163,7 @@ class GspaApiEU(ApiImpl):
 
     data_timezone = dt.UTC
     supports_valet_mode = True
+    SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES_LIST
 
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""
@@ -173,6 +176,12 @@ class GspaApiEU(ApiImpl):
     REQUEST_ID_HEADER: str = ""
     DEVICE_ID_HEADER: str = ""
     CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+    LOGIN_COUNTRY: str = "de"
+    LOGIN_LANGUAGE: str | None = "en"
+    LOGIN_SCOPE: str = ""
+    LOGIN_STATE: str = "ccsp"
+    CCI_REFRESH_SEND_AUTH_HEADERS: bool = True
+    CCI_REFRESH_SEND_ID_TOKEN: bool = True
 
     # Library region id (REGIONS enum, e.g. 9 = Europe CCI) is a DIFFERENT
     # namespace from the stamp-region code the SDK cipher expects. EU CCI
@@ -190,7 +199,7 @@ class GspaApiEU(ApiImpl):
         language = language.lower()
         if len(language) > 2:
             language = language[0:2]
-        if language not in SUPPORTED_LANGUAGES_LIST:
+        if language not in self.SUPPORTED_LANGUAGES:
             _LOGGER.warning(f"Unsupported language: {language}, fallback to en")
             language = "en"
 
@@ -217,6 +226,25 @@ class GspaApiEU(ApiImpl):
 
         self.session = ApiImplSession()
 
+    def _build_authorization_url(self) -> str:
+        """Build the shared IDPConnect OAuth authorization URL."""
+        query = [
+            ("response_type", "code"),
+            ("client_id", self.ONEAPP_CLIENT_ID),
+            ("redirect_uri", self.ONEAPP_REDIRECT_URI),
+        ]
+        if self.LOGIN_LANGUAGE:
+            query.append(("lang", self.LOGIN_LANGUAGE))
+        query.append(("state", self.LOGIN_STATE))
+        if self.LOGIN_COUNTRY:
+            query.append(("country", self.LOGIN_COUNTRY))
+        if self.LOGIN_SCOPE:
+            query.append(("scope", self.LOGIN_SCOPE))
+        encoded_query = urlencode(query, quote_via=quote)
+        return (
+            f"{self.LOGIN_FORM_HOST}/auth/api/v2/user/oauth2/authorize?{encoded_query}"
+        )
+
     def login(
         self,
         username: str,
@@ -233,7 +261,34 @@ class GspaApiEU(ApiImpl):
 
         login_result = self._login_with_password(username, password, device_id)
 
-        token = Token(
+        token = self._token_from_login_result(
+            login_result,
+            device_id,
+            username=username,
+            password=password,
+            pin=pin,
+        )
+
+        # Register device on CCI (non-critical — best effort).
+        self._register_device(token)
+
+        # Extract CCS user-id for GSPA X-Stamp (best effort).
+        self._fetch_user_id(token)
+
+        return token
+
+    @staticmethod
+    def _token_from_login_result(
+        login_result: dict[str, Any],
+        device_id: str,
+        username: str | None = None,
+        password: str | None = None,
+        pin: str | None = None,
+        user_id: str | None = None,
+        cc_id: str | None = None,
+    ) -> Token:
+        """Create a token from the normalized result of any CCI login flow."""
+        return Token(
             username=username,
             password=password,
             access_token=login_result["access_token"],
@@ -247,15 +302,9 @@ class GspaApiEU(ApiImpl):
             non_ccs_token=login_result.get("non_ccs_token"),
             non_ccs_refresh_token=login_result.get("non_ccs_refresh_token"),
             id_token=login_result.get("id_token"),
+            user_id=user_id,
+            cc_id=cc_id,
         )
-
-        # Register device on CCI (non-critical — best effort).
-        self._register_device(token)
-
-        # Extract CCS user-id for GSPA X-Stamp (best effort).
-        self._fetch_user_id(token)
-
-        return token
 
     def _login_with_password(
         self, username: str, password: str, device_id: str
@@ -269,7 +318,6 @@ class GspaApiEU(ApiImpl):
         4. token (auth code -> CCI tokens)
         5. token-exchange (CCI -> CCS token)
         """
-        host = self.LOGIN_FORM_HOST
         client_id = self.ONEAPP_CLIENT_ID
         redirect_uri = self.ONEAPP_REDIRECT_URI
         mobile_ua = USER_AGENT_MOZILLA + "_CCS_APP_AOS"
@@ -278,12 +326,7 @@ class GspaApiEU(ApiImpl):
         s.headers.update({"User-Agent": mobile_ua})
 
         # Step 1: authorize
-        auth_url = (
-            f"{host}/auth/api/v2/user/oauth2/authorize"
-            f"?response_type=code&client_id={client_id}"
-            f"&redirect_uri={redirect_uri}&lang=en&state=ccsp&country=de"
-        )
-        auth_resp = s.get(auth_url, allow_redirects=True)
+        auth_resp = s.get(self._build_authorization_url(), allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
             raise AuthenticationError(
                 "IDPConnect authorize was blocked by the WAF ('abusing request'). "
@@ -291,7 +334,7 @@ class GspaApiEU(ApiImpl):
             )
 
         # Step 2: RSA public key
-        resp = s.get(f"{host}/auth/api/v1/accounts/certs")
+        resp = s.get(f"{self.LOGIN_FORM_HOST}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
@@ -308,19 +351,23 @@ class GspaApiEU(ApiImpl):
         key = RSA.construct(
             (int.from_bytes(n_bytes, "big"), int.from_bytes(e_bytes, "big"))
         )
-        encrypted_pw = PKCS1_v1_5.new(key).encrypt(password.encode("utf-8")).hex()
+        if jwk.get("alg") == "RSA-OAEP-256":
+            cipher = PKCS1_OAEP.new(key, hashAlgo=SHA256)
+        else:
+            cipher = PKCS1_v1_5.new(key)
+        encrypted_pw = cipher.encrypt(password.encode("utf-8")).hex()
 
         # Step 3: signin with RSA-encrypted password
         resp = s.post(
-            f"{host}/auth/account/signin",
+            f"{self.LOGIN_FORM_HOST}/auth/account/signin",
             data={
                 "client_id": client_id,
                 "encryptedPassword": "true",
                 "password": encrypted_pw,
                 "redirect_uri": redirect_uri,
-                "scope": "",
+                "scope": self.LOGIN_SCOPE,
                 "nonce": "",
-                "state": "ccsp",
+                "state": self.LOGIN_STATE,
                 "username": username,
                 "connector_session_key": "",
                 "kid": kid,
@@ -359,8 +406,13 @@ class GspaApiEU(ApiImpl):
             )
         code = code_list[0]
 
-        # Step 4: exchange auth code for CCI tokens
-        cci = self._exchange_auth_code_for_cci_tokens(device_id, code)
+        return self._exchange_authorization_code(device_id, code)
+
+    def _exchange_authorization_code(
+        self, device_id: str, auth_code: str
+    ) -> dict[str, Any]:
+        """Exchange an authorization code for the normalized CCI/CCS token set."""
+        cci = self._exchange_auth_code_for_cci_tokens(device_id, auth_code)
         cci_access_token = cci.get("accessToken", "")
         cci_refresh_token = cci.get("refreshToken", "")
         non_ccs_token = cci.get("nonCcsToken", "")
@@ -370,7 +422,6 @@ class GspaApiEU(ApiImpl):
         id_token = cci.get("idToken", "")
         cci_expires_in = int(cci.get("expiresIn", 3599))
 
-        # Step 5: exchange CCI token for CCS token
         ccs_token, ccs_valid_until = self._exchange_ccs_token(
             device_id, cci_access_token, non_ccs_token, exchangeable_token
         )
@@ -483,6 +534,16 @@ class GspaApiEU(ApiImpl):
         return self._parse_vehicles_from_cci(data)
 
     def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
+        def is_true(value: Any) -> bool:
+            """Parse the boolean-like values returned by CCI vehicle metadata."""
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, int):
+                return value == 1
+            if isinstance(value, str):
+                return value.strip().upper() in {"1", "TRUE", "Y", "YES"}
+            return False
+
         vehicles: list[Vehicle] = []
         vehicle_list = (
             data
@@ -503,14 +564,16 @@ class GspaApiEU(ApiImpl):
                 "ccs2ProtocolSupport", entry.get("ccu_ccs2_protocol_support", 0)
             )
             if not ccs2_support:
-                is_ccs = entry.get("isCcs", False)
-                is_ccs_open = entry.get("isCcsOpen", False)
+                is_ccs = is_true(entry.get("isCcs", False))
+                is_ccs_open = is_true(entry.get("isCcsOpen", False))
                 if is_ccs and is_ccs_open:
                     ccs2_support = 2
 
-            car_type = (ccsp.get("carType") if ccsp else "") or ""
-            is_ev = entry.get("isEv", False)
-            fuel_type = entry.get("fuelType", entry.get("engineFuelCode", ""))
+            car_type = str((ccsp.get("carType") if ccsp else "") or "").upper()
+            is_ev = is_true(entry.get("isEv", False))
+            fuel_type = str(
+                entry.get("fuelType", entry.get("engineFuelCode", "")) or ""
+            ).upper()
             if is_ev or fuel_type == "EV" or car_type in ("EV", "ELEC"):
                 entry_engine_type = ENGINE_TYPES.EV
             elif fuel_type in ("PHEV", "HEV+PHEV") or car_type in ("PHEV",):
@@ -711,13 +774,17 @@ class GspaApiEU(ApiImpl):
         the app, not JSON.
         """
         device_id = token.device_id or ""
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
-        )
+        if self.CCI_REFRESH_SEND_AUTH_HEADERS:
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+        else:
+            headers = self._get_cci_headers(device_id, content_type="application/json")
+            headers["non-ccs-token"] = token.non_ccs_token or ""
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -725,18 +792,30 @@ class GspaApiEU(ApiImpl):
             "exchangeableRefreshToken": token.exchangeable_refresh_token or "",
             "nonCcsToken": token.non_ccs_token or "",
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
-            "idToken": token.id_token or "",
         }
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
-            headers=headers,
-            json=body,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
+        if self.CCI_REFRESH_SEND_ID_TOKEN:
+            body["idToken"] = token.id_token or ""
+        try:
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+                headers=headers,
+                json=body,
+                timeout=(5, 30),
+            )
+        except requests.RequestException as exc:
+            raise ServiceTemporaryUnavailable(
+                "CCI token refresh temporarily unavailable: network request failed"
+            ) from exc
+        if resp.status_code in (401, 403):
             raise AuthenticationError(
                 f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
             )
+        if resp.status_code == 429 or resp.status_code >= 500:
+            raise ServiceTemporaryUnavailable(
+                f"CCI token refresh temporarily unavailable: HTTP {resp.status_code}"
+            )
+        if resp.status_code != 200:
+            raise APIError(f"CCI token refresh failed: HTTP {resp.status_code}")
         data = resp.json()
         cci_access_token = data.get("accessToken", token.cci_access_token or "")
         cci_refresh_token = data.get("refreshToken", token.refresh_token or "")
@@ -764,21 +843,24 @@ class GspaApiEU(ApiImpl):
             device_id, cci_access_token, non_ccs_token, exchangeable_token
         )
 
-        return Token(
+        return self._token_from_login_result(
+            {
+                "access_token": "Bearer " + ccs_token,
+                "refresh_token": cci_refresh_token,
+                "valid_until": ccs_valid_until,
+                "cci_access_token": cci_access_token,
+                "exchangeable_token": exchangeable_token,
+                "exchangeable_refresh_token": exchangeable_refresh_token,
+                "non_ccs_token": non_ccs_token,
+                "non_ccs_refresh_token": non_ccs_refresh_token,
+                "id_token": id_token,
+            },
+            token.device_id or "",
             username=token.username,
             password=token.password,
-            access_token="Bearer " + ccs_token,
-            refresh_token=cci_refresh_token,
-            device_id=token.device_id,
-            valid_until=ccs_valid_until,
             pin=token.pin,
-            cci_access_token=cci_access_token,
-            exchangeable_token=exchangeable_token,
-            exchangeable_refresh_token=exchangeable_refresh_token,
-            non_ccs_token=non_ccs_token,
-            non_ccs_refresh_token=non_ccs_refresh_token,
-            id_token=id_token,
             user_id=token.user_id,
+            cc_id=token.cc_id,
         )
 
     # ------------------------------------------------------------------
@@ -786,7 +868,7 @@ class GspaApiEU(ApiImpl):
     # ------------------------------------------------------------------
 
     def test_token(self, token: Token) -> bool:
-        """Test if the CCS token is still valid via CCI API."""
+        """Return false only when CCI conclusively rejects the current token."""
         url = self.CCI_DOMAIN_API_URL + "v1/vehicle/available-vehicles?detail=false"
         headers = self._get_cci_headers(
             token.device_id or "",
@@ -796,10 +878,21 @@ class GspaApiEU(ApiImpl):
         )
         try:
             response = requests.get(url, headers=headers, timeout=(5, 30))
-            return bool(response.status_code == 200)
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - CCS token freshness check failed")
+        except requests.RequestException:
+            _LOGGER.debug(f"{DOMAIN} - CCS token freshness check was inconclusive")
+            return True
+        if response.status_code == 200:
+            return True
+        if response.status_code in (401, 403):
             return False
+        if response.status_code == 429 or response.status_code >= 500:
+            _LOGGER.debug(
+                "%s - CCS token freshness check was inconclusive: HTTP %s",
+                DOMAIN,
+                response.status_code,
+            )
+            return True
+        return False
 
     # ------------------------------------------------------------------
     # GSPA X-Stamp computation

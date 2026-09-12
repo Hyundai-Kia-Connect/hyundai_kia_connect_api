@@ -7,10 +7,12 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import (
     AuthenticationError,
+    ServiceTemporaryUnavailable,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
@@ -430,6 +432,18 @@ def test_refresh_cci_token_uses_v2_endpoint():
     first_call_url = mock_post.call_args_list[0].args[0]
     assert "v2/auth/token-refresh" in first_call_url
     assert "v1/auth/token-refresh" not in first_call_url
+    first_call = mock_post.call_args_list[0]
+    assert first_call.kwargs["headers"]["authorization"] == "Bearer old-cci-at"
+    assert first_call.kwargs["headers"]["exchangeable-token"] == "old-exch-at"
+    assert first_call.kwargs["json"] == {
+        "accessToken": "old-cci-at",
+        "refreshToken": "OLDCCIREFRESHTOKEN1234567890123456789012345678901234567",
+        "exchangeableAccessToken": "old-exch-at",
+        "exchangeableRefreshToken": "old-exch-rt",
+        "nonCcsToken": "old-nonccs",
+        "nonCcsRefreshToken": "old-nonccs-rt",
+        "idToken": "old-id-tok",
+    }
     assert result.access_token == "Bearer new-ccs-token"
 
 
@@ -555,8 +569,8 @@ def test_test_token_returns_true_on_200():
         assert api.test_token(token) is True
 
 
-def test_test_token_returns_false_on_non_200():
-    """test_token returns False when CCI API returns non-200."""
+def test_test_token_returns_false_on_authentication_failure():
+    """test_token returns False when CCI explicitly rejects authentication."""
     api = _make_hyundai_api()
     token = _make_token()
     with patch(
@@ -564,6 +578,68 @@ def test_test_token_returns_false_on_non_200():
         return_value=MagicMock(status_code=401),
     ):
         assert api.test_token(token) is False
+
+
+@pytest.mark.parametrize("status_code", [429, 500, 503])
+def test_test_token_preserves_time_valid_token_on_transient_http_failure(status_code):
+    """An inconclusive CCI health check must not invalidate a time-valid token."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        return_value=MagicMock(status_code=status_code),
+    ):
+        assert api.test_token(token) is True
+
+
+def test_test_token_preserves_time_valid_token_on_transport_failure():
+    """A CCI connection failure is not evidence that the token is invalid."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=requests.ConnectionError("CCI unavailable"),
+    ):
+        assert api.test_token(token) is True
+
+
+def test_refresh_cci_token_classifies_server_failure_as_transient():
+    """A CCI server outage must not force browser reauthentication."""
+    api = _make_hyundai_api()
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
+            return_value=MagicMock(status_code=500, text="temporary failure"),
+        ),
+        pytest.raises(ServiceTemporaryUnavailable, match="temporarily unavailable"),
+    ):
+        api._refresh_cci_token(_make_token())
+
+
+def test_refresh_cci_token_classifies_transport_failure_as_transient():
+    """A CCI network outage must not force browser reauthentication."""
+    api = _make_hyundai_api()
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
+            side_effect=requests.Timeout("CCI unavailable"),
+        ),
+        pytest.raises(ServiceTemporaryUnavailable, match="temporarily unavailable"),
+    ):
+        api._refresh_cci_token(_make_token())
+
+
+def test_refresh_cci_token_preserves_explicit_authentication_failure():
+    """An explicit CCI authentication rejection must still require reauthentication."""
+    api = _make_hyundai_api()
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
+            return_value=MagicMock(status_code=401, text="unauthorized"),
+        ),
+        pytest.raises(AuthenticationError, match="HTTP 401"),
+    ):
+        api._refresh_cci_token(_make_token())
 
 
 # ── supports_valet_mode class attribute ────────────────────────
