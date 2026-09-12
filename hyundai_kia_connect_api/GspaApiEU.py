@@ -17,20 +17,38 @@ import json
 import logging
 import re
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
-from .ApiImpl import ApiImpl, ApiImplSession
-from .const import BRANDS, DOMAIN, ENGINE_TYPES
+from .ApiImpl import (
+    ApiImpl,
+    ApiImplSession,
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
+from .const import (
+    BRANDS,
+    CHARGE_PORT_ACTION,
+    DOMAIN,
+    ENGINE_TYPES,
+    ORDER_STATUS,
+    VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
+)
 from .exceptions import (
     APIError,
     AuthenticationError,
     ConsentRequiredError,
+    DuplicateRequestError,
     InvalidAPIResponseError,
+    ServiceTemporaryUnavailable,
+    UnsupportedControlError,
 )
 from .gspa import create_tsid
 from .svm import (
@@ -162,6 +180,10 @@ class GspaApiEU(ApiImpl):
     data_timezone = dt.UTC
     supports_valet_mode = True
 
+    # Remote control ships per brand only after live verification of the
+    # GSPA command layer on that brand. Subclasses flip this to True.
+    GSPA_REMOTE_CONTROL_VERIFIED = False
+
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""
     ONEAPP_REDIRECT_URI: str = ""
@@ -179,6 +201,51 @@ class GspaApiEU(ApiImpl):
     # stamps are computed with the EU stamp region (1), matching the
     # live-verified pre-rework mapping (region 9 -> EU IV).
     STAMP_REGION = 1
+
+    # ------------------------------------------------------------------
+    # GSPA control constants (brand-neutral)
+    # ------------------------------------------------------------------
+
+    # CCSP endpoint names that differ from their GSPA endpoint names.
+    GSPA_ENDPOINT_MAP: ClassVar[dict[str, str]] = {
+        "hornlight": "horn-light",
+        "windowcurtain": "window-curtain",
+    }
+
+    # Endpoints NOT under /gspa/v1/remote/vehicles/{carId}/.
+    # (Valet control posts to the "control" endpoint on the valet path —
+    # callers pass path_prefix="valet/vehicles" explicitly.)
+    GSPA_PATH_PREFIX_MAP: ClassVar[dict[str, str]] = {
+        "rearseat-alarm": "safety/vehicles",
+    }
+
+    # resCode -> (exception class, message label), keyed by exact code
+    # ("400-004") or 3-char prefix ("403" matches "403-001").
+    GSPA_RES_CODE_MAPPING: ClassVar[dict[str, tuple[type[Exception], str]]] = {
+        "400-004": (DuplicateRequestError, "GSPA duplicate"),
+        "4004": (DuplicateRequestError, "GSPA duplicate"),
+        "403": (AuthenticationError, "GSPA auth/stamp"),
+        "404": (UnsupportedControlError, "GSPA not supported"),
+    }
+
+    # Endpoints authenticated with standard GSPA headers (bearer) instead of
+    # the PIN-derived control token. Everything else is PIN-gated.
+    GSPA_BEARER_ENDPOINTS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "charge-target",
+            "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
+            "reservation-hvac",
+            "reservation-charge-hvac",
+            "reservation-engine",
+            "lock-and-start-toggle",
+        }
+    )
+
+    # Path constant used for action status polling (?path=...).
+    GSPA_REMOTE_VEHICLES_PATH = "gspa/v1/remote/vehicles"
 
     @property
     def CCI_DOMAIN_API_URL(self) -> str:
@@ -214,6 +281,15 @@ class GspaApiEU(ApiImpl):
             self._cipher = kia_cipher()
         else:
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
+
+        # PIN-derived control token cache (D5: per API instance, not Token).
+        # _control_token_source tracks which Token the cached control token
+        # was derived from (one-to-one mapping): if a different Token is
+        # passed (e.g. after a re-login), the cache is stale and the PIN is
+        # verified again against the new Token.
+        self._control_token: str | None = None
+        self._control_token_expiry: float = 0.0
+        self._control_token_source: str | None = None
 
         self.session = ApiImplSession()
 
@@ -877,6 +953,371 @@ class GspaApiEU(ApiImpl):
         if valid_until - dt.timedelta(seconds=60) <= dt.datetime.now(dt.UTC):
             raise AuthenticationError("CCS token expired — refresh required")
 
+    def _raise_gspa_error(self, status_code: int, data: dict[str, Any]) -> None:
+        """Raise a typed exception from a GSPA failure response.
+
+        Classification (HTTP status / resCode / rc -> typed exception):
+          401                       -> AuthenticationError
+          "400-004"/"4004"          -> DuplicateRequestError (queued duplicate)
+          resCode "403-*"           -> AuthenticationError (stamp/auth failure)
+          "no update info" in msg   -> APIError (no pending OTA — business state)
+          resCode "404-*"           -> UnsupportedControlError
+          5xx HTTP / resCode "5-*"  -> ServiceTemporaryUnavailable
+          else                      -> APIError with the raw server message
+
+        Handles three response shapes: the control-command envelope
+        ({"rc": ..., "msg": ...}), the REST envelope
+        ({"metaInfo": {"resCode": ..., "message": ...}}), and the Spring
+        Boot default error body ({"status": 404, "error": "Not Found",
+        "message": ...}) emitted when a GSPA route does not exist.
+        """
+        if status_code == 401:
+            raise AuthenticationError("GSPA: token expired or invalid")
+        meta: dict[str, Any] = (
+            data.get("metaInfo", {}) if isinstance(data, dict) else {}
+        )
+        # Spring Boot default error body ({"status": 404, "error": "Not
+        # Found", "message": "No static resource ...", "path": ...}) — used
+        # when a GSPA route does not exist for this vehicle/server.
+        if (
+            not meta
+            and not data.get("rc")
+            and isinstance(data.get("status"), int)
+            and data.get("error")
+        ):
+            spring_code = data["status"]
+            spring_msg = data.get("message", "")
+            if spring_code == 404:
+                raise UnsupportedControlError(
+                    f"GSPA not supported: {spring_code} {spring_msg}"
+                )
+            if spring_code == 403:
+                raise AuthenticationError(
+                    f"GSPA auth/stamp: {spring_code} {spring_msg}"
+                )
+            if spring_code >= 500:
+                raise ServiceTemporaryUnavailable(
+                    f"GSPA transient: {spring_code} {spring_msg}"
+                )
+            raise APIError(f"GSPA error: rc={spring_code}, msg={spring_msg}")
+        res_code = meta.get("resCode") or data.get("rc")
+        msg = meta.get("message") or data.get("msg", "")
+        # Business-state message takes precedence over the resCode mapping:
+        # live-probed OTA check returns 404-007 "No update info found by vin"
+        # — a normal "nothing pending" state, not an unsupported control.
+        if "update info" in str(msg).lower():
+            raise APIError(f"No pending OTA update: {res_code} {msg}".strip())
+        if isinstance(res_code, str):
+            # Exact codes and 3-char prefixes ("403-001") in one mapping,
+            # KiaUvoApiCA error_code_mapping style. Range checks that cannot
+            # be a dict (>= 500) stay below.
+            mapped = self.GSPA_RES_CODE_MAPPING.get(res_code) or (
+                self.GSPA_RES_CODE_MAPPING.get(res_code[:3])
+                if len(res_code) > 3
+                else None
+            )
+            if mapped is not None:
+                exc_class, label = mapped
+                raise exc_class(f"{label}: {res_code} {msg}")
+        if status_code >= 500 or (
+            isinstance(res_code, str) and res_code.startswith("5")
+        ):
+            raise ServiceTemporaryUnavailable(f"GSPA transient: {res_code} {msg}")
+        raise APIError(f"GSPA error: rc={res_code}, msg={msg}")
+
+    # ------------------------------------------------------------------
+    # GSPA control: PIN-derived control token + control commands
+    # ------------------------------------------------------------------
+
+    def _get_control_token(self, token: Token) -> tuple[str, int]:
+        """Verify the PIN and return (control_token, expiry_epoch_seconds).
+
+        Uses the CCI PIN endpoint (confirmed endpoint shape):
+          POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
+        Response: {"isMatched": true, "controlTokenInfo":
+                   {"controlToken": "...", "expiresTime": <ttl seconds>}}
+        """
+        if not token.pin:
+            raise UnsupportedControlError(
+                "PIN is not configured — remote control requires a PIN"
+            )
+        url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
+        headers = self._get_cci_headers(
+            token.device_id or "",
+            cci_access_token=token.cci_access_token,
+            non_ccs_token=token.non_ccs_token,
+            exchangeable_token=token.exchangeable_token,
+            content_type="application/json",
+        )
+        try:
+            response = requests.post(
+                url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
+            )
+            resp: dict[str, Any] = response.json()
+        except ValueError as e:
+            raise APIError("CCI PIN endpoint returned a non-JSON body") from e
+        if resp.get("isMatched") is not True:
+            # 2xx business error (live-probed 2026-09-04: HTTP 200 with
+            # isMatched false and controlTokenInfo null). After 5 failed
+            # attempts the server locks PIN entry for a window: remainCount
+            # drops 4->0 per failure, and while locked even the CORRECT pin
+            # returns isMatched false until the window passes. remainTime
+            # is the constant window length (SECONDS), not a countdown.
+            failed = resp.get("remainCountOnFailedInfo") or {}
+            remaining = failed.get("remainCount")
+            if remaining == 0:
+                window = failed.get("remainTime")
+                raise APIError(
+                    "PIN is temporarily locked by the server "
+                    f"(lockout window: {window}s). Wait for the lockout "
+                    "to expire, then the correct PIN will work again."
+                )
+            if remaining is not None:
+                raise APIError(
+                    "PIN verification failed, ensure PIN is entered "
+                    f"correctly. ({remaining} attempts remaining)"
+                )
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
+        info: dict[str, Any] = resp.get("controlTokenInfo", {})
+        control_token = info.get("controlToken")
+        if not control_token:
+            raise InvalidAPIResponseError("CCI PIN response missing controlToken")
+        try:
+            expires_ms = int(info.get("expiresTime", 0))
+        except (TypeError, ValueError) as e:
+            raise InvalidAPIResponseError("CCI PIN response missing expiresTime") from e
+        # expiresTime semantics live-probed (2026-09-04): a relative TTL in
+        # seconds (600 = 10 min) — the same field name the CCS token-exchange
+        # and legacy Type1 PIN endpoints use for a TTL. Fall back through
+        # ms/seconds epoch timestamps in case the server ever switches
+        # (values > 1e12 are implausible as a TTL).
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if expires_ms > 1e12:
+            expire_at = expires_ms // 1000  # ms epoch
+        elif expires_ms > 1e9:
+            expire_at = expires_ms  # seconds epoch
+        else:
+            expire_at = int(now) + expires_ms  # TTL seconds
+        return f"Bearer {control_token}", expire_at
+
+    def _get_control_token_cached(self, token: Token) -> str:
+        """Return the cached control token, verifying the PIN once per cycle.
+
+        The cache is one-to-one with the Token it was derived from: a cache
+        entry is only reused when the same Token instance identity (by its
+        CCI credential) is presented again.
+        """
+        now = dt.datetime.now(dt.UTC).timestamp()
+        source = (
+            token.cci_access_token
+            or token.non_ccs_token
+            or token.exchangeable_token
+            or token.access_token
+        )
+        if (
+            self._control_token
+            and self._control_token_source == source
+            and now < self._control_token_expiry - 30
+        ):
+            return self._control_token
+        control_token, expire_at = self._get_control_token(token)
+        self._control_token = control_token
+        self._control_token_expiry = float(expire_at)
+        self._control_token_source = source
+        return control_token
+
+    def _invalidate_control_token(self) -> None:
+        self._control_token = None
+        self._control_token_expiry = 0.0
+        self._control_token_source = None
+
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        """Headers for PIN-gated GSPA control commands.
+
+        Same base as _get_authenticated_headers, but Authorization carries the
+        PIN-derived control token (mirrored in AuthorizationCCSP).
+        """
+        control_token = self._get_control_token_cached(token)
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support or 0
+        )
+        headers["Authorization"] = control_token
+        headers["AuthorizationCCSP"] = control_token
+        return headers
+
+    def _get_control_request_headers(
+        self, token: Token, vehicle: Vehicle, endpoint: str
+    ) -> dict[str, Any]:
+        """Dispatch request headers by endpoint auth class (bearer vs PIN)."""
+        if endpoint in self.GSPA_BEARER_ENDPOINTS:
+            return self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support or 0
+            )
+        return self._get_control_headers(token, vehicle)
+
+    def _gspa_control_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        body: dict[str, Any],
+        path_prefix: str | None = None,
+    ) -> str:
+        """Send a control command via a GSPA endpoint.
+
+        POST {CCSP_API_URL}/gspa/v1/{prefix}/{carId}/{endpoint}; prefix
+        defaults to "remote/vehicles" unless the endpoint map says otherwise.
+        Body keys follow the confirmed protocol tables ("command", not
+        "action"; no "deviceId").
+
+        Response envelopes (standardized shape live-probed 2026-09-05):
+        success is {"data": {...}, "metaInfo": {"retCode": "S",
+        "resCode": "202-000"}} where "data" (CarRemoteControlApiResponse)
+        carries SID as the primary polling handle and svcSID as the
+        alternate; the legacy {"rt", "rc", "rs"} keys stay as a fallback.
+        Returns "gspa:{SID}" for action status polling — or the bare
+        "gspa:" when the command is accepted with an empty "data" object
+        (no polling handle). On a 401 for a PIN-gated endpoint the control
+        token cache is invalidated and the command is retried exactly once.
+
+        Pre-CCS2 EU vehicles are rejected with UnsupportedControlError
+        (region 1 handles them), and brands with
+        GSPA_REMOTE_CONTROL_VERIFIED=False raise NotImplementedError before
+        any request is sent.
+        """
+        if not self.GSPA_REMOTE_CONTROL_VERIFIED:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} GSPA remote control awaits "
+                "live verification"
+            )
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "Pre-CCS2 EU vehicles are not supported by the CCI region — "
+                "use region 1 (Europe) for remote control"
+            )
+        gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
+        prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
+            endpoint, "remote/vehicles"
+        )
+        # Normalize legacy bodies: GSPA uses "command"; no deviceId.
+        if "action" in body and "command" not in body:
+            action_value = body["action"]
+            body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
+            body["command"] = action_value
+        body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
+
+        url = self.CCSP_API_URL + f"/gspa/v1/{prefix}/{vehicle.id}/{gspa_endpoint}"
+        self._validate_ccs_token(token)
+        pin_gated = endpoint not in self.GSPA_BEARER_ENDPOINTS
+        response: requests.Response | None = None
+        for attempt in (1, 2):
+            headers = self._get_control_request_headers(token, vehicle, endpoint)
+            response = requests.post(url, headers=headers, json=body, timeout=(5, 30))
+            if response.status_code == 401 and pin_gated and attempt == 1:
+                self._invalidate_control_token()
+                continue
+            break
+        assert response is not None  # loop always runs at least once
+
+        if response.status_code >= 400:
+            try:
+                data: dict[str, Any] = response.json()
+            except ValueError:
+                data = {}
+            self._raise_gspa_error(response.status_code, data)
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise InvalidAPIResponseError(
+                f"GSPA control returned non-JSON body: {response.text[:200]!r}"
+            ) from e
+        if not isinstance(data, dict):
+            raise InvalidAPIResponseError("GSPA control returned non-object JSON")
+        # Standardized envelope (live-probed 2026-09-05): a successful
+        # command returns {"data": {...}, "metaInfo": {"retCode": "S",
+        # "resCode": "202-000", "msgId": ...}}; a 2xx business failure
+        # carries retCode "F". Legacy {"rt", "rc", "rs"} keys stay as a
+        # fallback.
+        meta = data.get("metaInfo")
+        meta_payload: dict[str, Any] = meta if isinstance(meta, dict) else {}
+        rc = data.get("rc") or meta_payload.get("retCode")
+        if rc and rc not in ("0000", "S"):
+            self._raise_gspa_error(response.status_code, data)
+        rs = data.get("rs")
+        rs_payload = rs if isinstance(rs, dict) else {}
+        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        # SID is the primary polling handle; svcSID the alternate (some
+        # commands return only svcSID). The response DTO
+        # (CarRemoteControlApiResponse) sits under "data".
+        sid = (
+            data_payload.get("SID")
+            or data_payload.get("svcSID")
+            or data.get("SID")
+            or rs_payload.get("SID")
+            or data.get("svcSID")
+            or rs_payload.get("svcSID")
+            or ""
+        )
+        if not sid:
+            # Live-probed 2026-09-05 (rearseat-alarm): some commands are
+            # accepted (HTTP 202, retCode "S", resCode "202-000") with an
+            # EMPTY "data" object — no SID and no svcSID. The server has
+            # accepted the command, so raising here would report a failure
+            # for a command that was in fact executed. Return the bare
+            # "gspa:" prefix: the action-status dispatcher still routes it,
+            # and callers that poll get PENDING until they give up.
+            _LOGGER.debug(
+                f"{DOMAIN} - GSPA control accepted without a polling SID "
+                f"(rc={rc!r}); status polling has no handle"
+            )
+            return "gspa:"
+        return f"gspa:{sid}"
+
+    def _gspa_check_action_status(
+        self, token: Token, vehicle: Vehicle, sid: str
+    ) -> ORDER_STATUS:
+        """Poll a GSPA action's status.
+
+        GET /gspa/v1/status/vehicles/{carId}/update-status
+            ?path=gspa/v1/remote/vehicles
+        Response: {"metaInfo": {"retCode": "S"}, "data": {"pollingState":
+        "WAIT" | "SUCCESS" | "FAILURE" | "TIMEOUT"}}. Any transport/parse
+        error or non-success retCode is reported as PENDING (caller re-polls).
+        """
+        url = (
+            self.CCSP_API_URL
+            + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
+            + f"?path={self.GSPA_REMOTE_VEHICLES_PATH}"
+        )
+        self._validate_ccs_token(token)
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support or 0
+        )
+        try:
+            response = requests.get(url, headers=headers, timeout=(5, 30))
+            # Live (2026-09-04): a successful poll returns HTTP 202
+            # (resCode "202-000 Accepted"), not 200 — accept any 2xx.
+            if not 200 <= response.status_code < 300:
+                return ORDER_STATUS.PENDING
+            data: dict[str, Any] = response.json()
+            meta: dict[str, Any] = data.get("metaInfo", {})
+            if meta.get("retCode") != "S":
+                return ORDER_STATUS.PENDING
+            payload: dict[str, Any] = data.get("data", {})
+            polling_state = payload.get("pollingState", "")
+            if polling_state == "SUCCESS":
+                return ORDER_STATUS.SUCCESS
+            if polling_state == "FAILURE":
+                return ORDER_STATUS.FAILED
+            if polling_state == "TIMEOUT":
+                return ORDER_STATUS.TIMEOUT
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - GSPA action status poll failed for SID {sid}",
+                exc_info=True,
+            )
+        return ORDER_STATUS.PENDING
+
     # ------------------------------------------------------------------
     # GSPA GET helper
     # ------------------------------------------------------------------
@@ -994,3 +1435,630 @@ class GspaApiEU(ApiImpl):
             f"{DOMAIN} - get_svm_details response: {redact_svm_metadata(scs_detail)}"
         )
         return parse_svm_detail(scs_detail)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — dispatcher
+    # ------------------------------------------------------------------
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        """Poll the status of a previously issued control action.
+
+        The CCI region only issues "gspa:" action ids; anything else cannot
+        be polled here. Brands with GSPA_REMOTE_CONTROL_VERIFIED=False raise
+        NotImplementedError (they never issue action ids to poll).
+        """
+        if not self.GSPA_REMOTE_CONTROL_VERIFIED:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} GSPA remote control awaits "
+                "live verification"
+            )
+        if action_id.startswith("gspa:"):
+            return self._gspa_check_action_status(
+                token, vehicle, action_id[len("gspa:") :]
+            )
+        raise UnsupportedControlError(
+            f"Cannot poll action {action_id!r}: the CCI region only issues "
+            "'gspa:' action ids"
+        )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — simple commands
+    # ------------------------------------------------------------------
+
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
+        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+
+    def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "door-power-off", {"command": "CLOSE"}
+        )
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "charge", {"command": "start"}
+        )
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "charge", {"command": "stop"})
+
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
+        command = "open" if action == CHARGE_PORT_ACTION.OPEN else "close"
+        return self._gspa_control_command(
+            token, vehicle, "portdoor", {"command": command}
+        )
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "frunk", {"command": "open"})
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "light", {"command": "on"})
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "hornlight", {"command": "on"}
+        )
+
+    def turn_off_lamp(
+        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+    ) -> str:
+        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+
+    def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "battery-conditioning", {"command": "start"}
+        )
+
+    def stop_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "battery-conditioning", {"command": "stop"}
+        )
+
+    def stop_rear_seat_alarm(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token,
+            vehicle,
+            "rearseat-alarm",
+            {"command": "stop"},
+            path_prefix="safety/vehicles",
+        )
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        """Activate/deactivate valet mode via the valet control endpoint.
+
+        The app posts ValetControlApiRequest{command} to the ``control``
+        endpoint on the valet path (ValetRemoteDataSource passes
+        getGspaValetVehiclesPath = "gspa/v1/valet/vehicles"):
+        POST /gspa/v1/valet/vehicles/{carId}/control.
+        """
+        command = "activate" if action == VALET_MODE_ACTION.ACTIVATE else "deactivate"
+        return self._gspa_control_command(
+            token,
+            vehicle,
+            "control",
+            {"command": command},
+            path_prefix="valet/vehicles",
+        )
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — climate / engine / pet care
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_seat_climate_info(
+        options: ClimateRequestOptions,
+    ) -> dict[str, Any] | None:
+        """Map ClimateRequestOptions seat fields to the seatClimateInfo shape."""
+        info: dict[str, Any] = {}
+        if options.front_left_seat is not None:
+            info["drvSeatClimateState"] = options.front_left_seat
+        if options.front_right_seat is not None:
+            info["psgSeatClimateState"] = options.front_right_seat
+        if options.rear_left_seat is not None:
+            info["rlSeatClimateState"] = options.rear_left_seat
+        if options.rear_right_seat is not None:
+            info["rrSeatClimateState"] = options.rear_right_seat
+        return info if info else None
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        body: dict[str, Any] = {"command": "start"}
+        if options.set_temp is not None:
+            body["hvacTemp"] = str(options.set_temp)
+        if options.defrost is not None:
+            body["windshieldFrontDefogState"] = options.defrost
+        if options.heating is not None:
+            body["heating1"] = options.heating
+        if options.temp_unit is not None:
+            body["tempUnit"] = options.temp_unit
+        if options.hvac_temp_type is not None:
+            body["hvacTempType"] = options.hvac_temp_type
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
+        if options.duration is not None:
+            body["ignitionDuration"] = options.duration
+        if options.steering_wheel is not None:
+            body["strgWhlHeating"] = options.steering_wheel
+        if options.side_rear_mirror_heating is not None:
+            body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
+        seat_info = self._build_seat_climate_info(options)
+        if seat_info:
+            body["seatClimateInfo"] = seat_info
+        return self._gspa_control_command(token, vehicle, "temperature", body)
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(
+            token, vehicle, "temperature", {"command": "stop"}
+        )
+
+    def start_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        """Remote start via the engine endpoint.
+
+        Accepts the same climate fields as start_climate plus hvacCtrl
+        (options.climate) — confirmed endpoint shape.
+        """
+        body: dict[str, Any] = {"command": "start"}
+        if options:
+            if options.set_temp is not None:
+                body["hvacTemp"] = str(options.set_temp)
+            if options.defrost is not None:
+                body["windshieldFrontDefogState"] = options.defrost
+            if options.climate is not None:
+                body["hvacCtrl"] = 1 if options.climate else 0
+            if options.heating is not None:
+                body["heating1"] = options.heating
+            if options.temp_unit is not None:
+                body["tempUnit"] = options.temp_unit
+            if options.hvac_temp_type is not None:
+                body["hvacTempType"] = options.hvac_temp_type
+            if options.driver_seat_location is not None:
+                body["drvSeatLoc"] = options.driver_seat_location
+            if options.duration is not None:
+                body["ignitionDuration"] = options.duration
+            if options.steering_wheel is not None:
+                body["strgWhlHeating"] = options.steering_wheel
+            if options.side_rear_mirror_heating is not None:
+                body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
+            seat_info = self._build_seat_climate_info(options)
+            if seat_info:
+                body["seatClimateInfo"] = seat_info
+        return self._gspa_control_command(token, vehicle, "engine", body)
+
+    def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
+        return self._gspa_control_command(token, vehicle, "engine", {"command": "stop"})
+
+    def start_pet_care(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        # tempUnit values ported verbatim from the confirmed protocol tables —
+        # awaiting live validation.
+        temp = options.set_temp if options and options.set_temp else 21
+        body = {"hvacTemp": str(temp), "tempUnit": "F"}
+        return self._gspa_control_command(token, vehicle, "pet-care", body)
+
+    def stop_pet_care(self, token: Token, vehicle: Vehicle) -> str:
+        body = {"hvacTemp": "21", "tempUnit": "C"}
+        return self._gspa_control_command(token, vehicle, "pet-care", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — windows
+    # ------------------------------------------------------------------
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set window state via the scope-based window-curtain endpoint.
+
+        GSPA supports scope commands only (all windows or front windows);
+        a mixed per-window request raises UnsupportedControlError.
+        """
+        if not self.supports_window_control:
+            raise APIError("Window control not supported")
+        drv = options.driver_seat_window
+        psg = options.passenger_seat_window
+        rl = options.rear_left_window
+        rr = options.rear_right_window
+        seats = (drv, psg, rl, rr)
+        if (
+            all(s is None for s in seats)
+            and options.rear_left_curtain is None
+            and options.rear_right_curtain is None
+        ):
+            raise UnsupportedControlError("No window state requested")
+        front = (drv, psg)
+        command: str | None = None
+        if all(s == WINDOW_STATE.CLOSED for s in seats):
+            command = "window-close"
+        elif all(s == WINDOW_STATE.OPEN for s in seats):
+            command = "window-open"
+        elif all(s == WINDOW_STATE.VENTILATION for s in seats):
+            command = "vent"
+        elif rl is None and rr is None:
+            if all(s == WINDOW_STATE.CLOSED for s in front):
+                command = "front-close"
+            elif all(s == WINDOW_STATE.OPEN for s in front):
+                command = "front-open"
+            elif all(s == WINDOW_STATE.VENTILATION for s in front):
+                command = "front-vent"
+        if command is None:
+            raise UnsupportedControlError(
+                "Mixed per-window state is not supported via GSPA — use "
+                "set_window_curtain for per-seat windows/curtains"
+            )
+        front_val = drv.value if drv is not None else None
+        rear_val = (
+            front_val if command in ("window-close", "window-open", "vent") else None
+        )
+        body: dict[str, Any] = {
+            "command": command,
+            "drvSeatWindow": front_val,
+            "psgSeatWindow": front_val,
+            "rlSeatWindow": rear_val,
+            "rrSeatWindow": rear_val,
+            "rlSeatWindowCurtain": None,
+            "rrSeatWindowCurtain": None,
+            "drvSeatLoc": options.driver_seat_location,
+        }
+        return self._gspa_control_command(token, vehicle, "windowcurtain", body)
+
+    def set_window_curtain(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Set per-seat windows/curtains via the window-curtain endpoint.
+
+        Values: 0 = close, 1 = open, 2 = vent (WINDOW_STATE IntEnum).
+        """
+        body: dict[str, Any] = {"command": "open"}
+        if options.driver_seat_window is not None:
+            body["drvSeatWindow"] = options.driver_seat_window.value
+        if options.passenger_seat_window is not None:
+            body["psgSeatWindow"] = options.passenger_seat_window.value
+        if options.rear_left_window is not None:
+            body["rlSeatWindow"] = options.rear_left_window.value
+        if options.rear_right_window is not None:
+            body["rrSeatWindow"] = options.rear_right_window.value
+        if options.rear_left_curtain is not None:
+            body["rlSeatWindowCurtain"] = options.rear_left_curtain.value
+        if options.rear_right_curtain is not None:
+            body["rrSeatWindowCurtain"] = options.rear_right_curtain.value
+        if options.driver_seat_location is not None:
+            body["drvSeatLoc"] = options.driver_seat_location
+        return self._gspa_control_command(token, vehicle, "window-curtain", body)
+
+    # ------------------------------------------------------------------
+    # Remote control (GSPA) — charge settings and reservations (bearer)
+    # ------------------------------------------------------------------
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        body = {
+            "targetSOClist": [
+                {"plugType": 0, "targetSOClevel": int(dc)},
+                {"plugType": 1, "targetSOClevel": int(ac)},
+            ],
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "charge-target", body)
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        body = {"chargingCurrent": level, "command": "set"}
+        return self._gspa_control_command(token, vehicle, "charging-current", body)
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        body = {"dischargingLimit": int(limit), "command": "set"}
+        return self._gspa_control_command(token, vehicle, "discharge-limit", body)
+
+    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+        if enabled:
+            body = {
+                "alarmOff": 0,
+                "alarmBefore10": 1,
+                "alarmBefore20": 1,
+                "alarmBefore30": 1,
+                "command": "set",
+            }
+        else:
+            body = {
+                "alarmOff": 1,
+                "alarmBefore10": 0,
+                "alarmBefore20": 0,
+                "alarmBefore30": 0,
+                "command": "set",
+            }
+        return self._gspa_control_command(token, vehicle, "charge-alarm", body)
+
+    def schedule_reservation_charge(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone charging reservation (flat DTO shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+
+        def _make_time(t: dt.time) -> dict[str, Any]:
+            return {
+                "time": t.strftime("%I%M"),
+                "timeSection": 1 if t >= dt.time(12, 0) else 0,
+            }
+
+        body = {
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "offpeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            "reservStartTime": _make_time(options.off_peak_start_time or dt.time()),
+            "reservEndTime": _make_time(
+                options.off_peak_end_time or options.off_peak_start_time or dt.time()
+            ),
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-charge", body)
+
+    def schedule_reservation_hvac(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        def _make_hvac_set() -> dict[str, Any]:
+            return {
+                "airCtrl": 1 if options.climate_enabled else 0,
+                "defrost": options.defrost or False,
+                "airTemp": {
+                    "value": f"{temperature:.1f}",
+                    "hvacTempType": 1,
+                    "unit": options.temperature_unit,
+                },
+                "heating1": 0,
+                "airPurifierControl": 0,
+            }
+
+        body = {
+            "reservedHVACInfo1": {
+                "reservHVACflag": 1 if options.first_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.first_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "reservedHVACInfo2": {
+                "reservHVACflag": 1 if options.second_departure.enabled else 0,
+                "reservInfo": _make_reserv_info(options.second_departure),
+                "reservHVACSet": _make_hvac_set(),
+            },
+            "command": "set",
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-hvac", body)
+
+    def schedule_reservation_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Schedule ICE engine remote-start reservation (reservInfo/2 shape)."""
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.first_departure.time is None:
+            options.first_departure.time = dt.time()
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure.time is None:
+            options.second_departure.time = dt.time()
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            temperature = max(17.0, min(27.0, temperature))
+
+        def _make_engine_reserv_info(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, Any]:
+            return {
+                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
+                "day": dep.days or [0],
+                "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                "windshieldFrontDefogState": options.defrost or False,
+                "ignitionDuration": 10,
+                "hvacCtrl": 1 if options.climate_enabled else 0,
+                "hvacTempType": 1,
+                "hvacTemp": f"{temperature:.1f}",
+                "tempUnit": options.temperature_unit,
+                "drvSeatLoc": "L",
+            }
+
+        body = {
+            "reservInfo": _make_engine_reserv_info(options.first_departure),
+            "reservInfo2": _make_engine_reserv_info(options.second_departure),
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-engine", body)
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        body = self._build_reservation_body(options)
+        return self._gspa_control_command(
+            token, vehicle, "reservation-charge-hvac", body
+        )
+
+    def _build_reservation_body(
+        self,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> dict[str, Any]:
+        """Build the reservation-charge-hvac body from options."""
+
+        def set_default_departure_options(
+            departure_options: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> None:
+            if departure_options.enabled is None:
+                departure_options.enabled = False
+            if departure_options.days is None:
+                departure_options.days = [0]
+            if departure_options.time is None:
+                departure_options.time = dt.time()
+
+        if options.first_departure is None:
+            options.first_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+        if options.second_departure is None:
+            options.second_departure = (
+                ScheduleChargingClimateRequestOptions.DepartureOptions()
+            )
+
+        set_default_departure_options(options.first_departure)
+        set_default_departure_options(options.second_departure)
+        departures = [options.first_departure, options.second_departure]
+
+        if options.off_peak_start_time is None:
+            options.off_peak_start_time = dt.time()
+        if options.off_peak_end_time is None:
+            options.off_peak_end_time = options.off_peak_start_time
+        if options.off_peak_charge_only_enabled is None:
+            options.off_peak_charge_only_enabled = False
+        if options.temperature is None:
+            options.temperature = 21.0
+        if options.temperature_unit is None:
+            options.temperature_unit = 0
+        if options.defrost is None:
+            options.defrost = False
+
+        temperature: float = options.temperature
+        if options.temperature_unit == 0:
+            temperature = round(temperature * 2.0) / 2.0
+            if temperature > 27.0:
+                temperature = 27.0
+            elif temperature < 17.0:
+                temperature = 17.0
+
+        return {
+            "reservChargeInfo": {
+                f"reservChargeInfo{i + 1}": {
+                    "reservChargeSet": departures[i].enabled,
+                    "reservInfo": {
+                        "day": departures[i].days,
+                        "time": {
+                            "time": departures[i].time.strftime("%I%M"),
+                            "timeSection": (
+                                1 if departures[i].time >= dt.time(12, 0) else 0
+                            ),
+                        },
+                    },
+                    "reservFatcSet": {
+                        "airCtrl": 1 if options.climate_enabled else 0,
+                        "airTemp": {
+                            "value": f"{temperature:.1f}",
+                            "hvacTempType": 1,
+                            "unit": options.temperature_unit,
+                        },
+                        "heating1": 0,
+                        "defrost": options.defrost,
+                    },
+                }
+                for i in range(2)
+            },
+            "offPeakPowerInfo": {
+                "offPeakPowerTime1": {
+                    "endtime": {
+                        "timeSection": (
+                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_end_time.strftime("%I%M"),
+                    },
+                    "starttime": {
+                        "timeSection": (
+                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
+                        ),
+                        "time": options.off_peak_start_time.strftime("%I%M"),
+                    },
+                },
+                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            },
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "command": "set",
+        }
+
+    def lock_and_start_toggle(
+        self, token: Token, vehicle: Vehicle, enable: bool = True
+    ) -> str:
+        body = {"lockAndStartEnable": enable}
+        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)

@@ -27,7 +27,10 @@ class KiaCciApiEU(GspaApiEU):
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
     production endpoints. Login, token lifecycle, and the GSPA
-    secure-request layer are inherited from ``GspaApiEU``.
+    secure-request layer are inherited from ``GspaApiEU``. GSPA remote
+    control is inherited too but stays gated (GSPA_REMOTE_CONTROL_VERIFIED
+    stays False): every control command raises NotImplementedError until
+    live verification on a real Kia vehicle (D6).
     """
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
@@ -55,3 +58,26 @@ class KiaCciApiEU(GspaApiEU):
             "Kia cached-state parser requires a live response fixture "
             "(captured during integration validation)."
         )
+
+    # ------------------------------------------------------------------
+    # Door control (Kia per-action endpoints) — GATED
+    #
+    # Confirmed endpoints (protocol tables):
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-lock          {"command": "lock"}
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-unlock        {"command": "unlock"}
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-lock-safety   {"command": "lock"}
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-unlock-safety {"command": "unlock"}
+    # Gated until a live-verified Kia fixture exists; no POST is sent.
+    # ------------------------------------------------------------------
+
+    def lock_door(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("Kia EU CCI door control awaits live verification")
+
+    def unlock_door(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("Kia EU CCI door control awaits live verification")
+
+    def lock_door_safety(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("Kia EU CCI door control awaits live verification")
+
+    def unlock_door_safety(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("Kia EU CCI door control awaits live verification")

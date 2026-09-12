@@ -45,6 +45,12 @@ class ClimateRequestOptions:
     rear_left_seat: int = None
     rear_right_seat: int = None
     steering_wheel: int = None
+    side_rear_mirror_heating: int | None = (
+        None  # 0/1 rear-mirror heating (GSPA sideRearMirrorHeating)
+    )
+    temp_unit: int | None = None  # 0=Celsius, 1=Fahrenheit (GSPA tempUnit)
+    hvac_temp_type: int | None = None  # HVAC temp type (GSPA hvacTempType, typically 1)
+    driver_seat_location: str | None = None  # "L" or "R" (GSPA drvSeatLoc)
 
 
 @dataclass
@@ -53,6 +59,14 @@ class WindowRequestOptions:
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
+    # Per-seat fields (GSPA window-curtain endpoint).
+    driver_seat_window: WINDOW_STATE | None = None
+    passenger_seat_window: WINDOW_STATE | None = None
+    rear_left_window: WINDOW_STATE | None = None
+    rear_right_window: WINDOW_STATE | None = None
+    rear_left_curtain: WINDOW_STATE | None = None
+    rear_right_curtain: WINDOW_STATE | None = None
+    driver_seat_location: str | None = None  # "L" or "R" (GSPA drvSeatLoc)
 
     def __post_init__(self):
         """Convert string/int values to WINDOW_STATE enums."""
@@ -60,6 +74,14 @@ class WindowRequestOptions:
         self.back_right = to_int_enum(WINDOW_STATE, self.back_right)
         self.front_left = to_int_enum(WINDOW_STATE, self.front_left)
         self.front_right = to_int_enum(WINDOW_STATE, self.front_right)
+        self.driver_seat_window = to_int_enum(WINDOW_STATE, self.driver_seat_window)
+        self.passenger_seat_window = to_int_enum(
+            WINDOW_STATE, self.passenger_seat_window
+        )
+        self.rear_left_window = to_int_enum(WINDOW_STATE, self.rear_left_window)
+        self.rear_right_window = to_int_enum(WINDOW_STATE, self.rear_right_window)
+        self.rear_left_curtain = to_int_enum(WINDOW_STATE, self.rear_left_curtain)
+        self.rear_right_curtain = to_int_enum(WINDOW_STATE, self.rear_right_curtain)
 
 
 @dataclass

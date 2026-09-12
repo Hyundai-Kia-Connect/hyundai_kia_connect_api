@@ -1,10 +1,10 @@
 """HyundaiCciApiEU.py — Hyundai EU CCI/GSPA API.
 
-Hyundai-specific EU implementation inheriting the OneApp (CCI) login flow
-and the GSPA secure-request layer from ``GspaApiEU``. This module keeps
-Hyundai brand constants and vehicle-read parsers (stored-status, driving
-info/history, breakdowns, CCS2 status). Control, OTA, and MQTT are
-handled in later PRs.
+Hyundai-specific EU implementation inheriting the OneApp (CCI) login flow,
+the GSPA secure-request layer, and the shared GSPA remote-control layer
+from ``GspaApiEU``. This module keeps Hyundai brand constants and
+vehicle-read parsers (stored-status, driving info/history, breakdowns,
+CCS2 status). OTA and MQTT are handled in later PRs.
 """
 
 # pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
@@ -43,10 +43,11 @@ class HyundaiCciApiEU(GspaApiEU):
     """Hyundai EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 4f4953b5) confirmed on
-    production endpoints. Login, token lifecycle, and the GSPA
-    secure-request layer are inherited from ``GspaApiEU``. Force refresh
-    (prewakeup + stored-status re-read) lives here: Kia EU CCI remote
-    actions await live verification.
+    production endpoints. Login, token lifecycle, the GSPA
+    secure-request layer, and the GSPA remote-control layer are all
+    inherited from ``GspaApiEU``. This subclass carries the brand
+    constants and the Hyundai-specific read layer: CCS2 vehicle-property
+    parsing, driving info/history, and breakdowns.
     """
 
     # Brand constants (Hyundai OneApp EU, confirmed on production endpoints).
@@ -63,6 +64,12 @@ class HyundaiCciApiEU(GspaApiEU):
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.
     supports_svm: bool = True
+
+    # CCS2 EU vehicles support GSPA window control.
+    supports_window_control: bool = True
+
+    # Hyundai EU CCI remote control is live-verified.
+    GSPA_REMOTE_CONTROL_VERIFIED = True
 
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)
