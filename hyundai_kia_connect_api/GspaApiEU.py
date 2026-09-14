@@ -282,14 +282,9 @@ class GspaApiEU(ApiImpl):
         else:
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
 
-        # PIN-derived control token cache (D5: per API instance, not Token).
-        # _control_token_source tracks which Token the cached control token
-        # was derived from (one-to-one mapping): if a different Token is
-        # passed (e.g. after a re-login), the cache is stale and the PIN is
-        # verified again against the new Token.
-        self._control_token: str | None = None
-        self._control_token_expiry: float = 0.0
-        self._control_token_source: str | None = None
+        # Control token caching lives on the Token object (control_token /
+        # control_token_expiry) — same pattern as ApiImplType1 for the Type1
+        # regions.
 
         self.session = ApiImplSession()
 
@@ -1029,14 +1024,23 @@ class GspaApiEU(ApiImpl):
     # GSPA control: PIN-derived control token + control commands
     # ------------------------------------------------------------------
 
-    def _get_control_token(self, token: Token) -> tuple[str, int]:
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
         """Verify the PIN and return (control_token, expiry_epoch_seconds).
+
+        The control token is cached on the Token object (control_token /
+        control_token_expiry), the same way ApiImplType1 caches the CCS2
+        control token for the Type1 regions: a fresh Token (e.g. after a
+        re-login) has no control token, so the PIN is verified again, and a
+        serialized Token keeps a still-valid control token across restarts.
 
         Uses the CCI PIN endpoint (confirmed endpoint shape):
           POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
         Response: {"isMatched": true, "controlTokenInfo":
                    {"controlToken": "...", "expiresTime": <ttl seconds>}}
         """
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if token.control_token is not None and token.control_token_expiry > now:
+            return token.control_token, token.control_token_expiry
         if not token.pin:
             raise UnsupportedControlError(
                 "PIN is not configured — remote control requires a PIN"
@@ -1091,45 +1095,21 @@ class GspaApiEU(ApiImpl):
         # and legacy Type1 PIN endpoints use for a TTL. Fall back through
         # ms/seconds epoch timestamps in case the server ever switches
         # (values > 1e12 are implausible as a TTL).
-        now = dt.datetime.now(dt.UTC).timestamp()
         if expires_ms > 1e12:
             expire_at = expires_ms // 1000  # ms epoch
         elif expires_ms > 1e9:
             expire_at = expires_ms  # seconds epoch
         else:
             expire_at = int(now) + expires_ms  # TTL seconds
-        return f"Bearer {control_token}", expire_at
+        token.control_token = f"Bearer {control_token}"
+        token.control_token_expiry = float(expire_at)
+        return token.control_token, token.control_token_expiry
 
-    def _get_control_token_cached(self, token: Token) -> str:
-        """Return the cached control token, verifying the PIN once per cycle.
-
-        The cache is one-to-one with the Token it was derived from: a cache
-        entry is only reused when the same Token instance identity (by its
-        CCI credential) is presented again.
-        """
-        now = dt.datetime.now(dt.UTC).timestamp()
-        source = (
-            token.cci_access_token
-            or token.non_ccs_token
-            or token.exchangeable_token
-            or token.access_token
-        )
-        if (
-            self._control_token
-            and self._control_token_source == source
-            and now < self._control_token_expiry - 30
-        ):
-            return self._control_token
-        control_token, expire_at = self._get_control_token(token)
-        self._control_token = control_token
-        self._control_token_expiry = float(expire_at)
-        self._control_token_source = source
-        return control_token
-
-    def _invalidate_control_token(self) -> None:
-        self._control_token = None
-        self._control_token_expiry = 0.0
-        self._control_token_source = None
+    def _invalidate_control_token(self, token: Token) -> None:
+        """Drop the cached control token so the next command re-verifies the
+        PIN (401-retry path)."""
+        token.control_token = None
+        token.control_token_expiry = 0.0
 
     def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         """Headers for PIN-gated GSPA control commands.
@@ -1137,7 +1117,7 @@ class GspaApiEU(ApiImpl):
         Same base as _get_authenticated_headers, but Authorization carries the
         PIN-derived control token (mirrored in AuthorizationCCSP).
         """
-        control_token = self._get_control_token_cached(token)
+        control_token, _ = self._get_control_token(token)
         headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support or 0
         )
@@ -1214,7 +1194,7 @@ class GspaApiEU(ApiImpl):
             headers = self._get_control_request_headers(token, vehicle, endpoint)
             response = requests.post(url, headers=headers, json=body, timeout=(5, 30))
             if response.status_code == 401 and pin_gated and attempt == 1:
-                self._invalidate_control_token()
+                self._invalidate_control_token(token)
                 continue
             break
         assert response is not None  # loop always runs at least once

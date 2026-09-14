@@ -143,11 +143,15 @@ def test_control_token_no_pin_raises():
 
 
 def test_control_token_cci_success():
+    token = _make_token()
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
-        control_token, expire_at = _make_api()._get_control_token(_make_token())
+        control_token, expire_at = _make_api()._get_control_token(token)
     assert control_token == "Bearer ctrl-token-abc"
     assert expire_at == 4_000_000_000  # ms -> s
+    # Cache lives on the Token (Type1 pattern), not on the API instance.
+    assert token.control_token == "Bearer ctrl-token-abc"
+    assert token.control_token_expiry == 4_000_000_000
     assert post.call_args.args[0].endswith("/domain/api/v1/auth/pin")
     assert post.call_args.kwargs["json"] == {"pin": "1234"}
 
@@ -182,42 +186,67 @@ def test_control_token_missing_control_token_raises():
             _make_api()._get_control_token(_make_token())
 
 
-def test_control_token_cache_hit_and_invalidate():
+def test_control_token_cache_lives_on_token():
+    """The control token is cached on the Token object (Type1 pattern):
+    a second call with the same Token reuses it without a new PIN POST,
+    and invalidation clears the Token fields."""
     api = _make_api()
+    token = _make_token()
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
-        token = _make_token()
-        first = api._get_control_token_cached(token)
-        second = api._get_control_token_cached(token)
-        assert first == second == "Bearer ctrl-token-abc"
+        first = api._get_control_token(token)
+        second = api._get_control_token(token)
+        assert first == second
+        assert first[0] == "Bearer ctrl-token-abc"
         assert post.call_count == 1  # one PIN POST for two commands
-    api._invalidate_control_token()
+    api._invalidate_control_token(token)
+    assert token.control_token is None
+    assert token.control_token_expiry == 0.0
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
-        api._get_control_token_cached(token)
+        api._get_control_token(token)
         assert post.call_count == 1  # refetched after invalidation
 
 
-def test_control_token_cache_is_per_source_token():
-    """One-to-one mapping: a different Token (new credentials) must not
-    reuse the cached control token derived from the old one."""
+def test_control_token_cache_is_structurally_per_token():
+    """A fresh Token (e.g. after a re-login) has no control token, so the
+    PIN is verified again — the one-to-one mapping is structural, with no
+    source-token bookkeeping."""
     api = _make_api()
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
-        api._get_control_token_cached(_make_token())
+        old_token = _make_token()
+        api._get_control_token(old_token)
         assert post.call_count == 1
-        new_token = _make_token()
-        new_token.access_token = "Bearer fresh-ccs-token"
-        api._get_control_token_cached(new_token)
-        assert post.call_count == 2  # source changed -> PIN verified again
+        fresh_token = _make_token()
+        fresh_token.access_token = "Bearer fresh-ccs-token"
+        api._get_control_token(fresh_token)
+        assert post.call_count == 2  # fresh Token -> PIN verified again
+        assert fresh_token.control_token == "Bearer ctrl-token-abc"
+
+
+def test_control_token_persists_through_token_serialization():
+    """control_token/control_token_expiry ride Token.to_dict/from_dict, so
+    a persisted Token (kia_uvo) keeps a still-valid control token across
+    restarts."""
+    api = _make_api()
+    token = _make_token()
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(200, PIN_RESPONSE_MATCHED)
+        api._get_control_token(token)
+    restored = Token.from_dict(token.to_dict())
+    assert restored.control_token == "Bearer ctrl-token-abc"
+    assert restored.control_token_expiry == token.control_token_expiry
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        api._get_control_token(restored)  # cache hit — no PIN POST
+        assert post.call_count == 0
 
 
 def test_control_headers_carry_authorization_ccsp():
-    api = _make_api()
-    api._control_token = "Bearer ctrl-token-abc"
-    api._control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
-    api._control_token_source = "Bearer ccs-token"
-    headers = api._get_control_headers(_make_token(), _make_vehicle())
+    token = _make_token()
+    token.control_token = "Bearer ctrl-token-abc"
+    token.control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
+    headers = _make_api()._get_control_headers(token, _make_vehicle())
     assert headers["Authorization"] == "Bearer ctrl-token-abc"
     assert headers["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
     assert "X-Stamp" in headers
@@ -225,9 +254,6 @@ def test_control_headers_carry_authorization_ccsp():
 
 def test_control_request_headers_bearer_endpoint_has_no_ccsp():
     api = _make_api()
-    api._control_token = "Bearer ctrl-token-abc"
-    api._control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
-    api._control_token_source = "Bearer ccs-token"
     headers = api._get_control_request_headers(
         _make_token(), _make_vehicle(), "charge-target"
     )
@@ -322,25 +348,26 @@ def test_gspa_control_command_rc_error_raises_typed():
 
 
 def test_gspa_control_command_401_invalidates_cache_and_retries_once():
+    """A 401 on a PIN-gated command clears the Token's control token and
+    retries exactly once with a freshly verified PIN (no method mocks —
+    the real _get_control_token cache path is exercised)."""
     api = _make_api()
-    with (
-        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
-        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
-    ):
-        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+    token = _make_token()
+    token.control_token = "Bearer stale"
+    token.control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.side_effect = [
-            _post_mock(401, {}),
-            _post_mock(200, CONTROL_ENVELOPE),
+            _post_mock(401, {}),  # control command: stale token rejected
+            _post_mock(200, PIN_RESPONSE_MATCHED),  # PIN re-verified
+            _post_mock(200, CONTROL_ENVELOPE),  # retried command
         ]
-        token = _make_token()
-        api._control_token = "Bearer stale"
-        api._control_token_expiry = dt.datetime.now(dt.UTC).timestamp() + 3600
         action_id = api._gspa_control_command(
             token, _make_vehicle(), "door", {"command": "close"}
         )
-        assert action_id == "gspa:sid-1"
-        assert post.call_count == 2
-        assert api._control_token == "Bearer ctrl-token-abc"  # refetched
+    assert action_id == "gspa:sid-1"
+    assert post.call_count == 3  # 401 + PIN re-verify + retried command
+    assert token.control_token == "Bearer ctrl-token-abc"
+    assert post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/pin")
 
 
 def test_gspa_control_command_path_prefix_override():

@@ -62,7 +62,13 @@ class WindowRequestOptions:
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
-    # Per-seat fields (GSPA window-curtain endpoint).
+    # Per-seat fields (GSPA window-curtain endpoint, body keys
+    # drvSeatWindow/psgSeatWindow/rlSeatWindow/rrSeatWindow). The rear-window
+    # fields target the same physical windows as the position-based
+    # back_left/back_right (the CCS2 endpoint's vocabulary); they are kept
+    # endpoint-specific, and only the front seats genuinely differ: the GSPA
+    # driver/passenger split depends on drvSeatLoc (LHD/RHD), which the
+    # library cannot derive itself.
     driver_seat_window: WINDOW_STATE | None = None
     passenger_seat_window: WINDOW_STATE | None = None
     rear_left_window: WINDOW_STATE | None = None
