@@ -48,6 +48,11 @@ Korea support should still be considered experimental until it receives broader
 live-account testing. EV charge controls, Kia Korea, and Genesis Korea are not
 yet supported.
 
+Korea's synchronous force-refresh path waits about 25 seconds before its first
+cached-status readback. If the vehicle has not returned a fresh result, it can
+wait twice more for 10 seconds, so the caller may remain occupied for roughly
+45 seconds plus network time.
+
 Pleos browser login
 ~~~~~~~~~~~~~~~~~~~
 

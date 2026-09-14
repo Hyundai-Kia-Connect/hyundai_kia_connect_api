@@ -79,6 +79,22 @@ class Vehicle:
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
+    # Connected-car capability metadata
+    remote_control_generation: str | None = None
+    supports_remote_start: bool | None = None
+    remote_control_waiting_time: int | None = None
+    hvac_temperature_type: int | None = None
+    front_left_seat_climate_capability: int | None = None
+    front_right_seat_climate_capability: int | None = None
+    rear_left_seat_climate_capability: int | None = None
+    rear_right_seat_climate_capability: int | None = None
+    steering_wheel_heater_option: int | None = None
+    steering_wheel_heating_option: int | None = None
+    supports_steering_wheel_heater: bool | None = None
+    window_safety_option: int | None = None
+    window_safety_option2: int | None = None
+    window_status_capabilities_loaded: bool = False
+
     # Shared (EV/PHEV/HEV/IC)
     # General
     _total_driving_range: float = None

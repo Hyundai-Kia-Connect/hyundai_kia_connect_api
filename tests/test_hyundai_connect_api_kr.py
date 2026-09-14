@@ -1,6 +1,7 @@
 """Protocol-level tests for Hyundai Korea support."""
 
 import datetime as dt
+from dataclasses import asdict
 from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -341,6 +342,8 @@ def test_vehicle_capabilities_uses_current_myhyundai_infolist_request():
             "startYn": "Y",
             "remoteControlTime": 168,
             "hvacTempType": 1,
+            "windowSafetyOption": 1,
+            "windowSafetyOption2": 3,
             "seatHeaterVentInfo": [
                 {
                     "drvSeatHeatState": 6,
@@ -383,6 +386,26 @@ def test_vehicle_capabilities_uses_current_myhyundai_infolist_request():
     assert vehicle.steering_wheel_heater_option == 1
     assert vehicle.steering_wheel_heating_option == 1
     assert vehicle.supports_steering_wheel_heater is True
+    serialized = asdict(vehicle)
+    expected_capabilities = {
+        "remote_control_generation": "GEN2",
+        "supports_remote_start": True,
+        "remote_control_waiting_time": 168,
+        "hvac_temperature_type": 1,
+        "front_left_seat_climate_capability": 6,
+        "front_right_seat_climate_capability": 2,
+        "rear_left_seat_climate_capability": 0,
+        "rear_right_seat_climate_capability": 0,
+        "steering_wheel_heater_option": 1,
+        "steering_wheel_heating_option": 1,
+        "supports_steering_wheel_heater": True,
+        "window_safety_option": 1,
+        "window_safety_option2": 3,
+        "window_status_capabilities_loaded": True,
+    }
+    assert {
+        field: serialized[field] for field in expected_capabilities
+    } == expected_capabilities
 
 
 def test_korean_cached_status_uses_window_level_capability():

@@ -356,7 +356,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Update a vehicle from MyHyundai Korea's most recent cached status."""
-        if not getattr(vehicle, "window_status_capabilities_loaded", False):
+        if not vehicle.window_status_capabilities_loaded:
             try:
                 self.get_vehicle_capabilities(token, vehicle)
             except AuthenticationError:
@@ -386,8 +386,8 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
         """Interpret Korea window fields according to native capability flags."""
-        use_open_level = getattr(vehicle, "window_safety_option2", None) in (3, 4)
-        use_open_flag = getattr(vehicle, "window_safety_option", None) == 1
+        use_open_level = vehicle.window_safety_option2 in (3, 4)
+        use_open_flag = vehicle.window_safety_option == 1
         windows = (
             ("front_left_window_is_open", "Cabin.Window.Row1.Driver"),
             ("front_right_window_is_open", "Cabin.Window.Row1.Passenger"),
@@ -585,19 +585,16 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         self, token: Token, vehicle: Vehicle, require_start: bool
     ) -> None:
         """Require GEN2 control and, when needed, remote-start eligibility."""
-        if getattr(vehicle, "remote_control_generation", None) is None or (
-            require_start and getattr(vehicle, "supports_remote_start", None) is None
+        if vehicle.remote_control_generation is None or (
+            require_start and vehicle.supports_remote_start is None
         ):
             self.get_vehicle_capabilities(token, vehicle)
-        if getattr(vehicle, "remote_control_generation", None) != "GEN2":
-            mode = getattr(vehicle, "remote_control_generation", None) or "unknown"
+        if vehicle.remote_control_generation != "GEN2":
+            mode = vehicle.remote_control_generation or "unknown"
             raise APIError(
                 f"Hyundai Korea GEN2 remote control is unavailable (appMode={mode})"
             )
-        if (
-            require_start
-            and getattr(vehicle, "supports_remote_start", None) is not True
-        ):
+        if require_start and vehicle.supports_remote_start is not True:
             raise APIError(
                 "This vehicle is not eligible for remote engine/climate start"
             )
@@ -619,17 +616,12 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
                 )
         if options.steering_wheel not in (None, 0, 1, 2):
             raise APIError("steering_wheel must be 0 (off), 1 (on), or 2 (high)")
-        if (
-            options.steering_wheel == 2
-            and getattr(vehicle, "steering_wheel_heater_option", None) != 2
-        ):
+        if options.steering_wheel == 2 and vehicle.steering_wheel_heater_option != 2:
             raise APIError(
                 "steering_wheel state 2 requires two-level steering-wheel control"
             )
         if options.steering_wheel not in (None, 0):
-            steering_supported = getattr(
-                vehicle, "supports_steering_wheel_heater", None
-            )
+            steering_supported = vehicle.supports_steering_wheel_heater
             if steering_supported is None:
                 raise APIError("steering-wheel capability is unavailable")
             if steering_supported is False:
@@ -705,11 +697,9 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         if options is not None:
             temperature = options.set_temp if options.set_temp is not None else 21.0
             heating = options.heating if options.heating is not None else 0
-            separate_heating = (
-                getattr(vehicle, "steering_wheel_heater_option", None) is not None
-            )
+            separate_heating = vehicle.steering_wheel_heater_option is not None
             shared_options = {
-                "hvacTempType": getattr(vehicle, "hvac_temperature_type", None) or 1,
+                "hvacTempType": vehicle.hvac_temperature_type or 1,
                 "seatHeaterVentInfo": self._seat_climate_payload(vehicle, options),
                 "sideRearMirrorHeating": (
                     (1 if heating in (1, 2, 4) else 0) if separate_heating else None
