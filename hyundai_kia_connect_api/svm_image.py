@@ -205,6 +205,8 @@ def crop_view(details: SVMDetails, view: str) -> Image.Image | None:
         return None
     height = sizes[1]
     width = sizes[match.width_index]
+    if height <= 0 or width <= 0:
+        return None
     # x offset = sum of preceding segment widths (in VIEWS order).
     x = 0
     for other in VIEWS[: VIEWS.index(match)]:
@@ -237,9 +239,21 @@ def render_views(details: SVMDetails, *, dewarp: bool = False) -> dict[str, byte
                 f"SVM dewarp requires numpy ({IMAGE_EXTRA_HINT})"
             ) from err
     views: dict[str, bytes] = {}
-    for view in VIEWS:
+    for order, view in enumerate(VIEWS):
         img = crop_view(details, view.key)
         if img is None:
             continue
+        if dewarp and order < 4:
+            fov = camera_fov_deg(details.valid_angle_of_view, order)
+            if fov is not None:
+                # Zoom in slightly so the output rectangle stays inside the
+                # fisheye circle and the worst corner stretch is cropped
+                # away. Factor tuned against a daylight capture: FRONT 76 ->
+                # ~59, REAR 78 -> ~61, LEFT 87 -> ~68, RIGHT 81 -> ~63. Clamp
+                # keeps the value sane if calibration reports an odd FOV.
+                output_fov = max(50.0, min(fov * 0.78, 85.0))
+                dewarped = dewarp_fisheye(img, fov, output_fov_deg=output_fov)
+                if dewarped is not None:
+                    img = dewarped
         views[view.key] = to_jpeg_bytes(img)
     return views

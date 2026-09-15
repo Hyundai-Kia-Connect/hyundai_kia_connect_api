@@ -143,6 +143,47 @@ def test_crop_view_missing_pillow_raises_with_hint(monkeypatch):
         crop_view(details, "front")
 
 
+def test_render_views_dewarp_changes_cameras_not_top():
+    # Solid-color segments dewarp to themselves: the 0.78 output-FOV zoom
+    # keeps the output rectangle inside the fisheye circle, so a constant
+    # field resamples to the same constant and the JPEG bytes stay identical.
+    # Use a gradient composite instead — dewarp resamples it, so the camera
+    # bytes must change, while TOP (never dewarped) stays raw-identical.
+    from PIL import Image
+
+    gradient = Image.linear_gradient("L").resize(PANORAMA).convert("RGB")
+    buf = io.BytesIO()
+    gradient.save(buf, format="JPEG", quality=100, subsampling=0)
+    details = _make_details(
+        image_bytes=buf.getvalue(), valid_angle_of_view=_calibration()
+    )
+    raw = render_views(details)
+    dewarped = render_views(details, dewarp=True)
+    assert set(dewarped) == set(raw)
+    assert dewarped["top"] == raw["top"]
+    for key in ("front", "rear", "left", "right"):
+        assert dewarped[key] != raw[key]
+
+
+def test_render_views_dewarp_without_calibration_serves_raw():
+    raw = render_views(_make_details())
+    dewarped = render_views(_make_details(), dewarp=True)
+    assert set(dewarped) == set(VIEW_KEYS)
+    for key in raw:
+        assert dewarped[key] == raw[key]
+
+
+def test_render_views_missing_numpy_raises_with_hint(monkeypatch):
+    monkeypatch.setitem(sys.modules, "numpy", None)
+    with pytest.raises(ImportError, match=r"hyundai_kia_connect_api\[image\]"):
+        render_views(_make_details(valid_angle_of_view=_calibration()), dewarp=True)
+
+
+def test_render_views_degenerate_sizes_omits_views():
+    views = render_views(_make_details(image_sizes=(4472, 0, 960, 0, 632, 0)))
+    assert views == {}
+
+
 def test_to_jpeg_bytes_roundtrip():
     from PIL import Image
 
