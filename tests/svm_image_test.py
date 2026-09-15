@@ -2,11 +2,17 @@
 
 import datetime as dt
 import io
+import sys
 
 import pytest
 
 from hyundai_kia_connect_api.svm import SVMDetails
-from hyundai_kia_connect_api.svm_image import camera_fov_deg
+from hyundai_kia_connect_api.svm_image import (
+    camera_fov_deg,
+    crop_view,
+    render_views,
+    to_jpeg_bytes,
+)
 
 pytest.importorskip("PIL", reason="svm_image tests need the [image] extra")
 pytest.importorskip("numpy", reason="svm_image tests need the [image] extra")
@@ -89,3 +95,58 @@ def test_camera_fov_deg_guards():
     big_fov = list(_calibration())
     big_fov[1] = 180.5
     assert camera_fov_deg(tuple(big_fov), 0) is None
+
+
+def test_render_views_raw_returns_five_views():
+    views = render_views(_make_details())
+    assert set(views) == set(VIEW_KEYS)
+
+
+def test_render_views_crop_sizes_and_colors():
+    from PIL import Image
+
+    views = render_views(_make_details())
+    for key in ("front", "rear", "left", "right"):
+        img = Image.open(io.BytesIO(views[key]))
+        assert img.size == (960, 720)
+        assert _close(img.getpixel((10, 10)), SEGMENT_COLORS[key])
+    img = Image.open(io.BytesIO(views["top"]))
+    assert img.size == (632, 720)
+    assert _close(img.getpixel((10, 10)), SEGMENT_COLORS["top"])
+
+
+def test_render_views_omits_views_when_image_sizes_missing():
+    views = render_views(_make_details(image_sizes=None))
+    assert views == {}
+
+
+def test_render_views_omits_views_when_sizes_too_short():
+    views = render_views(_make_details(image_sizes=(4472, 720)))
+    assert views == {}
+
+
+def test_crop_view_unknown_view_returns_none():
+    assert crop_view(_make_details(), "hood") is None
+
+
+def test_crop_view_without_image_bytes_returns_none():
+    assert crop_view(_make_details(image_bytes=b""), "front") is None
+
+
+def test_crop_view_missing_pillow_raises_with_hint(monkeypatch):
+    # Build the fixture before hiding PIL: _composite_jpeg() itself imports
+    # Pillow, so constructing details inside the block would raise the raw
+    # "import of PIL halted" error before crop_view is ever reached.
+    details = _make_details()
+    monkeypatch.setitem(sys.modules, "PIL", None)
+    with pytest.raises(ImportError, match=r"hyundai_kia_connect_api\[image\]"):
+        crop_view(details, "front")
+
+
+def test_to_jpeg_bytes_roundtrip():
+    from PIL import Image
+
+    img = Image.new("RGB", (8, 8), (10, 200, 30))
+    data = to_jpeg_bytes(img)
+    assert data[:2] == b"\xff\xd8"  # JPEG magic
+    assert _close(Image.open(io.BytesIO(data)).getpixel((0, 0)), (10, 200, 30))

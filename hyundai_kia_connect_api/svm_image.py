@@ -24,6 +24,8 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .svm import SVMDetails
+
 if TYPE_CHECKING:
     from PIL import Image
 
@@ -179,3 +181,65 @@ def to_jpeg_bytes(img: Image.Image) -> bytes:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=100, subsampling=0)
     return buf.getvalue()
+
+
+def crop_view(details: SVMDetails, view: str) -> Image.Image | None:
+    """Crop one named view (front/rear/left/right/top) from the composite.
+
+    Returns None when the view key is unknown or the data needed to crop is
+    missing/malformed, so render_views can omit that view without failing.
+    Raises ImportError with an install hint when Pillow is missing — serving
+    any view at all is impossible without it, so that failure is loud.
+    """
+    try:
+        from PIL import Image
+    except ImportError as err:
+        raise ImportError(
+            f"SVM image support requires Pillow ({IMAGE_EXTRA_HINT})"
+        ) from err
+    match = next((v for v in VIEWS if v.key == view), None)
+    if match is None:
+        return None
+    sizes = details.image_sizes
+    if not details.image_bytes or not sizes or len(sizes) <= max(match.width_index, 1):
+        return None
+    height = sizes[1]
+    width = sizes[match.width_index]
+    # x offset = sum of preceding segment widths (in VIEWS order).
+    x = 0
+    for other in VIEWS[: VIEWS.index(match)]:
+        if len(sizes) > other.width_index:
+            x += sizes[other.width_index]
+    try:
+        img = Image.open(io.BytesIO(details.image_bytes))
+        cropped = img.crop((x, 0, x + width, height))
+    except Exception:
+        return None
+    return cropped if cropped.mode == "RGB" else cropped.convert("RGB")
+
+
+def render_views(details: SVMDetails, *, dewarp: bool = False) -> dict[str, bytes]:
+    """Render all 5 SVM views as JPEG bytes keyed by view name.
+
+    With ``dewarp=True`` the 4 camera segments are dewarped (FOV from
+    ``details.valid_angle_of_view``, output FOV = clamp(fov * 0.78, 50, 85));
+    TOP is never dewarped. Views that cannot be cropped are omitted — no
+    exception for per-view failures. Raises ImportError with an install hint
+    when Pillow is missing, and — with ``dewarp=True`` — when numpy is
+    missing (the caller explicitly asked for dewarp; a silent raw fallback
+    would hide the misconfiguration).
+    """
+    if dewarp:
+        try:
+            import numpy  # noqa: F401
+        except ImportError as err:
+            raise ImportError(
+                f"SVM dewarp requires numpy ({IMAGE_EXTRA_HINT})"
+            ) from err
+    views: dict[str, bytes] = {}
+    for view in VIEWS:
+        img = crop_view(details, view.key)
+        if img is None:
+            continue
+        views[view.key] = to_jpeg_bytes(img)
+    return views
