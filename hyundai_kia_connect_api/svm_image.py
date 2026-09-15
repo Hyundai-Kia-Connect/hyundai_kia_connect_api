@@ -12,9 +12,11 @@ viewers).
 
 Pillow and numpy are optional (the ``image`` extra); imports are lazy so the
 module imports without them. Missing Pillow raises ImportError with an
-install hint; dewarp failures (bad FOV, no numpy) fall back to the raw
-fisheye crop. JPEG encoding is quality 100, 4:4:4 so the car's JPEG stays
-the only lossy generation.
+install hint. A low-level dewarp failure (bad FOV, missing calibration)
+falls back to the raw fisheye crop, but ``render_views(dewarp=True)`` with
+numpy missing raises ImportError with the install hint — an explicit dewarp
+request must fail loud. JPEG encoding is quality 100, 4:4:4 so the car's
+JPEG stays the only lossy generation.
 """
 
 from __future__ import annotations
