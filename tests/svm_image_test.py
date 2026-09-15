@@ -191,3 +191,16 @@ def test_to_jpeg_bytes_roundtrip():
     data = to_jpeg_bytes(img)
     assert data[:2] == b"\xff\xd8"  # JPEG magic
     assert _close(Image.open(io.BytesIO(data)).getpixel((0, 0)), (10, 200, 30))
+
+
+def test_render_views_sizes_larger_than_image_omit_views():
+    # Internally consistent sizes that exceed the real JPEG: the crop box
+    # would run past the panorama edge and PIL pads out-of-bounds with black
+    # — the spec omits such views instead of serving padded ones.
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), (5, 5, 5))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=100, subsampling=0)
+    views = render_views(_make_details(image_bytes=buf.getvalue()))
+    assert views == {}

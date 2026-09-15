@@ -216,6 +216,8 @@ def crop_view(details: SVMDetails, view: str) -> Image.Image | None:
             x += sizes[other.width_index]
     try:
         img = Image.open(io.BytesIO(details.image_bytes))
+        if x + width > img.width or height > img.height:
+            return None
         cropped = img.crop((x, 0, x + width, height))
     except Exception:
         return None
