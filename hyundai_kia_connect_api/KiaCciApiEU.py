@@ -6,17 +6,19 @@ This module keeps Kia brand constants. Remote actions are not
 implemented: force refresh raises NotImplementedError (inherited from
 ApiImpl) and prewakeup is overridden here with the same — Kia EU CCI
 remote control awaits live verification (D6). Cached-state parsing
-requires a live response fixture (captured during integration
-validation) and raises NotImplementedError until then. Extended reads
-(driving info, history, breakdowns, DTC) are Hyundai-specific parsers
-and are intentionally not present on Kia; they are added once live
-fixtures from a real Kia vehicle confirm their payload shapes.
+uses the shared CCS2 property parser (moved to ``GspaApiEU``): the Kia
+stored-status envelope and vehicle state tree match the Hyundai shape
+(confirmed live on a real EV6). Extended reads (driving info, history,
+breakdowns, DTC) are Hyundai-specific parsers and are intentionally
+not present on Kia; they are added once live fixtures from a real Kia
+vehicle confirm their payload shapes.
 """
 
 # pylint:disable=missing-class-docstring,invalid-name
 
 from typing import Any
 
+from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
 from .Vehicle import Vehicle
@@ -49,15 +51,24 @@ class KiaCciApiEU(GspaApiEU):
         raise NotImplementedError("Kia EU CCI prewakeup awaits live verification")
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Raise until the Kia stored-status parser is live-verified.
+        """Fetch GSPA stored-status and update vehicle properties.
 
-        The Kia cached-state parser awaits a live response fixture,
-        captured during integration validation on a real vehicle (D5).
+        Same response shape as Hyundai EU CCI (``state.Vehicle`` in CCS2
+        nested format), so the shared CCS2 property parser applies.
+        Unlike the Hyundai implementation, driving info and history are
+        not fetched: on Kia these endpoints currently fail server-side
+        (confirmed live on a real EV6), so a cached-state update stays
+        limited to stored-status.
         """
-        raise NotImplementedError(
-            "Kia cached-state parser requires a live response fixture "
-            "(captured during integration validation)."
-        )
+        if not (token.access_token or token.exchangeable_token):
+            raise APIError("No CCS token — cannot fetch GSPA stored-status")
+        data = self.get_stored_status(token, vehicle)
+        if not data:
+            raise APIError("GSPA stored-status returned no data")
+        state = data.get("state", {})
+        if isinstance(state, dict) and "Vehicle" in state:
+            state = state["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints) — GATED

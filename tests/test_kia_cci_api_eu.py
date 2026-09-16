@@ -179,11 +179,15 @@ def test_kia_get_vehicles_shared_path():
     assert vehicles[0].model == "EV3"
 
 
-def test_kia_update_cached_state_not_implemented():
-    """update_vehicle_with_cached_state raises until a live fixture exists."""
+def test_kia_update_cached_state_requires_ccs_token():
+    """update_vehicle_with_cached_state is implemented (D5) and rejects a
+    token without CCS credentials before any network call."""
     api = _make_kia_api()
-    with pytest.raises(NotImplementedError):
-        api.update_vehicle_with_cached_state(MagicMock(), MagicMock())
+    token = MagicMock()
+    token.access_token = None
+    token.exchangeable_token = None
+    with pytest.raises(APIError):
+        api.update_vehicle_with_cached_state(token, MagicMock())
 
 
 def test_kia_prewakeup_not_implemented():
