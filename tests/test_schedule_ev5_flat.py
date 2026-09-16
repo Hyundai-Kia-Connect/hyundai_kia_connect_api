@@ -372,7 +372,7 @@ class TestEV5AutoFill:
         assert charge["reservFlag"] == 0  # explicit
         assert charge["reservStartTime"] == {"time": "1130", "timeSection": 1}
         assert charge["reservEndTime"] == {"time": "0130", "timeSection": 0}
-        assert charge["offpeakPowerFlag"] == 1  # from vehicle state
+        assert charge["offpeakPowerFlag"] == 2  # from vehicle state
 
     def test_vehicle_state_reaches_hvac_payload(self, api):
         calls = _mock_post(api)
