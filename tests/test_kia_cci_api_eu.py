@@ -78,7 +78,7 @@ def test_kia_constants_set_correctly():
     assert api.CCI_PACKAGE_ID == "com.kia.oneapp.eu"
     assert api.GSPA_BASE_URL == "https://gspa-ccs-eu.kia.com/"
     assert api.LOGIN_FORM_HOST == "https://idpconnect-eu.kia.com"
-    assert api.REQUEST_ID_HEADER == "DD-REQUEST-ID"
+    assert api.REQUEST_ID_HEADER == "X-Request-Id"
     assert api.DEVICE_ID_HEADER == "X-Userdevice-Id"
     assert api._cci_client_name == "kia"
     assert api.CCSP_API_URL == "https://gspa-ccs-eu.kia.com"

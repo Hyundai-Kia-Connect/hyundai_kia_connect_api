@@ -41,7 +41,7 @@ class KiaCciApiEU(GspaApiEU):
     GSPA_BASE_URL = "https://gspa-ccs-eu.kia.com/"
     LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
     CIPHER_BRAND = "kia"
-    REQUEST_ID_HEADER = "DD-REQUEST-ID"
+    REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Userdevice-Id"
 
     def prewakeup(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
