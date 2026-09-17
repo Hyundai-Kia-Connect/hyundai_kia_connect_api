@@ -1221,8 +1221,10 @@ class ApiImplType1(ApiImpl):
             _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
             charge_payload = {
                 "reservFlag": 1 if options.charging_enabled else 0,
-                # Same enum as the combined path: 2 = only off-peak, 1 = prioritised.
-                "offpeakPowerFlag": (2 if options.off_peak_charge_only_enabled else 1),
+                # EV5 flat-path enum is the OPPOSITE of the combined path:
+                # 1 = only off-peak, 2 = prioritised (#1312 live evidence,
+                # Kia PV5). Do not "align" it with the combined path.
+                "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
                 "reservStartTime": {
                     "time": options.off_peak_start_time.strftime("%I%M"),
                     "timeSection": (

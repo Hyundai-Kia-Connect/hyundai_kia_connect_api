@@ -181,24 +181,26 @@ class TestEV5FlatChargePayload:
         }
 
     def test_offpeak_power_flag_only(self, api):
-        # off_peak_charge_only_enabled=True -> flag 2 ("off-peak tariffs only")
+        # off_peak_charge_only_enabled=True -> flag 1 ("off-peak tariffs only").
+        # The flat-path enum is the OPPOSITE of the combined path (#1312,
+        # live-verified on a Kia PV5): 1 = only, 2 = prioritised.
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
             MagicMock(spec=Token), v, _options(off_peak_charge_only_enabled=True)
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
-        assert charge["offpeakPowerFlag"] == 2
+        assert charge["offpeakPowerFlag"] == 1
 
     def test_offpeak_power_flag_prioritised(self, api):
-        # off_peak_charge_only_enabled=False -> flag 1 ("off-peak tariffs prioritised")
+        # off_peak_charge_only_enabled=False -> flag 2 ("off-peak tariffs prioritised")
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
             MagicMock(spec=Token), v, _options(off_peak_charge_only_enabled=False)
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
-        assert charge["offpeakPowerFlag"] == 1
+        assert charge["offpeakPowerFlag"] == 2
 
     def test_reserv_flag_on_off(self, api):
         calls = _mock_post(api)
@@ -372,7 +374,7 @@ class TestEV5AutoFill:
         assert charge["reservFlag"] == 0  # explicit
         assert charge["reservStartTime"] == {"time": "1130", "timeSection": 1}
         assert charge["reservEndTime"] == {"time": "0130", "timeSection": 0}
-        assert charge["offpeakPowerFlag"] == 2  # from vehicle state
+        assert charge["offpeakPowerFlag"] == 1  # from vehicle state (flat: 1 = only)
 
     def test_vehicle_state_reaches_hvac_payload(self, api):
         calls = _mock_post(api)
