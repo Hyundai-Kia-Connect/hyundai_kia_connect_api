@@ -17,7 +17,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 import requests
@@ -163,7 +163,7 @@ class GspaApiEU(ApiImpl):
 
     data_timezone = dt.UTC
     supports_valet_mode = True
-    SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES_LIST
+    SUPPORTED_LANGUAGES: ClassVar[list[str]] = SUPPORTED_LANGUAGES_LIST
 
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""

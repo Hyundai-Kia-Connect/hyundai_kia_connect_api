@@ -39,7 +39,7 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
 
     data_timezone = dt.timezone(dt.timedelta(hours=9))
     supports_valet_mode = False
-    SUPPORTED_LANGUAGES = ("ko", "en")
+    SUPPORTED_LANGUAGES: ClassVar[list[str]] = ["ko", "en"]
 
     ONEAPP_CLIENT_ID = "11769a37-9a46-48c8-82f4-24a2a11c1337"
     ONEAPP_REDIRECT_URI = "https://oneapp.hyundai.com/redirect"
@@ -83,28 +83,6 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         8: frozenset((2, 8)),
         9: frozenset((2, 5, 8)),
     }
-    SEAT_CLIMATE_FIELDS: ClassVar[tuple[tuple[str, str, str], ...]] = (
-        (
-            "drvSeatHeatState",
-            "front_left_seat",
-            "front_left_seat_climate_capability",
-        ),
-        (
-            "astSeatHeatState",
-            "front_right_seat",
-            "front_right_seat_climate_capability",
-        ),
-        (
-            "rlSeatHeatState",
-            "rear_left_seat",
-            "rear_left_seat_climate_capability",
-        ),
-        (
-            "rrSeatHeatState",
-            "rear_right_seat",
-            "rear_right_seat_climate_capability",
-        ),
-    )
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         """Initialize the Korea API with MyHyundai Android client metadata."""
@@ -456,8 +434,18 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
             seats = seat_info[0]
         else:
             seats = data
-        for api_field, _option_field, capability_field in self.SEAT_CLIMATE_FIELDS:
-            setattr(vehicle, capability_field, seats.get(api_field))
+        vehicle.front_left_seat_climate_capability = self._optional_int(
+            seats.get("drvSeatHeatState")
+        )
+        vehicle.front_right_seat_climate_capability = self._optional_int(
+            seats.get("astSeatHeatState")
+        )
+        vehicle.rear_left_seat_climate_capability = self._optional_int(
+            seats.get("rlSeatHeatState")
+        )
+        vehicle.rear_right_seat_climate_capability = self._optional_int(
+            seats.get("rrSeatHeatState")
+        )
 
         steering_option = data.get("strgWhlHeatOption")
         stepped_steering_option = data.get("strgWhlHeatingOption")
@@ -554,25 +542,66 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         token.control_token_expiry = now + 240
         return token.control_token
 
+    @staticmethod
+    def _optional_int(value: Any) -> int | None:
+        """Return integer capability metadata and reject malformed values."""
+        return value if isinstance(value, int) else None
+
+    @staticmethod
+    def _seat_climate_fields(
+        vehicle: Vehicle, options: ClimateRequestOptions | None = None
+    ) -> tuple[tuple[str, str, int | None, int | None], ...]:
+        """Return typed API, option, capability, and requested seat values."""
+        return (
+            (
+                "drvSeatHeatState",
+                "front_left_seat",
+                vehicle.front_left_seat_climate_capability,
+                options.front_left_seat if options is not None else None,
+            ),
+            (
+                "astSeatHeatState",
+                "front_right_seat",
+                vehicle.front_right_seat_climate_capability,
+                options.front_right_seat if options is not None else None,
+            ),
+            (
+                "rlSeatHeatState",
+                "rear_left_seat",
+                vehicle.rear_left_seat_climate_capability,
+                options.rear_left_seat if options is not None else None,
+            ),
+            (
+                "rrSeatHeatState",
+                "rear_right_seat",
+                vehicle.rear_right_seat_climate_capability,
+                options.rear_right_seat if options is not None else None,
+            ),
+        )
+
     @classmethod
     def _supported_seat_fields(cls, vehicle: Vehicle) -> tuple[str, ...]:
         """Return API fields for seats with an advertised climate capability."""
         return tuple(
             api_field
-            for api_field, _option_field, capability_field in cls.SEAT_CLIMATE_FIELDS
-            if getattr(vehicle, capability_field, None) not in (None, 0, 7)
+            for api_field, _option_field, capability, _requested in cls._seat_climate_fields(
+                vehicle
+            )
+            if capability not in (None, 0, 7)
         )
 
     @classmethod
     def _seat_climate_payload(
         cls, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> list[dict] | None:
+    ) -> list[dict[str, int]] | None:
         """Build requested seat states and turn omitted supported seats off."""
         supported = cls._supported_seat_fields(vehicle)
         requested = {
             key: value if value is not None else 2
-            for key, option_field, _capability_field in cls.SEAT_CLIMATE_FIELDS
-            if (value := getattr(options, option_field)) is not None or key in supported
+            for key, _option_field, _capability, value in cls._seat_climate_fields(
+                vehicle, options
+            )
+            if value is not None or key in supported
         }
         return [requested] if requested else None
 
@@ -603,13 +632,22 @@ class HyundaiConnectApiKR(HyundaiCciApiEU):
         self, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> None:
         """Reject seat and steering requests unsupported by the vehicle."""
-        for _api_field, option_field, capability_field in self.SEAT_CLIMATE_FIELDS:
-            requested = getattr(options, option_field)
-            capability = getattr(vehicle, capability_field, None)
-            allowed = self.SEAT_CLIMATE_STATES.get(capability)
-            if requested is not None and allowed is None:
+        for (
+            _api_field,
+            option_field,
+            capability,
+            requested,
+        ) in self._seat_climate_fields(vehicle, options):
+            if requested is None:
+                continue
+            allowed = (
+                self.SEAT_CLIMATE_STATES.get(capability)
+                if capability is not None
+                else None
+            )
+            if allowed is None:
                 raise APIError(f"{option_field} capability is unavailable")
-            if requested is not None and requested not in allowed:
+            if requested not in allowed:
                 raise APIError(
                     f"{option_field} state {requested} is unsupported by capability "
                     f"{capability}"
