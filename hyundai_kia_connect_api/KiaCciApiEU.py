@@ -18,7 +18,6 @@ vehicle confirm their payload shapes.
 
 from typing import Any
 
-from .const import VEHICLE_LOCK_ACTION
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
@@ -32,14 +31,16 @@ class KiaCciApiEU(GspaApiEU):
     production endpoints. Login, token lifecycle, and the GSPA
     secure-request layer are inherited from ``GspaApiEU``. GSPA remote
     control is inherited but partially gated: only live-verified
-    endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock was live-proven
-    on a Kia PV5 (2026-09-19); everything else still raises
-    NotImplementedError until live verification (D6).
+    endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and unlock are
+    live-proven on a Kia PV5 (2026-09-19); the remaining commands still
+    raise NotImplementedError until live verification (D6).
     """
 
-    # Door lock via the shared "door" endpoint + {"command": "close"}
-    # live-proven on a Kia PV5 (2026-09-19): 202 S 202-000, hazard flash,
-    # fresh stored-status 7 s later. Unlock ("open") is NOT yet proven.
+    # Door lock and unlock via the shared "door" endpoint +
+    # {"command": "close"/"open"} live-proven on a Kia PV5 (2026-09-19):
+    # 202 S 202-000, fresh stored-status 7 s (lock) / 4 s (unlock)
+    # after sending. The vehicle re-locks itself after ~30 s if no door
+    # is opened.
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door"})
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
@@ -84,40 +85,21 @@ class KiaCciApiEU(GspaApiEU):
         self._update_vehicle_properties_ccs2(vehicle, state)
 
     # ------------------------------------------------------------------
-    # Door control (Kia per-action endpoints) — GATED
+    # Door control (Kia per-action endpoints)
     #
     # Confirmed endpoints (Kia OneApp request dispatch + live):
+    #   POST /gspa/v1/remote/vehicles/{carId}/door              {"command": "close" | "open"}
     #   POST /gspa/v1/remote/vehicles/{carId}/door-lock          {"command": "set"}
     #   POST /gspa/v1/remote/vehicles/{carId}/door-unlock        {"command": "set"}
-    #   POST /gspa/v1/remote/vehicles/{carId}/door-lock-safety   {"command": "set"}
-    #   POST /gspa/v1/remote/vehicles/{carId}/door-unlock-safety {"command": "set"}
-    # The action lives in the endpoint; bodies default to "set" and are
-    # case-sensitive ("lock"/"LOCK"/"CLOSE" are rejected with 400-002,
-    # live-verified on a PV5). door-lock + {"command": "set"} returned
-    # 202 S 202-000 on a PV5 (2026-09-19). Gated until the remaining
-    # commands are live-verified; no POST is sent.
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-lock-safety   {"command": "set"} — untested
+    #   POST /gspa/v1/remote/vehicles/{carId}/door-unlock-safety {"command": "set"} — untested
+    # The action lives in the endpoint; bodies are case-sensitive
+    # ("lock"/"LOCK"/"CLOSE" are rejected with 400-002, live-verified on
+    # a PV5). Both lock and unlock are live-proven on a PV5
+    # (2026-09-19): door + close/open and door-lock/door-unlock + set
+    # all returned 202 S 202-000 with a fresh stored-status 4-7 s
+    # after. The SID shape is endpoint-independent (short msgId or
+    # UUID, alternating between runs). lock_action covers both
+    # directions via the shared "door" endpoint; the safety variants
+    # stay gated until live-verified (D6).
     # ------------------------------------------------------------------
-
-    def lock_door(self, token: Token, vehicle: Vehicle) -> str:
-        raise NotImplementedError("Kia EU CCI door control awaits live verification")
-
-    def unlock_door(self, token: Token, vehicle: Vehicle) -> str:
-        raise NotImplementedError("Kia EU CCI door control awaits live verification")
-
-    def lock_door_safety(self, token: Token, vehicle: Vehicle) -> str:
-        raise NotImplementedError("Kia EU CCI door control awaits live verification")
-
-    def unlock_door_safety(self, token: Token, vehicle: Vehicle) -> str:
-        raise NotImplementedError("Kia EU CCI door control awaits live verification")
-
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        """Lock via the shared "door" endpoint (live-proven on a PV5).
-
-        Unlock is intentionally still gated: the "open" direction was not
-        exercised live on a Kia vehicle (2026-09-19 PV5 session).
-        """
-        if action != VEHICLE_LOCK_ACTION.LOCK:
-            raise NotImplementedError("Kia EU CCI unlock awaits live verification")
-        return super().lock_action(token, vehicle, action)

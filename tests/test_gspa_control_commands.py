@@ -185,15 +185,14 @@ def test_control_command_pre_ccs2_raises_unsupported():
 
 def test_kia_remote_control_gated_not_implemented():
     """Kia EU CCI inherits the GSPA control layer but ships partially
-    gated: only live-proven endpoints pass (door lock, PV5 2026-09-19).
-    Everything else raises NotImplementedError before any request."""
+    gated: only live-proven endpoints pass (door lock + unlock, PV5
+    2026-09-19). Everything else raises NotImplementedError before any
+    request."""
     from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
     api = KiaCciApiEU(9, 2, "en")
     post = patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
     with post as p:
-        with pytest.raises(NotImplementedError):
-            api.lock_action(_make_token(), _make_vehicle(), VEHICLE_LOCK_ACTION.UNLOCK)
         with pytest.raises(NotImplementedError):
             api.check_action_status(_make_token(), _make_vehicle(), "gspa:noop")
         p.assert_not_called()
