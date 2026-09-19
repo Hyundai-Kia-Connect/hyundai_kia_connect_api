@@ -31,7 +31,12 @@ from .svm import SVMDetails
 if TYPE_CHECKING:
     from PIL import Image
 
-IMAGE_EXTRA_HINT = "pip install hyundai_kia_connect_api[image]"
+# Tool-agnostic: not every consumer installs with pip (uv, poetry, conda, or
+# Home Assistant's manifest-driven installer); pip is only an example.
+IMAGE_EXTRA_HINT = (
+    "install the hyundai_kia_connect_api[image] extra "
+    "(e.g. pip install 'hyundai_kia_connect_api[image]')"
+)
 
 
 @dataclass(frozen=True)
