@@ -87,7 +87,10 @@ def test_lock_action_lock():
 def test_door_power_off():
     _, call = _run_command(HyundaiCciApiEU.door_power_off)
     assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-power-off")
-    assert call.kwargs["json"] == {"command": "CLOSE"}
+    # Body is "set" (app protocol, confirmed on both OneApp builds); the
+    # action is in the endpoint. "CLOSE" was rejected as case-sensitive
+    # on a live PV5.
+    assert call.kwargs["json"] == {"command": "set"}
 
 
 def test_start_stop_charge():
@@ -181,20 +184,23 @@ def test_control_command_pre_ccs2_raises_unsupported():
 
 
 def test_kia_remote_control_gated_not_implemented():
-    """Kia EU CCI inherits the GSPA control layer but ships gated: every
-    control command raises NotImplementedError before any request."""
+    """Kia EU CCI inherits the GSPA control layer but ships partially
+    gated: only live-proven endpoints pass (door lock, PV5 2026-09-19).
+    Everything else raises NotImplementedError before any request."""
     from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
     api = KiaCciApiEU(9, 2, "en")
     post = patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
     with post as p:
         with pytest.raises(NotImplementedError):
-            api.lock_action(_make_token(), _make_vehicle(), VEHICLE_LOCK_ACTION.LOCK)
+            api.lock_action(_make_token(), _make_vehicle(), VEHICLE_LOCK_ACTION.UNLOCK)
         with pytest.raises(NotImplementedError):
             api.check_action_status(_make_token(), _make_vehicle(), "gspa:noop")
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
+    # Evidence-mapped: only the live-proven "door" endpoint passes.
+    assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset({"door"})
 
 
 def test_start_climate_full_options():

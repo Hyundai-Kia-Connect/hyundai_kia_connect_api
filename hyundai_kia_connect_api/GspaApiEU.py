@@ -68,6 +68,7 @@ from .svm import (
 from .Token import Token
 from .utils import (
     bool_or_none,
+    ccs2_reservation_time_or_none,
     float_or_none,
     get_child_value,
     normalize_battery_soc,
@@ -195,6 +196,12 @@ class GspaApiEU(ApiImpl):
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
     GSPA_REMOTE_CONTROL_VERIFIED = False
+
+    # Endpoints individually live-verified on this brand while the rest of
+    # GSPA remote control stays gated (GSPA_REMOTE_CONTROL_VERIFIED=False).
+    # Evidence-mapped: only commands proven against a live vehicle pass the
+    # gate; everything else still raises NotImplementedError.
+    GSPA_VERIFIED_ENDPOINTS: ClassVar[frozenset[str]] = frozenset()
 
     # Brand placeholders — every subclass MUST override these.
     ONEAPP_CLIENT_ID: str = ""
@@ -1173,11 +1180,15 @@ class GspaApiEU(ApiImpl):
         token cache is invalidated and the command is retried exactly once.
 
         Pre-CCS2 EU vehicles are rejected with UnsupportedControlError
-        (region 1 handles them), and brands with
-        GSPA_REMOTE_CONTROL_VERIFIED=False raise NotImplementedError before
+        (region 1 handles them), and commands not live-verified on this
+        brand (neither GSPA_REMOTE_CONTROL_VERIFIED nor a listing in
+        GSPA_VERIFIED_ENDPOINTS) raise NotImplementedError before
         any request is sent.
         """
-        if not self.GSPA_REMOTE_CONTROL_VERIFIED:
+        if not (
+            self.GSPA_REMOTE_CONTROL_VERIFIED
+            or endpoint in self.GSPA_VERIFIED_ENDPOINTS
+        ):
             raise NotImplementedError(
                 f"{self.__class__.__name__} GSPA remote control awaits "
                 "live verification"
@@ -1586,6 +1597,9 @@ class GspaApiEU(ApiImpl):
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         # Headlamp / lamp status
+        vehicle.headlamp_status = get_child_value(
+            state, "Body.Lights.Front.HeadLamp.SystemWarning"
+        )
         vehicle.headlamp_left_low = get_child_value(
             state, "Body.Lights.Front.Left.Low.Warning"
         )
@@ -1798,24 +1812,47 @@ class GspaApiEU(ApiImpl):
             if defrost2 is not None:
                 vehicle.ev_second_departure_climate_defrost = bool(defrost2)
 
-        off_peak_start = get_child_value(
-            state, "Green.Reservation.OffPeakPower.StartTime"
-        )
-        if off_peak_start is not None:
-            vehicle.ev_off_peak_start_time = off_peak_start
-        off_peak_end = get_child_value(state, "Green.Reservation.OffPeakPower.EndTime")
-        if off_peak_end is not None:
-            vehicle.ev_off_peak_end_time = off_peak_end
-        off_peak_only = get_child_value(
-            state, "Green.Reservation.OffPeakPower.OffPeakOnly"
-        )
-        if off_peak_only is not None:
-            vehicle.ev_off_peak_charge_only_enabled = bool(off_peak_only)
-        charge_schedule_enable = get_child_value(
-            state, "Green.Reservation.ChargeSchedule.Enable"
-        )
-        if charge_schedule_enable is not None:
-            vehicle.ev_schedule_charge_enabled = bool(charge_schedule_enable)
+        # Off-peak charging window — flat CCS2-schema OffPeakTime block
+        # (live EV6/PV5 GSPA stored-status + Sportage PHEV CCS2 dump; the
+        # nested "OffPeakPower.*" variants appear in no captured payload).
+        # Mode 0 = off, 2 = target-priority, 3 = time-priority (kia_uvo
+        # #1304/#1269 lineage). When the block is absent all fields stay
+        # None — do NOT synthesise dt.time(0,0) (phantom midnight window).
+        # ccs2_reservation_time_or_none handles the 31:70 sentinel silently.
+        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime")
+        if off_peak:
+            try:
+                vehicle.ev_off_peak_start_time = ccs2_reservation_time_or_none(
+                    off_peak.get("StartHour"), off_peak.get("StartMin")
+                )
+                vehicle.ev_off_peak_end_time = ccs2_reservation_time_or_none(
+                    off_peak.get("EndHour"), off_peak.get("EndMin")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
+                vehicle.ev_off_peak_start_time = None
+                vehicle.ev_off_peak_end_time = None
+
+            mode = off_peak.get("Mode")
+            if mode == 0:
+                vehicle.ev_schedule_charge_enabled = False
+                vehicle.ev_off_peak_charge_only_enabled = None
+            elif mode == 2:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = False
+            elif mode == 3:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif mode is not None:
+                _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
+        else:
+            # RE-documented alternative carrier (Kia app: Green.Reservation.
+            # ChargeSchedule.Enable) — no captured payload shows it yet.
+            charge_schedule_enable = get_child_value(
+                state, "Green.Reservation.ChargeSchedule.Enable"
+            )
+            if charge_schedule_enable is not None:
+                vehicle.ev_schedule_charge_enabled = bool(charge_schedule_enable)
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1838,13 +1875,16 @@ class GspaApiEU(ApiImpl):
         if side_mirror_heat is not None:
             vehicle.side_mirror_heater_is_on = bool(side_mirror_heat)
 
+        # Battery pack voltage / chiller RPM — flat CCS2-schema paths (live
+        # PV5 payload + Sportage PHEV CCS2 dump; the nested "BatteryPack.
+        # Voltage"/"Chiller.RPM" variants appear in no captured payload).
         bat_pack_voltage = get_child_value(
-            state, "Green.BatteryManagement.BatteryPack.Voltage"
+            state, "Green.BatteryManagement.BatteryPackVoltage"
         )
         if bat_pack_voltage is not None:
             vehicle.ev_battery_pack_voltage = int(bat_pack_voltage)
 
-        chiller_rpm = get_child_value(state, "Green.BatteryManagement.Chiller.RPM")
+        chiller_rpm = get_child_value(state, "Green.BatteryManagement.ChillerRPM")
         if chiller_rpm is not None:
             vehicle.ev_battery_chiller_rpm = int(chiller_rpm)
 
@@ -1855,15 +1895,28 @@ class GspaApiEU(ApiImpl):
         if isinstance(bat_temp_max, dict):
             bat_temp_max = bat_temp_max.get("Raw")
         if bat_temp_min is not None:
-            vehicle.ev_battery_temperature_min = (int(bat_temp_min), "C")
+            vehicle.ev_battery_temperature_min = (
+                int(bat_temp_min),
+                TEMPERATURE_UNITS[0],
+            )
         if bat_temp_max is not None:
-            vehicle.ev_battery_temperature_max = (int(bat_temp_max), "C")
+            vehicle.ev_battery_temperature_max = (
+                int(bat_temp_max),
+                TEMPERATURE_UNITS[0],
+            )
 
+        # Cooling-water temperature — flat CCS2-schema path (live PV5
+        # payload + Sportage PHEV CCS2 dump; "Temperature.Water" appears in
+        # no captured payload). Unit from TEMPERATURE_UNITS[0], not a bare
+        # "C" literal.
         bat_water_temp = get_child_value(
-            state, "Green.BatteryManagement.Temperature.Water"
+            state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
         )
         if bat_water_temp is not None:
-            vehicle.ev_battery_water_temperature = (int(bat_water_temp), "C")
+            vehicle.ev_battery_water_temperature = (
+                int(bat_water_temp),
+                TEMPERATURE_UNITS[0],
+            )
 
         battery_heating_state = get_child_value(
             state, "Green.BatteryManagement.HeatingState"
@@ -1871,18 +1924,21 @@ class GspaApiEU(ApiImpl):
         if battery_heating_state is not None:
             vehicle.ev_battery_heating_state = bool(battery_heating_state)
 
+        # Instantaneous power draws — flat CCS2-schema paths (live PV5
+        # payload + Sportage PHEV CCS2 dump; "EnergyConsumption.*.Value"
+        # appears in no captured payload).
         ev_power_ac = get_child_value(
-            state, "Green.EnergyConsumption.AirConditioning.Value"
+            state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
         )
         if ev_power_ac is not None:
             vehicle.ev_power_consumption_air_conditioning = float(ev_power_ac)
         ev_power_cooling = get_child_value(
-            state, "Green.EnergyConsumption.BatteryCooling.Value"
+            state, "Green.PowerConsumption.Moment.BatteryCooling"
         )
         if ev_power_cooling is not None:
             vehicle.ev_power_consumption_battery_cooling = float(ev_power_cooling)
         ev_power_heater = get_child_value(
-            state, "Green.EnergyConsumption.BatteryHeater.Value"
+            state, "Green.PowerConsumption.Moment.BatteryHeater"
         )
         if ev_power_heater is not None:
             vehicle.ev_power_consumption_battery_heater = float(ev_power_heater)
@@ -1890,14 +1946,24 @@ class GspaApiEU(ApiImpl):
         winter_mode = get_child_value(
             state, "Green.BatteryManagement.WinterModeOperation"
         )
-        if winter_mode is not None:
-            vehicle.ev_battery_winter_mode = bool(winter_mode)
 
-        battery_precondition = get_child_value(
-            state, "Green.BatteryManagement.BatteryPreCondition"
+        # EV battery preconditioning toggle — Status enum mapping matches the
+        # official app (kia_uvo #1823): 0 / 2 / 6 = off, 3 / 4 = on. Status is
+        # a configuration setting; WinterModeOperation is not a user-facing
+        # "Winter Mode" toggle on EVs there, so leave ev_battery_winter_mode
+        # unset when Status is present. HEV-style payloads (no Status) keep
+        # the WinterModeOperation behaviour as the fallback (no regression).
+        battery_precondition_status = get_child_value(
+            state, "Green.BatteryManagement.BatteryPreCondition.Status"
         )
-        if battery_precondition is not None:
-            vehicle.ev_battery_precondition_enabled = bool(battery_precondition)
+        if battery_precondition_status is not None:
+            vehicle.ev_battery_precondition_enabled = battery_precondition_status in (
+                3,
+                4,
+            )
+        elif winter_mode is not None:
+            vehicle.ev_battery_precondition_enabled = bool(winter_mode)
+            vehicle.ev_battery_winter_mode = bool(winter_mode)
 
         v2l_mode = get_child_value(state, "Green.Electric.SmartGrid.VehicleToLoad.mode")
         if v2l_mode is not None:
@@ -2042,7 +2108,7 @@ class GspaApiEU(ApiImpl):
 
     def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
-            token, vehicle, "door-power-off", {"command": "CLOSE"}
+            token, vehicle, "door-power-off", {"command": "set"}
         )
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
