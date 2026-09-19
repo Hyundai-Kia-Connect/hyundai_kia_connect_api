@@ -1653,7 +1653,7 @@
     'ev_battery_percentage': 77,
     'ev_battery_precondition_enabled': False,
     'ev_battery_remain': 0,
-    'ev_battery_soh_percentage': 0,
+    'ev_battery_soh_percentage': None,
     'ev_battery_temperature_max': 23,
     'ev_battery_temperature_max_unit': '°C',
     'ev_battery_temperature_min': 22,
