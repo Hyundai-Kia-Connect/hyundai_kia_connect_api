@@ -222,7 +222,10 @@ class HyundaiCciApiEU(GspaApiEU):
         """Send a prewakeup command to bring the vehicle online.
 
         GSPA remote paths are brand-global (the path is shared across EU
-        CCI brands, issued on the instance's CCSP host).
+        CCI brands, issued on the instance's CCSP host). The app always
+        sends a body here (PreWakeupApiRequest, Moshi default
+        "prewakeup") — not proven required server-side, but it is what
+        the app sends, so it is mirrored.
         """
         car_id = vehicle.id
         url = self.CCSP_API_URL + f"/gspa/v1/remote/vehicles/{car_id}/prewakeup"
@@ -231,7 +234,9 @@ class HyundaiCciApiEU(GspaApiEU):
             token, vehicle.ccu_ccs2_protocol_support or 0
         )
         try:
-            response = requests.post(url, headers=headers, timeout=(5, 60))
+            response = requests.post(
+                url, headers=headers, json={"action": "prewakeup"}, timeout=(5, 60)
+            )
             if response.status_code == 401:
                 raise AuthenticationError("GSPA: Token expired or invalid")
             if response.status_code >= 400:
