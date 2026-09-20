@@ -2212,7 +2212,9 @@ class GspaApiEU(ApiImpl):
         if options.heating is not None:
             body["heating1"] = options.heating
         if options.temp_unit is not None:
-            body["tempUnit"] = options.temp_unit
+            # tempUnit is a string on the wire ("C"/"F"); the 0/1 int form is
+            # rejected with 400-002 (live-proven on a PV5, 2026-09-19).
+            body["tempUnit"] = "F" if options.temp_unit == 1 else "C"
         if options.hvac_temp_type is not None:
             body["hvacTempType"] = options.hvac_temp_type
         if options.driver_seat_location is not None:
@@ -2226,6 +2228,12 @@ class GspaApiEU(ApiImpl):
         seat_info = self._build_seat_climate_info(options)
         if seat_info:
             body["seatClimateInfo"] = seat_info
+        if options.set_temp is not None:
+            # Without tempUnit/hvacTempType the backend ignores hvacTemp and
+            # applies the car's stored set point instead (live-proven on a
+            # PV5; the vehicle reports Server.Option.HvacTempType = 1).
+            body.setdefault("tempUnit", "C")
+            body.setdefault("hvacTempType", 1)
         return self._gspa_control_command(token, vehicle, "temperature", body)
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -2255,7 +2263,10 @@ class GspaApiEU(ApiImpl):
             if options.heating is not None:
                 body["heating1"] = options.heating
             if options.temp_unit is not None:
-                body["tempUnit"] = options.temp_unit
+                # tempUnit is a string on the wire ("C"/"F"); the 0/1 int
+                # form is rejected with 400-002 (live-proven on a PV5,
+                # 2026-09-19).
+                body["tempUnit"] = "F" if options.temp_unit == 1 else "C"
             if options.hvac_temp_type is not None:
                 body["hvacTempType"] = options.hvac_temp_type
             if options.driver_seat_location is not None:
@@ -2269,6 +2280,12 @@ class GspaApiEU(ApiImpl):
             seat_info = self._build_seat_climate_info(options)
             if seat_info:
                 body["seatClimateInfo"] = seat_info
+            if options.set_temp is not None:
+                # Without tempUnit/hvacTempType the backend ignores hvacTemp
+                # and applies the car's stored set point instead (live-proven
+                # on a PV5; the vehicle reports Server.Option.HvacTempType = 1).
+                body.setdefault("tempUnit", "C")
+                body.setdefault("hvacTempType", 1)
         return self._gspa_control_command(token, vehicle, "engine", body)
 
     def stop_engine(self, token: Token, vehicle: Vehicle) -> str:

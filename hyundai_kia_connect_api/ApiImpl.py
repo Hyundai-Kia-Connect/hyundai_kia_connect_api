@@ -51,7 +51,8 @@ class ClimateRequestOptions:
     side_rear_mirror_heating: int | None = (
         None  # 0/1 rear-mirror heating (GSPA sideRearMirrorHeating)
     )
-    temp_unit: int | None = None  # 0=Celsius, 1=Fahrenheit (GSPA tempUnit)
+    temp_unit: int | None = None  # 0=Celsius, 1=Fahrenheit (mapped to the
+    # string "C"/"F" the GSPA API expects on the wire)
     hvac_temp_type: int | None = None  # HVAC temp type (GSPA hvacTempType, typically 1)
     driver_seat_location: str | None = None  # "L" or "R" (GSPA drvSeatLoc)
 

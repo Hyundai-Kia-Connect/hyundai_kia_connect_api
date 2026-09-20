@@ -31,17 +31,23 @@ class KiaCciApiEU(GspaApiEU):
     production endpoints. Login, token lifecycle, and the GSPA
     secure-request layer are inherited from ``GspaApiEU``. GSPA remote
     control is inherited but partially gated: only live-verified
-    endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and unlock are
-    live-proven on a Kia PV5 (2026-09-19); the remaining commands still
-    raise NotImplementedError until live verification (D6).
+    endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and unlock, and
+    climate start/stop, are live-proven on a Kia PV5 (2026-09-19); the
+    remaining commands still raise NotImplementedError until live
+    verification (D6).
     """
 
     # Door lock and unlock via the shared "door" endpoint +
     # {"command": "close"/"open"} live-proven on a Kia PV5 (2026-09-19):
     # 202 S 202-000, fresh stored-status 7 s (lock) / 4 s (unlock)
     # after sending. The vehicle re-locks itself after ~30 s if no door
-    # is opened.
-    GSPA_VERIFIED_ENDPOINTS = frozenset({"door"})
+    # is opened. Climate start/stop via the "temperature" endpoint also
+    # live-proven on the same PV5 (2026-09-19): 202 S 202-000 both
+    # directions, reaction ~5 s awake / ~21 s from sleep. tempUnit must
+    # be a string ("C"/"F"); the int form is rejected with 400-002, and
+    # without tempUnit/hvacTempType the backend applies the car's
+    # stored set point instead of the requested one.
+    GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature"})
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"

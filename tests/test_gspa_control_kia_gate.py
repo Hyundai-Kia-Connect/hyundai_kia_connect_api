@@ -3,8 +3,9 @@
 Only live-proven endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and
 unlock via the shared "door" endpoint + {"command": "close"/"open"} were
 live-proven on a Kia PV5 (2026-09-19: 202 S 202-000, fresh stored-status
-7 s / 4 s after sending). Everything else stays gated until live
-verification (D6).
+7 s / 4 s after sending), and climate start/stop via the "temperature"
+endpoint on the same PV5 (202 S 202-000 both directions). Everything else
+stays gated until live verification (D6).
 """
 
 import datetime as dt
@@ -12,6 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
 from hyundai_kia_connect_api.const import VEHICLE_LOCK_ACTION
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -65,6 +67,40 @@ def test_kia_lock_unlock_passes_gate():
         assert action_id == "gspa:sid-1"
         assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/door")
         assert post.call_args.kwargs["json"] == {"command": command}
+
+
+def test_kia_climate_passes_gate():
+    """Climate start/stop (temperature endpoint) is live-proven on a PV5."""
+    api = KiaCciApiEU(9, 2, "en")
+    token = _make_token()
+    vehicle = _make_vehicle()
+    for method, body in (
+        (
+            api.start_climate,
+            {
+                "command": "start",
+                "hvacTemp": "22.0",
+                "tempUnit": "C",
+                "hvacTempType": 1,
+            },
+        ),
+        (api.stop_climate, {"command": "stop"}),
+    ):
+        with (
+            patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+            patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+        ):
+            get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+            post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+            if method == api.start_climate:
+                action_id = method(token, vehicle, ClimateRequestOptions(set_temp=22.0))
+            else:
+                action_id = method(token, vehicle)
+        assert action_id == "gspa:sid-1"
+        assert post.call_args.args[0].endswith(
+            "/gspa/v1/remote/vehicles/test123/temperature"
+        )
+        assert post.call_args.kwargs["json"] == body
 
 
 def test_kia_unverified_commands_are_gated():

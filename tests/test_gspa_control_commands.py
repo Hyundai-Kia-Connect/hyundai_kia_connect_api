@@ -198,8 +198,8 @@ def test_kia_remote_control_gated_not_implemented():
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
-    # Evidence-mapped: only the live-proven "door" endpoint passes.
-    assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset({"door"})
+    # Evidence-mapped: only the live-proven endpoints pass.
+    assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset({"door", "temperature"})
 
 
 def test_start_climate_full_options():
@@ -224,7 +224,7 @@ def test_start_climate_full_options():
     assert body["hvacTemp"] == "21.5"
     assert body["windshieldFrontDefogState"] is True
     assert body["heating1"] == 1
-    assert body["tempUnit"] == 0
+    assert body["tempUnit"] == "C"
     assert body["hvacTempType"] == 1
     assert body["drvSeatLoc"] == "L"
     assert body["ignitionDuration"] == 10
@@ -244,6 +244,20 @@ def test_start_climate_minimal():
     assert body == {"command": "start"}
 
 
+def test_start_climate_temp_defaults_without_unit():
+    """Without tempUnit/hvacTempType the backend ignores hvacTemp and
+    applies the car's stored set point (live-proven on a PV5, 2026-09-19):
+    the library defaults to Celsius / hvacTempType 1 when a set point is
+    given."""
+    _, call = _run_command(
+        HyundaiCciApiEU.start_climate, ClimateRequestOptions(set_temp=21.0)
+    )
+    body = call.kwargs["json"]
+    assert body["hvacTemp"] == "21.0"
+    assert body["tempUnit"] == "C"
+    assert body["hvacTempType"] == 1
+
+
 def test_stop_climate():
     _, call = _run_command(HyundaiCciApiEU.stop_climate)
     assert call.args[0].endswith("/temperature")
@@ -258,6 +272,10 @@ def test_start_engine_maps_climate_field():
     assert body["command"] == "start"
     assert body["hvacTemp"] == "22.0"
     assert body["hvacCtrl"] == 1
+    # Defaults applied when a set point is given without a unit — same
+    # backend behavior as the temperature endpoint (live-proven on a PV5).
+    assert body["tempUnit"] == "C"
+    assert body["hvacTempType"] == 1
 
 
 def test_stop_engine():
