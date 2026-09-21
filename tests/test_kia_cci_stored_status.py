@@ -1,7 +1,10 @@
 """Tests for KiaCciApiEU.update_vehicle_with_cached_state — the shared
-CCS2 property parser applied to a live Kia EV6 GSPA stored-status
-fixture (zero network). Fixture leaf values are synthetic (replaced by
-the volunteer before sharing); structure and key names are real."""
+CCS2 property parser applied to live Kia GSPA stored-status fixtures
+(EV6 2024, PV5 2026; zero network). The EV6 fixture leaf values are
+synthetic (replaced by the volunteer before sharing); the PV5 fixture
+keeps the real values except the identifying leaves (Date, Version,
+Drivetrain.Odometer, envelope msgId/lastUpdateTime). Structure and key
+names are real in both."""
 
 from unittest.mock import patch
 
@@ -13,6 +16,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.fixture_helpers import load_fixture
 
 FIXTURE = "eu_kia_gspa_ev6_2024_stored_status.json"
+PV5_FIXTURE = "eu_kia_gspa_pv5_2026_stored_status.json"
 
 
 @pytest.fixture
@@ -42,6 +46,44 @@ def test_ccs2_parser_on_kia_stored_status(api: KiaCciApiEU, vehicle: Vehicle) ->
     # (graceful degradation, not masking): OutsideTemperature is not in
     # the EV6 payload.
     assert vehicle.outside_temperature is None
+
+
+def test_ccs2_parser_on_pv5_stored_status(api: KiaCciApiEU, vehicle: Vehicle) -> None:
+    """The shared CCS2 parser handles the second live Kia schema (PV5
+    Passenger, 2026). Sections absent from the PV5 payload (Location,
+    SoH, charging door, seat climate) stay None — no crash — while the
+    PV5-only leaves (OutsideTemperature, pack voltage, chiller, water
+    temperature, V2L, sunroof) parse."""
+    import datetime as dt
+
+    from hyundai_kia_connect_api.const import PressureUnit
+
+    data = load_fixture(PV5_FIXTURE)
+    api._update_vehicle_properties_ccs2(vehicle, data)
+
+    assert vehicle.ev_battery_percentage == 56.5
+    assert vehicle.car_battery_percentage == 88
+    # PV5 carries OutsideTemperature (EV6 does not).
+    assert vehicle.outside_temperature == 19.5
+    # OffPeakTime Mode=2 (live): schedule on, off-peak-only off.
+    assert vehicle.ev_off_peak_start_time == dt.time(14, 20)
+    assert vehicle.ev_off_peak_end_time == dt.time(17, 30)
+    assert vehicle.ev_schedule_charge_enabled is True
+    assert vehicle.ev_off_peak_charge_only_enabled is False
+    # PV5-only BMS/SmartGrid leaves.
+    assert vehicle.ev_battery_pack_voltage == 413
+    assert vehicle.ev_battery_chiller_rpm == 0
+    assert vehicle.ev_battery_water_temperature == 20
+    assert vehicle.ev_v2l_discharge_limit == 20
+    assert vehicle.sunroof_is_open is True
+    assert vehicle.tire_pressure_unit == PressureUnit.BAR
+    assert vehicle.is_locked is True
+    # HVAC temperature is 'OFF' -> no temperature set.
+    assert vehicle.air_temperature is None
+    # Absent from the PV5 payload -> None (graceful degradation, not
+    # masking): SoH, charging door.
+    assert vehicle.ev_battery_soh_percentage is None
+    assert vehicle.ev_battery_is_plugged_in == 0
 
 
 def test_update_vehicle_with_cached_state(api: KiaCciApiEU, vehicle: Vehicle) -> None:
