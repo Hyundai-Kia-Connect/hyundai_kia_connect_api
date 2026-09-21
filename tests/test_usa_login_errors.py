@@ -213,6 +213,51 @@ def test_verify_otp_no_status_block_raises_apierror(usa_api):
     assert not isinstance(exc_info.value, AuthenticationError)
 
 
+def test_login_non_dict_status_raises_apierror(usa_api):
+    """Regression for #1313: a truthy non-dict status (e.g. int 1) must yield a
+    clean APIError, not AttributeError ('int' object has no attribute 'get')."""
+    token = Token(username="u", password="p", access_token="x", refresh_token="r")
+    usa_api.session = MagicMock()
+    resp = MagicMock()
+    resp.json.return_value = {"status": 1}
+    resp.text = '{"status": 1}'
+    resp.headers = {}
+    usa_api.session.post.return_value = resp
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api.login("u", "p", token)
+    assert not isinstance(exc_info.value, AuthenticationError)
+    assert not isinstance(exc_info.value, AttributeError)
+
+
+def test_verify_otp_non_dict_status_raises_apierror(usa_api):
+    """Regression for #1313: non-dict status in verifyOTP must not crash."""
+    usa_api.session = MagicMock()
+    resp = MagicMock()
+    resp.json.return_value = {"status": 1}
+    resp.text = '{"status": 1}'
+    resp.headers = {}
+    usa_api.session.post.return_value = resp
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api._verify_otp("otpkey", "1234", "xid")
+    assert not isinstance(exc_info.value, AuthenticationError)
+
+
+def test_get_vehicles_non_dict_status_raises_apierror(usa_api):
+    """Regression for #1313: non-dict status in get_vehicles must not crash."""
+    token = Token(username="u", password="p", access_token="x", refresh_token="r")
+    usa_api.session = MagicMock()
+    resp = MagicMock()
+    resp.json.return_value = {"status": 1}
+    resp.text = '{"status": 1}'
+    usa_api.session.get.return_value = resp
+
+    with pytest.raises(APIError) as exc_info:
+        usa_api.get_vehicles(token)
+    assert "Missing payload in response" in str(exc_info.value)
+
+
 def test_complete_login_with_otp_missing_sid_raises_apierror(usa_api):
     usa_api.session = MagicMock()
     usa_api.session.post.return_value = _complete_login_response(sid=None)
