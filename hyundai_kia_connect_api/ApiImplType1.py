@@ -1304,25 +1304,6 @@ class ApiImplType1(ApiImpl):
 
         return charge_msg_id if charge_active else hvac_msg_id
 
-    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
-        """Return the driver seat location for CCS2 climate payloads.
-
-        "L" for LHD (left-hand drive), "R" for RHD (right-hand drive).
-        Derived from the vehicle's reported odometer unit: mile-based markets
-        (UK, Ireland) are RHD, kilometre-based markets are LHD.
-
-        This base implementation covers EU and CN. RHD regions that use
-        kilometres (AU, IN) override this method to return "R" directly,
-        because the km/miles signal would incorrectly resolve to "L".
-
-        Falls back to "L" when the odometer unit is unavailable (e.g. the
-        cached state response did not include it), which is correct for the
-        LHD majority of EU/CN markets.
-        """
-        if vehicle.odometer_unit in (DISTANCE_UNITS[2], DISTANCE_UNITS[3]):
-            return "R"
-        return "L"
-
     @_retry_on_device_id_error
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions

@@ -16,12 +16,14 @@ except ImportError:
 
 from .const import (
     CHARGE_PORT_ACTION,
+    DISTANCE_UNITS,
     DOMAIN,
     GEO_LOCATION_PROVIDERS,
     GOOGLE,
     OPENSTREETMAP,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
+    SEAT_LOCATION,
     TEMPERATURE_C,
     TEMPERATURE_F,
     VALET_MODE_ACTION,
@@ -54,29 +56,23 @@ class ClimateRequestOptions:
     temp_unit: int | None = None  # 0=Celsius, 1=Fahrenheit (mapped to the
     # string "C"/"F" the GSPA API expects on the wire)
     hvac_temp_type: int | None = None  # HVAC temp type (GSPA hvacTempType, typically 1)
-    driver_seat_location: str | None = None  # "L" or "R" (GSPA drvSeatLoc)
+    driver_seat_location: SEAT_LOCATION | None = None  # drvSeatLoc override
 
 
 @dataclass
 class WindowRequestOptions:
+    # Universal, position-based vocabulary: front_left/front_right are the
+    # physical front windows (not the seats), back_left/back_right the rear
+    # ones. The GSPA window-curtain endpoint's seat-based body keys
+    # (drvSeatWindow/psgSeatWindow) are derived from these in the API
+    # implementation using drvSeatLoc — callers never touch seat keys.
     back_left: WINDOW_STATE = None
     back_right: WINDOW_STATE = None
     front_left: WINDOW_STATE = None
     front_right: WINDOW_STATE = None
-    # Per-seat fields (GSPA window-curtain endpoint, body keys
-    # drvSeatWindow/psgSeatWindow/rlSeatWindow/rrSeatWindow). The rear-window
-    # fields target the same physical windows as the position-based
-    # back_left/back_right (the CCS2 endpoint's vocabulary); they are kept
-    # endpoint-specific, and only the front seats genuinely differ: the GSPA
-    # driver/passenger split depends on drvSeatLoc (LHD/RHD), which the
-    # library cannot derive itself.
-    driver_seat_window: WINDOW_STATE | None = None
-    passenger_seat_window: WINDOW_STATE | None = None
-    rear_left_window: WINDOW_STATE | None = None
-    rear_right_window: WINDOW_STATE | None = None
     rear_left_curtain: WINDOW_STATE | None = None
     rear_right_curtain: WINDOW_STATE | None = None
-    driver_seat_location: str | None = None  # "L" or "R" (GSPA drvSeatLoc)
+    driver_seat_location: SEAT_LOCATION | None = None  # drvSeatLoc override
 
     def __post_init__(self):
         """Convert string/int values to WINDOW_STATE enums."""
@@ -84,12 +80,6 @@ class WindowRequestOptions:
         self.back_right = to_int_enum(WINDOW_STATE, self.back_right)
         self.front_left = to_int_enum(WINDOW_STATE, self.front_left)
         self.front_right = to_int_enum(WINDOW_STATE, self.front_right)
-        self.driver_seat_window = to_int_enum(WINDOW_STATE, self.driver_seat_window)
-        self.passenger_seat_window = to_int_enum(
-            WINDOW_STATE, self.passenger_seat_window
-        )
-        self.rear_left_window = to_int_enum(WINDOW_STATE, self.rear_left_window)
-        self.rear_right_window = to_int_enum(WINDOW_STATE, self.rear_right_window)
         self.rear_left_curtain = to_int_enum(WINDOW_STATE, self.rear_left_curtain)
         self.rear_right_curtain = to_int_enum(WINDOW_STATE, self.rear_right_curtain)
 
@@ -613,6 +603,26 @@ class ApiImpl:
         raise NotImplementedError(
             "set_charging_current is not implemented for this region"
         )
+
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
+        """Return the driver seat location for drvSeatLoc payloads.
+
+        "L" for LHD (left-hand drive), "R" for RHD (right-hand drive).
+        Derived from the vehicle's reported odometer unit: mile-based markets
+        (UK, Ireland) are RHD, kilometre-based markets are LHD.
+
+        This base implementation covers EU and CN. RHD regions that use
+        kilometres (AU, IN) override this method to return SEAT_LOCATION.RIGHT
+        directly, because the km/miles signal would incorrectly resolve to
+        LEFT.
+
+        Falls back to LEFT when the odometer unit is unavailable (e.g. the
+        cached state response did not include it), which is correct for the
+        LHD majority of EU/CN markets.
+        """
+        if vehicle.odometer_unit in (DISTANCE_UNITS[2], DISTANCE_UNITS[3]):
+            return SEAT_LOCATION.RIGHT
+        return SEAT_LOCATION.LEFT
 
     def set_windows_state(
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions

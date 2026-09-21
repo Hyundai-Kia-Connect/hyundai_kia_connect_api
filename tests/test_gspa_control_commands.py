@@ -14,6 +14,7 @@ from hyundai_kia_connect_api.ApiImpl import (
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
+    SEAT_LOCATION,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
@@ -209,7 +210,7 @@ def test_start_climate_full_options():
         heating=1,
         temp_unit=0,
         hvac_temp_type=1,
-        driver_seat_location="L",
+        driver_seat_location=SEAT_LOCATION.LEFT,
         duration=10,
         steering_wheel=True,
         side_rear_mirror_heating=True,
@@ -299,22 +300,23 @@ def test_pet_care_start_with_temp():
 
 def test_windows_all_close_scope_command():
     options = WindowRequestOptions(
-        driver_seat_window=WINDOW_STATE.CLOSED,
-        passenger_seat_window=WINDOW_STATE.CLOSED,
-        rear_left_window=WINDOW_STATE.CLOSED,
-        rear_right_window=WINDOW_STATE.CLOSED,
+        front_left=WINDOW_STATE.CLOSED,
+        front_right=WINDOW_STATE.CLOSED,
+        back_left=WINDOW_STATE.CLOSED,
+        back_right=WINDOW_STATE.CLOSED,
     )
     _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
     assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/window-curtain")
     body: dict[str, Any] = call.kwargs["json"]
     assert body["command"] == "window-close"
     assert body["rlSeatWindow"] == WINDOW_STATE.CLOSED.value
+    assert body["drvSeatLoc"] == "L"  # derived from odometer unit in fixture
 
 
 def test_windows_front_open_scope():
     options = WindowRequestOptions(
-        driver_seat_window=WINDOW_STATE.OPEN,
-        passenger_seat_window=WINDOW_STATE.OPEN,
+        front_left=WINDOW_STATE.OPEN,
+        front_right=WINDOW_STATE.OPEN,
     )
     _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
     assert call.kwargs["json"]["command"] == "front-open"
@@ -322,8 +324,8 @@ def test_windows_front_open_scope():
 
 def test_windows_mixed_state_raises():
     options = WindowRequestOptions(
-        driver_seat_window=WINDOW_STATE.OPEN,
-        passenger_seat_window=WINDOW_STATE.CLOSED,
+        front_left=WINDOW_STATE.OPEN,
+        front_right=WINDOW_STATE.CLOSED,
     )
     api = _make_api()
     with pytest.raises(UnsupportedControlError):
@@ -334,7 +336,7 @@ def test_window_curtain_per_seat():
     options = WindowRequestOptions(
         rear_left_curtain=WINDOW_STATE.OPEN,
         rear_right_curtain=WINDOW_STATE.CLOSED,
-        driver_seat_location="L",
+        driver_seat_location=SEAT_LOCATION.LEFT,
     )
     _, call = _run_command(HyundaiCciApiEU.set_window_curtain, options)
     body: dict[str, Any] = call.kwargs["json"]
@@ -343,6 +345,23 @@ def test_window_curtain_per_seat():
     assert body["rlSeatWindowCurtain"] == WINDOW_STATE.OPEN.value
     assert body["rrSeatWindowCurtain"] == WINDOW_STATE.CLOSED.value
     assert body["drvSeatLoc"] == "L"
+
+
+def test_window_curtain_universal_fields_rhd():
+    """The universal position-based vocabulary maps onto the seat-based
+    body keys via drvSeatLoc: on RHD front_left is the passenger seat."""
+    options = WindowRequestOptions(
+        front_left=WINDOW_STATE.CLOSED,
+        front_right=WINDOW_STATE.OPEN,
+        back_right=WINDOW_STATE.OPEN,
+        driver_seat_location=SEAT_LOCATION.RIGHT,
+    )
+    _, call = _run_command(HyundaiCciApiEU.set_window_curtain, options)
+    body = call.kwargs["json"]
+    assert body["psgSeatWindow"] == WINDOW_STATE.CLOSED.value  # front-left window
+    assert body["drvSeatWindow"] == WINDOW_STATE.OPEN.value  # front-right window
+    assert body["rrSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["drvSeatLoc"] == "R"
 
 
 def test_set_charge_limits_bearer_auth():

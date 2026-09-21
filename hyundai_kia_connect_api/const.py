@@ -149,6 +149,13 @@ class WINDOW_STATE(IntEnum):
     VENTILATION = 2
 
 
+class SEAT_LOCATION(str, Enum):
+    """Driver seat location (GSPA drvSeatLoc wire values)."""
+
+    LEFT = "L"
+    RIGHT = "R"
+
+
 class VALET_MODE_ACTION(Enum):
     ACTIVATE = "activate"
     DEACTIVATE = "deactivate"

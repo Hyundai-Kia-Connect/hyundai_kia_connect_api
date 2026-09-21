@@ -39,6 +39,7 @@ from .const import (
     ENGINE_TYPES,
     ORDER_STATUS,
     PRESSURE_SCALES,
+    SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
@@ -2321,18 +2322,17 @@ class GspaApiEU(ApiImpl):
         """
         if not self.supports_window_control:
             raise APIError("Window control not supported")
-        drv = options.driver_seat_window
-        psg = options.passenger_seat_window
-        rl = options.rear_left_window
-        rr = options.rear_right_window
-        seats = (drv, psg, rl, rr)
+        drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
+        front = (options.front_left, options.front_right)
+        rl = options.back_left
+        rr = options.back_right
+        seats = (options.front_left, options.front_right, rl, rr)
         if (
             all(s is None for s in seats)
             and options.rear_left_curtain is None
             and options.rear_right_curtain is None
         ):
             raise UnsupportedControlError("No window state requested")
-        front = (drv, psg)
         command: str | None = None
         if all(s == WINDOW_STATE.CLOSED for s in seats):
             command = "window-close"
@@ -2352,7 +2352,7 @@ class GspaApiEU(ApiImpl):
                 "Mixed per-window state is not supported via GSPA — use "
                 "set_window_curtain for per-seat windows/curtains"
             )
-        front_val = drv.value if drv is not None else None
+        front_val = options.front_left.value if options.front_left is not None else None
         rear_val = (
             front_val if command in ("window-close", "window-open", "vent") else None
         )
@@ -2364,7 +2364,7 @@ class GspaApiEU(ApiImpl):
             "rrSeatWindow": rear_val,
             "rlSeatWindowCurtain": None,
             "rrSeatWindowCurtain": None,
-            "drvSeatLoc": options.driver_seat_location,
+            "drvSeatLoc": drv_seat_loc,
         }
         return self._gspa_control_command(token, vehicle, "windowcurtain", body)
 
@@ -2373,23 +2373,33 @@ class GspaApiEU(ApiImpl):
     ) -> str:
         """Set per-seat windows/curtains via the window-curtain endpoint.
 
-        Values: 0 = close, 1 = open, 2 = vent (WINDOW_STATE IntEnum).
+        Takes the universal, position-based vocabulary (front_left is the
+        physical front-left window, etc.) and maps it onto the endpoint's
+        seat-based body keys using drvSeatLoc: on RHD the driver's seat is
+        on the right, so front_left drives psgSeatWindow and front_right
+        drives drvSeatWindow. Values: 0 = close, 1 = open, 2 = vent
+        (WINDOW_STATE IntEnum).
         """
         body: dict[str, Any] = {"command": "open"}
-        if options.driver_seat_window is not None:
-            body["drvSeatWindow"] = options.driver_seat_window.value
-        if options.passenger_seat_window is not None:
-            body["psgSeatWindow"] = options.passenger_seat_window.value
-        if options.rear_left_window is not None:
-            body["rlSeatWindow"] = options.rear_left_window.value
-        if options.rear_right_window is not None:
-            body["rrSeatWindow"] = options.rear_right_window.value
+        drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
+        drv_key, psg_key = (
+            ("psgSeatWindow", "drvSeatWindow")
+            if drv_seat_loc == SEAT_LOCATION.RIGHT
+            else ("drvSeatWindow", "psgSeatWindow")
+        )
+        if options.front_left is not None:
+            body[drv_key] = options.front_left.value
+        if options.front_right is not None:
+            body[psg_key] = options.front_right.value
+        if options.back_left is not None:
+            body["rlSeatWindow"] = options.back_left.value
+        if options.back_right is not None:
+            body["rrSeatWindow"] = options.back_right.value
         if options.rear_left_curtain is not None:
             body["rlSeatWindowCurtain"] = options.rear_left_curtain.value
         if options.rear_right_curtain is not None:
             body["rrSeatWindowCurtain"] = options.rear_right_curtain.value
-        if options.driver_seat_location is not None:
-            body["drvSeatLoc"] = options.driver_seat_location
+        body["drvSeatLoc"] = drv_seat_loc
         return self._gspa_control_command(token, vehicle, "window-curtain", body)
 
     # ------------------------------------------------------------------
