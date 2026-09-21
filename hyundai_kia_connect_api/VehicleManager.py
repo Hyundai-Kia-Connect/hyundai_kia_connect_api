@@ -4,6 +4,7 @@
 
 import datetime as dt
 import logging
+import re
 from datetime import timedelta
 
 from .ApiImpl import (
@@ -36,7 +37,7 @@ from .const import (
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import APIError, AuthenticationOTPRequired
+from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
@@ -240,9 +241,29 @@ class VehicleManager:
                 token_expired = valid_until - grace_period <= now_utc
         if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            result = self.api.refresh_access_token(
-                self.token,
-            )
+            try:
+                result = self.api.refresh_access_token(
+                    self.token,
+                )
+            except AuthenticationError:
+                # The legacy password field may hold a 48-char refresh token;
+                # a fallback login with it re-enters the refresh-token grant
+                # and wedges the account (kia_uvo #1888). Retry once with the
+                # credentials the manager was constructed with.
+                if (
+                    re.fullmatch(r"[A-Z0-9]{48}", self.token.password or "")
+                    and self.password
+                    and self.password != self.token.password
+                    and not re.fullmatch(r"[A-Z0-9]{48}", self.password)
+                ):
+                    _LOGGER.warning(
+                        f"{DOMAIN} - Refresh failed with a legacy "
+                        "refresh-token password; retrying login with the "
+                        "configured credentials"
+                    )
+                    result = self.api.login(self.username, self.password, self.pin)
+                else:
+                    raise
             if isinstance(result, Token):
                 self.token: Token = result
                 # Temp correction to fix bad data due to a bug.
