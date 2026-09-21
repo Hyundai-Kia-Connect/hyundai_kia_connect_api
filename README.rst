@@ -79,6 +79,7 @@ The wizard is the simplest setup path. It saves renewable credentials under
 status query. The equivalent Python flow is shown below::
 
     import getpass
+    import json
     import webbrowser
     from pathlib import Path
 
@@ -100,19 +101,27 @@ status query. The equivalent Python flow is shown below::
     redirect_url = input("Paste the final redirect URL: ").strip()
     manager.login_with_redirect_url(redirect_url)
 
-    # Save all refresh credentials atomically. Password, PIN, and the temporary
-    # vehicle-control token are omitted. The file is created with mode 0600.
+    # Save the refresh credentials. Password, PIN, and the temporary
+    # vehicle-control token are omitted.
     token_file = (
         Path.home()
         / ".local/state/hyundai-kia-connect-api/myhyundai-kr.json"
     )
-    manager.token.save(token_file)
+    token_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    token_file.touch(mode=0o600, exist_ok=True)
+    token_file.chmod(0o600)
+    token_file.write_text(
+        json.dumps(manager.token.to_persistent_dict()) + "\n",
+        encoding="utf-8",
+    )
+    token_file.chmod(0o600)
 
 For later API sessions, load the saved refresh credentials and call
 ``check_and_refresh_token()``. A browser is only needed again if Hyundai expires
 or revokes the refresh credentials::
 
     import getpass
+    import json
     from pathlib import Path
 
     from hyundai_kia_connect_api import Token, VehicleManager
@@ -121,7 +130,7 @@ or revokes the refresh credentials::
         Path.home()
         / ".local/state/hyundai-kia-connect-api/myhyundai-kr.json"
     )
-    token = Token.load(token_file)
+    token = Token.from_dict(json.loads(token_file.read_text(encoding="utf-8")))
     pin = getpass.getpass("MyHyundai PIN: ")
     token.pin = pin
     manager = VehicleManager(
@@ -136,7 +145,12 @@ or revokes the refresh credentials::
     manager.check_and_refresh_token()
     # Hyundai may rotate refresh credentials, so persist the current set after
     # every successful refresh or API session.
-    manager.token.save(token_file)
+    token_file.chmod(0o600)
+    token_file.write_text(
+        json.dumps(manager.token.to_persistent_dict()) + "\n",
+        encoding="utf-8",
+    )
+    token_file.chmod(0o600)
 
 The saved refresh credentials are bearer secrets. Keep the file private and do
 not commit, copy, or log it. This avoids repeated Pleos browser login while the

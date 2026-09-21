@@ -3,11 +3,7 @@
 # pylint:disable=invalid-name
 
 import datetime as dt
-import json
-import os
-import tempfile
 from dataclasses import asdict, dataclass
-from pathlib import Path
 
 
 @dataclass
@@ -59,35 +55,6 @@ class Token:
         data["control_token"] = None
         data["control_token_expiry"] = 0
         return data
-
-    def save(self, path: str | os.PathLike) -> None:
-        """Atomically save a refreshable session in a user-only JSON file."""
-        destination = Path(path).expanduser()
-        destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        file_descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{destination.name}.",
-            suffix=".tmp",
-            dir=destination.parent,
-        )
-        try:
-            with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
-                json.dump(self.to_persistent_dict(), file)
-                file.write("\n")
-            os.chmod(temporary_name, 0o600)
-            os.replace(temporary_name, destination)
-            os.chmod(destination, 0o600)
-        finally:
-            try:
-                os.unlink(temporary_name)
-            except FileNotFoundError:
-                pass
-
-    @classmethod
-    def load(cls, path: str | os.PathLike) -> "Token":
-        """Load session data created by :meth:`save`."""
-        source = Path(path).expanduser()
-        with source.open(encoding="utf-8") as file:
-            return cls.from_dict(json.load(file))
 
     @classmethod
     def from_dict(cls, data: dict) -> "Token":

@@ -108,6 +108,7 @@ note "Session file: $SESSION_FILE"
 note "The file contains bearer credentials. It never contains your password or PIN."
 
 stage "Pleos browser sign-in" 2
+MYHYUNDAI_REDIRECT_URL=""
 if [[ -f "$SESSION_FILE" ]] && ! confirm "Replace the existing renewable session?"; then
   say "Keeping the existing session."
 else
@@ -130,40 +131,67 @@ PY
     warn "No redirect address was provided. Nothing was saved."
     exit 1
   fi
-  MYHYUNDAI_REDIRECT_URL="$MYHYUNDAI_REDIRECT_URL" \
-  MYHYUNDAI_KR_SESSION_FILE="$SESSION_FILE" \
-  PYTHONPATH="$REPO_DIR" "$SESSION_PYTHON" - <<'PY'
-import os
-
-from hyundai_kia_connect_api import VehicleManager
-
-redirect_url = os.environ.pop("MYHYUNDAI_REDIRECT_URL")
-session_file = os.environ["MYHYUNDAI_KR_SESSION_FILE"]
-manager = VehicleManager(10, 2, "", "", "", language="ko")
-manager.login_with_redirect_url(redirect_url)
-manager.token.save(session_file)
-print(f"  Saved renewable credentials for {len(manager.vehicles)} vehicle(s).")
-PY
-  unset MYHYUNDAI_REDIRECT_URL
 fi
 
 stage "Refresh and read-only check" 1
+MYHYUNDAI_REDIRECT_URL="$MYHYUNDAI_REDIRECT_URL" \
 MYHYUNDAI_KR_SESSION_FILE="$SESSION_FILE" \
 PYTHONPATH="$REPO_DIR" "$SESSION_PYTHON" - <<'PY'
+import json
 import os
+import tempfile
+from pathlib import Path
 
 from hyundai_kia_connect_api import Token, VehicleManager
 
-session_file = os.environ["MYHYUNDAI_KR_SESSION_FILE"]
-token = Token.load(session_file)
-manager = VehicleManager(10, 2, "", "", "", token=token, language="ko")
+redirect_url = os.environ.pop("MYHYUNDAI_REDIRECT_URL")
+session_file = Path(os.environ["MYHYUNDAI_KR_SESSION_FILE"]).expanduser()
+
+
+def save_session(token: Token) -> None:
+    session_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{session_file.name}.",
+        suffix=".tmp",
+        dir=session_file.parent,
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file:
+            json.dump(token.to_persistent_dict(), file)
+            file.write("\n")
+        os.chmod(temporary_name, 0o600)
+        os.replace(temporary_name, session_file)
+        session_file.chmod(0o600)
+    finally:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+
+
+if redirect_url:
+    manager = VehicleManager(10, 2, "", "", "", language="ko")
+    manager.login_with_redirect_url(redirect_url)
+else:
+    token_data = json.loads(session_file.read_text(encoding="utf-8"))
+    manager = VehicleManager(
+        10,
+        2,
+        "",
+        "",
+        "",
+        token=Token.from_dict(token_data),
+        language="ko",
+    )
+
 manager.check_and_refresh_token()
-manager.token.save(session_file)
+save_session(manager.token)
 manager.update_all_vehicles_with_cached_state()
 print(f"  Session works. Found {len(manager.vehicles)} vehicle(s).")
 print(f"  Access token expires at {manager.token.valid_until.isoformat()}.")
 print("  The saved refresh credentials will obtain another access token when needed.")
 PY
+unset MYHYUNDAI_REDIRECT_URL
 chmod 600 "$SESSION_FILE"
 note "Keep $SESSION_FILE private and out of source control."
 

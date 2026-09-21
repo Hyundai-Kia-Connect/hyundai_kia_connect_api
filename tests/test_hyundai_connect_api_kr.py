@@ -1221,6 +1221,28 @@ def test_connected_car_id_survives_token_serialization():
     assert token.cc_id == "customer-id"
 
 
+def test_persistent_token_data_omits_login_and_control_secrets():
+    token = _token(
+        password="account-password",
+        pin="1234",
+        control_token="short-lived-control-token",
+        control_token_expiry=12345,
+        exchangeable_refresh_token="exchangeable-refresh-token",
+        non_ccs_refresh_token="non-ccs-refresh-token",
+    )
+
+    data = token.to_persistent_dict()
+    restored = Token.from_dict(data)
+
+    assert data["password"] is None
+    assert data["pin"] is None
+    assert data["control_token"] is None
+    assert data["control_token_expiry"] == 0
+    assert restored.cc_id == "customer-id"
+    assert restored.exchangeable_refresh_token == "exchangeable-refresh-token"
+    assert restored.non_ccs_refresh_token == "non-ccs-refresh-token"
+
+
 def test_domestic_error_reads_top_level_return_code():
     api = _api()
     response = _response(
