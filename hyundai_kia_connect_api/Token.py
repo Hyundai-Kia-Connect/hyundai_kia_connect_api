@@ -35,6 +35,8 @@ class Token:
     id_token: str | None = None
     # User ID for GSPA X-Stamp (uid claim from CCS JWT).
     user_id: str | None = None
+    # Connected-car customer ID used by Hyundai Korea's domestic API.
+    cc_id: str | None = None
 
     def to_dict(self) -> dict:
         """Convert Token to a JSON‑serializable dict."""
@@ -43,6 +45,15 @@ class Token:
         # Convert datetimes to ISO strings
         data["valid_until"] = self.valid_until.isoformat()
 
+        return data
+
+    def to_persistent_dict(self) -> dict:
+        """Return refreshable session data without account or control secrets."""
+        data = self.to_dict()
+        data["password"] = None
+        data["pin"] = None
+        data["control_token"] = None
+        data["control_token_expiry"] = 0
         return data
 
     @classmethod
@@ -71,4 +82,5 @@ class Token:
             non_ccs_refresh_token=data.get("non_ccs_refresh_token"),
             id_token=data.get("id_token"),
             user_id=data.get("user_id"),
+            cc_id=data.get("cc_id"),
         )
