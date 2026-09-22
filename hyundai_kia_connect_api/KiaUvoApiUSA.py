@@ -228,7 +228,8 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.post(url, json=data, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
         response_json = response.json()
-        status = response_json.get("status") or {}
+        status = response_json.get("status")
+        status = status if isinstance(status, dict) else {}
         if status.get("statusCode"):
             raise AuthenticationError(
                 f"OTP verification failed: {status.get('errorMessage', '')}"
@@ -363,7 +364,8 @@ class KiaUvoApiUSA(ApiImpl):
                 has_email=bool(payload.get("hasEmail")),
                 has_sms=bool(payload.get("hasPhone")),
             )
-        status = response_json.get("status") or {}
+        status = response_json.get("status")
+        status = status if isinstance(status, dict) else {}
         if status.get("errorCode") == 1001:
             raise AuthenticationError(
                 f"Invalid Email or Password: {status.get('errorMessage', '')}"
@@ -383,7 +385,8 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
-        status = response.get("status") or {}
+        status = response.get("status")
+        status = status if isinstance(status, dict) else {}
         if (
             status.get("statusCode") == 1
             and status.get("errorType") == 1
@@ -429,7 +432,8 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
         response = response.json()
-        status = response.get("status") or {}
+        status = response.get("status")
+        status = status if isinstance(status, dict) else {}
         if (
             status.get("statusCode") == 1
             and status.get("errorType") == 1
