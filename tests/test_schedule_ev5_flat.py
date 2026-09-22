@@ -13,7 +13,8 @@ import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
-from hyundai_kia_connect_api.const import ENGINE_TYPES
+from hyundai_kia_connect_api.const import ENGINE_TYPES, ORDER_STATUS
+from hyundai_kia_connect_api.exceptions import APIError, DuplicateRequestError
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -26,6 +27,9 @@ def api() -> ApiImplType1:
     api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
     # session.post is mocked per-test; _get_control_headers returns a stub.
     api._get_control_headers = MagicMock(return_value={"Authorization": "ctrl"})
+    # Two-scope sequencing (#1316): default to an immediately-settled charge
+    # record; sequencing-specific tests override this.
+    api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
     return api
 
 
@@ -272,6 +276,97 @@ class TestEV5Return:
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         msg_id = api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
         assert msg_id == "charge-xyz"
+
+
+class TestEV5TwoScopeSequencing:
+    """Two-scope write sequencing (#1316): the vehicle processes /charge
+    before it accepts /hvac — a /hvac POST sent ~0.2 s after /charge fails
+    with 4004 (channel busy). The charge action record
+    (/notifications/.../records) must settle before /hvac is sent."""
+
+    def test_two_scope_polls_charge_record_before_hvac(self, api):
+        calls = _mock_post(api, charge_id="charge-seq")
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
+        token = MagicMock(spec=Token)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        api.schedule_charging_and_climate(token, v, _options())
+        api.check_action_status.assert_called_once_with(
+            token, v, "charge-seq", synchronous=True, timeout=15
+        )
+        urls = [c["url"] for c in calls]
+        # both endpoints still sent, in order
+        assert urls.index(next(u for u in urls if u.endswith("/charge"))) < urls.index(
+            next(u for u in urls if u.endswith("/hvac"))
+        )
+
+    def test_charge_only_skips_poll(self, api):
+        _mock_post(api)
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_schedule_charge_enabled = True
+        v.ev_off_peak_start_time = dt.time(23, 0)
+        v.ev_off_peak_end_time = dt.time(5, 0)
+        v.ev_off_peak_charge_only_enabled = True
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+        )
+        api.check_action_status.assert_not_called()
+
+    def test_climate_only_skips_poll(self, api):
+        _mock_post(api)
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        v.ev_first_departure_climate_temperature = (21.0, "°C")
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+        )
+        api.check_action_status.assert_not_called()
+
+    def test_poll_timeout_raises_with_charge_context(self, api):
+        _mock_post(api, charge_id="charge-still-busy")
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.TIMEOUT)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(DuplicateRequestError, match="charge-still-busy"):
+            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+
+    def test_poll_timeout_message_says_charge_applied(self, api):
+        _mock_post(api)
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.TIMEOUT)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(DuplicateRequestError, match="applied"):
+            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+
+    def test_charge_record_failed_raises_not_duplicate(self, api):
+        _mock_post(api)
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.FAILED)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(APIError, match="failed"):
+            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+
+    def test_hvac_4004_after_poll_keeps_charge_context(self, api):
+        _mock_post(api)
+        api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
+
+        def _post(url, json=None, headers=None, **kwargs):
+            resp = MagicMock()
+            if url.endswith("/hvac"):
+                resp.json.return_value = {
+                    "retCode": "F",
+                    "resCode": "4004",
+                    "resMsg": "channel busy",
+                }
+            else:
+                resp.json.return_value = {
+                    "retCode": "S",
+                    "resCode": "0000",
+                    "msgId": "charge-ctx",
+                }
+            return resp
+
+        api.session.post.side_effect = _post
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        with pytest.raises(DuplicateRequestError, match="charge-ctx"):
+            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
 
 
 def _raw_options(**kw) -> ScheduleChargingClimateRequestOptions:
