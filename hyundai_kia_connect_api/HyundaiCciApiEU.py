@@ -13,14 +13,12 @@ import datetime as dt
 import logging
 from typing import Any
 
-import requests
-
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
 )
-from .exceptions import APIError, AuthenticationError
+from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
 from .utils import (
@@ -217,44 +215,6 @@ class HyundaiCciApiEU(GspaApiEU):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - prewakeup failed (car may be offline)")
         self.update_vehicle_with_cached_state(token, vehicle)
-
-    def prewakeup(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
-        """Send a prewakeup command to bring the vehicle online.
-
-        GSPA remote paths are brand-global (the path is shared across EU
-        CCI brands, issued on the instance's CCSP host). The app always
-        sends a body here (PreWakeupApiRequest, Moshi default
-        "prewakeup") — not proven required server-side, but it is what
-        the app sends, so it is mirrored.
-        """
-        car_id = vehicle.id
-        url = self.CCSP_API_URL + f"/gspa/v1/remote/vehicles/{car_id}/prewakeup"
-        self._validate_ccs_token(token)
-        headers = self._get_authenticated_headers(
-            token, vehicle.ccu_ccs2_protocol_support or 0
-        )
-        try:
-            response = requests.post(
-                url, headers=headers, json={"action": "prewakeup"}, timeout=(5, 60)
-            )
-            if response.status_code == 401:
-                raise AuthenticationError("GSPA: Token expired or invalid")
-            if response.status_code >= 400:
-                raise APIError(
-                    f"GSPA control error: HTTP {response.status_code} - "
-                    f"{response.text[:200]}"
-                )
-            data: dict[str, Any] = response.json()
-            rc = data.get("rc")
-            if rc and rc != "0000":
-                raise APIError(f"GSPA error: rc={rc}, msg={data.get('msg', '')}")
-            rs: dict[str, Any] = data.get("rs", data)
-            return rs
-        except AuthenticationError:
-            raise
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - GSPA prewakeup failed")
-            return None
 
     # ------------------------------------------------------------------
     # Update vehicle with cached state

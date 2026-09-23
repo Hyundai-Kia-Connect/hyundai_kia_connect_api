@@ -728,7 +728,7 @@ def test_prewakeup_sends_action_body():
     resp.json.return_value = {"rc": "0000", "rs": {}}
     with (
         patch.object(HyundaiCciApiEU, "_get_authenticated_headers") as headers,
-        patch("hyundai_kia_connect_api.HyundaiCciApiEU.requests.post") as post,
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
     ):
         headers.return_value = {"Authorization": "Bearer ccs-token"}
         post.return_value = resp
@@ -747,7 +747,7 @@ def test_prewakeup_failure_returns_none():
     with (
         patch.object(HyundaiCciApiEU, "_get_authenticated_headers"),
         patch(
-            "hyundai_kia_connect_api.HyundaiCciApiEU.requests.post",
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
             side_effect=OSError("offline"),
         ),
     ):

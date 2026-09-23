@@ -2,10 +2,10 @@
 
 Kia-specific EU implementation inheriting the OneApp (CCI) login flow,
 vehicle listing, and the GSPA secure-request layer from ``GspaApiEU``.
-This module keeps Kia brand constants. Remote actions are not
-implemented: force refresh raises NotImplementedError (inherited from
-ApiImpl) and prewakeup is overridden here with the same — Kia EU CCI
-remote control awaits live verification (D6). Cached-state parsing
+This module keeps Kia brand constants. Remote actions are gated: only
+live-verified endpoints pass (GSPA_VERIFIED_ENDPOINTS) and force refresh
+raises NotImplementedError (inherited from ApiImpl) — Kia EU CCI remote
+control beyond the verified set awaits live verification (D6). Cached-state parsing
 uses the shared CCS2 property parser (moved to ``GspaApiEU``): the Kia
 stored-status envelope and vehicle state tree match the Hyundai shape
 (confirmed live on a real EV6). Extended reads (driving info, history,
@@ -15,8 +15,6 @@ vehicle confirm their payload shapes.
 """
 
 # pylint:disable=missing-class-docstring,invalid-name
-
-from typing import Any
 
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
@@ -33,8 +31,10 @@ class KiaCciApiEU(GspaApiEU):
     control is inherited but partially gated: only live-verified
     endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and unlock, and
     climate start/stop, are live-proven on a Kia PV5 (2026-09-19); lamp
-    is live-proven on a Kia EV6 (2026-09-23). The remaining commands
-    still raise NotImplementedError until live verification (D6).
+    is live-proven on a Kia EV6 (2026-09-23), and prewakeup (inherited
+    from ``GspaApiEU``) was accepted with HTTP 202 on the same EV6. The
+    remaining commands still raise NotImplementedError until live
+    verification (D6).
     """
 
     # Door lock and unlock via the shared "door" endpoint +
@@ -49,7 +49,9 @@ class KiaCciApiEU(GspaApiEU):
     # stored set point instead of the requested one. Lamp all-off via
     # the "lamp" endpoint live-proven on a Kia EV6 (2026-09-23): 202
     # APPLIED with the stored-status lastUpdateTime advancing, and
-    # prewakeup accepted with HTTP 202 on the same vehicle.
+    # prewakeup accepted with HTTP 202 on the same vehicle. Prewakeup is
+    # inherited from GspaApiEU (brand-neutral raw POST with the standard
+    # bearer headers — confirmed shape {"action": "prewakeup"}).
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature", "lamp"})
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
@@ -62,16 +64,6 @@ class KiaCciApiEU(GspaApiEU):
     CIPHER_BRAND = "kia"
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Userdevice-Id"
-
-    def prewakeup(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
-        """Kia EU CCI remote actions await live verification (D6).
-
-        App-confirmed request shape when implemented: the app sends
-        {"action": "prewakeup"} (PreWakeupApiRequest) to the same
-        brand-global prewakeup path — mirror the Hyundai implementation
-        then.
-        """
-        raise NotImplementedError("Kia EU CCI prewakeup awaits live verification")
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch GSPA stored-status and update vehicle properties.

@@ -190,13 +190,29 @@ def test_kia_update_cached_state_requires_ccs_token():
         api.update_vehicle_with_cached_state(token, MagicMock())
 
 
-def test_kia_prewakeup_not_implemented():
-    """prewakeup raises NotImplementedError (D6: Kia EU CCI remote
-    actions await live verification — no working GSPA remote POST is
-    inherited from the base)."""
+def test_kia_prewakeup_sends_action_body():
+    """prewakeup (inherited from GspaApiEU) posts the app-confirmed shape
+    {"action": "prewakeup"} to the brand-global prewakeup path — accepted
+    with HTTP 202 on a Kia EV6 (2026-09-23). Best-effort: any failure is
+    swallowed to None."""
     api = _make_kia_api()
-    with pytest.raises(NotImplementedError):
-        api.prewakeup(MagicMock(), MagicMock())
+    token = MagicMock()
+    token.access_token = "Bearer ccs-token"
+    vehicle = MagicMock()
+    vehicle.id = "test123"
+    vehicle.ccu_ccs2_protocol_support = 2
+    with (
+        patch.object(KiaCciApiEU, "_get_authenticated_headers") as headers,
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+    ):
+        headers.return_value = {"Authorization": "Bearer ccs-token"}
+        post.return_value = MagicMock(
+            status_code=200, json=lambda: {"rc": "0000", "rs": {}}
+        )
+        result = api.prewakeup(token, vehicle)
+    assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/prewakeup")
+    assert post.call_args.kwargs["json"] == {"action": "prewakeup"}
+    assert result == {}
 
 
 def test_kia_force_refresh_not_implemented():
