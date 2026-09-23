@@ -4,7 +4,9 @@ Only live-proven endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and
 unlock via the shared "door" endpoint + {"command": "close"/"open"} were
 live-proven on a Kia PV5 (2026-09-19: 202 S 202-000, fresh stored-status
 7 s / 4 s after sending), and climate start/stop via the "temperature"
-endpoint on the same PV5 (202 S 202-000 both directions). Everything else
+endpoint on the same PV5 (202 S 202-000 both directions), and lamp
+all-off on a Kia EV6 (2026-09-23: 202 APPLIED with the stored-status
+lastUpdateTime advancing). Everything else
 stays gated until live verification (D6).
 """
 
@@ -101,6 +103,24 @@ def test_kia_climate_passes_gate():
             "/gspa/v1/remote/vehicles/test123/temperature"
         )
         assert post.call_args.kwargs["json"] == body
+
+
+def test_kia_lamp_passes_gate():
+    """Lamp all-off is live-proven on a Kia EV6 (2026-09-23: 202 APPLIED
+    with the stored-status lastUpdateTime advancing)."""
+    api = KiaCciApiEU(9, 2, "en")
+    token = _make_token()
+    vehicle = _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = api.turn_off_lamp(token, vehicle, "all-off")
+    assert action_id == "gspa:sid-1"
+    assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/lamp")
+    assert post.call_args.kwargs["json"] == {"command": "all-off"}
 
 
 def test_kia_unverified_commands_are_gated():

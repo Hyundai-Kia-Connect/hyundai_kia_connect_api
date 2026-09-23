@@ -200,7 +200,9 @@ def test_kia_remote_control_gated_not_implemented():
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
     # Evidence-mapped: only the live-proven endpoints pass.
-    assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset({"door", "temperature"})
+    assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset(
+        {"door", "temperature", "lamp"}
+    )
 
 
 def test_start_climate_full_options():
