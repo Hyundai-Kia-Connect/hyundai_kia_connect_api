@@ -2,6 +2,7 @@
 stub flow, the shared get_vehicles path, and the NotImplementedError
 cached-state parser stub (zero network)."""
 
+import datetime as dt
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
@@ -242,3 +243,13 @@ def test_vehicle_manager_routes_genesis_to_error():
     # REGION_EUROPE_CCI = 9, BRAND_GENESIS = 3
     with pytest.raises(APIError, match="Genesis"):
         VehicleManager.get_implementation_by_region_brand(9, 3, "en")
+
+
+def test_kia_schedule_reservation_charge_na_gated():
+    """schedule_reservation_charge_na is implemented (inherited from
+    GspaApiEU) but stays gated on Kia until live verification (D6)."""
+    api = _make_kia_api()
+    with pytest.raises(NotImplementedError):
+        api.schedule_reservation_charge_na(
+            MagicMock(), MagicMock(), [1], dt.time(9, 0), dt.time(12, 0)
+        )

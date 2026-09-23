@@ -257,6 +257,7 @@ class GspaApiEU(ApiImpl):
             "discharge-limit",
             "charge-alarm",
             "reservation-charge",
+            "reservation-charge-na",
             "reservation-hvac",
             "reservation-charge-hvac",
             "reservation-engine",
@@ -2646,6 +2647,66 @@ class GspaApiEU(ApiImpl):
             "reservInfo2": _make_engine_reserv_info(options.second_departure),
         }
         return self._gspa_control_command(token, vehicle, "reservation-engine", body)
+
+    def schedule_reservation_charge_na(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        days: list[int],
+        start: dt.time,
+        end: dt.time,
+    ) -> str:
+        """Schedule the NA-variant charging reservation.
+
+        The "reservation-charge-na" wire shape is a single weekly charge
+        window (active days + start time + end time) with no climate and
+        no target-SOC scope; the app hardcodes ``reservChargeSet`` to
+        ``false``. Because most ``ScheduleChargingClimateRequestOptions``
+        fields have no wire counterpart here, the window is taken
+        directly (app-faithful: the use case passes isOn/end/days/start
+        and the datasource drops the on/off flag).
+
+        ``days`` uses the Sun=0..Sat=6 encoding shared by the other
+        schedule methods. Times are interpreted as wall clock in
+        ``data_timezone`` and converted to the UTC "HH:MM:00Z" form the
+        endpoint expects; day indices shift across the UTC midnight
+        boundary accordingly (the app converts device-local times the
+        same way). Bearer-authenticated (no PIN control token). Like the
+        other unverified reservation endpoints it raises
+        NotImplementedError on brands without live verification (D6).
+        """
+        if not days:
+            raise ValueError("schedule_reservation_charge_na requires at least one day")
+
+        def _to_utc(t: dt.time, day: int | None = None) -> tuple[int, str]:
+            """Convert a local wall-clock time to (UTC weekday, "HH:MM:00Z")."""
+            reference = dt.datetime.now(self.data_timezone)
+            if day is None:
+                date = reference.date()
+            else:
+                target_py_weekday = (day - 1) % 7  # Sun=0 encoding -> py Mon=0
+                date = reference.date() + dt.timedelta(
+                    days=(target_py_weekday - reference.weekday()) % 7
+                )
+            aware = dt.datetime.combine(date, t).replace(tzinfo=self.data_timezone)
+            utc = aware.astimezone(dt.UTC)
+            return (utc.weekday() + 1) % 7, utc.strftime("%H:%M:00Z")
+
+        wire_days: list[int] = []
+        start_wire = ""
+        for day in sorted(set(days)):
+            wire_day, start_wire = _to_utc(start, day)
+            wire_days.append(wire_day)
+        end_wire = _to_utc(end)[1]
+
+        body: dict[str, Any] = {
+            "reservChargeInfo": {
+                "reservInfo": {"day": wire_days, "time": start_wire},
+                "reservEndTime": end_wire,
+                "reservChargeSet": False,
+            }
+        }
+        return self._gspa_control_command(token, vehicle, "reservation-charge-na", body)
 
     def schedule_charging_and_climate(
         self,

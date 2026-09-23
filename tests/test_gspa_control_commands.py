@@ -646,3 +646,65 @@ def test_control_command_2xx_business_error_raises():
         post.return_value = MagicMock(status_code=200, json=lambda: body)
         with pytest.raises(AuthenticationError):
             api.stop_rear_seat_alarm(token, vehicle)
+
+
+def test_schedule_reservation_charge_na_body():
+    """NA-variant charge reservation: single weekly window, reservChargeSet
+    hardcoded false (as both apps send), no command key, bearer auth."""
+    _, call = _run_command(
+        HyundaiCciApiEU.schedule_reservation_charge_na,
+        [1],
+        dt.time(7, 5),
+        dt.time(10, 0),
+    )
+    assert call.args[0].endswith(
+        "/gspa/v1/remote/vehicles/test123/reservation-charge-na"
+    )
+    # data_timezone is UTC on the CCI region — conversion is a pass-through.
+    assert call.kwargs["json"] == {
+        "reservChargeInfo": {
+            "reservInfo": {"day": [1], "time": "07:05:00Z"},
+            "reservEndTime": "10:00:00Z",
+            "reservChargeSet": False,
+        }
+    }
+    assert "AuthorizationCCSP" not in call.kwargs["headers"]
+    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_schedule_reservation_charge_na_dedup_and_guard():
+    with pytest.raises(ValueError):
+        _run_command(
+            HyundaiCciApiEU.schedule_reservation_charge_na,
+            [],
+            dt.time(7, 5),
+            dt.time(10, 0),
+        )
+    _, call = _run_command(
+        HyundaiCciApiEU.schedule_reservation_charge_na,
+        [3, 1, 3],
+        dt.time(7, 5),
+        dt.time(10, 0),
+    )
+    assert call.kwargs["json"]["reservChargeInfo"]["reservInfo"]["day"] == [1, 3]
+
+
+def test_schedule_reservation_charge_na_utc_day_shift():
+    """A local time west of UTC midnight shifts the wire day index back
+    (Sunday 00:30 at UTC+2 -> Saturday 22:30 UTC), mirroring the app's
+    device-local -> UTC conversion."""
+    api = _make_api()
+    api.data_timezone = dt.timezone(dt.timedelta(hours=2))
+    token = _make_token()
+    vehicle = _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        api.schedule_reservation_charge_na(
+            token, vehicle, [0], dt.time(0, 30), dt.time(6, 0)
+        )
+    body = post.call_args.kwargs["json"]["reservChargeInfo"]
+    assert body["reservInfo"] == {"day": [6], "time": "22:30:00Z"}
