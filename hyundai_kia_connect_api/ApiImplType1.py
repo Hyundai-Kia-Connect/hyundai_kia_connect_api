@@ -1291,15 +1291,49 @@ class ApiImplType1(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge response: {charge_response}")
             _check_response_for_errors(charge_response)
             charge_msg_id = charge_response["msgId"]
+        if hvac_payload is not None and charge_payload is not None:
+            # Two-scope write (#1316): the vehicle processes /charge first,
+            # and a /hvac POST sent while the charge action is still running
+            # fails with 4004 (channel busy). Live data: the charge record
+            # settles ~6 s after the POST. Wait for the action record to
+            # settle (the same /notifications/.../records read the
+            # action-status path uses; timeout=15 catches a ~6 s settle with
+            # the 5 s poll interval) before sending /hvac.
+            state = self.check_action_status(
+                token, vehicle, charge_msg_id, synchronous=True, timeout=15
+            )
+            if state not in (ORDER_STATUS.SUCCESS,):
+                if state in (ORDER_STATUS.TIMEOUT, ORDER_STATUS.PENDING):
+                    raise DuplicateRequestError(
+                        f"The charge schedule was applied (msgId {charge_msg_id}) "
+                        f"but the charge action record is still "
+                        f"{state.name.lower()}: the vehicle channel stayed busy "
+                        f"and the climate scope was not sent. Retry the "
+                        f"climate scope separately."
+                    )
+                raise APIError(
+                    f"The charge schedule action ended in state "
+                    f"{state.name.lower()} (msgId {charge_msg_id}); the "
+                    f"climate scope was not sent."
+                )
         if hvac_payload is not None:
             _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac request: {hvac_payload}")
-            hvac_response = self.session.post(
-                base_url + "/hvac",
-                json=hvac_payload,
-                headers=self._get_control_headers(token, vehicle),
-            ).json()
+            try:
+                hvac_response = self.session.post(
+                    base_url + "/hvac",
+                    json=hvac_payload,
+                    headers=self._get_control_headers(token, vehicle),
+                ).json()
+                _check_response_for_errors(hvac_response)
+            except DuplicateRequestError as exc:
+                if charge_payload is None:
+                    raise
+                raise DuplicateRequestError(
+                    f"The charge schedule was applied (msgId {charge_msg_id}) "
+                    f"but the vehicle still did not accept the climate scope: "
+                    f"{exc}"
+                ) from exc
             _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac response: {hvac_response}")
-            _check_response_for_errors(hvac_response)
             hvac_msg_id = hvac_response["msgId"]
 
         return charge_msg_id if charge_active else hvac_msg_id
