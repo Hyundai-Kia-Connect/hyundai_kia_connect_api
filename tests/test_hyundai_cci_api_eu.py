@@ -713,3 +713,42 @@ def test_fob_low_battery_bool_or_none(low_battery, expected):
     }
     api._update_vehicle_properties_ccs2(vehicle, state)
     assert vehicle.smart_key_battery_warning_is_on is expected
+
+
+def test_prewakeup_sends_action_body():
+    """The app's prewakeup call carries {"action": "prewakeup"}
+    (PreWakeupApiRequest, Moshi default "prewakeup") — mirror it."""
+    api = _make_hyundai_api()
+    token = Token()
+    token.access_token = "ccs-token"
+    token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
+    vehicle = Vehicle()
+    vehicle.id = "test123"
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"rc": "0000", "rs": {}}
+    with (
+        patch.object(HyundaiCciApiEU, "_get_authenticated_headers") as headers,
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+    ):
+        headers.return_value = {"Authorization": "Bearer ccs-token"}
+        post.return_value = resp
+        result = api.prewakeup(token, vehicle)
+    assert result == {}
+    assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/prewakeup")
+    assert post.call_args.kwargs["json"] == {"action": "prewakeup"}
+
+
+def test_prewakeup_failure_returns_none():
+    """prewakeup is best-effort: any failure is swallowed to None."""
+    api = _make_hyundai_api()
+    token = Token()
+    token.access_token = "ccs-token"
+    token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
+    with (
+        patch.object(HyundaiCciApiEU, "_get_authenticated_headers"),
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
+            side_effect=OSError("offline"),
+        ),
+    ):
+        assert api.prewakeup(token, Vehicle()) is None
