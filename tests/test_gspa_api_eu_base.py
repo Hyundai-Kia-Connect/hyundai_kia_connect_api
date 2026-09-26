@@ -222,10 +222,15 @@ def test_get_weather_url_and_payload():
     with patch(
         "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
     ) as mock_get:
-        result = api.get_weather(token)
+        result = api.get_weather(token, 50.0614, 19.9373)
 
     assert result == rs_data
     assert mock_get.call_args[0][0].endswith("/gspa/v1/contents/wts/weathers")
+    # On-device-confirmed query shape: currentCoordinate=%f,%f + attributes
+    assert mock_get.call_args[1]["params"] == {
+        "currentCoordinate": "50.061400,19.937300",
+        "attributes": "currentWeather",
+    }
 
 
 def test_spa_api_url_built_from_ccapi_base():

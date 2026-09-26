@@ -3057,21 +3057,29 @@ class GspaApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA vehicles list failed")
             return None
 
-    def get_weather(self, token: Token) -> dict[str, Any] | None:
-        """Get weather at vehicle location from GSPA.
+    def get_weather(
+        self, token: Token, latitude: float, longitude: float
+    ) -> dict[str, Any] | None:
+        """Get weather at the given coordinates from GSPA.
 
-        Live probe (2026-09-04): HTTP 400 400-007. Two candidate
-        causes, unproven: (1) the car was in an underground garage at
-        probe time (no GPS fix — weather is location-based), (2) in the
-        app the weather annotation is an orphan (no method body calls
-        it), so the real wire shape was never captured. Returns None
-        either way.
+        Wire shape confirmed from the app's shared CCS SDK request
+        construction: the endpoint requires
+        ``?currentCoordinate=<lat>,<lon>`` (Java ``%f,%f`` — 6 decimal
+        places) and ``attributes=currentWeather``. The earlier live
+        probe (2026-09-04) returned HTTP 400 400-007 — sent with no
+        query params, which alone explains the rejection.
         """
         self._validate_ccs_token(token)
         headers = self._get_authenticated_headers(token, 0)
         url = self.CCSP_API_URL + "/gspa/v1/contents/wts/weathers"
+        params = {
+            "currentCoordinate": f"{latitude:.6f},{longitude:.6f}",
+            "attributes": "currentWeather",
+        }
         try:
-            response = requests.get(url, headers=headers, timeout=(5, 30))
+            response = requests.get(
+                url, headers=headers, params=params, timeout=(5, 30)
+            )
             if response.status_code == 401:
                 raise AuthenticationError("GSPA: Token expired or invalid")
             data: dict[str, Any] = response.json()
