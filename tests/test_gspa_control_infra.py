@@ -485,3 +485,22 @@ def test_check_action_status_202_accepted():
         get.return_value = _post_mock(202, _status_response("SUCCESS"))
         status = api._gspa_check_action_status(_make_token(), _make_vehicle(), "sid-1")
     assert status is ORDER_STATUS.SUCCESS
+
+
+def test_post_for_data_2xx_business_error():
+    """HTTP 200 + metaInfo retCode F is an error, not silent success."""
+    api = _make_api()
+    body = {
+        "data": {},
+        "metaInfo": {
+            "retCode": "F",
+            "resCode": "403-006",
+            "message": "Invalid request id",
+        },
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(200, body)
+        with pytest.raises(AuthenticationError):
+            api._gspa_post_for_data(
+                _make_token(), _make_vehicle(), "reservation-hvac", {}
+            )
