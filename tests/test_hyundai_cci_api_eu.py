@@ -10,6 +10,7 @@ import pytest
 
 from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import (
+    APIError,
     AuthenticationError,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
@@ -752,3 +753,84 @@ def test_prewakeup_failure_returns_none():
         ),
     ):
         assert api.prewakeup(token, Vehicle()) is None
+
+
+def test_update_vehicle_extended_data_populates_valet_widget():
+    """The extended-read wiring populates valet mode, widget lamp data
+    and DTC breakdowns on the cached-update path."""
+    api = _make_hyundai_api()
+    token = Token(access_token="ccs-token")
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    widget = {
+        "state": {
+            "Vehicle": {
+                "Body": {
+                    "Lights": {
+                        "Front": {
+                            "Left": {
+                                "Low": {"Warning": 1.0},
+                                "TurnSignal": {"Warning": 0.0},
+                            }
+                        },
+                        "Rear": {"Right": {"StopLamp": {"Warning": 1.0}}},
+                    }
+                },
+                "Electronics": {"PowerSupply": {"Ignition3": 0.0}},
+                "RemoteControl": {"SleepMode": 1.0},
+            }
+        }
+    }
+    with (
+        patch.object(api, "get_valet_status", return_value={"valetMode": "Active"}),
+        patch.object(api, "get_stored_status_widget", return_value=widget),
+        patch.object(api, "get_breakdowns", return_value={"breakdown": []}),
+    ):
+        api._update_vehicle_extended_data(token, vehicle)
+
+    assert vehicle.valet_mode_active is True
+    assert vehicle.headlamp_left_low is True
+    assert vehicle.turn_signal_left_front is False
+    assert vehicle.stop_lamp_right is True
+    assert vehicle.ign3 is False
+    assert vehicle.sleep_mode_check is True
+
+
+def test_update_vehicle_extended_data_failure_sets_unknown():
+    """HA convention: a failed read leaves the field unknown (None),
+    never stale."""
+    api = _make_hyundai_api()
+    token = Token(access_token="ccs-token")
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    vehicle.valet_mode_active = True  # stale from a previous poll
+    with (
+        patch.object(api, "get_valet_status", side_effect=APIError("boom")),
+        patch.object(api, "get_stored_status_widget", side_effect=APIError("boom")),
+        patch.object(api, "get_breakdowns", side_effect=APIError("boom")),
+    ):
+        api._update_vehicle_extended_data(token, vehicle)
+
+    assert vehicle.valet_mode_active is None
+
+
+def test_parse_gspa_widget_lamp_data_flat_and_nested():
+    """Widget payloads nested under state.Vehicle and flat shapes both
+    parse; keys absent from the payload leave the fields untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    api._parse_gspa_widget_lamp_data(
+        vehicle,
+        {
+            "Body": {"Lights": {"Front": {"Left": {"High": {"Warning": 1.0}}}}},
+        },
+    )
+    assert vehicle.headlamp_left_high is True
+    assert vehicle.headlamp_left_low is None  # not in payload — untouched
+
+    flat = Vehicle()
+    api._parse_gspa_widget_lamp_data(
+        flat,
+        {"Body": {"Lights": {"Front": {"Right": {"Low": {"Warning": 0.0}}}}}},
+    )
+    assert flat.headlamp_right_low is False

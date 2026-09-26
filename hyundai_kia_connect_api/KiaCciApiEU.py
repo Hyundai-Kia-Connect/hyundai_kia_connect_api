@@ -64,6 +64,7 @@ class KiaCciApiEU(GspaApiEU):
     CIPHER_BRAND = "kia"
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Userdevice-Id"
+    CCAPI_BASE_URL = "prd.eu-ccapi.kia.com:8080"
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch GSPA stored-status and update vehicle properties.

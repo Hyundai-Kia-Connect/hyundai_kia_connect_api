@@ -144,3 +144,112 @@ def test_base_gspa_get_500_json_meta_raises_api_error():
         pytest.raises(APIError, match="HTTP 500 500-999"),
     ):
         api._gspa_get(token, vehicle, "status/vehicles/{carId}/stored-status")
+
+
+EXTENDED_READS = {
+    "get_location_update_status": "location/vehicles/test123/update-status",
+    "get_location_routes": "location/vehicles/test123/routes",
+    "get_valet_status": "valet/vehicles/test123/status",
+    "get_valet_history": "valet/vehicles/test123/history",
+    "get_safety_data": "safety/vehicles/test123/alert-setting",
+    "get_stored_status_widget": "status/vehicles/test123/stored-status-widget",
+}
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    sorted(EXTENDED_READS.items()),
+    ids=[name for name, _ in sorted(EXTENDED_READS.items())],
+)
+def test_extended_read_url_construction(method, path):
+    """Each extended read requests CCSP_API_URL + /gspa/v1/{path}."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        getattr(api, method)(token, vehicle)
+
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + f"/gspa/v1/{path}"
+
+
+def test_get_gspa_vehicles_url_and_payload():
+    """get_gspa_vehicles GETs /gspa/v1/vehicles (no carId) and returns the
+    data list."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    vehicles = [{"vin": "VIN1"}, {"vin": "VIN2"}]
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": vehicles,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_gspa_vehicles(token)
+
+    assert result == vehicles
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + "/gspa/v1/vehicles"
+
+
+def test_get_gspa_vehicles_returns_none_on_business_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "F", "resCode": "404-001", "message": "none"},
+        "data": None,
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
+        assert api.get_gspa_vehicles(token) is None
+
+
+def test_get_weather_url_and_payload():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    rs_data = {"temperature": 21}
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": rs_data,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_weather(token, 50.0614, 19.9373)
+
+    assert result == rs_data
+    assert mock_get.call_args[0][0].endswith("/gspa/v1/contents/wts/weathers")
+    # On-device-confirmed query shape: currentCoordinate=%f,%f + attributes
+    assert mock_get.call_args[1]["params"] == {
+        "currentCoordinate": "50.061400,19.937300",
+        "attributes": "currentWeather",
+    }
+
+
+def _trip_token() -> Token:
+    return _make_base_token()
+
+
+def test_get_location_stored_status_path():
+    """Location stored-status read — D7 companion endpoint."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        api.get_location_stored_status(token, vehicle)
+
+    assert mock_get.call_args[0][0] == (
+        api.CCSP_API_URL + "/gspa/v1/location/vehicles/test123/stored-status"
+    )
