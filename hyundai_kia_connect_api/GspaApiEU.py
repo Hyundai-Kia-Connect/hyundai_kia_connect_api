@@ -2989,7 +2989,7 @@ class GspaApiEU(ApiImpl):
     def get_safety_data(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         """Get vehicle safety alert settings from GSPA.
 
-        Uses the app's alert-setting path (D6 naming).
+        Uses the vehicle safety alert-setting path.
         """
         self._validate_ccs_token(token)
         try:
@@ -3050,8 +3050,7 @@ class GspaApiEU(ApiImpl):
     ) -> dict[str, Any] | None:
         """Get weather at the given coordinates from GSPA.
 
-        Wire shape confirmed from the app's shared CCS SDK request
-        construction: the endpoint requires
+        Wire shape (app-confirmed on-device): the endpoint requires
         ``?currentCoordinate=<lat>,<lon>`` (Java ``%f,%f`` — 6 decimal
         places) and ``attributes=currentWeather``. The earlier live
         probe (2026-09-04) returned HTTP 400 400-007 — sent with no
