@@ -263,6 +263,10 @@ class GspaApiEU(ApiImpl):
             "reservation-charge-hvac",
             "reservation-engine",
             "lock-and-start-toggle",
+            # OTA commands: the app sends these with the standard
+            # authenticated headers — no PIN-derived control token.
+            "ota-updates",
+            "ota-updates-reservation",
         }
     )
 
@@ -1278,6 +1282,92 @@ class GspaApiEU(ApiImpl):
             )
             return "gspa:"
         return f"gspa:{sid}"
+
+    def _gspa_post_for_data(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        body: dict[str, Any],
+        path_prefix: str | None = None,
+    ) -> dict[str, Any]:
+        """POST a GSPA command and return the parsed response body.
+
+        Shared request path of _gspa_control_command and the OTA commands:
+        POST {CCSP_API_URL}/gspa/v1/{prefix}/{carId}/{endpoint}, body
+        normalization ("command", not "action"; no "deviceId"), bearer/PIN
+        header dispatch, and on a 401 for a PIN-gated endpoint the control
+        token cache is invalidated and the command is retried exactly once.
+        Transport/parse/business-envelope errors raise typed exceptions.
+
+        Pre-CCS2 EU vehicles are rejected with UnsupportedControlError
+        (region 1 handles them), and commands not live-verified on this
+        brand (neither GSPA_REMOTE_CONTROL_VERIFIED nor a listing in
+        GSPA_VERIFIED_ENDPOINTS) raise NotImplementedError before
+        any request is sent.
+        """
+        if not (
+            self.GSPA_REMOTE_CONTROL_VERIFIED
+            or endpoint in self.GSPA_VERIFIED_ENDPOINTS
+        ):
+            raise NotImplementedError(
+                f"{self.__class__.__name__} GSPA remote control awaits "
+                "live verification"
+            )
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "Pre-CCS2 EU vehicles are not supported by the CCI region — "
+                "use region 1 (Europe) for remote control"
+            )
+        gspa_endpoint = self.GSPA_ENDPOINT_MAP.get(endpoint, endpoint)
+        prefix = path_prefix or self.GSPA_PATH_PREFIX_MAP.get(
+            endpoint, "remote/vehicles"
+        )
+        # Normalize legacy bodies: GSPA uses "command"; no deviceId.
+        if "action" in body and "command" not in body:
+            action_value = body["action"]
+            body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
+            body["command"] = action_value
+        body = {k: v for k, v in body.items() if k not in ("action", "deviceId")}
+
+        url = self.CCSP_API_URL + f"/gspa/v1/{prefix}/{vehicle.id}/{gspa_endpoint}"
+        self._validate_ccs_token(token)
+        pin_gated = endpoint not in self.GSPA_BEARER_ENDPOINTS
+        response: requests.Response | None = None
+        for attempt in (1, 2):
+            headers = self._get_control_request_headers(token, vehicle, endpoint)
+            response = requests.post(url, headers=headers, json=body, timeout=(5, 30))
+            if response.status_code == 401 and pin_gated and attempt == 1:
+                self._invalidate_control_token(token)
+                continue
+            break
+        assert response is not None  # loop always runs at least once
+
+        if response.status_code >= 400:
+            try:
+                data: dict[str, Any] = response.json()
+            except ValueError:
+                data = {}
+            self._raise_gspa_error(response.status_code, data)
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise InvalidAPIResponseError(
+                f"GSPA control returned non-JSON body: {response.text[:200]!r}"
+            ) from e
+        if not isinstance(data, dict):
+            raise InvalidAPIResponseError("GSPA control returned non-object JSON")
+        # Standardized envelope (live-probed 2026-09-05): a successful
+        # command returns {"data": {...}, "metaInfo": {"retCode": "S",
+        # "resCode": "202-000", "msgId": ...}}; a 2xx business failure
+        # carries retCode "F". Legacy {"rt", "rc", "rs"} keys stay as a
+        # fallback.
+        meta = data.get("metaInfo")
+        meta_payload: dict[str, Any] = meta if isinstance(meta, dict) else {}
+        rc = data.get("rc") or meta_payload.get("retCode")
+        if rc and rc not in ("0000", "S"):
+            self._raise_gspa_error(response.status_code, data)
+        return data
 
     def _gspa_check_action_status(
         self, token: Token, vehicle: Vehicle, sid: str
@@ -2908,6 +2998,82 @@ class GspaApiEU(ApiImpl):
         body = {"lockAndStartEnable": enable}
         return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
 
+    def set_ota_reservation(
+        self, token: Token, vehicle: Vehicle, settings: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Schedule or cancel an OTA update reservation via GSPA.
+
+        POST /gspa/v1/mru/vehicles/{carId}/ota-updates-reservation with
+        CCUSoftwareUpdateReservationApiRequest (operation,
+        targetReservationTime, originReservationTime). ``settings`` is
+        passed through — callers build the body per the app's model.
+        The OTA response (CCUSoftwareUpdateReservationApiResponse) carries
+        no polling SID — the parsed response body is returned; poll
+        progress via get_ota_updates().
+        """
+        return self._gspa_post_for_data(
+            token,
+            vehicle,
+            "ota-updates-reservation",
+            settings,
+            path_prefix="mru/vehicles",
+        )
+
+    def set_ota_update(
+        self, token: Token, vehicle: Vehicle, start: bool
+    ) -> dict[str, Any]:
+        """Start or cancel a CCU OTA update via GSPA.
+
+        POST /gspa/v1/mru/vehicles/{carId}/ota-updates with
+        CCUSoftwareUpdateStartApiRequest body {"updateStart": 1|2}
+        (1 = start, 2 = cancel). The OTA response
+        (CCUSoftwareUpdateStartApiResponse) carries no polling SID — the
+        parsed response body is returned; progress is reported via
+        get_ota_updates() and the CCU's MQTT push, not action polling.
+        """
+        return self._gspa_post_for_data(
+            token,
+            vehicle,
+            "ota-updates",
+            {"updateStart": 1 if start else 2},
+            path_prefix="mru/vehicles",
+        )
+
+    def get_ota_updates(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Get CCU OTA update status from GSPA.
+
+        GET /gspa/v1/mru/vehicles/{carId}/ota-updates returns the update
+        list (needUpdate detection + install/reservation progress).
+        Returns the data dict, or None on failure.
+        """
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "mru/vehicles/{carId}/ota-updates")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA ota-updates GET failed")
+            return None
+
+    def get_software_version(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get vehicle software version from GSPA (needUpdate detection).
+
+        GET /gspa/v1/device-info/vehicles/{carId}/software-version.
+        Returns the data dict, or None on failure.
+        """
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "device-info/vehicles/{carId}/software-version"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA software-version GET failed")
+            return None
+
     # ------------------------------------------------------------------
     # GSPA extended reads (brand-neutral paths)
     # ------------------------------------------------------------------
@@ -2989,7 +3155,7 @@ class GspaApiEU(ApiImpl):
     def get_safety_data(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         """Get vehicle safety alert settings from GSPA.
 
-        Uses the app's alert-setting path (D6 naming).
+        Uses the vehicle safety alert-setting path.
         """
         self._validate_ccs_token(token)
         try:
@@ -3050,8 +3216,7 @@ class GspaApiEU(ApiImpl):
     ) -> dict[str, Any] | None:
         """Get weather at the given coordinates from GSPA.
 
-        Wire shape confirmed from the app's shared CCS SDK request
-        construction: the endpoint requires
+        Wire shape (app-confirmed on-device): the endpoint requires
         ``?currentCoordinate=<lat>,<lon>`` (Java ``%f,%f`` — 6 decimal
         places) and ``attributes=currentWeather``. The earlier live
         probe (2026-09-04) returned HTTP 400 400-007 — sent with no
