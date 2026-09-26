@@ -31,7 +31,6 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
-from .ApiImplType1 import _check_response_for_errors
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
@@ -78,13 +77,7 @@ from .utils import (
     parse_datetime,
     pressure_or_none,
 )
-from .Vehicle import (
-    DayTripCounts,
-    DayTripInfo,
-    MonthTripInfo,
-    TripInfo,
-    Vehicle,
-)
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -219,9 +212,6 @@ class GspaApiEU(ApiImpl):
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
     LOGIN_FORM_HOST: str = ""
-    # v1 CCAPI host (prd.eu-ccapi.<brand>.com:8080) — used only by the legacy
-    # /tripinfo read; empty when a subclass does not support it.
-    CCAPI_BASE_URL: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
     DEVICE_ID_HEADER: str = ""
@@ -303,8 +293,6 @@ class GspaApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
-        if self.CCAPI_BASE_URL:
-            self.SPA_API_URL: str = f"https://{self.CCAPI_BASE_URL}/api/v1/spa/"
         if self.CIPHER_BRAND == "hyundai":
             from .gspa.cipher_keys import hyundai_cipher
 
@@ -3097,100 +3085,3 @@ class GspaApiEU(ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA weather failed")
             return None
-
-    # ------------------------------------------------------------------
-    # Trip info (v1 CCAPI — the app keeps /tripinfo on the legacy host)
-    # ------------------------------------------------------------------
-
-    def _get_trip_info(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        date_string: str,
-        trip_period_type: int,
-    ) -> dict[str, Any]:
-        """Fetch trip info from the v1 CCAPI /tripinfo endpoint.
-
-        Live probe (2026-09-04, Hyundai EU): the CCI token authenticates
-        on the legacy host (no 401) but returns 4002 "invalid deviceId" —
-        the device_id issued in the CCI flow is not registered on the v1
-        CCAPI backend (legacy logins register it there). Until a
-        registration step is validated, this raises DeviceIDError.
-        """
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
-        if trip_period_type == 0:  # month
-            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
-        else:
-            payload = {"tripPeriodType": 1, "setTripDay": date_string}
-        response = requests.post(
-            url,
-            json=payload,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support or 0
-            ),
-            timeout=(5, 30),
-        )
-        data: dict[str, Any] = response.json()
-        _check_response_for_errors(data)
-        return data
-
-    def update_month_trip_info(
-        self, token: Token, vehicle: Vehicle, yyyymm_string: str
-    ) -> None:
-        """Update vehicle.month_trip_info for the specified month."""
-        vehicle.month_trip_info = None
-        json_result = self._get_trip_info(token, vehicle, yyyymm_string, 0)
-        msg = json_result["resMsg"]
-        if msg["monthTripDayCnt"] > 0:
-            result = MonthTripInfo(
-                yyyymm=yyyymm_string,
-                day_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-            for day in msg["tripDayList"]:
-                result.day_list.append(
-                    DayTripCounts(
-                        yyyymmdd=day["tripDayInMonth"],
-                        trip_count=day["tripCntDay"],
-                    )
-                )
-            vehicle.month_trip_info = result
-
-    def update_day_trip_info(
-        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
-    ) -> None:
-        """Update vehicle.day_trip_info for the specified day."""
-        vehicle.day_trip_info = None
-        json_result = self._get_trip_info(token, vehicle, yyyymmdd_string, 1)
-        day_trip_list = json_result["resMsg"]["dayTripList"]
-        if day_trip_list and len(day_trip_list) > 0:
-            msg = day_trip_list[0]
-            result = DayTripInfo(
-                yyyymmdd=yyyymmdd_string,
-                trip_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-            for trip in msg["tripList"]:
-                result.trip_list.append(
-                    TripInfo(
-                        hhmmss=trip["tripTime"],
-                        drive_time=trip["tripDrvTime"],
-                        idle_time=trip["tripIdleTime"],
-                        distance=trip["tripDist"],
-                        avg_speed=trip["tripAvgSpeed"],
-                        max_speed=trip["tripMaxSpeed"],
-                    )
-                )
-            vehicle.day_trip_info = result
