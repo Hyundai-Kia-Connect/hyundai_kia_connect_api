@@ -20,6 +20,7 @@ from .const import (
 )
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
+from .mqtt_service_hub import MqttServiceHubMixin
 from .Token import Token
 from .utils import (
     get_child_value,
@@ -29,7 +30,7 @@ from .Vehicle import DailyDrivingStats, Vehicle
 _LOGGER = logging.getLogger(__name__)
 
 
-class HyundaiCciApiEU(GspaApiEU):
+class HyundaiCciApiEU(GspaApiEU, MqttServiceHubMixin):
     """Hyundai EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 4f4953b5) confirmed on
@@ -37,7 +38,9 @@ class HyundaiCciApiEU(GspaApiEU):
     secure-request layer, and the GSPA remote-control layer are all
     inherited from ``GspaApiEU``. This subclass carries the brand
     constants and the Hyundai-specific read layer: CCS2 vehicle-property
-    parsing, driving info/history, and breakdowns.
+    parsing, driving info/history, and breakdowns. MQTT Service Hub
+    registration and the receive-only MQTT client are provided by
+    ``MqttServiceHubMixin`` and ``mqtt_client.py``.
     """
 
     # Brand constants (Hyundai OneApp EU, confirmed on production endpoints).
@@ -54,6 +57,12 @@ class HyundaiCciApiEU(GspaApiEU):
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.
     supports_svm: bool = True
+
+    # ccspServiceId — the service identifier in the X-Service-Id header
+    # (Service Hub). Distinct from CCSP_SERVICE_ID (OAuth client_id).
+    CCSP_CLIENT_SERVICE_ID = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
+    # pushProviderId — X-Application-Id header value.
+    PUSH_PROVIDER_ID = "33258e5f-b8c8-459e-add1-1e94217ba148"
 
     # CCS2 EU vehicles support GSPA window control.
     supports_window_control: bool = True

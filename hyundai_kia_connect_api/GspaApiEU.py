@@ -18,7 +18,7 @@ import logging
 import re
 import uuid
 from typing import Any, ClassVar
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 import requests
 from Crypto.Cipher import PKCS1_v1_5
@@ -32,6 +32,9 @@ from .ApiImpl import (
     WindowRequestOptions,
 )
 from .const import (
+    BRAND_GENESIS,
+    BRAND_HYUNDAI,
+    BRAND_KIA,
     BRANDS,
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -211,6 +214,9 @@ class GspaApiEU(ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
+    # Service Hub staging flag (class attr default; production bases in
+    # mqtt_client.SERVICE_HUB_PRODUCTION_BASES).
+    staging: bool = False
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
@@ -307,6 +313,13 @@ class GspaApiEU(ApiImpl):
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
         # regions.
+
+        # MQTT Service Hub state (used by MqttServiceHubMixin on
+        # HyundaiCciApiEU): session tid from device/host response headers,
+        # and a requests.Session keeping cookies/connection state like
+        # OkHttp's ConnectionPool between host → register → protocol.
+        self._service_hub_tid: str | None = None
+        self._service_hub_session: requests.Session | None = None
 
         self.session = ApiImplSession()
 
@@ -1419,6 +1432,153 @@ class GspaApiEU(ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA prewakeup failed")
             return None
+
+    # ------------------------------------------------------------------
+    # MQTT Service Hub (api/v3/servicehub/*)
+    # ------------------------------------------------------------------
+
+    @property
+    def _service_hub_brand(self) -> str:
+        """Short brand code for Service Hub API (H, K, or G).
+
+        Service Hub endpoints use single-letter brand codes in the body,
+        not the full brand names used in HTTP headers.
+        """
+        if BRANDS[self.brand] == BRAND_KIA:
+            return "K"
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            return "G"
+        return "H"
+
+    def _get_service_hub_headers(self, token: Token) -> dict:
+        """Headers for Service Hub (api/v3/servicehub/*).
+
+        Service Hub uses the CCS SDK HTTP client, not the CCI API
+        headers (app-confirmed header set): Authorization carries the CCS
+        token, plus client-os-code,
+        locale, Accept-Language, X-Application-Id (pushProviderId = FCM),
+        EpitVersion, X-Service-Id (ccspServiceId) and a per-request UUID
+        in X-Request-Id. exchangeable-token / non-ccs-token are attached
+        when the token carries them.
+        """
+        ccs_access = token.ccs_token or token.access_token or ""
+        ccs_access = ccs_access.removeprefix("Bearer ").strip()
+        headers = {
+            "Authorization": f"Bearer {ccs_access}",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT_OK_HTTP,
+            "client-os-code": "AOS",
+            "locale": self.LANGUAGE,
+            "Accept-Language": self.LANGUAGE,
+            "X-Application-Id": self.PUSH_PROVIDER_ID,
+            "EpitVersion": "EPITV2",
+            "X-Service-Id": self.CCSP_CLIENT_SERVICE_ID,
+            # X-Request-Id: per-request UUID (TSID)
+            "X-Request-Id": str(uuid.uuid4()),
+        }
+        # CciAuthenticationHeaderInterceptor — exchangeable-token
+        exchangeable = getattr(token, "exchangeable_token", None) or ""
+        if exchangeable:
+            headers["exchangeable-token"] = exchangeable
+        # CciAuthenticationHeaderInterceptor — non-ccs-token (optional)
+        non_ccs = getattr(token, "non_ccs_token", None) or ""
+        if non_ccs:
+            headers["non-ccs-token"] = non_ccs
+        return headers
+
+    @staticmethod
+    def _build_service_hub_url(base_url: str, params: dict) -> str:
+        """Build URL with query params matching OkHttp 3.12.0 encoding.
+
+        OkHttp does NOT encode '@' in query parameter values, but Python's
+        urllib3 (used by requests) encodes '@' as '%40'. The Service Hub
+        server validates the tid session exactly as sent, so '%40' vs '@'
+        causes "Invalid Parameter (client-id)" on device/protocol.
+
+        This method uses quote() with safe='@' to match OkHttp's behavior.
+        """
+        if not params:
+            return base_url
+        # OkHttp 3.12.0 QUERY_COMPONENT encode set does NOT include @.
+        # We add a generous safe set to match: unreserved chars + @ + sub-delims
+        safe_chars = "-_.~!$'()*,;=:@/?"
+        parts = []
+        for k, v in params.items():
+            encoded_key = quote(str(k), safe=safe_chars)
+            encoded_val = quote(str(v), safe=safe_chars)
+            parts.append(f"{encoded_key}={encoded_val}")
+        return f"{base_url}?{'&'.join(parts)}"
+
+    def _get_service_hub_url(self) -> str:
+        """Get Service Hub base URL for the current brand/region.
+
+        Production bases app-confirmed on live endpoints; staging
+        bases ship in the companion config (plaintext).
+        """
+        # Map brand + region to Service Hub key
+        # Key format: {H|K|G}_{region_code}
+        brand_prefix = {
+            BRAND_HYUNDAI: "H",
+            BRAND_KIA: "K",
+            BRAND_GENESIS: "G",
+        }.get(BRANDS[self.brand], "H")
+
+        # Region mapping (EU is default for this API class)
+        # The CCI EU API only supports EU region, but we provide
+        # the full mapping for future region subclasses
+        region_suffix = "EU"  # The CCI EU API is EU-only
+
+        service_hub_key = f"{brand_prefix}_{region_suffix}"
+
+        from .mqtt_client import SERVICE_HUB_PRODUCTION_BASES, SERVICE_HUB_STAGING_BASES
+
+        if self.staging:
+            bases = SERVICE_HUB_STAGING_BASES
+        else:
+            bases = SERVICE_HUB_PRODUCTION_BASES
+
+        host_port = bases.get(service_hub_key)
+        if not host_port:
+            _LOGGER.error(f"{DOMAIN} - No Service Hub URL for key={service_hub_key}")
+            return ""
+
+        return f"https://{host_port}"
+
+    def get_mqtt_connection_state(self, token: Token) -> str | None:
+        """GET api/v3/vstatus/connstate — check MQTT connection state.
+
+        The app sends: @Query("clientId") — no tid or client-id headers.
+        Returns: "ONLINE", "OFFLINE", or "UNKNOWN".
+        """
+        url = self._get_service_hub_url()
+        if not url:
+            return None
+        url += "/api/v3/vstatus/connstate"
+        headers = self._get_service_hub_headers(token)
+
+        params = {
+            "clientId": token.mqtt_client_id or token.client_device_id or "",
+        }
+        try:
+            full_url = self._build_service_hub_url(url, params)
+            response = requests.get(full_url, headers=headers, timeout=(5, 30))
+            if response.status_code == 200:
+                data = response.json()
+                state = (
+                    data.get("connState")
+                    or data.get("state")
+                    or data.get("status")
+                    or "UNKNOWN"
+                )
+                _LOGGER.debug(f"{DOMAIN} - MQTT connection state: {state}")
+                return state.upper()
+            _LOGGER.warning(
+                f"{DOMAIN} - Service Hub connstate failed: "
+                f"HTTP {response.status_code} — {response.text[:300]}"
+            )
+        except Exception as ex:
+            _LOGGER.error(f"{DOMAIN} - Service Hub connstate error: {ex}")
+        return None
 
     # ------------------------------------------------------------------
     # GSPA stored-status

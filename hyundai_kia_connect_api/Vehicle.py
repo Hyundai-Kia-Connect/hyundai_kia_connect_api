@@ -153,6 +153,11 @@ class Vehicle:
     # SVM (Surround View Monitor / Find My Car) — USA Hyundai
     supports_svm: bool | None = None
 
+    # MQTT identity fields (populated by the Service Hub metadata reads);
+    # subscription capabilities live in mqtt_client.MqttCacheCapabilities.
+    mqtt_client_id: str | None = None
+    hu_client_id: str | None = None
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None

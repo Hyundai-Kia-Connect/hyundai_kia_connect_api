@@ -36,6 +36,7 @@ setup(
     extras_require={
         "google": ["geopy>=2.2.0"],
         "image": ["Pillow>=10.0.0", "numpy>=1.26.0"],
+        "mqtt": ["paho-mqtt>=2.1.0"],
     },
     license="MIT license",
     long_description=long_description,

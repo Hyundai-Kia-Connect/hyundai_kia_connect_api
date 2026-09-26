@@ -35,6 +35,16 @@ class Token:
     id_token: str | None = None
     # User ID for GSPA X-Stamp (uid claim from CCS JWT).
     user_id: str | None = None
+    # CCS token (distinct from access_token on the k0 lineage; kept for
+    # parity — MQTT password fallback reads ccs_token or access_token).
+    ccs_token: str | None = None
+    # Client device id (ccId from login; used as MQTT register uuid
+    # fallback before device_id).
+    client_device_id: str | None = None
+    # MQTT connection state (populated by Service Hub registration).
+    mqtt_client_id: str | None = None
+    mqtt_broker_host: str | None = None
+    mqtt_broker_port: int | None = None
 
     def to_dict(self) -> dict:
         """Convert Token to a JSON‑serializable dict."""
@@ -71,4 +81,9 @@ class Token:
             non_ccs_refresh_token=data.get("non_ccs_refresh_token"),
             id_token=data.get("id_token"),
             user_id=data.get("user_id"),
+            ccs_token=data.get("ccs_token"),
+            client_device_id=data.get("client_device_id"),
+            mqtt_client_id=data.get("mqtt_client_id"),
+            mqtt_broker_host=data.get("mqtt_broker_host"),
+            mqtt_broker_port=data.get("mqtt_broker_port"),
         )
