@@ -153,6 +153,17 @@ class Vehicle:
     # SVM (Surround View Monitor / Find My Car) — USA Hyundai
     supports_svm: bool | None = None
 
+    # Software version (GSPA device-info read)
+    software_version: str | None = None
+    ota_update_available: bool | None = None
+
+    # Cached-failure flags for GSPA query endpoints (reset by force refresh).
+    # _ota_checked: True after the first OTA check (no re-check until force
+    # refresh); _valet_failed: pessimistic circuit — True while a valet read
+    # is in flight or after a failure, reset to False on success.
+    _ota_checked: bool = False
+    _valet_failed: bool = False
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None
     tire_pressure_rear_left_warning_is_on: bool = None

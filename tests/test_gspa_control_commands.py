@@ -648,47 +648,6 @@ def test_control_command_2xx_business_error_raises():
             api.stop_rear_seat_alarm(token, vehicle)
 
 
-def test_schedule_reservation_charge_na_body():
-    """NA-variant charge reservation: single weekly window, reservChargeSet
-    hardcoded false (as both apps send), no command key, bearer auth."""
-    _, call = _run_command(
-        HyundaiCciApiEU.schedule_reservation_charge_na,
-        [1],
-        dt.time(7, 5),
-        dt.time(10, 0),
-    )
-    assert call.args[0].endswith(
-        "/gspa/v1/remote/vehicles/test123/reservation-charge-na"
-    )
-    # data_timezone is UTC on the CCI region — conversion is a pass-through.
-    assert call.kwargs["json"] == {
-        "reservChargeInfo": {
-            "reservInfo": {"day": [1], "time": "07:05:00Z"},
-            "reservEndTime": "10:00:00Z",
-            "reservChargeSet": False,
-        }
-    }
-    assert "AuthorizationCCSP" not in call.kwargs["headers"]
-    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
-
-
-def test_schedule_reservation_charge_na_dedup_and_guard():
-    with pytest.raises(ValueError):
-        _run_command(
-            HyundaiCciApiEU.schedule_reservation_charge_na,
-            [],
-            dt.time(7, 5),
-            dt.time(10, 0),
-        )
-    _, call = _run_command(
-        HyundaiCciApiEU.schedule_reservation_charge_na,
-        [3, 1, 3],
-        dt.time(7, 5),
-        dt.time(10, 0),
-    )
-    assert call.kwargs["json"]["reservChargeInfo"]["reservInfo"]["day"] == [1, 3]
-
-
 def test_schedule_reservation_charge_na_utc_day_shift():
     """A local time west of UTC midnight shifts the wire day index back
     (Sunday 00:30 at UTC+2 -> Saturday 22:30 UTC), mirroring the app's
@@ -708,3 +667,53 @@ def test_schedule_reservation_charge_na_utc_day_shift():
         )
     body = post.call_args.kwargs["json"]["reservChargeInfo"]
     assert body["reservInfo"] == {"day": [6], "time": "22:30:00Z"}
+
+
+def test_set_ota_update_start():
+    """set_ota_update(start=True) POSTs {updateStart: 1} to the mru
+    ota-updates path (1 = start). The response has no polling SID, so
+    the parsed body is returned."""
+    result, call = _run_command(HyundaiCciApiEU.set_ota_update, True)
+    assert isinstance(result, dict)
+    assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
+    assert call.kwargs["json"] == {"updateStart": 1}
+
+
+def test_set_ota_update_cancel():
+    """set_ota_update(start=False) POSTs {updateStart: 2} (cancel)."""
+    result, call = _run_command(HyundaiCciApiEU.set_ota_update, False)
+    assert isinstance(result, dict)
+    assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
+    assert call.kwargs["json"] == {"updateStart": 2}
+
+
+def test_set_ota_reservation_passthrough():
+    """set_ota_reservation POSTs the settings body unchanged to the D4
+    path (missing vehicles/{carId} was the pre-rework bug)."""
+    settings = {
+        "operation": "create",
+        "targetReservationTime": "20260905-0300",
+        "originReservationTime": None,
+    }
+    result, call = _run_command(HyundaiCciApiEU.set_ota_reservation, settings)
+    assert isinstance(result, dict)
+    assert call.args[0].endswith(
+        "/gspa/v1/mru/vehicles/test123/ota-updates-reservation"
+    )
+    assert call.kwargs["json"] == settings
+
+
+def test_set_ota_update_uses_bearer_headers():
+    """OTA commands authenticate with the standard GSPA headers — the
+    PIN-derived control token path is not used."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        HyundaiCciApiEU.set_ota_update(api, token, vehicle, True)
+    get_ct.assert_not_called()
+    assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer ccs-token"

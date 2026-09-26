@@ -144,3 +144,65 @@ def test_base_gspa_get_500_json_meta_raises_api_error():
         pytest.raises(APIError, match="HTTP 500 500-999"),
     ):
         api._gspa_get(token, vehicle, "status/vehicles/{carId}/stored-status")
+
+
+def test_get_ota_updates_returns_data():
+    """get_ota_updates GETs the mru ota-updates path and returns the
+    data payload."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    rs_data = {"otaUpdateList": [{"updateVer": "CCU26.1.0"}]}
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": rs_data,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_ota_updates(token, vehicle)
+
+    assert result == rs_data
+    assert mock_get.call_args[0][0].endswith(
+        "/gspa/v1/mru/vehicles/test123/ota-updates"
+    )
+
+
+def test_get_ota_updates_returns_none_on_error():
+    """get_ota_updates swallows non-auth failures and returns None."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "F", "resCode": "404-007", "message": "no update info"},
+        "data": None,
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
+        assert api.get_ota_updates(token, vehicle) is None
+
+
+def test_get_software_version_returns_data():
+    """get_software_version GETs the device-info software-version path."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    rs_data = {"swVer": "CCU25.SF.HEV.SOP1.001"}
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+        "data": rs_data,
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        result = api.get_software_version(token, vehicle)
+
+    assert result == rs_data
+    assert mock_get.call_args[0][0].endswith(
+        "/gspa/v1/device-info/vehicles/test123/software-version"
+    )
