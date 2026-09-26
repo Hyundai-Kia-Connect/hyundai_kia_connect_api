@@ -236,3 +236,74 @@ def test_ccs2_parser_ev6_offpeak_mode_zero(api: KiaCciApiEU, vehicle: Vehicle) -
     assert vehicle.ev_battery_precondition_enabled is False
     assert vehicle.ev_battery_winter_mode is None
     assert vehicle.headlamp_status == 0
+
+
+def test_ccs2_parser_bucket_a_fields(api: KiaCciApiEU, vehicle: Vehicle) -> None:
+    """Remaining stored-status fields with clear semantics (issue #1321,
+    bucket A) on the PV5 fixture, which carries every block."""
+    data = load_fixture(PV5_FIXTURE)
+    api._update_vehicle_properties_ccs2(vehicle, data)
+
+    # Charge-complete alarm presets.
+    assert vehicle.ev_charge_complete_alarm_before_10min is True
+    assert vehicle.ev_charge_complete_alarm_before_20min is False
+    assert vehicle.ev_charge_complete_alarm_before_30min is False
+    assert vehicle.ev_charge_complete_alarm_off is False
+    # Unconfigured ExpectedTime sentinel (Hour 31 / Min 63) -> None.
+    assert vehicle.ev_charge_expected_start_time is None
+    assert vehicle.ev_charge_expected_end_time is None
+    # Cabin / lamp / auto-cut booleans.
+    assert vehicle.hazard_lights_on is False
+    assert vehicle.windshield_front_heater_is_on is False
+    assert vehicle.air_cleaning_is_on is True
+    assert vehicle.auto_cut_battery_prewarning_on is False
+    assert vehicle.steering_wheel_heat_step == 0
+    # Drivetrain + V2L (raw values; unit/enum semantics stay unmapped).
+    assert vehicle.gear_position == 0
+    assert vehicle.ev_v2l_discharge_remain_time == 0
+    assert vehicle.ev_v2l_discharge_dte == 78
+    assert vehicle.ev_v2l_mode == 1
+    assert vehicle.average_fuel_economy_accumulated == 19.3
+    assert vehicle.average_fuel_economy_drive == 16.6
+    assert vehicle.average_fuel_economy_after_refuel == 16.7
+    assert vehicle.average_fuel_economy_unit == 5
+
+
+def test_ccs2_parser_absent_blocks_stay_none(
+    api: KiaCciApiEU, vehicle: Vehicle
+) -> None:
+    """The EV6 fixture lacks the CompleteAlarm block and VehicleToLoad.
+    Mode — those fields stay None (no synthesized defaults)."""
+    data = load_fixture(FIXTURE)
+    api._update_vehicle_properties_ccs2(vehicle, data)
+
+    assert vehicle.ev_charge_complete_alarm_before_10min is None
+    assert vehicle.ev_charge_complete_alarm_before_20min is None
+    assert vehicle.ev_charge_complete_alarm_before_30min is None
+    assert vehicle.ev_charge_complete_alarm_off is None
+    assert vehicle.ev_v2l_mode is None
+
+
+def test_ccs2_parser_expected_time_in_range(api: KiaCciApiEU, vehicle: Vehicle) -> None:
+    """A configured ExpectedTime (Hour/Min in range) parses to times; the
+    live payloads only ever carry the unconfigured sentinel."""
+    import datetime as dt
+
+    state = {
+        "Green": {
+            "ChargingInformation": {
+                "ExpectedTime": {
+                    "StartDay": 1,
+                    "StartHour": 22,
+                    "StartMin": 5,
+                    "EndDay": 1,
+                    "EndHour": 6,
+                    "EndMin": 30,
+                }
+            }
+        }
+    }
+    api._update_vehicle_properties_ccs2(vehicle, state)
+
+    assert vehicle.ev_charge_expected_start_time == dt.time(22, 5)
+    assert vehicle.ev_charge_expected_end_time == dt.time(6, 30)

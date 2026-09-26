@@ -209,6 +209,9 @@ class Vehicle:
         None  # Europe feature only, ac charging current limit
     )
     ev_v2l_discharge_limit: int | None = None
+    ev_v2l_discharge_remain_time: int | None = None  # minutes (raw)
+    ev_v2l_discharge_dte: int | None = None  # raw, unit not enum-mapped
+    ev_v2l_mode: int | None = None  # raw SmartGrid.VehicleToLoad.Mode
 
     ev_v2l_status: bool | None = None
     ev_v2x_status: bool | None = None
@@ -230,7 +233,28 @@ class Vehicle:
     ign3: bool = None
     remote_ignition: bool = None
     transmission_condition: str = None
+    gear_position: int | None = None  # raw Transmission.GearPosition
     sleep_mode_check: bool = None
+    auto_cut_battery_prewarning_on: bool | None = None
+
+    # Charge-complete alarm options (GSPA ChargingInformation.Setting.
+    # CompleteAlarm.* — independent preset flags, raw booleans).
+    ev_charge_complete_alarm_before_10min: bool | None = None
+    ev_charge_complete_alarm_before_20min: bool | None = None
+    ev_charge_complete_alarm_before_30min: bool | None = None
+    ev_charge_complete_alarm_off: bool | None = None
+    # Expected charge window (GSPA ChargingInformation.ExpectedTime) —
+    # hour/min guarded by ccs2_reservation_time_or_none (Day semantics
+    # unconfirmed, not exposed).
+    ev_charge_expected_start_time: datetime.time | None = None
+    ev_charge_expected_end_time: datetime.time | None = None
+
+    # Average fuel economy (Drivetrain.FuelSystem.AverageFuelEconomy);
+    # values raw, Unit enum not translated (differs per powertrain).
+    average_fuel_economy_accumulated: float | None = None
+    average_fuel_economy_drive: float | None = None
+    average_fuel_economy_after_refuel: float | None = None
+    average_fuel_economy_unit: int | None = None
 
     # Lamp status fields (KiaUvoApiEU and CA)
     headlamp_status: str = None
@@ -246,6 +270,12 @@ class Vehicle:
     turn_signal_right_front: bool = None
     turn_signal_left_rear: bool = None
     turn_signal_right_rear: bool = None
+    hazard_lights_on: bool | None = None
+
+    # GSPA cabin extras (flat CCS2 schema)
+    windshield_front_heater_is_on: bool | None = None
+    air_cleaning_is_on: bool | None = None
+    steering_wheel_heat_step: int | None = None
 
     @property
     def daily_stats(self):

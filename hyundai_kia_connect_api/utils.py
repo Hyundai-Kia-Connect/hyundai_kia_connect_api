@@ -85,6 +85,16 @@ def float_or_none(value: str | float | None) -> float | None:
         return None
 
 
+def int_or_none(value: str | float | None) -> int | None:
+    """Coerce to int; return None for missing or non-numeric values."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):  # fmt: skip
+        return None
+
+
 def bool_or_none(value: Any) -> bool | None:
     """Cast to bool, preserving None (None -> None, else bool(value)).
 

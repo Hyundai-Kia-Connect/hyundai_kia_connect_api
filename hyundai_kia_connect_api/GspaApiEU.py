@@ -72,6 +72,7 @@ from .utils import (
     ccs2_reservation_time_or_none,
     float_or_none,
     get_child_value,
+    int_or_none,
     normalize_battery_soc,
     parse_datetime,
     pressure_or_none,
@@ -1499,6 +1500,13 @@ class GspaApiEU(ApiImpl):
             vehicle.steering_wheel_heater_is_on = False
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
+        vehicle.steering_wheel_heat_step = int_or_none(
+            get_child_value(state, "Cabin.SteeringWheel.Heat.RemoteControl.Step")
+        )
+
+        vehicle.windshield_front_heater_is_on = bool_or_none(
+            get_child_value(state, "Body.Windshield.Front.Heat.State")
+        )
 
         defrost_rear_is_on = get_child_value(state, "Body.Windshield.Rear.Defog.State")
         if defrost_rear_is_on in [0, 2]:
@@ -1681,10 +1689,19 @@ class GspaApiEU(ApiImpl):
         vehicle.turn_signal_right_rear = get_child_value(
             state, "Body.Lights.Rear.Right.TurnSignal.Warning"
         )
+        vehicle.hazard_lights_on = bool_or_none(
+            get_child_value(state, "Body.Lights.Hazard.Alert")
+        )
 
         # Drivetrain / ignition state
         vehicle.transmission_condition = get_child_value(
             state, "Drivetrain.Transmission.ParkingPosition"
+        )
+        vehicle.gear_position = int_or_none(
+            get_child_value(state, "Drivetrain.Transmission.GearPosition")
+        )
+        vehicle.auto_cut_battery_prewarning_on = bool_or_none(
+            get_child_value(state, "Electronics.AutoCut.BatteryPreWarning")
         )
         vehicle.ign3 = get_child_value(state, "Electronics.PowerSupply.Ignition3")
         accessory_ign = get_child_value(state, "Electronics.PowerSupply.Ignition1")
@@ -1765,6 +1782,37 @@ class GspaApiEU(ApiImpl):
         vehicle.ev_charging_current = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
         )
+
+        # Expected charge window — live payloads carry the unconfigured
+        # sentinel (Day 7, Hour 31, Min 63); the time guard maps it to
+        # None. Day semantics are unconfirmed, so only the time is exposed.
+        expected = get_child_value(state, "Green.ChargingInformation.ExpectedTime")
+        if isinstance(expected, dict):
+            vehicle.ev_charge_expected_start_time = ccs2_reservation_time_or_none(
+                expected.get("StartHour"), expected.get("StartMin")
+            )
+            vehicle.ev_charge_expected_end_time = ccs2_reservation_time_or_none(
+                expected.get("EndHour"), expected.get("EndMin")
+            )
+
+        # Charge-complete alarm presets — independent flags; absent block
+        # (EV6 fixture) leaves all four None.
+        complete_alarm = get_child_value(
+            state, "Green.ChargingInformation.Setting.CompleteAlarm"
+        )
+        if isinstance(complete_alarm, dict):
+            vehicle.ev_charge_complete_alarm_before_10min = bool_or_none(
+                complete_alarm.get("Before10min")
+            )
+            vehicle.ev_charge_complete_alarm_before_20min = bool_or_none(
+                complete_alarm.get("Before20min")
+            )
+            vehicle.ev_charge_complete_alarm_before_30min = bool_or_none(
+                complete_alarm.get("Before30min")
+            )
+            vehicle.ev_charge_complete_alarm_off = bool_or_none(
+                complete_alarm.get("Off")
+            )
         ev_charging_power = get_child_value(
             state, "Green.Electric.SmartGrid.RealTimePower"
         )
@@ -1772,6 +1820,21 @@ class GspaApiEU(ApiImpl):
             vehicle.ev_charging_power = float(ev_charging_power)
         vehicle.ev_v2l_discharge_limit = get_child_value(
             state, "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
+        )
+        vehicle.ev_v2l_discharge_remain_time = int_or_none(
+            get_child_value(
+                state,
+                "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.RemainTime",
+            )
+        )
+        vehicle.ev_v2l_discharge_dte = int_or_none(
+            get_child_value(
+                state,
+                "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.DTE",
+            )
+        )
+        vehicle.ev_v2l_mode = int_or_none(
+            get_child_value(state, "Green.Electric.SmartGrid.VehicleToLoad.Mode")
         )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Standard"),
@@ -1909,8 +1972,31 @@ class GspaApiEU(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(
             state, "Drivetrain.FuelSystem.LowFuelWarning"
         )
+
+        # Average fuel economy (HEV/PHEV l-per-100km style, EV km/kWh style —
+        # Unit enum differs per powertrain, so values and unit stay raw).
+        average_fuel_economy = get_child_value(
+            state, "Drivetrain.FuelSystem.AverageFuelEconomy"
+        )
+        if isinstance(average_fuel_economy, dict):
+            vehicle.average_fuel_economy_accumulated = float_or_none(
+                average_fuel_economy.get("Accumulated")
+            )
+            vehicle.average_fuel_economy_drive = float_or_none(
+                average_fuel_economy.get("Drive")
+            )
+            vehicle.average_fuel_economy_after_refuel = float_or_none(
+                average_fuel_economy.get("AfterRefuel")
+            )
+            vehicle.average_fuel_economy_unit = int_or_none(
+                average_fuel_economy.get("Unit")
+            )
+
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
+        vehicle.air_cleaning_is_on = bool_or_none(
+            get_child_value(state, "Cabin.HVAC.Vent.AirCleaning.Indicator")
         )
         vehicle.smart_key_battery_warning_is_on = bool_or_none(
             get_child_value(state, "Electronics.FOB.LowBattery")
