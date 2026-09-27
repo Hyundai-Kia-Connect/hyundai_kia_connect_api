@@ -72,6 +72,9 @@ class KiaCciApiEU(GspaApiEU):
     # integration through vehicle-status pushes or the cached state read.
     # Observed per command on EV6, EV3, eNiro, I5, Tucson and IONIQ 6.
 
+    # Legacy v1 CCAPI host - used only by the /tripinfo read.
+    CCAPI_BASE_URL = "prd.eu-ccapi.kia.com:8080"
+
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
     ONEAPP_REDIRECT_URI = "https://oneapp.kia.com/redirect"
