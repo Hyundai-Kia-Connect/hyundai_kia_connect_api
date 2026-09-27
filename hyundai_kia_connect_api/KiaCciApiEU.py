@@ -54,6 +54,9 @@ class KiaCciApiEU(GspaApiEU):
     # bearer headers — confirmed shape {"action": "prewakeup"}).
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature", "lamp"})
 
+    # Legacy v1 CCAPI host - used only by the /tripinfo read.
+    CCAPI_BASE_URL = "prd.eu-ccapi.kia.com:8080"
+
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
     ONEAPP_REDIRECT_URI = "https://oneapp.kia.com/redirect"
