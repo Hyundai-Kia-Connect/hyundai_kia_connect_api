@@ -8,49 +8,74 @@ paho-mqtt is a hard dependency (requirements.txt, >=2,<3).
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
 from enum import Enum
 
 import paho.mqtt.client as mqtt
 
+from .mqtt_service_hub import (  # noqa: F401 — transitional re-exports (removed with the VM rewrite)
+    MQTT_CONTENT_TYPE_RC,
+    MQTT_PROTOCOL_ID_CCU_UPDATE,
+    MQTT_PROTOCOL_ID_CONNECTION,
+    MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_CAR,
+    MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_MOBILE,
+    MQTT_PROTOCOL_ID_DEVICE_RC_COMMAND,
+    MQTT_PROTOCOL_ID_DEVICE_RC_CONNECT,
+    MQTT_PROTOCOL_ID_DEVICE_RC_CONNECTCHECK,
+    MQTT_PROTOCOL_ID_RC_CLOSE_CAR,
+    MQTT_PROTOCOL_ID_RC_CLOSE_MOBILE,
+    MQTT_PROTOCOL_ID_RC_COMMAND,
+    MQTT_PROTOCOL_ID_RC_CONNECT,
+    MQTT_PROTOCOL_ID_RC_CONNECTCHECK,
+    MQTT_PROTOCOL_ID_RES,
+    POSTFIX_CLOSE_CONNECTIONSTATUS_REQ,
+    POSTFIX_CLOSE_CONNECTIONSTATUS_RES,
+    POSTFIX_CLOSE_MEDIA_VEHICLESTATUS,
+    POSTFIX_CLOSE_PRECONDITION,
+    POSTFIX_CLOSE_PRECONDITION_REQ,
+    POSTFIX_CLOSE_REMOTE_REQ,
+    POSTFIX_CLOSE_REMOTE_RES,
+    POSTFIX_CLOSE_VEHICLESTATUS,
+    POSTFIX_CLOSE_VEHICLESTATUS_REQ,
+    POSTFIX_OTA_PROGRESS,
+    POSTFIX_OTA_SCHEDULEUPDATE,
+    POSTFIX_REMOTE_COMMAND,
+    POSTFIX_REMOTE_CONNECT,
+    POSTFIX_REMOTE_CONNECTCHECK,
+    POSTFIX_REMOTE_MOBILECLOSE,
+    POSTFIX_REMOTE_VEHICLECLOSE,
+    SERVICE_HUB_PRODUCTION_BASES,
+    SERVICE_HUB_STAGING_BASES,
+    TOPIC_PREFIX_CONNECTION,
+    TOPIC_PREFIX_DEVICE,
+    TOPIC_PREFIX_DEVICE_RES,
+    TOPIC_PREFIX_LOCATION,
+    TOPIC_PREFIX_RES,
+    TOPIC_PREFIX_VEHICLE,
+    TOPIC_PREFIX_VSS,
+    MqttCacheCapabilities,
+    MqttHVACCommand,
+    MqttHVACHeader,
+    MqttMessage,
+    MqttRCCommandType,
+    MqttRCHeader,
+    _classify_topic,
+    _extract_infix,
+    build_car_close_remote_topics,
+    build_car_remote_topics,
+    build_car_status_topics,
+    build_device_close_remote_topics,
+    build_device_remote_topics,
+    build_ota_topics,
+    build_topic,
+    parse_mqtt_message,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "hyundai_kia_connect_api"
-
-# ---------------------------------------------------------------------------
-# MQTT topic constants (resolved from the official EU app, v1.1.4)
-# ---------------------------------------------------------------------------
-
-# Topic prefixes (prefix + infix + postfix = full topic)
-TOPIC_PREFIX_VEHICLE = "vehicle/"  # CarRemote, CarCloseRemote, CarOta
-TOPIC_PREFIX_DEVICE = "device/"  # DeviceRemote, DeviceCloseRemote
-TOPIC_PREFIX_VSS = "service/phone/_/vss/"  # CarStatus.Status
-TOPIC_PREFIX_CONNECTION = "service/phone/_/connection/"  # CarStatus.Connect
-TOPIC_PREFIX_RES = "service/phone/_/res/"  # CarStatus.Res
-TOPIC_PREFIX_LOCATION = "service/phone/_/location/"  # CarStatus.Location
-TOPIC_PREFIX_DEVICE_RES = "$/device/res/"  # DeviceRemote.Res (separate prefix)
-
-# Topic postfixes
-POSTFIX_REMOTE_COMMAND = "/remotecontroller/command"
-POSTFIX_REMOTE_CONNECT = "/remotecontroller/connect"
-POSTFIX_REMOTE_CONNECTCHECK = "/remotecontroller/connectcheck"
-POSTFIX_REMOTE_MOBILECLOSE = "/remotecontroller/mobileclose"
-POSTFIX_REMOTE_VEHICLECLOSE = "/remotecontroller/vehicleclose"
-POSTFIX_CLOSE_CONNECTIONSTATUS_REQ = "/closeremote/connectionstatus/req"
-POSTFIX_CLOSE_PRECONDITION_REQ = "/closeremote/precondition/req"
-POSTFIX_CLOSE_REMOTE_REQ = "/closeremote/remote/req"
-POSTFIX_CLOSE_VEHICLESTATUS_REQ = "/closeremote/vehiclestatus/req"
-POSTFIX_CLOSE_CONNECTIONSTATUS_RES = "/closeremote/connectionstatus/res"
-POSTFIX_CLOSE_MEDIA_VEHICLESTATUS = "/closeremote/media/vehiclestatus"
-POSTFIX_CLOSE_PRECONDITION = "/closeremote/precondition"
-POSTFIX_CLOSE_REMOTE_RES = "/closeremote/remote/res"
-POSTFIX_CLOSE_VEHICLESTATUS = "/closeremote/vehiclestatus"
-POSTFIX_OTA_PROGRESS = "/_/ota/otaprogress"
-POSTFIX_OTA_SCHEDULEUPDATE = "/_/ota/scheduleupdate"
 
 
 # MQTT connection state values
@@ -59,382 +84,6 @@ class MqttConnectionState(str, Enum):
     OFFLINE = "OFFLINE"
     UNKNOWN = "UNKNOWN"
 
-
-# MQTT RC command types (from MQTTRCCommand enum)
-class MqttRCCommandType(int, Enum):
-    CONNECT = -1
-    CONNECT_CHECK = -2
-    CONNECTING_CANCEL = -3
-    DISCONNECT = 0
-    MODE_CHANGE = 1
-    VOLUME_UP = 2
-    VOLUME_DOWN = 3
-    MUTE = 4
-    SEEK_UP = 5
-    SEEK_DOWN = 6
-    AV_ON_OFF = 7
-
-
-# MQTT HVAC command values (from MQTTHVACCommand)
-class MqttHVACCommand(str, Enum):
-    PLAY = "PLAY"
-    STOP = "STOP"
-    PAUSE = "PAUSE"
-    PREV = "PREV"
-    NEXT = "NEXT"
-    VOL_UP = "VOL_UP"
-    VOL_DOWN = "VOL_DOWN"
-    MUTE = "MUTE"
-    UNMUTE = "UNMUTE"
-
-
-# Service Hub URL patterns (from the official EU app, v1.1.4)
-# Production URLs are used for real connections; staging for testing.
-# Both use port 31010 (HTTPS for REST, same host serves MQTT on port 443/8883).
-SERVICE_HUB_PRODUCTION_BASES = {
-    "H_EU": "egw-svchub-ccs-h-eu.eu-central.hmgmobility.com:31010",
-    "H_KR": "egw-svchub-ccs-h-kr.ap-northeast.hmgmobility.com:31010",
-    "H_CA": "egw-svchub-ccs-h-ca.us-west.hmgmobility.com:31010",
-    "H_JP": "egw-svchub-ccs-h-jp.ap-northeast.hmgmobility.com:31010",
-    "H_US": "egw-svchub-ccs-h-us.us-west.hmgmobility.com:31010",
-    "H_SA": "egw-svchub-ccs-h-sa.sa-east.hmgmobility.com:31010",
-    "K_EU": "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010",
-    "K_KR": "egw-svchub-ccs-k-kr.ap-northeast.hmgmobility.com:31010",
-    "K_CA": "egw-svchub-ccs-k-ca.us-west.hmgmobility.com:31010",
-    "K_JP": "egw-svchub-ccs-k-jp.ap-northeast.hmgmobility.com:31010",
-    "K_US": "egw-svchub-ccs-k-us.us-west.hmgmobility.com:31010",
-    "K_SA": "egw-svchub-ccs-k-sa.sa-east.hmgmobility.com:31010",
-    "G_EU": "egw-svchub-ccs-g-eu.eu-central.hmgmobility.com:31010",
-    "G_KR": "egw-svchub-ccs-g-kr.ap-northeast.hmgmobility.com:31010",
-    "G_CA": "egw-svchub-ccs-g-ca.us-west.hmgmobility.com:31010",
-    "G_US": "egw-svchub-ccs-g-us.us-west.hmgmobility.com:31010",
-    "G_SA": "egw-svchub-ccs-g-sa.sa-central.hmgmobility.com:31010",
-}
-
-SERVICE_HUB_STAGING_BASES = {
-    "H_EU": "stg-egw-svchub-ccs-H-eu.eu-central.hmgmobility.com:31010",
-    "H_KR": "stg-egw-svchub-ccs-H-kr.ap-northeast.hmgmobility.com:31010",
-    "H_CA": "stg-egw-svchub-ccs-H-ca.us-west.hmgmobility.com:31010",
-    "H_JP": "stg-egw-svchub-ccs-H-jp.ap-northeast.hmgmobility.com:31010",
-    "H_US": "stg-egw-svchub-ccs-H-us.us-west.hmgmobility.com:31010",
-    "H_SA": "stg-egw-svchub-ccs-H-sa.sa-east.hmgmobility.com:31010",
-    "K_EU": "stg-egw-svchub-ccs-K-eu.eu-central.hmgmobility.com:31010",
-    "K_KR": "stg-egw-svchub-ccs-K-kr.ap-northeast.hmgmobility.com:31010",
-    "K_CA": "stg-egw-svchub-ccs-K-ca.us-west.hmgmobility.com:31010",
-    "K_JP": "stg-egw-svchub-ccs-K-jp.ap-northeast.hmgmobility.com:31010",
-    "K_SA": "stg-egw-svchub-ccs-K-sa.sa-east.hmgmobility.com:31010",
-    "G_EU": "stg-egw-svchub-ccs-G-eu.eu-central.hmgmobility.com:31010",
-    "G_KR": "stg-egw-svchub-ccs-G-kr.ap-northeast.hmgmobility.com:31010",
-    "G_CA": "stg-egw-svchub-ccs-G-ca.us-west.hmgmobility.com:31010",
-}
-
-# Protocol IDs — sent as plain strings in Service Hub and MQTT messages
-# Base protocols (always included): service.phone.vss, service.phone.connection,
-# service.phone.res; RC connect: vehicle.remotecontroller.connect
-#   m39749(1540415511) mode=7 → vehicle.remotecontroller.command
-#   m39740(1808586424) mode=0 → vehicle.remotecontroller.connectcheck
-#   m39739(1250028738) mode=2 → vehicle.remotecontroller.mobileclose
-#   m39739(1250028938) mode=2 → vehicle.remotecontroller.vehicleclose (closefromcar was wrong)
-#   m39750(1676614053) mode=5 → application/json (content type, NOT a protocol)
-#   m1335(1674116117) mode=4  → statesync.vehicle.ccu.update (protocolId field)
-MQTT_PROTOCOL_ID_VSS = "service.phone.vss"
-MQTT_PROTOCOL_ID_CONNECTION = "service.phone.connection"
-MQTT_PROTOCOL_ID_RES = "service.phone.res"
-# Vehicle RC protocols (CarRemote topics use vehicle/ prefix)
-MQTT_PROTOCOL_ID_RC_CONNECT = "vehicle.remotecontroller.connect"
-MQTT_PROTOCOL_ID_RC_COMMAND = "vehicle.remotecontroller.command"
-MQTT_PROTOCOL_ID_RC_CONNECTCHECK = "vehicle.remotecontroller.connectcheck"
-MQTT_PROTOCOL_ID_RC_CLOSE_MOBILE = "vehicle.remotecontroller.mobileclose"
-MQTT_PROTOCOL_ID_RC_CLOSE_CAR = "vehicle.remotecontroller.vehicleclose"
-# Device RC protocols (DeviceRemote topics use device/ prefix)
-# The app's protocol registration includes BOTH device.* AND vehicle.* variants
-MQTT_PROTOCOL_ID_DEVICE_RC_CONNECT = "device.remotecontroller.connect"
-MQTT_PROTOCOL_ID_DEVICE_RC_COMMAND = "device.remotecontroller.command"
-MQTT_PROTOCOL_ID_DEVICE_RC_CONNECTCHECK = "device.remotecontroller.connectcheck"
-MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_MOBILE = "device.remotecontroller.mobileclose"
-MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_CAR = "device.remotecontroller.vehicleclose"
-MQTT_CONTENT_TYPE_RC = "application/json"
-MQTT_PROTOCOL_ID_CCU_UPDATE = "statesync.vehicle.ccu.update"
-
-
-# ---------------------------------------------------------------------------
-# Message data classes
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class MqttMessage:
-    """Parsed MQTT message delivered to the callback."""
-
-    topic_group: str  # "CarStatus", "DeviceRemote", "CarRemote", etc.
-    topic_type: str  # "Status", "Res", "Connect", "Command", etc.
-    vehicle_id: str  # Vehicle ID from topic infix
-    payload: dict  # Parsed JSON (header + body)
-
-
-@dataclass
-class MqttRCHeader:
-    """RC message header."""
-
-    authorization: str | None = None
-    content_type: str | None = None
-    client_id: str | None = None
-    device_id: str | None = None
-    protocol_id: str | None = None
-    tid: str | None = None
-
-
-@dataclass
-class MqttHVACHeader:
-    """HVAC message header."""
-
-    tid: str | None = None
-    client_id: str | None = None
-    protocol_id: str | None = None
-    scenario: int | None = None
-    air_conditioning: int | None = None
-    media: int | None = None
-
-
-@dataclass
-class MqttCacheCapabilities:
-    """Capabilities from MQTTCacheResponse (topic subscription logic)."""
-
-    has_hvac_close_remote: bool = False
-    has_media_close_remote: bool = False
-    is_support_speed_event: bool = False
-    is_support_ota_progress: bool = False
-    is_support_schedule_update: bool = False
-    ccu_client_id: str | None = None
-    hu_client_id: str | None = None
-    vehicle_id: str | None = None
-    client_id: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# Topic builder
-# ---------------------------------------------------------------------------
-
-
-def build_topic(prefix: str, infix: str, postfix: str = "") -> str:
-    """Build an MQTT topic string from prefix + infix + postfix."""
-    return prefix + infix + postfix
-
-
-def build_car_status_topics(
-    vehicle_id: str, capabilities: MqttCacheCapabilities
-) -> list[str]:
-    """Build CarStatus topic list for a vehicle.
-
-    NOTE: The `service/phone/_/res/{vehicle_id}` topic (TOPIC_PREFIX_RES) is
-    NOT included because the Hyundai CCI broker rejects subscriptions to it
-    with rc=128 disconnect. Only VSS and Connection topics are authorized for
-    phone clients. The `res` topic may only be available to head-unit clients.
-    """
-    topics = [
-        build_topic(TOPIC_PREFIX_VSS, vehicle_id),
-        build_topic(TOPIC_PREFIX_CONNECTION, vehicle_id),
-        # res topic excluded — broker rejects with rc=128
-        # build_topic(TOPIC_PREFIX_RES, vehicle_id),
-    ]
-    if capabilities.is_support_speed_event:
-        topics.append(build_topic(TOPIC_PREFIX_LOCATION, vehicle_id))
-    return topics
-
-
-def build_device_remote_topics(client_id: str) -> list[str]:
-    """Build DeviceRemote topic list for a device."""
-    return [
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_REMOTE_COMMAND),
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_REMOTE_CONNECT),
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_REMOTE_CONNECTCHECK),
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_REMOTE_MOBILECLOSE),
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_REMOTE_VEHICLECLOSE),
-        build_topic(TOPIC_PREFIX_DEVICE_RES, client_id),
-    ]
-
-
-def build_car_remote_topics(hu_client_id: str) -> list[str]:
-    """Build CarRemote topic list (infix = huClientId)."""
-    return [
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_REMOTE_COMMAND),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_REMOTE_CONNECT),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_REMOTE_CONNECTCHECK),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_REMOTE_MOBILECLOSE),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_REMOTE_VEHICLECLOSE),
-    ]
-
-
-def build_car_close_remote_topics(hu_client_id: str) -> list[str]:
-    """Build CarCloseRemote topic list."""
-    return [
-        build_topic(
-            TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_CLOSE_CONNECTIONSTATUS_REQ
-        ),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_CLOSE_PRECONDITION_REQ),
-        build_topic(TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_CLOSE_REMOTE_REQ),
-        build_topic(
-            TOPIC_PREFIX_VEHICLE, hu_client_id, POSTFIX_CLOSE_VEHICLESTATUS_REQ
-        ),
-    ]
-
-
-def build_device_close_remote_topics(
-    client_id: str, capabilities: MqttCacheCapabilities
-) -> list[str]:
-    """Build DeviceCloseRemote topic list (conditional on capabilities)."""
-    topics = [
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_CLOSE_REMOTE_RES),
-    ]
-    if capabilities.has_hvac_close_remote:
-        topics.append(
-            build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_CLOSE_VEHICLESTATUS)
-        )
-    if capabilities.has_media_close_remote:
-        topics.append(
-            build_topic(
-                TOPIC_PREFIX_DEVICE, client_id, POSTFIX_CLOSE_MEDIA_VEHICLESTATUS
-            )
-        )
-    topics.append(
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_CLOSE_CONNECTIONSTATUS_RES)
-    )
-    topics.append(
-        build_topic(TOPIC_PREFIX_DEVICE, client_id, POSTFIX_CLOSE_PRECONDITION)
-    )
-    return topics
-
-
-def build_ota_topics(vehicle_id: str, capabilities: MqttCacheCapabilities) -> list[str]:
-    """Build OTA topic list (conditional on capabilities)."""
-    topics = []
-    if capabilities.is_support_ota_progress:
-        topics.append(
-            build_topic(TOPIC_PREFIX_VEHICLE, vehicle_id, POSTFIX_OTA_PROGRESS)
-        )
-    if capabilities.is_support_schedule_update:
-        topics.append(
-            build_topic(TOPIC_PREFIX_VEHICLE, vehicle_id, POSTFIX_OTA_SCHEDULEUPDATE)
-        )
-    return topics
-
-
-# ---------------------------------------------------------------------------
-# Message parser
-# ---------------------------------------------------------------------------
-
-
-def parse_mqtt_message(topic: str, payload: bytes) -> MqttMessage:
-    """Parse an MQTT message into a structured MqttMessage.
-
-    Determines topic_group and topic_type from the topic string,
-    parses the JSON payload, and extracts vehicle_id from the topic.
-    """
-    # Determine topic group and type from the topic string
-    topic_group, topic_type, vehicle_id = _classify_topic(topic)
-
-    try:
-        data = json.loads(payload.decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        data = {"raw": payload.hex()}
-
-    return MqttMessage(
-        topic_group=topic_group,
-        topic_type=topic_type,
-        vehicle_id=vehicle_id,
-        payload=data,
-    )
-
-
-def _classify_topic(topic: str) -> tuple[str, str, str]:
-    """Classify a topic string into (group, type, vehicle_id)."""
-    # CarStatus topics (no /remotecontroller/ or /closeremote/ prefix)
-    if topic.startswith(TOPIC_PREFIX_VSS):
-        return ("CarStatus", "Status", _extract_infix(topic, TOPIC_PREFIX_VSS))
-    if topic.startswith(TOPIC_PREFIX_CONNECTION):
-        return ("CarStatus", "Connect", _extract_infix(topic, TOPIC_PREFIX_CONNECTION))
-    if topic.startswith(TOPIC_PREFIX_RES):
-        return ("CarStatus", "Res", _extract_infix(topic, TOPIC_PREFIX_RES))
-    if topic.startswith(TOPIC_PREFIX_LOCATION):
-        return ("CarStatus", "Location", _extract_infix(topic, TOPIC_PREFIX_LOCATION))
-
-    # DeviceRemote.Res (special prefix)
-    if topic.startswith(TOPIC_PREFIX_DEVICE_RES):
-        infix = _extract_infix(topic, TOPIC_PREFIX_DEVICE_RES)
-        return ("DeviceRemote", "Res", infix)
-
-    # Vehicle-prefixed topics (CarRemote, CarCloseRemote, CarOta)
-    if topic.startswith(TOPIC_PREFIX_VEHICLE):
-        infix = _extract_infix(topic, TOPIC_PREFIX_VEHICLE)
-        suffix = topic[len(TOPIC_PREFIX_VEHICLE) + len(infix) :]
-
-        if POSTFIX_REMOTE_COMMAND in suffix:
-            return ("CarRemote", "Command", infix)
-        if POSTFIX_REMOTE_CONNECT in suffix:
-            return ("CarRemote", "Connect", infix)
-        if POSTFIX_REMOTE_CONNECTCHECK in suffix:
-            return ("CarRemote", "ConnectCheck", infix)
-        if POSTFIX_REMOTE_MOBILECLOSE in suffix:
-            return ("CarRemote", "MobileClose", infix)
-        if POSTFIX_REMOTE_VEHICLECLOSE in suffix:
-            return ("CarRemote", "CarClose", infix)
-        if POSTFIX_CLOSE_CONNECTIONSTATUS_REQ in suffix:
-            return ("CarCloseRemote", "ConnectionStatus", infix)
-        if POSTFIX_CLOSE_PRECONDITION_REQ in suffix:
-            return ("CarCloseRemote", "PreCondition", infix)
-        if POSTFIX_CLOSE_REMOTE_REQ in suffix:
-            return ("CarCloseRemote", "Remote", infix)
-        if POSTFIX_CLOSE_VEHICLESTATUS_REQ in suffix:
-            return ("CarCloseRemote", "VehicleStatus", infix)
-        if POSTFIX_OTA_PROGRESS in suffix:
-            return ("CarOta", "Progress", infix)
-        if POSTFIX_OTA_SCHEDULEUPDATE in suffix:
-            return ("CarOta", "ScheduleUpdate", infix)
-        return ("CarRemote", "Unknown", infix)
-
-    # Device-prefixed topics (DeviceRemote, DeviceCloseRemote)
-    if topic.startswith(TOPIC_PREFIX_DEVICE):
-        infix = _extract_infix(topic, TOPIC_PREFIX_DEVICE)
-        suffix = topic[len(TOPIC_PREFIX_DEVICE) + len(infix) :]
-
-        if POSTFIX_REMOTE_COMMAND in suffix:
-            return ("DeviceRemote", "Command", infix)
-        if POSTFIX_REMOTE_CONNECT in suffix:
-            return ("DeviceRemote", "Connect", infix)
-        if POSTFIX_REMOTE_CONNECTCHECK in suffix:
-            return ("DeviceRemote", "ConnectCheck", infix)
-        if POSTFIX_REMOTE_MOBILECLOSE in suffix:
-            return ("DeviceRemote", "MobileClose", infix)
-        if POSTFIX_REMOTE_VEHICLECLOSE in suffix:
-            return ("DeviceRemote", "CarClose", infix)
-        if POSTFIX_CLOSE_CONNECTIONSTATUS_RES in suffix:
-            return ("DeviceCloseRemote", "ConnectionStatus", infix)
-        if POSTFIX_CLOSE_MEDIA_VEHICLESTATUS in suffix:
-            return ("DeviceCloseRemote", "MediaVehicleStatus", infix)
-        if POSTFIX_CLOSE_PRECONDITION in suffix:
-            return ("DeviceCloseRemote", "PreCondition", infix)
-        if POSTFIX_CLOSE_REMOTE_RES in suffix:
-            return ("DeviceCloseRemote", "Remote", infix)
-        if POSTFIX_CLOSE_VEHICLESTATUS in suffix:
-            return ("DeviceCloseRemote", "VehicleStatus", infix)
-        return ("DeviceRemote", "Unknown", infix)
-
-    return ("Unknown", "Unknown", "")
-
-
-def _extract_infix(topic: str, prefix: str) -> str:
-    """Extract the vehicle/client ID infix from a topic after the prefix.
-
-    The infix is the segment between the prefix and the next '/' or end of string.
-    """
-    after_prefix = topic[len(prefix) :]
-    slash_pos = after_prefix.find("/")
-    if slash_pos > 0:
-        return after_prefix[:slash_pos]
-    # Trailing slash topics (e.g., service/phone/_/vss/{vehicleId}/)
-    if after_prefix.endswith("/"):
-        return after_prefix[:-1]
-    return after_prefix
 
 
 # ---------------------------------------------------------------------------
