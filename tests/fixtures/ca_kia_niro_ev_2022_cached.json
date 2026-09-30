@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "ca",
         "vehicle": "Kia Niro EV",
         "year": 2022,
         "region": "CA",

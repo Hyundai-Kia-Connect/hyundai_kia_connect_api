@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "usa_hyundai",
         "vehicle": "Hyundai Ioniq 5",
         "year": 2024,
         "region": "US",

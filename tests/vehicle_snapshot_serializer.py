@@ -45,16 +45,16 @@ def vehicle_to_dict(vehicle) -> dict:
         if name.startswith("_"):
             continue
 
-        result[name] = _serialize_value(getattr(vehicle, name))
+        result[name] = serialize_value(getattr(vehicle, name))
 
     # Add property values
     for prop in sorted(property_names):
-        result[prop] = _serialize_value(getattr(vehicle, prop))
+        result[prop] = serialize_value(getattr(vehicle, prop))
 
     return dict(sorted(result.items()))
 
 
-def _serialize_value(value):
+def serialize_value(value):
     """Convert a value to a JSON-friendly representation."""
     if value is None:
         return None
@@ -73,12 +73,12 @@ def _serialize_value(value):
     if isinstance(value, datetime.timezone):
         return str(value)
     if isinstance(value, (list, tuple)):
-        return [_serialize_value(v) for v in value]
+        return [serialize_value(v) for v in value]
     if isinstance(value, dict):
-        return {k: _serialize_value(v) for k, v in sorted(value.items())}
+        return {k: serialize_value(v) for k, v in sorted(value.items())}
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
-            f.name: _serialize_value(getattr(value, f.name))
+            f.name: serialize_value(getattr(value, f.name))
             for f in dataclasses.fields(value)
         }
     return str(value)

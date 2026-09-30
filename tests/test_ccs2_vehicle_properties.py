@@ -1,8 +1,9 @@
-"""Tests for CCS2 protocol _update_vehicle_properties_ccs2 using JSON fixtures.
+"""Targeted tests for the CCS2 parser (ApiImplType1._update_vehicle_properties_ccs2).
 
-Tests ApiImplType1._update_vehicle_properties_ccs2 with fixtures that use
-the newer CCS2 protocol structure (Drivetrain/Cabin/Green/Body/Chassis paths).
-TargetSoC in CCS2 is direct scalar values, not arrays.
+The CCS2 protocol uses Drivetrain/Cabin/Green/Body/Chassis paths, and TargetSoC
+is direct scalar values, not arrays. Per-fixture field values are covered by
+tests/test_fixture_parsing.py; this module covers edge cases by mutating a
+fixture or building a minimal payload.
 """
 
 import datetime as dt
@@ -13,76 +14,19 @@ import pytest
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.const import PressureUnit
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from tests.fixture_helpers import (
-    discover_fixtures,
-    get_fixture_expected,
-    get_fixture_meta,
-    load_fixture,
-)
+from tests.fixture_helpers import PARSERS, discover_fixtures, load_fixture
 
 CCS2_FIXTURE_FILES = discover_fixtures("eu_kia_ev9_")
-EV6_CCS2_FIXTURE_FILES = discover_fixtures("eu_kia_ev6_2024_ccs2_")
 
 
 @pytest.fixture
 def ccs2_api() -> ApiImplType1:
-    api = ApiImplType1.__new__(ApiImplType1)
-    api.data_timezone = None
-    api.temperature_range = [x * 0.5 for x in range(28, 60)]
-    return api
+    return PARSERS["ccs2"].api()
 
 
 @pytest.fixture
 def vehicle() -> Vehicle:
     return Vehicle()
-
-
-@pytest.mark.parametrize("fixture_file", CCS2_FIXTURE_FILES, ids=CCS2_FIXTURE_FILES)
-class TestCCS2UpdateVehicleProperties:
-    def test_ev_battery_percentage(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.ev_battery_percentage == expected["ev_battery_percentage"]
-
-    def test_ev_charge_limits(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        meta = get_fixture_meta(data)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-
-        if meta.get("has_target_soc"):
-            assert vehicle.ev_charge_limits_dc == expected["ev_charge_limits_dc"]
-            assert vehicle.ev_charge_limits_ac == expected["ev_charge_limits_ac"]
-
-    def test_car_battery_percentage(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.car_battery_percentage == expected["car_battery_percentage"]
-
-    def test_engine_is_running(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.engine_is_running == expected["engine_is_running"]
-
-    def test_is_locked(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.is_locked == expected["is_locked"]
-
-    def test_ev_plugged_in(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.ev_battery_is_plugged_in == expected["ev_battery_is_plugged_in"]
-
-    def test_data_is_stored(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.data is data
 
 
 def _window_state(open_front_left=0, open_level_front_left=0, **levels) -> dict:
@@ -355,69 +299,6 @@ class TestCCS2LocationTimestampNone:
         assert ts is not None
         assert ts.year == 2024 and ts.month == 9 and ts.day == 15
         assert ts.hour == 14 and ts.minute == 0 and ts.second == 0
-
-
-@pytest.mark.parametrize(
-    "fixture_file", EV6_CCS2_FIXTURE_FILES, ids=EV6_CCS2_FIXTURE_FILES
-)
-class TestCCS2ScheduledCharging:
-    def test_ev_off_peak_start_time(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert str(vehicle.ev_off_peak_start_time) == expected["ev_off_peak_start_time"]
-
-    def test_ev_off_peak_end_time(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert str(vehicle.ev_off_peak_end_time) == expected["ev_off_peak_end_time"]
-
-    def test_ev_schedule_charge_enabled(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert (
-            vehicle.ev_schedule_charge_enabled == expected["ev_schedule_charge_enabled"]
-        )
-
-    def test_ev_off_peak_charge_only_enabled(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert (
-            vehicle.ev_off_peak_charge_only_enabled
-            == expected["ev_off_peak_charge_only_enabled"]
-        )
-
-    def test_ev_first_departure_time(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert (
-            str(vehicle.ev_first_departure_time) == expected["ev_first_departure_time"]
-        )
-
-    def test_ev_first_departure_days(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.ev_first_departure_days == expected["ev_first_departure_days"]
-
-    def test_ev_second_departure_time(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert (
-            str(vehicle.ev_second_departure_time)
-            == expected["ev_second_departure_time"]
-        )
-
-    def test_ev_second_departure_days(self, ccs2_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-        assert vehicle.ev_second_departure_days == expected["ev_second_departure_days"]
 
 
 def test_ccs2_off_peak_absent_yields_none_not_midnight(ccs2_api, vehicle):

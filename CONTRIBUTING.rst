@@ -77,13 +77,17 @@ Ready to contribute? Here's how to set up `hyundai_kia_connect_api` for local de
    Now you can make your changes locally.
 
 5. When you're done making changes, check that your changes pass linting and tests.
-   Pre-commit hooks use ruff for linting and formatting. Most tests require
-   environment variables to supply the username and password and they will run
-   as part of the PR pre-requisites:
+   Pre-commit hooks use ruff for linting and formatting. Tests run offline
+   against JSON fixtures and mocked HTTP; they will run as part of the PR
+   pre-requisites:
 
-    $ pip install pre-commit
+    $ pip install pre-commit -e ".[image,test]"
     $ pre-commit run --all-files
     $ pytest
+
+   To cover a new vehicle or response shape, add a JSON fixture to
+   ``tests/fixtures/`` (see ``tests/fixtures/README.md``); no test code is
+   needed.
 
 6. Commit your changes and push your branch to GitHub::
 
@@ -110,4 +114,4 @@ Tips
 
 To run a subset of tests::
 
-$ pytest tests.test_hyundai_kia_connect_api
+$ pytest tests/test_fixture_parsing.py
