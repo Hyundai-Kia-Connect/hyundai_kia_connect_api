@@ -336,7 +336,6 @@ class TestProductionUrls:
 # ---------------------------------------------------------------------------
 
 
-
 def test_vehicle_push_identity_fields():
     """Vehicle-level push identity: mqtt_vehicle_id (renamed from mqtt_client_id)."""
     from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -369,7 +368,9 @@ def _vehicle() -> Vehicle:
 
 
 def test_parse_push_message_status_message():
-    msg = _kia_api().parse_push_message("service/phone/_/vss/testmqtt1/", b'{"test": 1}')
+    msg = _kia_api().parse_push_message(
+        "service/phone/_/vss/testmqtt1/", b'{"test": 1}'
+    )
     assert msg is not None
     assert msg.topic_group == "CarStatus"
     assert msg.topic_type == "Status"
@@ -380,7 +381,9 @@ def test_parse_push_message_status_message():
 
 def test_parse_push_message_action_result():
     body = {"header": {"tid": "tid-1"}, "body": {"resCode": "success"}}
-    msg = _kia_api().parse_push_message("$/device/res/testclient1", json.dumps(body).encode())
+    msg = _kia_api().parse_push_message(
+        "$/device/res/testclient1", json.dumps(body).encode()
+    )
     assert msg.action_id == "tid-1"
     assert msg.action_result == "success"
     assert msg.is_status is False
@@ -413,7 +416,10 @@ def test_get_push_topics_single_batch_qos0_ready():
 def test_cci_classes_implement_contract():
     api = KiaCciApiEU(region=9, brand=1, language="en")
     assert api.supports_mqtt_push is True
-    assert isinstance(api.get_push_broker_info(Token()), dict) or api.get_push_broker_info(Token()) is None
+    assert (
+        isinstance(api.get_push_broker_info(Token()), dict)
+        or api.get_push_broker_info(Token()) is None
+    )
     # contract presence (all 7)
     for name in (
         "get_push_broker_info",

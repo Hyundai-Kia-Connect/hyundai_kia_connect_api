@@ -569,7 +569,6 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub vehicleId error: {ex}")
         return None
 
-
     def get_push_connection_state(self, token: Token) -> str | None:
         """GET api/v3/vstatus/connstate — check the push connection state.
 
@@ -606,7 +605,9 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub connstate error: {ex}")
         return None
 
-    def get_push_vehicle_identity(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         """Get the vehicle push identity: metadata + MQTT vehicle id.
 
         Combines the two Service Hub reads (metadata/vehicleId endpoint).
@@ -620,9 +621,7 @@ class MqttServiceHubMixin:
             "hu_client_id": vehicle.hu_client_id,
         }
 
-    def parse_push_message(
-        self, topic: str, payload: bytes
-    ) -> "CciPushMessage | None":
+    def parse_push_message(self, topic: str, payload: bytes) -> "CciPushMessage | None":
         """Parse a raw Service Hub MQTT delivery (push-contract method).
 
         Transport delivers raw (topic, payload bytes); JSON decoding and
@@ -714,6 +713,7 @@ POSTFIX_CLOSE_REMOTE_RES = "/closeremote/remote/res"
 POSTFIX_CLOSE_VEHICLESTATUS = "/closeremote/vehiclestatus"
 POSTFIX_OTA_PROGRESS = "/_/ota/otaprogress"
 POSTFIX_OTA_SCHEDULEUPDATE = "/_/ota/scheduleupdate"
+
 
 # MQTT RC command types (from MQTTRCCommand enum)
 class MqttRCCommandType(int, Enum):
@@ -828,6 +828,7 @@ class MqttMessage:
 @dataclass
 class CciPushMessage:
     """Parsed Service Hub MQTT message — the push-message contract shape."""
+
     topic_group: str  # "CarStatus", "DeviceRemote", "CarRemote", ...
     topic_type: str  # "Status", "Connect", "Res", ...
     vehicle_id: str  # push-level vehicle id (topic infix)
@@ -840,7 +841,6 @@ class CciPushMessage:
 
 @dataclass
 class MqttRCHeader:
-
     """RC message header."""
 
     authorization: str | None = None
@@ -876,6 +876,7 @@ class MqttCacheCapabilities:
     hu_client_id: str | None = None
     vehicle_id: str | None = None
     client_id: str | None = None
+
 
 # ---------------------------------------------------------------------------
 # Topic builder
