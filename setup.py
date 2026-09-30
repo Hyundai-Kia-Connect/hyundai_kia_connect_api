@@ -36,6 +36,7 @@ setup(
     extras_require={
         "google": ["geopy>=2.2.0"],
         "image": ["Pillow>=10.0.0", "numpy>=1.26.0"],
+        "test": test_requirements,
     },
     license="MIT license",
     long_description=long_description,
@@ -48,8 +49,6 @@ setup(
     entry_points={
         "console_scripts": ["bluelink = hyundai_kia_connect_api.bluelink:main"]
     },
-    test_suite="tests",
-    tests_require=test_requirements,
     url="https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api",
     version="4.35.0",
     zip_safe=False,

@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "eu_kia_cci",
         "vehicle": "Kia PV5 Passenger",
         "year": 2026,
         "region": "EU",

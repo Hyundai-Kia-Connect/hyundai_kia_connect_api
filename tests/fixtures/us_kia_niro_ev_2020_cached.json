@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "usa_kia",
         "vehicle": "Kia Niro EV",
         "year": 2020,
         "region": "US",
@@ -11,7 +12,7 @@
             "ev_battery_percentage": 68,
             "ev_charge_limits_dc": null,
             "ev_charge_limits_ac": null,
-            "odometer_value": 23456,
+            "odometer": 23456,
             "car_battery_percentage": 87,
             "engine_is_running": false,
             "is_locked": true,

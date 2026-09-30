@@ -3,7 +3,8 @@
 Covers:
   * the cached-status endpoint (regression for the /status/latest 503 bug),
   * the asynchronous force-refresh flow (wake + sleep + read + staleness guard),
-  * CCS2 status parsing driven by a JSON fixture.
+  * CCS2 status parsing driven by a JSON fixture (field values are covered
+    by tests/test_fixture_parsing.py).
 
 BR reports ``ccuCCS2ProtocolSupport: 0`` but serves status in CCS2 format at
 ``/ccs2/carstatus/latest``, so BR extends ``ApiImplType1`` and reuses its
@@ -17,7 +18,7 @@ import pytest
 from hyundai_kia_connect_api.const import BRAND_HYUNDAI, BRANDS, REGION_BRAZIL, REGIONS
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from tests.fixture_helpers import discover_fixtures, get_fixture_expected, load_fixture
+from tests.fixture_helpers import discover_fixtures, load_fixture, parse_fixture
 
 BR_FIXTURE_FILES = discover_fixtures("br_")
 
@@ -160,48 +161,12 @@ class TestBRForceRefresh:
         assert vehicle.car_battery_percentage is None
 
 
-@pytest.fixture
-def properties_api() -> HyundaiBlueLinkApiBR:
-    api = HyundaiBlueLinkApiBR.__new__(HyundaiBlueLinkApiBR)
-    api.data_timezone = HyundaiBlueLinkApiBR.data_timezone
-    return api
+@pytest.mark.parametrize("fixture_file", BR_FIXTURE_FILES)
+def test_last_updated_and_location_set(fixture_file):
+    """CCS2 'Date' populates last_updated_at (not now()), and location is parsed.
 
-
-@pytest.fixture
-def vehicle() -> Vehicle:
-    return Vehicle()
-
-
-@pytest.mark.parametrize("fixture_file", BR_FIXTURE_FILES, ids=BR_FIXTURE_FILES)
-class TestBRUpdateVehicleProperties:
-    def _parse(self, properties_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        state = data["resMsg"]["state"]["Vehicle"]
-        properties_api._update_vehicle_properties_ccs2(vehicle, state)
-        return get_fixture_expected(data)
-
-    def test_battery_and_engine(self, properties_api, vehicle, fixture_file):
-        expected = self._parse(properties_api, vehicle, fixture_file)
-        assert vehicle.car_battery_percentage == expected["car_battery_percentage"]
-        assert bool(vehicle.engine_is_running) == expected["engine_is_running"]
-
-    def test_is_locked(self, properties_api, vehicle, fixture_file):
-        expected = self._parse(properties_api, vehicle, fixture_file)
-        assert vehicle.is_locked == expected["is_locked"]
-
-    def test_fuel_and_range(self, properties_api, vehicle, fixture_file):
-        expected = self._parse(properties_api, vehicle, fixture_file)
-        assert vehicle.fuel_level == expected["fuel_level"]
-        assert vehicle.total_driving_range == expected["total_driving_range"]
-        assert vehicle._total_driving_range_unit == expected["total_driving_range_unit"]
-
-    def test_odometer(self, properties_api, vehicle, fixture_file):
-        expected = self._parse(properties_api, vehicle, fixture_file)
-        assert vehicle.odometer == expected["odometer"]
-        assert vehicle._odometer_unit == expected["odometer_unit"]
-
-    def test_last_updated_and_location_set(self, properties_api, vehicle, fixture_file):
-        self._parse(properties_api, vehicle, fixture_file)
-        # CCS2 'Date' populates last_updated_at (not now()), and location is parsed.
-        assert vehicle.last_updated_at is not None
-        assert vehicle.location is not None
+    Field values are covered by tests/test_fixture_parsing.py.
+    """
+    vehicle, _ = parse_fixture(fixture_file)
+    assert vehicle.last_updated_at is not None
+    assert vehicle.location is not None

@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "eu_kia_cci",
         "vehicle": "Kia EV6",
         "year": 2024,
         "region": "EU",
@@ -23,7 +24,7 @@
             "engine_is_running": false,
             "front_left_door_is_locked": true,
             "is_locked": true,
-            "air_temperature_on": false
+            "air_temperature": null
         }
     },
     "Location": {

@@ -2,17 +2,25 @@
 
 This directory contains JSON files representing real API response shapes from the Hyundai/Kia Connect API. Tests load these files and verify that the parsing logic in each region's API implementation correctly populates `Vehicle` objects.
 
-## Supported Regions & API Classes
+## Supported Parsers
 
-| Region       | API Class               | Test File                                 | Fixture Prefix           | Response Structure                                 |
-| ------------ | ----------------------- | ----------------------------------------- | ------------------------ | -------------------------------------------------- |
-| US (Kia)     | `KiaUvoApiUSA`          | `test_usa_vehicle_properties.py`          | `us_kia_`                | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*` |
-| US (Hyundai) | `HyundaiBlueLinkApiUSA` | `test_bluelink_usa_vehicle_properties.py` | `us_hyundai_`            | `vehicleStatus.*`                                  |
-| EU           | `KiaUvoApiEU`           | `test_eu_vehicle_properties.py`           | `eu_kia_ev6_` (non-CCS2) | `vehicleStatus.*`                                  |
-| EU (CCS2)    | `ApiImplType1`          | `test_ccs2_vehicle_properties.py`         | `eu_kia_ev9_`            | `Green.*`, `Cabin.*`, `Body.*`                     |
-| CA           | `KiaUvoApiCA`           | `test_ca_vehicle_properties.py`           | `ca_`                    | `status.*`                                         |
-| AU           | `KiaUvoApiAU`           | `test_au_vehicle_properties.py`           | `au_`                    | `status.*`                                         |
-| CN           | `KiaUvoApiCN`           | `test_cn_vehicle_properties.py`           | `cn_`                    | `status.*`                                         |
+Each fixture names its parser in `_fixture_meta.parser`. The parsers are
+registered in `PARSERS` in [`tests/fixture_helpers.py`](../fixture_helpers.py):
+
+| `parser`      | API Class               | Parse method                      | Response Structure                                 |
+| ------------- | ----------------------- | --------------------------------- | -------------------------------------------------- |
+| `usa_kia`     | `KiaUvoApiUSA`          | `_update_vehicle_properties`      | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*` |
+| `usa_hyundai` | `HyundaiBlueLinkApiUSA` | `_update_vehicle_properties`      | `vehicleStatus.*`                                  |
+| `eu`          | `KiaUvoApiEU`           | `_update_vehicle_properties`      | `vehicleStatus.*`                                  |
+| `ccs2`        | `ApiImplType1`          | `_update_vehicle_properties_ccs2` | `Green.*`, `Cabin.*`, `Body.*`                     |
+| `eu_kia_cci`  | `KiaCciApiEU`           | `_update_vehicle_properties_ccs2` | CCS2 tree from GSPA stored-status                  |
+| `br`          | `HyundaiBlueLinkApiBR`  | `_update_vehicle_properties_ccs2` | `resMsg.state.Vehicle` (CCS2)                      |
+| `ca`          | `KiaUvoApiCA`           | `_update_vehicle_properties_base` | `status.*`                                         |
+| `au`          | `KiaUvoApiAU`           | `_update_vehicle_properties`      | `status.*`                                         |
+| `cn`          | `KiaUvoApiCN`           | `_update_vehicle_properties`      | `status.*`                                         |
+
+A new API needs one `PARSERS` entry; a new fixture for an existing API needs
+no code at all.
 
 ## Naming Convention
 
@@ -28,16 +36,7 @@ This directory contains JSON files representing real API response shapes from th
 | `year`     | Model year                          | `2020`, `2024`                                |
 | `scenario` | What the response represents        | `cached`, `force_refresh`, `with_soc`, `ccs2` |
 
-**Current fixtures:**
-
-- `us_kia_niro_ev_2020_cached.json` — US Kia cached state, no targetSOC
-- `us_kia_niro_ev_2020_force_refresh.json` — US Kia after force refresh, with targetSOC
-- `us_hyundai_ioniq_5_2024_cached.json` — US Hyundai BlueLinkAPI, with targetSOC
-- `eu_kia_ev6_2023_with_soc.json` — EU standard protocol, with targetSOC
-- `eu_kia_ev9_2024_ccs2.json` — EU CCS2 protocol (newer vehicles), with TargetSoC
-- `ca_kia_niro_ev_2022_cached.json` — CA cached status (charge limits via separate call)
-- `au_hyundai_ioniq_5_2023_with_soc.json` — AU with targetSOC
-- `cn_kia_ev6_2024_with_soc.json` — CN with targetSOC
+The filename is for humans only; tests route on `_fixture_meta.parser`.
 
 ## File Structure
 
@@ -46,6 +45,7 @@ Each fixture file is a JSON object matching the structure returned by the API en
 ```json
 {
     "_fixture_meta": {
+        "parser": "usa_kia",
         "vehicle": "Kia Niro EV",
         "year": 2020,
         "region": "US",
@@ -57,6 +57,7 @@ Each fixture file is a JSON object matching the structure returned by the API en
             "ev_battery_percentage": 68,
             "ev_charge_limits_dc": null,
             "ev_charge_limits_ac": null,
+            "odometer": 23456,
             "car_battery_percentage": 87,
             "engine_is_running": false,
             "is_locked": true,
@@ -71,35 +72,45 @@ Each fixture file is a JSON object matching the structure returned by the API en
 
 ### `_fixture_meta` Fields
 
-| Field            | Required | Description                                          |
-| ---------------- | -------- | ---------------------------------------------------- |
-| `vehicle`        | Yes      | Human-readable vehicle name                          |
-| `year`           | Yes      | Model year                                           |
-| `region`         | Yes      | Region code (US, EU, CA, AU, CN)                     |
-| `brand`          | Yes      | Kia or Hyundai                                       |
-| `endpoint`       | Yes      | API endpoint the response comes from                 |
-| `description`    | Yes      | What makes this fixture interesting/unique           |
-| `has_target_soc` | Yes      | Whether targetSOC data is present in evStatus        |
-| `expected`       | Yes      | Dict of Vehicle field names to their expected values |
+| Field            | Required | Description                                                                     |
+| ---------------- | -------- | ------------------------------------------------------------------------------- |
+| `parser`         | Yes      | Key into `PARSERS` (see table above)                                            |
+| `description`    | Yes      | What makes this fixture interesting/unique                                      |
+| `vehicle`        | No       | Human-readable vehicle name                                                     |
+| `year`           | No       | Model year                                                                      |
+| `region`         | No       | Region code (US, EU, CA, AU, CN, BR)                                            |
+| `brand`          | No       | Kia, Hyundai or Genesis                                                         |
+| `endpoint`       | No       | API endpoint the response comes from                                            |
+| `has_target_soc` | No       | Whether targetSOC data is present in evStatus                                   |
+| `expected`       | No       | Public `Vehicle` attribute names mapped to their expected (JSON-encoded) values |
+
+`expected` values are compared after the same conversion the snapshots use:
+times and datetimes become ISO strings (`"22:30:00"`), enums become `str()`.
 
 ## How Tests Use Fixtures
 
-Tests in the parent `tests/` directory use helpers from `fixture_helpers.py`:
+[`tests/test_fixture_parsing.py`](../test_fixture_parsing.py) runs against
+every fixture in this directory:
 
-- `discover_fixtures("us_kia_")` — finds all fixture files starting with `us_kia_`
-- `load_fixture(filename)` — loads and parses a JSON fixture
-- `get_fixture_expected(data)` — extracts the `_fixture_meta.expected` block
-- `get_fixture_meta(data)` — extracts the full `_fixture_meta` block
+- `test_fixture_meta` — `_fixture_meta` has the required keys and a known parser.
+- `test_expected_fields` — every `expected` value matches the parsed `Vehicle`.
+- `test_raw_payload_retained` — the parser keeps the raw payload on `vehicle.data`.
+- `test_vehicle_snapshot` — the full parsed `Vehicle` matches the syrupy snapshot
+  in `tests/__snapshots__/test_fixture_parsing.ambr`.
 
-Tests are parameterized over all matching fixtures, so adding a new JSON file automatically creates new test cases.
+Other tests can reuse a fixture with `parse_fixture(filename)` (returns
+`(vehicle, payload)`), `load_fixture(filename)`, or build an API instance with
+`PARSERS["ccs2"].api()`.
 
 ## Contributing a Fixture
 
 1. Capture the API response for your vehicle (from `cmm/gvi`, `lststatus`, or equivalent endpoint).
 2. Strip any sensitive data (VIN, real GPS coordinates, account info).
-3. Name the file following the convention above — the prefix must match what the corresponding test file discovers.
-4. Add the `_fixture_meta` block with expected values.
-5. Run `pytest tests/` to verify your fixture is picked up and tests pass.
+3. Name the file following the convention above.
+4. Add the `_fixture_meta` block with `parser`, `description`, and the
+   `expected` values you have checked against the real app/vehicle.
+5. Run `pytest tests/test_fixture_parsing.py --snapshot-update` to record the
+   snapshot, review the generated `.ambr` diff, then run `pytest`.
 
 ### Region-Specific Notes
 

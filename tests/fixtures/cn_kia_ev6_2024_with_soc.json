@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "cn",
         "vehicle": "Kia EV6",
         "year": 2024,
         "region": "CN",
