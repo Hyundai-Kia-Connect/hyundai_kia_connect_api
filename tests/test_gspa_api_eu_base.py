@@ -324,72 +324,69 @@ def _legacy_register_response_ok(device_id: str = "canonical-device-id") -> Magi
     return resp
 
 
-def test_register_legacy_device_hyundai_live_shape():
-    """Legacy register posts to the :8080 SPA host, GCM body, legacy headers.
+def test_register_legacy_device_delegates_to_legacy_api():
+    """Legacy register delegates to the legacy EU register machinery.
 
-    Live shape (2026-09-30): POST
-    https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register
-    with ccsp-service-id / ccsp-application-id / Stamp headers and
-    {pushRegId, pushType, uuid} body — no Authorization. Hyundai legacy
-    push type is GCM (APNS is rejected with 4002).
+    The brand constants, stamp and request shape live on the legacy
+    class (KiaUvoApiEU, inherited from ApiImplType1) — GspaApiEU must
+    not duplicate them. Constructed for the EU legacy region with the
+    same brand+language; the returned canonical device_id passes
+    through. Live shape (2026-09-30): register returns a canonical
+    deviceId accepted by both the :8080 v1 host and GSPA.
     """
     api = HyundaiCciApiEU(9, 2, "en")
+    legacy = MagicMock()
+    legacy._get_stamp.return_value = "legacy-stamp"
+    legacy._get_device_id.return_value = "canonical-device-id"
     with patch(
-        "hyundai_kia_connect_api.GspaApiEU.requests.post",
-        return_value=_legacy_register_response_ok(),
-    ) as mock_post:
+        "hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy
+    ) as mock_cls:
         device_id = api._register_legacy_device()
 
     assert device_id == "canonical-device-id"
-    url = mock_post.call_args[0][0]
-    assert url == (
-        "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register"
-    )
-    body = mock_post.call_args[1]["json"]
-    assert body["pushType"] == "GCM"
-    assert len(body["pushRegId"]) == 64
-    assert body["uuid"]
-    headers = mock_post.call_args[1]["headers"]
-    assert headers["ccsp-service-id"] == ("6d477c38-3ca4-4cf3-9557-2a1929a94654")
-    assert headers["ccsp-application-id"] == "014d2225-8495-4735-812d-2616334fd15d"
-    assert headers["Stamp"]
-    assert "Authorization" not in headers
+    assert mock_cls.call_args[0][0] == 1
+    assert mock_cls.call_args[0][1] == 2
+    assert mock_cls.call_args[0][2] == "en"
+    legacy._get_device_id.assert_called_once_with("legacy-stamp")
 
 
-def test_register_legacy_device_kia_live_shape():
-    """Kia legacy register uses its own constants and APNS push type."""
+def test_register_legacy_device_delegate_uses_brand():
+    """Kia CCI delegates with the Kia legacy constants (APNS there)."""
     api = KiaCciApiEU(9, 1, "en")
+    legacy = MagicMock()
+    legacy._get_device_id.return_value = "canonical-device-id"
     with patch(
-        "hyundai_kia_connect_api.GspaApiEU.requests.post",
-        return_value=_legacy_register_response_ok(),
-    ) as mock_post:
+        "hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy
+    ) as mock_cls:
         device_id = api._register_legacy_device()
 
     assert device_id == "canonical-device-id"
-    assert mock_post.call_args[0][0] == (
-        "https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register"
-    )
-    body = mock_post.call_args[1]["json"]
-    assert body["pushType"] == "APNS"
-    headers = mock_post.call_args[1]["headers"]
-    assert headers["ccsp-service-id"] == "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-    assert headers["ccsp-application-id"] == "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+    assert mock_cls.call_args[0][0] == 1
+    assert mock_cls.call_args[0][1] == 1
 
 
-def test_register_legacy_device_error_raises_device_id_error():
-    """A legacy error response (4002) raises DeviceIDError."""
+def test_register_legacy_device_error_propagates():
+    """A legacy register failure (4002 → DeviceIDError) propagates."""
     api = HyundaiCciApiEU(9, 2, "en")
-    resp = MagicMock()
-    resp.json.return_value = {
-        "retCode": "F",
-        "resCode": "4002",
-        "resMsg": "Invalid request body - Invalid parameter.",
-    }
+    legacy = MagicMock()
+    legacy._get_device_id.side_effect = DeviceIDError("Invalid parameter")
     with (
-        patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp),
+        patch("hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy),
         pytest.raises(DeviceIDError),
     ):
         api._register_legacy_device()
+
+
+def test_register_legacy_device_unconfigured_raises():
+    """Missing CCAPI_BASE_URL → typed DeviceIDError, no legacy call."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU") as mock_cls,
+        patch.object(api, "CCAPI_BASE_URL", ""),
+        pytest.raises(DeviceIDError),
+    ):
+        api._register_legacy_device()
+    mock_cls.assert_not_called()
 
 
 def test_login_uses_legacy_registered_device_id():
