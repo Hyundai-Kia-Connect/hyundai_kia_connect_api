@@ -26,7 +26,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
 )
-from .exceptions import APIError, AuthenticationError
+from .exceptions import APIError
 from .GspaApiEU import USER_AGENT_OK_HTTP, GspaApiEU
 from .mqtt_service_hub import MqttServiceHubMixin
 from .Token import Token
