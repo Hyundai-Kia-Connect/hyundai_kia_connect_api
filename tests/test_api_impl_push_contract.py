@@ -1,6 +1,5 @@
 """Tests for the push-contract no-op defaults on the ApiImpl base."""
 
-
 from hyundai_kia_connect_api.ApiImpl import ApiImpl
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle

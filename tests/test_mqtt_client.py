@@ -1,6 +1,5 @@
 """Tests for the generic MQTT transport (mqtt_client module)."""
 
-
 import pytest
 
 from hyundai_kia_connect_api.mqtt_client import MqttTransport
@@ -29,7 +28,10 @@ def test_connect_constructs_paho_client_with_callback_api_v2(monkeypatch):
     t = MqttTransport()
     t.configure("broker.example", 8883)
     t.connect()
-    assert captured.get("callback_api_version") == mqtt_client_mod.mqtt.CallbackAPIVersion.VERSION2
+    assert (
+        captured.get("callback_api_version")
+        == mqtt_client_mod.mqtt.CallbackAPIVersion.VERSION2
+    )
 
 
 def test_module_has_no_v1_fallback_flags():

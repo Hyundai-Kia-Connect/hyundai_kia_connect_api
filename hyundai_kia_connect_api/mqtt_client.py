@@ -27,7 +27,6 @@ class MqttConnectionState(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-
 # ---------------------------------------------------------------------------
 # MQTT Client
 # ---------------------------------------------------------------------------
@@ -172,7 +171,6 @@ class MqttTransport:
         _LOGGER.debug(f"{DOMAIN} - MQTT batch subscribe mid={mid}, rc={result}")
         self._subscribed_topics = list(topics)
         return list(topics)
-
 
     # -- paho-mqtt callbacks (called on background thread) --
 
