@@ -3,10 +3,7 @@
 Uses paho-mqtt v2.x (matching HA 2026.6+ which ships paho-mqtt 2.1.0).
 MQTT is receive-only — commands are still sent via HTTP GSPA REST API.
 
-For backwards compatibility with paho-mqtt v1.x, a compatibility layer
-detects the version and adapts callback signatures accordingly.
-
-Install with: pip install hyundai_kia_connect_api[mqtt]
+paho-mqtt is a hard dependency (requirements.txt, >=2,<3).
 """
 
 from __future__ import annotations
@@ -18,17 +15,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
+import paho.mqtt.client as mqtt
+
 _LOGGER = logging.getLogger(__name__)
-
-try:
-    import paho.mqtt.client as mqtt
-
-    _PAHO_AVAILABLE = True
-except ImportError:
-    _PAHO_AVAILABLE = False
-
-# Detect paho-mqtt v2 vs v1 for callback compatibility
-_PAHO_V2 = _PAHO_AVAILABLE and hasattr(mqtt, "CallbackAPIVersion")
 
 DOMAIN = "hyundai_kia_connect_api"
 
@@ -463,8 +452,7 @@ class HyundaiMqttClient:
     Callbacks are dispatched on that thread. Callers must dispatch to their
     own event loop if needed (e.g., asyncio.run_coroutine_threadsafe).
 
-    Requires paho-mqtt>=2.1.0 (v1.x supported as fallback). Install with:
-        pip install hyundai_kia_connect_api[mqtt]
+    Requires paho-mqtt>=2,<3 (hard dependency).
     """
 
     def __init__(
@@ -473,12 +461,6 @@ class HyundaiMqttClient:
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[str], None] | None = None,
     ) -> None:
-        if not _PAHO_AVAILABLE:
-            raise ImportError(
-                "paho-mqtt is required for MQTT support. "
-                "Install with: pip install hyundai_kia_connect_api[mqtt]"
-            )
-
         self._client: mqtt.Client | None = None
         self._on_message = on_message
         self._on_connect = on_connect
@@ -536,19 +518,12 @@ class HyundaiMqttClient:
         if not self._broker_host:
             raise ValueError("Broker host not configured. Call configure() first.")
 
-        if _PAHO_V2:
-            self._client = mqtt.Client(
-                callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-                client_id=self._client_id,
-                protocol=mqtt.MQTTv311,
-                clean_session=True,
-            )
-        else:
-            self._client = mqtt.Client(
-                client_id=self._client_id,
-                protocol=mqtt.MQTTv311,
-                clean_session=True,
-            )
+        self._client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id=self._client_id,
+            protocol=mqtt.MQTTv311,
+            clean_session=True,
+        )
 
         if self._username:
             self._client.username_pw_set(self._username, self._password or "")
@@ -559,12 +534,7 @@ class HyundaiMqttClient:
 
         # Match the app's MQTT client: connectionTimeout=10, keepAliveInterval=15
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
-        if hasattr(self._client, "connect_timeout"):
-            # paho-mqtt v2: property, default 5.0
-            self._client.connect_timeout = 10
-        elif hasattr(self._client, "_connect_timeout"):
-            # paho-mqtt v1: internal attribute, default 5.0
-            self._client._connect_timeout = 10
+        self._client.connect_timeout = 10
 
         self._client.on_connect = self._on_mqtt_connect
         self._client.on_disconnect = self._on_mqtt_disconnect
@@ -655,10 +625,8 @@ class HyundaiMqttClient:
     def _on_mqtt_connect(
         self, client, userdata, flags, reason_code, properties=None
     ) -> None:
-        """Handle MQTT connection callback (v2 signature with v1 compat)."""
-        # v2: reason_code is a ReasonCode object, supports == comparison with int
-        # v1: rc is a plain int (passed as reason_code when properties=None)
-        rc = reason_code if isinstance(reason_code, int) else reason_code.value
+        """Handle MQTT connection callback (paho v2 signature)."""
+        rc = reason_code.value if not isinstance(reason_code, int) else reason_code
         if rc == 0:
             _LOGGER.info(f"{DOMAIN} - MQTT CONNECTED OK")
             self._connected = True
@@ -670,32 +638,20 @@ class HyundaiMqttClient:
             _LOGGER.warning(f"{DOMAIN} - MQTT connect FAILED: rc={rc}")
 
     def _on_mqtt_disconnect(
-        self, client, userdata, flags=None, reason_code=None, properties=None
+        self, client, userdata, flags, reason_code, properties=None
     ) -> None:
-        """Handle MQTT disconnection callback (v2 signature with v1 compat).
-
-        v1: (client, userdata, rc)
-        v2: (client, userdata, flags, reason_code, properties)
-        """
+        """Handle MQTT disconnection callback (paho v2 signature)."""
         self._connected = False
         if self._on_connection_change:
             self._on_connection_change(False)
-        # v1 passes rc as 3rd arg; v2 passes flags as 3rd, reason_code as 4th
-        if isinstance(flags, int) and reason_code is None:
-            # v1 callback: (client, userdata, rc)
-            rc = flags
-        elif reason_code is not None:
-            # v2 callback: (client, userdata, flags, reason_code, properties)
-            rc = reason_code if isinstance(reason_code, int) else reason_code.value
-        else:
-            rc = -1
+        rc = reason_code.value if not isinstance(reason_code, int) else reason_code
         reason = "clean disconnect" if rc == 0 else f"unexpected (rc={rc})"
         _LOGGER.warning(f"{DOMAIN} - MQTT DISCONNECTED: {reason}")
         if self._on_disconnect:
             self._on_disconnect(reason)
 
     def _on_mqtt_message(self, client, userdata, msg) -> None:
-        """Handle incoming MQTT message (unchanged between v1 and v2)."""
+        """Handle incoming MQTT message."""
         topic = msg.topic
         payload = msg.payload
 
@@ -722,13 +678,9 @@ class HyundaiMqttClient:
     def _on_mqtt_subscribe(
         self, client, userdata, mid, reason_codes, properties=None
     ) -> None:
-        """Handle subscription confirmation (v2 signature with v1 compat).
+        """Handle subscription confirmation (paho v2 signature).
 
-        v1: (client, userdata, mid, granted_qos) — granted_qos is list of ints
-        v2: (client, userdata, mid, reason_codes, properties) — reason_codes
-            is list of ReasonCode objects
-
-        In MQTT 3.1.1, SUBACK granted QoS 0x80 (128) means subscription
+        reason_codes is a list of ReasonCode objects. In MQTT 3.1.1, SUBACK granted QoS 0x80 (128) means subscription
         failure — the broker rejected that topic. This is critical for
         diagnosing rc=128 disconnects.
         """
@@ -736,20 +688,11 @@ class HyundaiMqttClient:
         # Batch subscribe: raw is comma-joined topic list
         topics = raw.split(",") if "," in raw else [raw]
 
-        # Normalize reason_codes to list of ints
+        # Normalize reason_codes to a list of ints (paho v2: ReasonCode objects)
         if reason_codes is None:
             qos_values = []
-        elif isinstance(reason_codes, list):
-            qos_values = [
-                rc.value if hasattr(rc, "value") else int(rc) for rc in reason_codes
-            ]
         else:
-            # paho v1: granted_qos is already a list of ints
-            qos_values = (
-                list(reason_codes)
-                if hasattr(reason_codes, "__iter__")
-                else [int(reason_codes)]
-            )
+            qos_values = [rc.value for rc in reason_codes]
 
         # Log per-topic result when topic count matches QoS count
         if len(topics) == len(qos_values):
