@@ -524,13 +524,17 @@ class VehicleManager:
             self._subscribe_vehicle_topics(vehicle_id)
         return True
 
-    def _register_new_vehicle(self, token: Token, vehicle: Vehicle, vehicle_id: str) -> bool:
+    def _register_new_vehicle(
+        self, token: Token, vehicle: Vehicle, vehicle_id: str
+    ) -> bool:
         """Run the per-vehicle registration steps of the push contract."""
         try:
             self.api.get_push_vehicle_identity(token, vehicle)
             self.api.register_push_vehicle(token, vehicle)
         except Exception as ex:
-            _LOGGER.warning(f"{DOMAIN} - Push registration failed for {vehicle_id}: {ex}")
+            _LOGGER.warning(
+                f"{DOMAIN} - Push registration failed for {vehicle_id}: {ex}"
+            )
             return False
         return True
 
@@ -553,7 +557,9 @@ class VehicleManager:
                 try:
                     self._subscribe_vehicle_topics(vehicle_id)
                 except Exception:
-                    _LOGGER.exception(f"{DOMAIN} - Push subscribe failed for {vehicle_id}")
+                    _LOGGER.exception(
+                        f"{DOMAIN} - Push subscribe failed for {vehicle_id}"
+                    )
 
     def _on_push_delivery_raw(self, topic: str, payload: bytes) -> None:
         """Raw delivery from the transport; parse via the region API.
@@ -575,7 +581,9 @@ class VehicleManager:
         action_id = getattr(message, "action_id", None)
         if action_id and action_id in self._push_action_events:
             result = message.action_result or (
-                "connected" if getattr(message, "action_connected", False) else "success"
+                "connected"
+                if getattr(message, "action_connected", False)
+                else "success"
             )
             self._push_action_results[action_id] = result
             self._push_action_events[action_id].set()
@@ -704,7 +712,9 @@ class VehicleManager:
                 delay = min(delay * 2, max_delay)
             _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 
-        threading.Thread(target=_reconnect_with_backoff, name="push-reconnect", daemon=True).start()
+        threading.Thread(
+            target=_reconnect_with_backoff, name="push-reconnect", daemon=True
+        ).start()
 
     def _cleanup_push_client(self) -> None:
         old_client = self._push_client

@@ -501,11 +501,15 @@ class ApiImpl:
         """Register the device/client with the push infrastructure."""
         return None
 
-    def register_push_vehicle(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+    def register_push_vehicle(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         """Register this vehicle's protocols with the push infrastructure."""
         return None
 
-    def get_push_vehicle_identity(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         """Fetch the vehicle push identity (metadata + push vehicle id)."""
         return None
 

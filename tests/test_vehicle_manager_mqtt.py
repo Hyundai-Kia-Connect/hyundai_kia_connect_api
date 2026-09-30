@@ -56,13 +56,17 @@ class FakePushApi:
         self.calls.append("topics")
         return list(self.topics)
 
-    def parse_push_message(self, topic, payload):  # pragma: no cover — replaced in tests
+    def parse_push_message(
+        self, topic, payload
+    ):  # pragma: no cover — replaced in tests
         return None
 
 
 def _make_vm() -> VehicleManager:
     """VehicleManager with a push-capable fake API and one vehicle."""
-    vm = VehicleManager(region=9, brand=2, language="en", username="u", password="p", pin="0000")
+    vm = VehicleManager(
+        region=9, brand=2, language="en", username="u", password="p", pin="0000"
+    )
     vm.api = FakePushApi()  # type: ignore[assignment]
     vm.token = Token()
     vehicle = Vehicle()
@@ -75,7 +79,6 @@ class FakeTransport:
     """Transport double capturing configure/subscribe, connect state injectable."""
 
     instances: ClassVar[list] = []
-
 
     def __init__(self, on_message=None, on_connect=None, on_disconnect=None):
         self.on_message = on_message
