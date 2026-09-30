@@ -4,7 +4,7 @@
 import datetime as dt
 import logging
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -482,6 +482,50 @@ class ApiImpl:
         """Test if token is valid
         Use any dummy request to test if token is still valid"""
         return True
+
+    # ------------------------------------------------------------------
+    # Push/MQTT contract (no-op defaults; region implementations that
+    # support push override these — today: the CCI/EU lineage via
+    # MqttServiceHubMixin). Regions without support stay feature-off
+    # (None/[]/False) instead of raising. VehicleManager gates all glue
+    # on `supports_mqtt_push`.
+    # ------------------------------------------------------------------
+
+    supports_mqtt_push: bool = False
+
+    def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
+        """MQTT broker config. None = push not supported on this region API."""
+        return None
+
+    def register_push_client(self, token: Token) -> dict[str, Any] | None:
+        """Register the device/client with the push infrastructure."""
+        return None
+
+    def register_push_vehicle(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Register this vehicle's protocols with the push infrastructure."""
+        return None
+
+    def get_push_vehicle_identity(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Fetch the vehicle push identity (metadata + push vehicle id)."""
+        return None
+
+    def get_push_connection_state(self, token: Token) -> str | None:
+        """Push connection state ('ONLINE'/'OFFLINE'/'UNKNOWN')."""
+        return None
+
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
+        """Topics to subscribe for this vehicle. Empty = none."""
+        return []
+
+    def parse_push_message(self, topic: str, payload: bytes) -> Any:
+        """Parse a raw push delivery into the push-message shape. None = unknown.
+
+        Parse result is duck-typed with these attributes: topic_group,
+        topic_type, vehicle_id (push-level vehicle id), payload (dict),
+        is_status (bool) and optional action fields action_id /
+        action_result (str | None), action_connected (bool).
+        """
+        return None
 
     def check_action_status(
         self,
