@@ -9,6 +9,7 @@ CCS2 status). OTA and MQTT are handled in later PRs.
 
 # pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
 
+import base64
 import datetime as dt
 import logging
 from typing import Any
@@ -51,8 +52,17 @@ class HyundaiCciApiEU(GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
-    # Legacy v1 CCAPI host - used only by the /tripinfo read.
+    # Legacy v1 CCAPI host + legacy device-registry constants. Used by the
+    # /tripinfo read and the legacy device registration (live-proven
+    # 2026-09-30: register 200 S 0000 with pushType GCM — APNS is
+    # rejected with 4002; no Authorization accepted).
     CCAPI_BASE_URL = "prd.eu-ccapi.hyundai.com:8080"
+    LEGACY_CCSP_SERVICE_ID = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+    LEGACY_APP_ID = "014d2225-8495-4735-812d-2616334fd15d"
+    LEGACY_CFB = base64.b64decode(
+        "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+    )
+    LEGACY_PUSH_TYPE = "GCM"
 
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.

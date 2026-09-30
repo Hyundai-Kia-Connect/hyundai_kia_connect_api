@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, DeviceIDError
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -306,3 +307,116 @@ def test_update_day_trip_info_parses():
     assert info.summary.drive_time == 30
     assert info.trip_list[0].hhmmss == "081230"
     assert info.trip_list[0].distance == 4.5
+
+
+# ---------------------------------------------------------------------------
+# Legacy v1 device registration (D7 — live-proven 2026-09-30)
+# ---------------------------------------------------------------------------
+
+
+def _legacy_register_response_ok(device_id: str = "canonical-device-id") -> MagicMock:
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resCode": "0000",
+        "resMsg": {"deviceId": device_id},
+    }
+    return resp
+
+
+def test_register_legacy_device_hyundai_live_shape():
+    """Legacy register posts to the :8080 SPA host, GCM body, legacy headers.
+
+    Live shape (2026-09-30): POST
+    https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register
+    with ccsp-service-id / ccsp-application-id / Stamp headers and
+    {pushRegId, pushType, uuid} body — no Authorization. Hyundai legacy
+    push type is GCM (APNS is rejected with 4002).
+    """
+    api = HyundaiCciApiEU(9, 2, "en")
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post",
+        return_value=_legacy_register_response_ok(),
+    ) as mock_post:
+        device_id = api._register_legacy_device()
+
+    assert device_id == "canonical-device-id"
+    url = mock_post.call_args[0][0]
+    assert url == (
+        "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register"
+    )
+    body = mock_post.call_args[1]["json"]
+    assert body["pushType"] == "GCM"
+    assert len(body["pushRegId"]) == 64
+    assert body["uuid"]
+    headers = mock_post.call_args[1]["headers"]
+    assert headers["ccsp-service-id"] == ("6d477c38-3ca4-4cf3-9557-2a1929a94654")
+    assert headers["ccsp-application-id"] == "014d2225-8495-4735-812d-2616334fd15d"
+    assert headers["Stamp"]
+    assert "Authorization" not in headers
+
+
+def test_register_legacy_device_kia_live_shape():
+    """Kia legacy register uses its own constants and APNS push type."""
+    api = KiaCciApiEU(9, 1, "en")
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post",
+        return_value=_legacy_register_response_ok(),
+    ) as mock_post:
+        device_id = api._register_legacy_device()
+
+    assert device_id == "canonical-device-id"
+    assert mock_post.call_args[0][0] == (
+        "https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register"
+    )
+    body = mock_post.call_args[1]["json"]
+    assert body["pushType"] == "APNS"
+    headers = mock_post.call_args[1]["headers"]
+    assert headers["ccsp-service-id"] == "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
+    assert headers["ccsp-application-id"] == "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+
+
+def test_register_legacy_device_error_raises_device_id_error():
+    """A legacy error response (4002) raises DeviceIDError."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "F",
+        "resCode": "4002",
+        "resMsg": "Invalid request body - Invalid parameter.",
+    }
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp),
+        pytest.raises(DeviceIDError),
+    ):
+        api._register_legacy_device()
+
+
+def test_login_uses_legacy_registered_device_id():
+    """login() carries the legacy-registered device_id into the Token.
+
+    The CCI password login must use the same device_id (client-device-id),
+    so one canonical id serves both the legacy v1 host and CCI/GSPA.
+    """
+    api = HyundaiCciApiEU(9, 2, "en")
+    login_result = {
+        "access_token": "Bearer ccs-token",
+        "refresh_token": "REFRESH123456789012345678901234567890",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "cci_access_token": "cci-token",
+    }
+    with (
+        patch.object(
+            api, "_register_legacy_device", return_value="legacy-registered-id"
+        ) as mock_register,
+        patch.object(
+            api, "_login_with_password", return_value=login_result
+        ) as mock_login,
+        patch.object(api, "_register_device"),
+        patch.object(api, "_fetch_user_id"),
+    ):
+        token = api.login("user@test.com", "MyPassword123!")
+
+    assert token.device_id == "legacy-registered-id"
+    mock_register.assert_called_once()
+    assert mock_login.call_args[0][2] == "legacy-registered-id"

@@ -15,6 +15,7 @@ import datetime as dt
 import hashlib
 import json
 import logging
+import random
 import re
 import uuid
 from typing import Any, ClassVar
@@ -52,6 +53,7 @@ from .exceptions import (
     APIError,
     AuthenticationError,
     ConsentRequiredError,
+    DeviceIDError,
     DuplicateRequestError,
     InvalidAPIResponseError,
     ServiceTemporaryUnavailable,
@@ -221,6 +223,13 @@ class GspaApiEU(ApiImpl):
     # v1 CCAPI host (prd.eu-ccapi.<brand>.com:8080) - used only by the
     # legacy /tripinfo read; empty when a subclass does not support it.
     CCAPI_BASE_URL: str = ""
+    # Legacy v1 CCAPI device registration (device-id for the :8080 host —
+    # required by v1 endpoints like /tripinfo; live-proven 2026-09-30).
+    # Brand subclasses override all four together with CCAPI_BASE_URL.
+    LEGACY_CCSP_SERVICE_ID: ClassVar[str] = ""
+    LEGACY_APP_ID: ClassVar[str] = ""
+    LEGACY_CFB: ClassVar[bytes] = b""
+    LEGACY_PUSH_TYPE: ClassVar[str] = ""
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
@@ -334,11 +343,12 @@ class GspaApiEU(ApiImpl):
     ) -> Token:
         """Login via CCI flow and return a Token with all CCI fields.
 
-        Generates a local device_id (UUID), runs the CCI password login,
-        registers the device on CCI, and extracts the CCS user-id for
-        GSPA X-Stamp computation.
+        Registers the device on the legacy v1 CCAPI registry first (the
+        canonical device id the CCI login and GSPA calls then carry),
+        runs the CCI password login, registers the device on CCI, and
+        extracts the CCS user-id for GSPA X-Stamp computation.
         """
-        device_id = str(uuid.uuid4())
+        device_id = self._register_legacy_device()
 
         login_result = self._login_with_password(username, password, device_id)
 
@@ -1469,6 +1479,72 @@ class GspaApiEU(ApiImpl):
             return None
 
     # ------------------------------------------------------------------
+    # Legacy v1 device registration (D7 — live-proven 2026-09-30)
+    # ------------------------------------------------------------------
+
+    def _legacy_stamp(self) -> str:
+        """Legacy CCAPI 'Stamp' header (ApiImplType1 CFB XOR algorithm)."""
+        raw_data = f"{self.LEGACY_APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
+        result = bytes(b1 ^ b2 for b1, b2 in zip(self.LEGACY_CFB, raw_data))
+        return base64.b64encode(result).decode("utf-8")
+
+    def _register_legacy_device(self) -> str:
+        """Register the device on the legacy v1 CCAPI device registry.
+
+        The CCI flow does not touch the legacy backend's device registry,
+        so v1 endpoints (e.g. /tripinfo) reject a CCI-issued device_id
+        with 4002 "Invalid deviceId". The legacy registration endpoint
+        issues a canonical device_id accepted by both hosts:
+
+        - POST {SPA_API_URL}notifications/register
+          body {pushRegId, pushType, uuid}, headers legacy ccsp-service-id
+          / ccsp-application-id / Stamp — no Authorization (live-proven
+          2026-09-30, Hyundai EU: 200 S 0000, canonical deviceId; the CCI
+          push registrations, v3 bases/devices and v1 device/reg, never
+          bind the legacy registry).
+
+        The device_id stays valid for GSPA endpoints (stored-status and
+        the v1 reads live-verified with the same id). GSPA stored-status
+        accepts it; register returns a fresh id per call, so it is
+        called once per login and the id persists with the Token.
+
+        Raises:
+            DeviceIDError: When the legacy registry rejects the
+                registration or the brand legacy constants are not
+                configured; kia_uvo rotates the device_id on
+                DeviceIDError.
+        """
+        if not (self.CCAPI_BASE_URL and self.LEGACY_CCSP_SERVICE_ID):
+            raise DeviceIDError(
+                f"Legacy device registration is not configured for "
+                f"{BRANDS[self.brand]} (missing legacy CCAPI constants)"
+            )
+        url = self.SPA_API_URL + "notifications/register"
+        my_hex = f"{random.randrange(10**80):064x}"
+        payload = {
+            "pushRegId": my_hex[:64],
+            "pushType": self.LEGACY_PUSH_TYPE,
+            "uuid": str(uuid.uuid4()),
+        }
+        headers = {
+            "ccsp-service-id": self.LEGACY_CCSP_SERVICE_ID,
+            "ccsp-application-id": self.LEGACY_APP_ID,
+            "Stamp": self._legacy_stamp(),
+            "Content-Type": "application/json;charset=UTF-8",
+            "Host": self.CCAPI_BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=(5, 30))
+        data: dict[str, Any] = response.json()
+        _check_response_for_errors(data)
+        device_id = (data.get("resMsg") or {}).get("deviceId")
+        if not device_id:
+            raise DeviceIDError("Legacy device registration returned no deviceId")
+        return device_id
+
+    # ------------------------------------------------------------------
     # Trip info (v1 CCAPI — the app keeps /tripinfo on the legacy host)
     # ------------------------------------------------------------------
 
@@ -1481,11 +1557,10 @@ class GspaApiEU(ApiImpl):
     ) -> dict[str, Any]:
         """Fetch trip info from the v1 CCAPI /tripinfo endpoint.
 
-        Live probe (2026-09-04, Hyundai EU): the CCI token authenticates
-        on the legacy host (no 401) but returns 4002 "invalid deviceId" —
-        the device_id issued in the CCI flow is not registered on the v1
-        CCAPI backend (legacy logins register it there). Until a
-        registration step is validated, this raises DeviceIDError.
+        Requires the legacy-registered device_id from the Token (see
+        _register_legacy_device; a CCI-issued uuid without the legacy
+        registration gets 4002 "Invalid deviceId" — probed 2026-09-04,
+        resolved 2026-09-30 end-to-end on Hyundai EU with real data).
         """
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
         if trip_period_type == 0:  # month

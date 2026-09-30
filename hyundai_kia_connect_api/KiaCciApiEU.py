@@ -16,6 +16,8 @@ vehicle confirm their payload shapes.
 
 # pylint:disable=missing-class-docstring,invalid-name
 
+import base64
+
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
@@ -54,8 +56,16 @@ class KiaCciApiEU(GspaApiEU):
     # bearer headers — confirmed shape {"action": "prewakeup"}).
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature", "lamp"})
 
-    # Legacy v1 CCAPI host - used only by the /tripinfo read.
+    # Legacy v1 CCAPI host + legacy device-registry constants (the Kia
+    # legacy constant set — APNS push type; the same constants the legacy
+    # KiaUvoApiEU login has used all along).
     CCAPI_BASE_URL = "prd.eu-ccapi.kia.com:8080"
+    LEGACY_CCSP_SERVICE_ID = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
+    LEGACY_APP_ID = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
+    LEGACY_CFB = base64.b64decode(
+        "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+    )
+    LEGACY_PUSH_TYPE = "APNS"
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
