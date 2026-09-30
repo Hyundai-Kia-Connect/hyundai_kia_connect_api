@@ -18,10 +18,18 @@ import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
-from .const import DOMAIN
+from .const import (
+    BRAND_GENESIS,
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    BRANDS,
+    DOMAIN,
+)
+from .GspaApiEU import USER_AGENT_OK_HTTP
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -31,16 +39,135 @@ _LOGGER = logging.getLogger(__name__)
 class MqttServiceHubMixin:
     """Mixin providing MQTT Service Hub HTTP methods for HyundaiCciApiEU.
 
-    Inherits nothing; expects the host class to provide:
+    This mixin is the provider implementation of the ApiImpl push
+    contract for the CCI/EU lineage (both Hyundai and Kia brand classes
+    mix it in); it also carries the shared Service Hub helpers
+    (_service_hub_brand, _get_service_hub_headers, _build_service_hub_url,
+    _get_service_hub_url) so both brand subclasses get them unchanged.
+    The host class provides only:
       - self._service_hub_session  (requests.Session | None)
       - self._service_hub_tid      (str | None)
-      - self._service_hub_brand    (property -> str)
-      - self._get_service_hub_url() -> str | None
-      - self._get_service_hub_headers(token) -> dict
-      - self._build_service_hub_url(base_url, params) -> str
+      - self.staging               (bool config flag)
+      - CCSP_CLIENT_SERVICE_ID / PUSH_PROVIDER_ID   (per-brand constants)
     """
 
-    def get_mqtt_host(self, token: Token) -> dict | None:
+    # ------------------------------------------------------------------
+    # MQTT Service Hub (api/v3/servicehub/*)
+    # ------------------------------------------------------------------
+
+    @property
+    def _service_hub_brand(self) -> str:
+        """Short brand code for Service Hub API (H, K, or G).
+
+        Service Hub endpoints use single-letter brand codes in the body,
+        not the full brand names used in HTTP headers.
+        """
+        if BRANDS[self.brand] == BRAND_KIA:
+            return "K"
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            return "G"
+        return "H"
+
+    def _get_service_hub_headers(self, token: Token) -> dict:
+        """Headers for Service Hub (api/v3/servicehub/*).
+
+        Service Hub uses the CCS SDK interceptor chain, NOT the CCI API
+        headers. Based on the CCS interceptor chain (h.java, j.java,
+        d.java): Authorization carries the CCS token, plus client-os-code,
+        locale, Accept-Language, X-Application-Id (pushProviderId = FCM),
+        EpitVersion, X-Service-Id (ccspServiceId) and a per-request UUID
+        in X-Request-Id. exchangeable-token / non-ccs-token are attached
+        when the token carries them.
+        """
+        ccs_access = token.ccs_token or token.access_token or ""
+        ccs_access = ccs_access.removeprefix("Bearer ").strip()
+        headers = {
+            "Authorization": f"Bearer {ccs_access}",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT_OK_HTTP,
+            # CciAuthenticationHeaderInterceptor (h.java)
+            "client-os-code": "AOS",
+            "locale": self.LANGUAGE,
+            # DefaultHeaderInterceptor (j.java)
+            "Accept-Language": self.LANGUAGE,
+            "X-Application-Id": self.PUSH_PROVIDER_ID,
+            "EpitVersion": "EPITV2",
+            "X-Service-Id": self.CCSP_CLIENT_SERVICE_ID,
+            # X-Request-Id: per-request UUID (TSID)
+            "X-Request-Id": str(uuid.uuid4()),
+        }
+        # CciAuthenticationHeaderInterceptor — exchangeable-token
+        exchangeable = getattr(token, "exchangeable_token", None) or ""
+        if exchangeable:
+            headers["exchangeable-token"] = exchangeable
+        # CciAuthenticationHeaderInterceptor — non-ccs-token (optional)
+        non_ccs = getattr(token, "non_ccs_token", None) or ""
+        if non_ccs:
+            headers["non-ccs-token"] = non_ccs
+        return headers
+
+    @staticmethod
+    def _build_service_hub_url(base_url: str, params: dict) -> str:
+        """Build URL with query params matching OkHttp 3.12.0 encoding.
+
+        OkHttp does NOT encode '@' in query parameter values, but Python's
+        urllib3 (used by requests) encodes '@' as '%40'. The Service Hub
+        server validates the tid session exactly as sent, so '%40' vs '@'
+        causes "Invalid Parameter (client-id)" on device/protocol.
+
+        This method uses quote() with safe='@' to match OkHttp's behavior.
+        """
+        if not params:
+            return base_url
+        # OkHttp 3.12.0 QUERY_COMPONENT encode set does NOT include @.
+        # We add a generous safe set to match: unreserved chars + @ + sub-delims
+        safe_chars = "-_.~!$'()*,;=:@/?"
+        parts = []
+        for k, v in params.items():
+            encoded_key = quote(str(k), safe=safe_chars)
+            encoded_val = quote(str(v), safe=safe_chars)
+            parts.append(f"{encoded_key}={encoded_val}")
+        return f"{base_url}?{'&'.join(parts)}"
+
+    def _get_service_hub_url(self) -> str:
+        """Get Service Hub base URL for the current brand/region.
+
+        Production URLs from the official EU app (v1.1.4).
+        Staging URLs are in plaintext config.
+        """
+        # Map brand + region to Service Hub key
+        # Key format: {H|K|G}_{region_code}
+        brand_prefix = {
+            BRAND_HYUNDAI: "H",
+            BRAND_KIA: "K",
+            BRAND_GENESIS: "G",
+        }.get(self.brand, "H")
+
+        # Region mapping (EU is default for this API class)
+        # The CCI EU API only supports EU region, but we provide
+        # the full mapping for future region subclasses
+        region_suffix = "EU"  # HyundaiCciApiEU is EU-only
+
+        service_hub_key = f"{brand_prefix}_{region_suffix}"
+
+        from .mqtt_service_hub import (
+            SERVICE_HUB_PRODUCTION_BASES,
+            SERVICE_HUB_STAGING_BASES,
+        )
+
+        if self.staging:
+            bases = SERVICE_HUB_STAGING_BASES
+        else:
+            bases = SERVICE_HUB_PRODUCTION_BASES
+
+        host_port = bases.get(service_hub_key)
+        if not host_port:
+            _LOGGER.error(f"{DOMAIN} - No Service Hub URL for key={service_hub_key}")
+            return ""
+
+        return f"https://{host_port}"
+
+    def get_push_broker_info(self, token: Token) -> dict | None:
         """GET api/v3/servicehub/device/host — get MQTT broker config.
 
         Returns dict with keys: http_host, http_port, mqtt_host, mqtt_port, ssl.
@@ -118,7 +245,7 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub device/host error: {ex}")
         return None
 
-    def register_mqtt_client(self, token: Token) -> dict | None:
+    def register_push_client(self, token: Token) -> dict | None:
         """POST api/v3/servicehub/device/register — register device for MQTT push.
 
         The app sends: @Header("tid") + @Body {unit: "mobile", uuid: ccId}.
@@ -184,7 +311,7 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub device/register error: {ex}")
         return None
 
-    def register_mqtt_protocol(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def register_push_vehicle(self, token: Token, vehicle: Vehicle) -> dict | None:
         """POST api/v3/servicehub/device/protocol — register protocol for vehicle.
 
         App Retrofit interface: @Header("tid") + @Header("client-id") +
@@ -327,7 +454,9 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub device/protocol error: {ex}")
         return None
 
-    def get_mqtt_metadata(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _service_hub_get_metadata(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         """GET api/v3/servicehub/vehicles/metadatalist — vehicle MQTT metadata.
 
         The app sends: @Header("tid") + @Header("client-id") +
@@ -362,8 +491,9 @@ class MqttServiceHubMixin:
             session = self._service_hub_session or requests
             response = session.get(full_url, headers=headers, timeout=(5, 30))
             if response.status_code == 200:
-                data = response.json()
+                data: dict[str, Any] = response.json()
                 _LOGGER.debug(f"{DOMAIN} - MQTT metadatalist FULL response: {data}")
+                # typed: response.json() is Any; the shape is a metadata object
                 # Extract hu clientId from metadatalist for CarRemote topics.
                 # The app distinguishes ccu clientId vs hu clientId here
                 vehicles_list = data.get("vehicles", [])
@@ -385,7 +515,7 @@ class MqttServiceHubMixin:
             _LOGGER.error(f"{DOMAIN} - Service Hub metadatalist error: {ex}")
         return None
 
-    def get_mqtt_vehicle_id(self, token: Token, vehicle: Vehicle) -> str | None:
+    def _service_hub_get_vehicle_id(self, token: Token, vehicle: Vehicle) -> str | None:
         """POST api/v3/servicehub/vehicleId — get vehicle MQTT ID.
 
         The app sends: @Header("tid") + @Header("client-id") +
@@ -423,12 +553,14 @@ class MqttServiceHubMixin:
             session = self._service_hub_session or requests
             response = session.post(full_url, headers=headers, timeout=(5, 30))
             if response.status_code == 200:
-                data = response.json()
+                data: dict[str, Any] = response.json()
                 vehicle_id = data.get("vehicleId") or data.get("carId")
                 if vehicle_id:
                     vehicle.mqtt_vehicle_id = vehicle_id
                     _LOGGER.info(f"{DOMAIN} - MQTT vehicle ID: {vehicle_id}")
-                return vehicle_id
+                if vehicle_id:
+                    return str(vehicle_id)
+                return None
             _LOGGER.warning(
                 f"{DOMAIN} - Service Hub vehicleId failed: "
                 f"HTTP {response.status_code} — {response.text[:300]}"
@@ -436,6 +568,113 @@ class MqttServiceHubMixin:
         except Exception as ex:
             _LOGGER.error(f"{DOMAIN} - Service Hub vehicleId error: {ex}")
         return None
+
+
+    def get_push_connection_state(self, token: Token) -> str | None:
+        """GET api/v3/vstatus/connstate — check the push connection state.
+
+        The app sends: @Query("clientId") — no tid or client-id headers.
+        Returns: "ONLINE", "OFFLINE", or "UNKNOWN".
+        """
+        base = self._get_service_hub_url()
+        if not base:
+            return None
+        url = base + "/api/v3/vstatus/connstate"
+        headers = self._get_service_hub_headers(token)
+
+        params = {
+            "clientId": token.mqtt_client_id or token.client_device_id or "",
+        }
+        try:
+            full_url = self._build_service_hub_url(url, params)
+            response = requests.get(full_url, headers=headers, timeout=(5, 30))
+            if response.status_code == 200:
+                data: dict[str, Any] = response.json()
+                state = (
+                    data.get("connState")
+                    or data.get("state")
+                    or data.get("status")
+                    or "UNKNOWN"
+                )
+                _LOGGER.debug(f"{DOMAIN} - Push connection state: {state}")
+                return state.upper()
+            _LOGGER.warning(
+                f"{DOMAIN} - Service Hub connstate failed: "
+                f"HTTP {response.status_code} — {response.text[:300]}"
+            )
+        except Exception as ex:
+            _LOGGER.error(f"{DOMAIN} - Service Hub connstate error: {ex}")
+        return None
+
+    def get_push_vehicle_identity(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """Get the vehicle push identity: metadata + MQTT vehicle id.
+
+        Combines the two Service Hub reads (metadata/vehicleId endpoint).
+        Side effects: populates vehicle.hu_client_id (from the metadata
+        list) and vehicle.mqtt_vehicle_id (from the vehicleId endpoint).
+        """
+        self._service_hub_get_metadata(token, vehicle)
+        self._service_hub_get_vehicle_id(token, vehicle)
+        return {
+            "mqtt_vehicle_id": vehicle.mqtt_vehicle_id,
+            "hu_client_id": vehicle.hu_client_id,
+        }
+
+    def parse_push_message(
+        self, topic: str, payload: bytes
+    ) -> "CciPushMessage | None":
+        """Parse a raw Service Hub MQTT delivery (push-contract method).
+
+        Transport delivers raw (topic, payload bytes); JSON decoding and
+        the envelope's raw-hex fallback belong to this schema, not to the
+        transport. Returns None for unknown topic schemas.
+        """
+        msg = parse_mqtt_message(topic, payload)
+        if msg.topic_group == "Unknown":
+            return None
+        out = CciPushMessage(
+            topic_group=msg.topic_group,
+            topic_type=msg.topic_type,
+            vehicle_id=msg.vehicle_id,
+            payload=msg.payload,
+            is_status=msg.topic_group == "CarStatus",
+        )
+        header = out.payload.get("header", {})
+        body = out.payload.get("body", {})
+        tid = header.get("tid") or header.get("tId")
+        if out.topic_type == "Res":
+            out.action_id = tid
+            res_code = body.get("resCode", header.get("resCode"))
+            out.action_result = str(res_code) if res_code is not None else "success"
+        elif out.topic_type == "Connect":
+            out.action_id = tid
+            out.action_connected = True
+            out.action_result = "connected"
+        return out
+
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
+        """Topics to subscribe for a vehicle (Service Hub schema).
+
+        Excluded on purpose (broker rejects with rc=128):
+          - service/phone/_/res/{id} (CarStatus.Res)
+          - device/{id}/closeremote/* (DeviceCloseRemote)
+          QoS 0 only — the broker rejects QoS 1 SUBSCRIBEs outright.
+        DeviceRemote/CarRemote use the device/client id as the infix;
+        CarStatus/OTA use the MQTT vehicle id.
+        """
+        client_id = token.mqtt_client_id or token.client_device_id or ""
+        vid = vehicle.mqtt_vehicle_id or vehicle.id or ""
+        caps = MqttCacheCapabilities(
+            vehicle_id=vid,
+            client_id=client_id,
+        )
+        topics: list[str] = []
+        topics.extend(build_car_status_topics(vid, caps))
+        topics.extend(build_device_remote_topics(client_id))
+        # CarRemote / CarCloseRemote / DeviceCloseRemote excluded (broker
+        # rejects vehicle/{huClientId}/... and closeremote/* with rc=128)
+        topics.extend(build_ota_topics(vid, caps))
+        return topics
 
 
 # ---------------------------------------------------------------------------
@@ -587,7 +826,21 @@ class MqttMessage:
 
 
 @dataclass
+class CciPushMessage:
+    """Parsed Service Hub MQTT message — the push-message contract shape."""
+    topic_group: str  # "CarStatus", "DeviceRemote", "CarRemote", ...
+    topic_type: str  # "Status", "Connect", "Res", ...
+    vehicle_id: str  # push-level vehicle id (topic infix)
+    payload: dict[str, Any]  # parsed JSON
+    is_status: bool = False
+    action_id: str | None = None
+    action_result: str | None = None
+    action_connected: bool = False
+
+
+@dataclass
 class MqttRCHeader:
+
     """RC message header."""
 
     authorization: str | None = None

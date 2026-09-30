@@ -8,6 +8,7 @@ import re
 import threading
 from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
 from .ApiImpl import (
     ApiImpl,
@@ -50,6 +51,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .mqtt_client import MqttTransport
 from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
@@ -88,16 +90,19 @@ class VehicleManager:
         )
 
         self.token: Token = token
-        self.vehicles: dict = {}
+        self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
-        # MQTT client and action tracking
-        self._mqtt_client = None
-        self._mqtt_action_events: dict[str, threading.Event] = {}
-        self._mqtt_action_results: dict[str, str] = {}
-        self._mqtt_status_callback: Callable | None = None
-        self._mqtt_connection_change_callback: Callable[[bool], None] | None = None
-        self._mqtt_reconnect_cancel: threading.Event | None = None
-        self._mqtt_vehicle_id: str | None = None
+        # Push (MQTT) transport and action tracking. Connection-scoped
+        # state lives here; all vehicle-level push identity lives on
+        # Vehicle (mqtt_vehicle_id, hu_client_id).
+        self._push_client: MqttTransport | None = None
+        self._push_action_events: dict[str, threading.Event] = {}
+        self._push_action_results: dict[str, str] = {}
+        self._push_status_callback: Callable[[str, str], None] | None = None
+        self._push_connection_change_callback: Callable[[bool], None] | None = None
+        self._push_reconnect_cancel: threading.Event | None = None
+        self._push_vehicle_ids: list[str] = []
+        self._push_transport_factory: type = MqttTransport
 
     @DeprecationWarning
     def initialize(self) -> None:
@@ -443,473 +448,272 @@ class VehicleManager:
         )
 
     # ------------------------------------------------------------------
-    # MQTT Service Hub methods
+    # Push (MQTT) — generic glue over the ApiImpl push contract.
+    # The manager knows nothing about broker schemas: a region API that
+    # declares supports_mqtt_push supplies broker info, registration,
+    # vehicle identity, topics and the message parser. Regions without
+    # support are a no-op (False / None), never an AttributeError.
     # ------------------------------------------------------------------
 
-    def get_mqtt_host(self) -> dict | None:
-        """Get MQTT broker host/port from Service Hub."""
-        return self.api.get_mqtt_host(self.token)
+    @property
+    def is_push_supported(self) -> bool:
+        """Whether the active region API declares push support."""
+        return bool(getattr(self.api, "supports_mqtt_push", False))
 
-    def register_mqtt_client(self) -> dict | None:
-        """Register device for MQTT push notifications."""
-        return self.api.register_mqtt_client(self.token)
+    def start_push(self, vehicle_id: str) -> bool:
+        """Connect to the push broker and subscribe the vehicle's topics.
 
-    def register_mqtt_protocol(self, vehicle_id: str) -> dict | None:
-        """Register MQTT protocol for a vehicle."""
-        return self.api.register_mqtt_protocol(self.token, self.get_vehicle(vehicle_id))
-
-    def get_mqtt_metadata(self, vehicle_id: str) -> dict | None:
-        """Get MQTT metadata for a vehicle from Service Hub."""
-        return self.api.get_mqtt_metadata(self.token, self.get_vehicle(vehicle_id))
-
-    def get_mqtt_vehicle_id(self, vehicle_id: str) -> str | None:
-        """Get MQTT vehicle ID from Service Hub."""
-        return self.api.get_mqtt_vehicle_id(self.token, self.get_vehicle(vehicle_id))
-
-    def get_mqtt_connection_state(self) -> str | None:
-        """Check MQTT connection state: 'ONLINE', 'OFFLINE', or 'UNKNOWN'."""
-        return self.api.get_mqtt_connection_state(self.token)
-
-    # ------------------------------------------------------------------
-    # MQTT orchestration
-    # ------------------------------------------------------------------
-
-    def start_mqtt(self, vehicle_id: str):
-        """Connect to MQTT broker and subscribe to vehicle topics.
-
-        Full flow:
-        1. get_mqtt_host() → broker config (host, port, SSL)
-        2. register_mqtt_client() → device registration (clientId, credentials)
-        3. register_mqtt_protocol() → register protocol IDs
-        4. Configure and connect HyundaiMqttClient
-        5. Subscribe to topics based on vehicle capabilities
-
-        Returns the connected HyundaiMqttClient, or None on failure.
-        Gracefully handles missing paho-mqtt (ImportError).
+        Region order (live-probed, app-confirmed):
+        broker → register client → vehicle identity → register vehicle →
+        transport connect → subscribe topics. Returns False when the
+        region API does not support push or setup failed.
         """
-        try:
-            from .mqtt_client import (
-                HyundaiMqttClient,
-                MqttCacheCapabilities,
-            )
-        except ImportError:
-            _LOGGER.warning(
-                f"{DOMAIN} - paho-mqtt not installed, MQTT unavailable. "
-                "Install with: pip install hyundai_kia_connect_api[mqtt]"
-            )
-            return None
+        if not self.is_push_supported:
+            _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
+            return False
 
+        token = self.token
         vehicle = self.get_vehicle(vehicle_id)
+        if self._push_client is not None:
+            self._push_vehicle_ids.append(vehicle_id)
+            ok = self._register_new_vehicle(token, vehicle, vehicle_id)
+            if ok:
+                if self._push_client.is_connected:
+                    self._subscribe_vehicle_topics(vehicle_id)
+                return True
+            self._push_vehicle_ids.remove(vehicle_id)
+            return False
 
-        # Step 1: Get broker config
-        host_info = self.get_mqtt_host()
-        if not host_info or not host_info.get("mqtt_host"):
-            _LOGGER.warning(f"{DOMAIN} - MQTT broker host not available")
-            return None
-        _LOGGER.info(
-            f"{DOMAIN} - MQTT step 1 OK: broker={host_info.get('mqtt_host')}:{host_info.get('mqtt_port')}, ssl={host_info.get('use_ssl')}"
+        broker = self.api.get_push_broker_info(token)
+        if not broker or not broker.get("mqtt_host"):
+            _LOGGER.debug(f"{DOMAIN} - Push broker info not available")
+            return False
+        reg = self.api.register_push_client(token)
+        if not reg:
+            _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
+            return False
+
+        self._push_vehicle_ids.append(vehicle_id)
+        if not self._register_new_vehicle(token, vehicle, vehicle_id):
+            self._push_vehicle_ids.remove(vehicle_id)
+            return False
+
+        client = self._push_transport_factory(
+            on_message=self._on_push_delivery_raw,
+            on_connect=self._on_push_connect,
+            on_disconnect=self._on_push_disconnect,
         )
-
-        # Step 2: Register device
-        reg_info = self.register_mqtt_client()
-        if not reg_info:
-            _LOGGER.warning(f"{DOMAIN} - MQTT device registration failed")
-            return None
-        _LOGGER.info(
-            f"{DOMAIN} - MQTT step 2 OK: client_id={reg_info.get('client_id')}, username={'yes' if reg_info.get('username') else 'no'}, password={'yes' if reg_info.get('password') else 'no'}"
-        )
-
-        # Step 2b: Get vehicle metadata and MQTT vehicle ID
-        # The app calls these before protocol registration
-        meta = self.get_mqtt_metadata(vehicle_id)
-        if meta:
-            _LOGGER.info(f"{DOMAIN} - MQTT metadata retrieved for vehicle {vehicle_id}")
-        else:
-            _LOGGER.debug(f"{DOMAIN} - MQTT metadata not available, continuing")
-
-        mqtt_vid = self.get_mqtt_vehicle_id(vehicle_id)
-        if mqtt_vid:
-            _LOGGER.info(f"{DOMAIN} - MQTT vehicle ID: {mqtt_vid}")
-        else:
-            _LOGGER.debug(f"{DOMAIN} - MQTT vehicle ID not available, using car ID")
-
-        # Step 3: Register protocol
-        self.register_mqtt_protocol(vehicle_id)
-        _LOGGER.info(f"{DOMAIN} - MQTT step 3 OK: protocol registered")
-
-        # Step 4: Configure and connect
-        # Cancel any previous reconnect attempts
-        if self._mqtt_reconnect_cancel:
-            self._mqtt_reconnect_cancel.set()
-
-        client = HyundaiMqttClient(
-            on_message=self._on_mqtt_message,
-            on_connect=lambda: _LOGGER.info(f"{DOMAIN} - MQTT connected"),
-            on_disconnect=lambda reason: self._on_mqtt_disconnect(reason),
-        )
-
-        broker_host = host_info["mqtt_host"]
-        # MQTT broker uses the same hostname but different port (443 or 8883)
-        broker_port = host_info.get("mqtt_port", 8883)
-        # Strip :31010 from REST URL — MQTT uses port 443/8883
-        if broker_host and ":31010" in broker_host:
-            broker_host = broker_host.replace(":31010", "")
-
-        # MQTT credentials: registration response may include username/password.
-        # If not, fall back to CCS token as password (common pattern in
-        # automotive MQTT brokers) and client_id as username.
-        mqtt_username = reg_info.get("username")
-        mqtt_password = reg_info.get("password")
-        mqtt_client_id = reg_info.get("client_id")
-
-        if not mqtt_username:
-            # Fallback: use clientId as MQTT username
-            mqtt_username = mqtt_client_id
-            _LOGGER.info(
-                f"{DOMAIN} - MQTT username not in register response, "
-                f"using clientId as username"
-            )
-        if not mqtt_password:
-            # Fallback: use access token (stripped of "Bearer " prefix) as
-            # MQTT password. The app's MQTT repository resolves it as:
-            #   String accessToken = SDKAuthenticationContract.INSTANCE.getAccessToken();
-            #   return accessToken.replace("Bearer ", "");
-            # Previously tried ccId which caused rc=128 (broker disconnect).
-            # Access token with "Bearer " stripped matches the app behavior.
-            access_token = self.token.ccs_token or self.token.access_token or ""
-            access_token = access_token.removeprefix("Bearer ").strip()
-            if access_token:
-                mqtt_password = access_token
-                _LOGGER.info(
-                    f"{DOMAIN} - MQTT password not in register response, "
-                    f"using access token as password"
-                )
-            else:
-                _LOGGER.warning(
-                    f"{DOMAIN} - MQTT password not in register response "
-                    f"and no access token available — connecting without password"
-                )
-
-        _LOGGER.info(
-            f"{DOMAIN} - MQTT credentials: client_id={mqtt_client_id}, "
-            f"username={'present' if mqtt_username else 'absent'}, "
-            f"password={'present' if mqtt_password else 'absent'}"
-        )
-
         client.configure(
-            broker_host=broker_host,
-            broker_port=broker_port,
-            use_ssl=host_info.get("use_ssl", True),
-            client_id=mqtt_client_id,
-            username=mqtt_username,
-            password=mqtt_password,
+            broker_host=broker["mqtt_host"],
+            broker_port=broker.get("mqtt_port", 8883),
+            use_ssl=broker.get("use_ssl", True),
+            client_id=reg.get("client_id"),
+            username=reg.get("username"),
+            password=reg.get("password"),
         )
-        _LOGGER.info(
-            f"{DOMAIN} - MQTT step 4a OK: configure() done, "
-            f"broker={broker_host}:{broker_port}, "
-            f"user={'yes' if mqtt_username else 'no'}:{len(mqtt_password or '') if mqtt_password else 0}chars"
-        )
-
-        # Register connection change callback before connecting so we
-        # catch the initial connection event
-        if self._mqtt_connection_change_callback:
-            client.set_on_connection_change(self._mqtt_connection_change_callback)
-
+        if self._push_connection_change_callback:
+            client.set_on_connection_change(self._push_connection_change_callback)
         try:
             client.connect()
-            _LOGGER.info(f"{DOMAIN} - MQTT step 4b OK: connect_async() called")
         except Exception as ex:
-            _LOGGER.warning(f"{DOMAIN} - MQTT connection failed: {ex}")
-            return None
-
-        self._mqtt_client = client
-        # Store the MQTT topic vehicle ID (mqtt_vid from get_mqtt_vehicle_id),
-        # NOT the carId — MQTT topic messages (CarStatus/Status, etc.) carry
-        # mqtt_vid as the topic infix, and _vehicle_id_for_mqtt compares against
-        # this to resolve mqtt_vid → vehicle.id. Storing carId here caused
-        # "MQTT vehicle_id unknown, skipping refresh" (mqtt_vid ≠ carId).
-        self._mqtt_vehicle_id = mqtt_vid or vehicle_id
-        _LOGGER.info(
-            f"{DOMAIN} - MQTT client configured for vehicle {vehicle_id} (mqtt_vid={self._mqtt_vehicle_id})"
-        )
-
-        # Step 5: Subscribe (deferred — topics are subscribed after
-        # on_connect callback fires, since connect_async is used)
-        # We store the vehicle info for subscribe-on-connect
-        mqtt_client_id = reg_info.get("client_id") or self.token.mqtt_client_id
-        hu_client_id = vehicle.hu_client_id
-
-        # CarStatus/OTA topics use the MQTT vehicle ID (from vehicleId endpoint)
-        # as the topic infix, NOT the carId (app's vehicle-id cache).
-        topic_vehicle_id = mqtt_vid or vehicle_id
-
-        # Build capabilities from vehicle fields
-        caps = MqttCacheCapabilities(
-            has_hvac_close_remote=vehicle.has_hvac_close_remote,
-            has_media_close_remote=vehicle.has_media_close_remote,
-            is_support_speed_event=vehicle.is_support_speed_event,
-            is_support_ota_progress=vehicle.is_support_ota_progress,
-            is_support_schedule_update=vehicle.is_support_schedule_update,
-            ccu_client_id=mqtt_client_id,
-            hu_client_id=hu_client_id,
-            vehicle_id=topic_vehicle_id,
-            client_id=mqtt_client_id,
-        )
-
-        # Subscribe will be called after connection is established.
-        # For now, subscribe immediately if already connected (unlikely with
-        # async connect, but covers the case).
+            _LOGGER.warning(f"{DOMAIN} - Push connection failed: {ex}")
+            self._push_vehicle_ids.remove(vehicle_id)
+            return False
+        self._push_client = client
         if client.is_connected:
-            client.subscribe_topics(
-                vehicle_id=topic_vehicle_id,
-                client_id=mqtt_client_id,
-                hu_client_id=hu_client_id,
-                capabilities=caps,
-            )
-        else:
-            # Subscribe on connect — use the on_connect callback
-            original_on_connect = client._on_connect
+            self._subscribe_vehicle_topics(vehicle_id)
+        return True
 
-            def _subscribe_on_connect():
-                client.subscribe_topics(
-                    vehicle_id=topic_vehicle_id,
-                    client_id=mqtt_client_id,
-                    hu_client_id=hu_client_id,
-                    capabilities=caps,
-                )
-                if original_on_connect:
-                    original_on_connect()
+    def _register_new_vehicle(self, token: Token, vehicle: Vehicle, vehicle_id: str) -> bool:
+        """Run the per-vehicle registration steps of the push contract."""
+        try:
+            self.api.get_push_vehicle_identity(token, vehicle)
+            self.api.register_push_vehicle(token, vehicle)
+        except Exception as ex:
+            _LOGGER.warning(f"{DOMAIN} - Push registration failed for {vehicle_id}: {ex}")
+            return False
+        return True
 
-            client._on_connect = _subscribe_on_connect
+    def _subscribe_vehicle_topics(self, vehicle_id: str) -> None:
+        """Subscribe the topics the region API provides for the vehicle."""
+        assert self._push_client is not None
+        vehicle = self.get_vehicle(vehicle_id)
+        try:
+            topics = self.api.get_push_topics(self.token, vehicle)
+        except Exception:
+            _LOGGER.exception(f"{DOMAIN} - Push topic build failed for {vehicle_id}")
+            return
+        if topics:
+            self._push_client.subscribe(topics)
 
-        return client
+    def _on_push_connect(self) -> None:
+        """Subscribe topics for each started push vehicle on (re)connect."""
+        for vehicle_id in list(self._push_vehicle_ids):
+            if vehicle_id in self.vehicles:
+                try:
+                    self._subscribe_vehicle_topics(vehicle_id)
+                except Exception:
+                    _LOGGER.exception(f"{DOMAIN} - Push subscribe failed for {vehicle_id}")
 
-    # Reconnect timing defaults (overridable for tests)
-    _mqtt_reconnect_initial_delay: float = 5.0  # seconds
-    _mqtt_reconnect_max_delay: float = 300.0  # seconds (5 min cap)
+    def _on_push_delivery_raw(self, topic: str, payload: bytes) -> None:
+        """Raw delivery from the transport; parse via the region API.
 
-    def _on_mqtt_disconnect(self, reason: str) -> None:
-        """Handle MQTT disconnection with exponential backoff reconnect.
-
-        Called from paho-mqtt background thread — must be thread-safe.
-        Clean disconnects (rc=0) are not retried (e.g. explicit stop_mqtt).
-        Unexpected disconnects trigger continuous reconnect with capped backoff.
+        Called from the paho background thread — must be thread-safe.
         """
-        _LOGGER.warning(f"{DOMAIN} - MQTT disconnected: {reason}")
+        message = self.api.parse_push_message(topic, payload)
+        if message is None:
+            return
+        self._on_push_message(message)
 
-        # Clean disconnect — don't reconnect (e.g. explicit stop_mqtt call)
+    def _on_push_message(self, message: Any) -> None:
+        """Dispatch a parsed push message (duck-typed contract shape).
+
+        Expected attributes: is_status (bool), vehicle_id (str, push
+        level), topic_type (str), and optional action fields action_id /
+        action_result (str | None), action_connected (bool).
+        """
+        action_id = getattr(message, "action_id", None)
+        if action_id and action_id in self._push_action_events:
+            result = message.action_result or (
+                "connected" if getattr(message, "action_connected", False) else "success"
+            )
+            self._push_action_results[action_id] = result
+            self._push_action_events[action_id].set()
+
+        if not getattr(message, "is_status", False) or not self._push_status_callback:
+            return
+        vehicle_id = self._vehicle_id_for_push(getattr(message, "vehicle_id", ""))
+        if vehicle_id is None:
+            _LOGGER.debug(
+                f"{DOMAIN} - Push vehicle id {message.vehicle_id} unknown, dropping"
+            )
+            return
+        try:
+            self._push_status_callback(vehicle_id, message.topic_type)
+        except Exception:
+            _LOGGER.exception(f"{DOMAIN} - Push status callback error")
+
+    def _vehicle_id_for_push(self, mqtt_vehicle_id: str) -> str | None:
+        """Map the push-level vehicle id to a ``self.vehicles`` key.
+
+        ``self.vehicles`` is keyed by ``vehicle.id``; push messages carry
+        the topic-level id. Multi-vehicle safe: no manager-side
+        per-vehicle state — the identity lives on each Vehicle.
+        """
+        for vehicle_id, vehicle in self.vehicles.items():
+            if vehicle.mqtt_vehicle_id and vehicle.mqtt_vehicle_id == mqtt_vehicle_id:
+                return vehicle_id
+        return None
+
+    def stop_push(self) -> None:
+        """Disconnect push and reset orchestration state."""
+        if self._push_reconnect_cancel:
+            self._push_reconnect_cancel.set()
+            self._push_reconnect_cancel = None
+        if self._push_client:
+            try:
+                self._push_client.disconnect()
+            except Exception:
+                _LOGGER.debug("Push disconnect failed (already disconnected)")
+            self._push_client = None
+        self._push_action_events.clear()
+        self._push_action_results.clear()
+        self._push_vehicle_ids.clear()
+
+    @property
+    def is_push_connected(self) -> bool:
+        """Whether the push transport is connected."""
+        return self._push_client is not None and self._push_client.is_connected
+
+    def set_push_status_callback(
+        self, callback: Callable[[str, str], None] | None = None
+    ) -> None:
+        """Register a callback for status pushes: (vehicle_id, topic_type)."""
+        self._push_status_callback = callback
+
+    def set_push_connection_change_callback(
+        self, callback: Callable[[bool], None] | None = None
+    ) -> None:
+        """Register a callback for push connection changes: (connected: bool)."""
+        self._push_connection_change_callback = callback
+        if self._push_client:
+            self._push_client.set_on_connection_change(callback)
+
+    def get_push_connection_state(self) -> str | None:
+        """Push connection state through the region API (delegator)."""
+        state = self.api.get_push_connection_state(self.token)
+        return str(state) if state is not None else None
+
+    def wait_for_push_result(self, action_id: str, timeout: float = 60.0) -> str | None:
+        """Wait for an action-result push (designed for asyncio.to_thread callers)."""
+        event = threading.Event()
+        self._push_action_events[action_id] = event
+        try:
+            if event.wait(timeout=timeout):
+                return self._push_action_results.pop(action_id, None)
+            _LOGGER.debug(f"{DOMAIN} - Push wait timed out for action {action_id}")
+            return None
+        finally:
+            self._push_action_events.pop(action_id, None)
+
+    # Reconnect timing (overridable in tests)
+    _push_reconnect_initial_delay: float = 5.0
+    _push_reconnect_max_delay: float = 300.0
+
+    def _on_push_disconnect(self, reason: str) -> None:
+        """Reconnect with capped exponential backoff on unexpected drops.
+
+        Called from the paho background thread. Clean disconnects are not
+        retried (that is stop_push()).
+        """
+        _LOGGER.debug(f"{DOMAIN} - Push disconnected: {reason}")
         if reason == "clean disconnect":
             return
-
-        vehicle_id = self._mqtt_vehicle_id
-        if not vehicle_id:
+        if not self._push_vehicle_ids:
             return
-
-        # Cancel any previous reconnect attempt
-        if self._mqtt_reconnect_cancel:
-            self._mqtt_reconnect_cancel.set()
-
-        # Stop and clean up the old client before reconnecting
-        self._cleanup_mqtt_client()
-
+        if self._push_reconnect_cancel:
+            self._push_reconnect_cancel.set()
+        self._cleanup_push_client()
         cancel_event = threading.Event()
-        self._mqtt_reconnect_cancel = cancel_event
+        self._push_reconnect_cancel = cancel_event
 
-        initial_delay = self._mqtt_reconnect_initial_delay
-        max_delay = self._mqtt_reconnect_max_delay
+        initial_delay = self._push_reconnect_initial_delay
+        max_delay = self._push_reconnect_max_delay
+        vehicle_ids = list(self._push_vehicle_ids)
 
-        def _reconnect_with_backoff():
+        def _reconnect_with_backoff() -> None:
             delay = initial_delay
-            attempt = 0
-
             while not cancel_event.is_set():
-                attempt += 1
-                _LOGGER.info(
-                    f"{DOMAIN} - MQTT reconnect attempt #{attempt} in {delay}s..."
-                )
+                _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
                 if cancel_event.wait(delay):
                     return
                 try:
-                    # Refresh tokens before reconnect — Service Hub calls
-                    # require valid CCS tokens which may have expired
                     try:
                         self.check_and_refresh_token()
                     except Exception as token_ex:
                         _LOGGER.warning(
-                            f"{DOMAIN} - MQTT reconnect token refresh failed: "
-                            f"{token_ex}, will retry"
+                            f"{DOMAIN} - Push reconnect token refresh failed: {token_ex}"
                         )
-
-                    client = self.start_mqtt(vehicle_id)
-                    if client and client.is_connected:
-                        _LOGGER.info(f"{DOMAIN} - MQTT reconnected successfully")
+                    self._push_client = None
+                    ok = all(self.start_push(vid) for vid in vehicle_ids)
+                    if ok and self.is_push_connected:
+                        _LOGGER.debug(f"{DOMAIN} - Push reconnected")
                         return
                 except Exception as ex:
-                    _LOGGER.warning(f"{DOMAIN} - MQTT reconnect failed: {ex}")
-
-                # Exponential backoff: 5 → 10 → 20 → 40 → 80 → 160 → 300 → 300...
+                    _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
                 delay = min(delay * 2, max_delay)
+            _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 
-            _LOGGER.info(f"{DOMAIN} - MQTT reconnect cancelled by stop_mqtt")
+        threading.Thread(target=_reconnect_with_backoff, name="push-reconnect", daemon=True).start()
 
-        reconnect_thread = threading.Thread(
-            target=_reconnect_with_backoff,
-            name="mqtt-reconnect",
-            daemon=True,
-        )
-        reconnect_thread.start()
-
-    def _cleanup_mqtt_client(self) -> None:
-        """Stop and clean up the current MQTT client.
-
-        Called before reconnect attempts to ensure the old paho-mqtt
-        loop is stopped and the client object is cleared.
-        """
-        old_client = self._mqtt_client
+    def _cleanup_push_client(self) -> None:
+        old_client = self._push_client
         if old_client is not None:
             try:
                 old_client.disconnect()
             except Exception:
-                _LOGGER.debug(
-                    "MQTT disconnect on reconnect failed (already disconnected)"
-                )
-            self._mqtt_client = None
-
-    def stop_mqtt(self):
-        """Disconnect and clean up the MQTT client."""
-        # Cancel any pending reconnect attempts
-        if self._mqtt_reconnect_cancel:
-            self._mqtt_reconnect_cancel.set()
-            self._mqtt_reconnect_cancel = None
-
-        self._cleanup_mqtt_client()
-        _LOGGER.info(f"{DOMAIN} - MQTT client disconnected")
-        self._mqtt_action_events.clear()
-        self._mqtt_action_results.clear()
-        self._mqtt_vehicle_id = None
-
-    @property
-    def mqtt_client(self):
-        """The active MQTT client, or None if not connected."""
-        return self._mqtt_client
-
-    @property
-    def is_mqtt_connected(self) -> bool:
-        """Whether the MQTT client is connected to the broker."""
-        return self._mqtt_client is not None and self._mqtt_client.is_connected
-
-    def set_mqtt_status_callback(
-        self, callback: Callable[[str, str], None] | None = None
-    ):
-        """Register a callback for CarStatus MQTT messages.
-
-        Called from paho-mqtt background thread when vehicle status
-        updates arrive. The callback receives (vehicle_id, topic_type).
-
-        Set to None to unregister. Thread-safe.
-        """
-        self._mqtt_status_callback = callback
-
-    def set_mqtt_connection_change_callback(
-        self, callback: Callable[[bool], None] | None = None
-    ):
-        """Register a callback for MQTT connection state changes.
-
-        Called from paho-mqtt background thread when the connection
-        state changes. The callback receives a bool (True = connected).
-
-        Set to None to unregister. Thread-safe.
-        """
-        self._mqtt_connection_change_callback = callback
-
-    def _vehicle_id_for_mqtt(self, mqtt_vehicle_id: str) -> str | None:
-        """Map MQTT vehicle id → VehicleManager.vehicles key (vehicle.id).
-
-        MQTT CarStatus messages carry the mqttVehicleId (from the Service Hub
-        vehicleId endpoint) in the topic, but ``self.vehicles`` is keyed by
-        ``vehicle.id`` — a different identifier. This resolves the mapping so
-        the coordinator callback receives a key it can actually look up.
-
-        Single-vehicle case: the one registered ``self._mqtt_vehicle_id``
-        maps to the single vehicle in ``self.vehicles``.
-        """
-        if self._mqtt_vehicle_id and mqtt_vehicle_id == self._mqtt_vehicle_id:
-            for vid in self.vehicles:
-                return vid
-        # future: multi-vehicle reverse map via Vehicle.mqtt field if added
-        return None
-
-    def _on_mqtt_message(self, message):
-        """Route MQTT messages to waiting action handlers.
-
-        Called from paho-mqtt background thread — must be thread-safe.
-        """
-
-        _LOGGER.debug(
-            f"{DOMAIN} - MQTT message received: "
-            f"{message.topic_group}/{message.topic_type}"
-        )
-
-        # CarStatus messages trigger a vehicle state refresh
-        if message.topic_group == "CarStatus" and self._mqtt_status_callback:
-            resolved = self._vehicle_id_for_mqtt(message.vehicle_id)
-            if resolved is None:
-                _LOGGER.debug(
-                    f"{DOMAIN} - MQTT vehicle_id {message.vehicle_id} unknown, "
-                    f"skipping refresh"
-                )
-                return
-            try:
-                self._mqtt_status_callback(resolved, message.topic_type)
-            except Exception:
-                _LOGGER.exception(f"{DOMAIN} - MQTT status callback error")
-
-        # DeviceRemote/CarRemote Res messages carry command results
-        if message.topic_type == "Res":
-            payload = message.payload
-            # Extract action/result tracking info from header
-            header = payload.get("header", {})
-            body = payload.get("body", {})
-            res_code = body.get("resCode", header.get("resCode"))
-            tid = header.get("tid") or header.get("tId")
-
-            if tid and tid in self._mqtt_action_events:
-                self._mqtt_action_results[tid] = (
-                    str(res_code) if res_code is not None else "success"
-                )
-                self._mqtt_action_events[tid].set()
-                _LOGGER.debug(
-                    f"{DOMAIN} - MQTT result for tid={tid}: resCode={res_code}"
-                )
-
-        # Connect/Disconnect messages for CarRemote
-        if message.topic_type == "Connect":
-            header = message.payload.get("header", {})
-            tid = header.get("tid") or header.get("tId")
-            if tid and tid in self._mqtt_action_events:
-                self._mqtt_action_results[tid] = "connected"
-                self._mqtt_action_events[tid].set()
-
-    def wait_for_mqtt_result(self, action_id: str, timeout: float = 60.0) -> str | None:
-        """Wait for an MQTT result message for a given action_id.
-
-        Blocks the calling thread until the result arrives or timeout expires.
-        Returns the result code string, or None on timeout.
-
-        This is designed to be called from asyncio.to_thread() in HA.
-        """
-        event = threading.Event()
-        self._mqtt_action_events[action_id] = event
-
-        try:
-            if event.wait(timeout=timeout):
-                result = self._mqtt_action_results.pop(action_id, None)
-                return result
-            else:
-                _LOGGER.debug(f"{DOMAIN} - MQTT wait timed out for action {action_id}")
-                return None
-        finally:
-            self._mqtt_action_events.pop(action_id, None)
+                _LOGGER.debug("Push disconnect during cleanup failed (already down)")
+            self._push_client = None
 
     @staticmethod
     def get_implementation_by_region_brand(

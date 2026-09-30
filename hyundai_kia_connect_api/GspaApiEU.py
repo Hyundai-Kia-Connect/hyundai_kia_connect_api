@@ -211,6 +211,10 @@ class GspaApiEU(ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
+    # Service Hub staging flag (class attr — production endpoints only
+    # for now; staging bases live in mqtt_service_hub.SERVICE_HUB_STAGING_BASES).
+    staging: bool = False
+
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""

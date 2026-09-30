@@ -15,64 +15,6 @@ from enum import Enum
 
 import paho.mqtt.client as mqtt
 
-from .mqtt_service_hub import (  # noqa: F401 — transitional re-exports (removed with the VM rewrite)
-    MQTT_CONTENT_TYPE_RC,
-    MQTT_PROTOCOL_ID_CCU_UPDATE,
-    MQTT_PROTOCOL_ID_CONNECTION,
-    MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_CAR,
-    MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_MOBILE,
-    MQTT_PROTOCOL_ID_DEVICE_RC_COMMAND,
-    MQTT_PROTOCOL_ID_DEVICE_RC_CONNECT,
-    MQTT_PROTOCOL_ID_DEVICE_RC_CONNECTCHECK,
-    MQTT_PROTOCOL_ID_RC_CLOSE_CAR,
-    MQTT_PROTOCOL_ID_RC_CLOSE_MOBILE,
-    MQTT_PROTOCOL_ID_RC_COMMAND,
-    MQTT_PROTOCOL_ID_RC_CONNECT,
-    MQTT_PROTOCOL_ID_RC_CONNECTCHECK,
-    MQTT_PROTOCOL_ID_RES,
-    POSTFIX_CLOSE_CONNECTIONSTATUS_REQ,
-    POSTFIX_CLOSE_CONNECTIONSTATUS_RES,
-    POSTFIX_CLOSE_MEDIA_VEHICLESTATUS,
-    POSTFIX_CLOSE_PRECONDITION,
-    POSTFIX_CLOSE_PRECONDITION_REQ,
-    POSTFIX_CLOSE_REMOTE_REQ,
-    POSTFIX_CLOSE_REMOTE_RES,
-    POSTFIX_CLOSE_VEHICLESTATUS,
-    POSTFIX_CLOSE_VEHICLESTATUS_REQ,
-    POSTFIX_OTA_PROGRESS,
-    POSTFIX_OTA_SCHEDULEUPDATE,
-    POSTFIX_REMOTE_COMMAND,
-    POSTFIX_REMOTE_CONNECT,
-    POSTFIX_REMOTE_CONNECTCHECK,
-    POSTFIX_REMOTE_MOBILECLOSE,
-    POSTFIX_REMOTE_VEHICLECLOSE,
-    SERVICE_HUB_PRODUCTION_BASES,
-    SERVICE_HUB_STAGING_BASES,
-    TOPIC_PREFIX_CONNECTION,
-    TOPIC_PREFIX_DEVICE,
-    TOPIC_PREFIX_DEVICE_RES,
-    TOPIC_PREFIX_LOCATION,
-    TOPIC_PREFIX_RES,
-    TOPIC_PREFIX_VEHICLE,
-    TOPIC_PREFIX_VSS,
-    MqttCacheCapabilities,
-    MqttHVACCommand,
-    MqttHVACHeader,
-    MqttMessage,
-    MqttRCCommandType,
-    MqttRCHeader,
-    _classify_topic,
-    _extract_infix,
-    build_car_close_remote_topics,
-    build_car_remote_topics,
-    build_car_status_topics,
-    build_device_close_remote_topics,
-    build_device_remote_topics,
-    build_ota_topics,
-    build_topic,
-    parse_mqtt_message,
-)
-
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "hyundai_kia_connect_api"
@@ -91,7 +33,7 @@ class MqttConnectionState(str, Enum):
 # ---------------------------------------------------------------------------
 
 
-class HyundaiMqttClient:
+class MqttTransport:
     """MQTT client for receiving real-time vehicle status and command results.
 
     Supports paho-mqtt v2.x (HA 2026.6+) and v1.x for backwards compatibility.
@@ -106,7 +48,7 @@ class HyundaiMqttClient:
 
     def __init__(
         self,
-        on_message: Callable[[MqttMessage], None] | None = None,
+        on_message: Callable[[str, bytes], None] | None = None,
         on_connect: Callable[[], None] | None = None,
         on_disconnect: Callable[[str], None] | None = None,
     ) -> None:
@@ -209,65 +151,28 @@ class HyundaiMqttClient:
         self._subscribed_topics = []
         self._pending_subs.clear()
 
-    def subscribe_topics(
-        self,
-        vehicle_id: str,
-        client_id: str,
-        hu_client_id: str | None = None,
-        capabilities: MqttCacheCapabilities | None = None,
-    ) -> list[str]:
-        """Subscribe to MQTT topic groups based on vehicle capabilities.
+    def subscribe(self, topics: list[str]) -> list[str]:
+        """Batch-subscribe to the given topics (QoS 0, single SUBSCRIBE).
 
-        Returns the list of subscribed topic strings.
+        Topic selection is the caller's business (provider); the transport
+        only carries the broker-facing rules:
+          - QoS 0 only — the Service Hub broker rejects QoS 1 SUBSCRIBEs
+            outright (rc=128) for paho-mqtt clients.
+          - one batch SUBSCRIBE for the whole list (app-confirmed).
+        Returns the subscribed topic list.
         """
         if not self._client or not self._connected:
             _LOGGER.warning(f"{DOMAIN} - MQTT not connected, cannot subscribe")
             return []
+        if not topics:
+            return []
+        result, mid = self._client.subscribe(list(zip(topics, [0] * len(topics))))
+        # Store mid→batch for the SUBACK handler
+        self._pending_subs[mid] = ",".join(topics)
+        _LOGGER.debug(f"{DOMAIN} - MQTT batch subscribe mid={mid}, rc={result}")
+        self._subscribed_topics = list(topics)
+        return list(topics)
 
-        caps = capabilities or MqttCacheCapabilities()
-        all_topics: list[str] = []
-
-        # 1. Always subscribe: CarStatus (VSS, Connect — Res excluded, broker rejects)
-        all_topics.extend(build_car_status_topics(vehicle_id, caps))
-
-        # 2. Always subscribe: DeviceRemote
-        all_topics.extend(build_device_remote_topics(client_id))
-
-        # 3. CarRemote and CarCloseRemote EXCLUDED — broker rejects vehicle/{huClientId}/...
-        # topics with rc=128. Phone clients can only subscribe to device/{clientId}/...
-        # topics for remote control. CarRemote topics (vehicle/{huClientId}/...) are only
-        # authorized for the head unit itself, not for phone clients.
-
-        # 4. DeviceCloseRemote EXCLUDED — broker rejects with rc=128.
-        # The app does NOT register any "closeremote" protocols in device/protocol,
-        # so the broker does not authorize subscriptions to
-        # device/{clientId}/closeremote/* topics.
-        # all_topics.extend(build_device_close_remote_topics(client_id, caps))
-
-        # 5. Conditional: OTA
-        all_topics.extend(build_ota_topics(vehicle_id, caps))
-
-        # Subscribe with QoS 0 (at most once)
-        # The Hyundai CCI broker does NOT authorize QoS 1 subscriptions — it
-        # disconnects with rc=128 immediately after receiving a QoS 1 SUBSCRIBE.
-        # QoS 0 subscriptions are accepted with SUBACK and remain stable.
-        # The app requests QoS 1 but the broker downgrades to 0
-        # for native Android clients. For paho-mqtt clients the broker rejects QoS 1
-        # outright, so we must request QoS 0.
-        # The app sends all topics in a single batch SUBSCRIBE (like paho-mqtt subscribe()
-        # with topic list), not one-by-one. This matches the broker's expectations.
-        if all_topics:
-            qos_list = [0] * len(all_topics)
-            _LOGGER.info(
-                f"{DOMAIN} - MQTT batch-subscribing to {len(all_topics)} topics (QoS 0)"
-            )
-            result, mid = self._client.subscribe(list(zip(all_topics, qos_list)))
-            # Store mid→"batch" for SUBACK handler
-            self._pending_subs[mid] = ",".join(all_topics)
-            _LOGGER.debug(f"{DOMAIN} - MQTT batch subscribe mid={mid}, rc={result}")
-
-        self._subscribed_topics = all_topics
-        return all_topics
 
     # -- paho-mqtt callbacks (called on background thread) --
 
@@ -304,25 +209,8 @@ class HyundaiMqttClient:
         topic = msg.topic
         payload = msg.payload
 
-        try:
-            parsed = parse_mqtt_message(topic, payload)
-            _LOGGER.debug(
-                f"{DOMAIN} - MQTT message: {parsed.topic_group}/"
-                f"{parsed.topic_type} for {parsed.vehicle_id}"
-            )
-            # Log first 3 messages at WARNING for operational visibility
-            if not hasattr(self, "_msg_count"):
-                self._msg_count = 0
-            self._msg_count += 1
-            if self._msg_count <= 3:
-                _LOGGER.warning(
-                    f"{DOMAIN} - MQTT msg #{self._msg_count}: "
-                    f"{parsed.topic_group}/{parsed.topic_type}"
-                )
-            if self._on_message:
-                self._on_message(parsed)
-        except Exception as e:
-            _LOGGER.error(f"{DOMAIN} - MQTT message parse error: {e}")
+        if self._on_message:
+            self._on_message(topic, payload)
 
     def _on_mqtt_subscribe(
         self, client, userdata, mid, reason_codes, properties=None
