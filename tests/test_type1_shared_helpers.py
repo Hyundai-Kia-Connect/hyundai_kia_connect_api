@@ -59,8 +59,8 @@ def test_au_stamp_uses_shared_cfb():
     assert api._get_stamp()
 
 
-def _driving_payloads(alltime_key: str):
-    alltime = {"resMsg": {alltime_key: [{"totalPwrCsp": 100, "regenPwr": 20}]}}
+def _driving_payloads(all_time_key: str):
+    all_time = {"resMsg": {all_time_key: [{"totalPwrCsp": 100, "regenPwr": 20}]}}
     month = {
         "resMsg": {
             "drivingInfoDetail": [],
@@ -69,7 +69,7 @@ def _driving_payloads(alltime_key: str):
             ],
         }
     }
-    return alltime, month
+    return all_time, month
 
 
 def _mock_posts(api, *payloads):
@@ -79,7 +79,7 @@ def _mock_posts(api, *payloads):
     ]
 
 
-def test_driving_info_alltime_key_per_region():
+def test_driving_info_all_time_key_per_region():
     for api, key in (
         (KiaUvoApiEU(region=1, brand=1, language="en"), "drivingInfo"),
         (KiaUvoApiAU(region=5, brand=2, language="en"), "drivingInfoDetail"),
