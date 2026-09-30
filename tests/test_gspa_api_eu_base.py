@@ -6,8 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, DeviceIDError
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -206,3 +207,213 @@ def test_get_software_version_returns_data():
     assert mock_get.call_args[0][0].endswith(
         "/gspa/v1/device-info/vehicles/test123/software-version"
     )
+
+
+def test_spa_api_url_built_from_ccapi_base():
+    """The legacy /tripinfo host is derived from CCAPI_BASE_URL."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    assert api.SPA_API_URL == "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/"
+
+
+def test_update_month_trip_info_parses():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resMsg": {
+            "monthTripDayCnt": 2,
+            "tripDrvTime": 100,
+            "tripIdleTime": 20,
+            "tripDist": 150.5,
+            "tripAvgSpeed": 40,
+            "tripMaxSpeed": 90,
+            "tripDayList": [
+                {"tripDayInMonth": 5, "tripCntDay": 2},
+                {"tripDayInMonth": 6, "tripCntDay": 3},
+            ],
+        },
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp
+    ) as mock_post:
+        api.update_month_trip_info(token, vehicle, "202608")
+
+    call_url = mock_post.call_args[0][0]
+    assert call_url == (
+        "https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/test123/tripinfo"
+    )
+    assert mock_post.call_args[1]["json"] == {
+        "tripPeriodType": 0,
+        "setTripMonth": "202608",
+    }
+    info = vehicle.month_trip_info
+    assert info is not None
+    assert info.yyyymm == "202608"
+    assert info.summary.drive_time == 100
+    assert info.summary.distance == 150.5
+    assert [d.yyyymmdd for d in info.day_list] == [5, 6]
+    assert [d.trip_count for d in info.day_list] == [2, 3]
+
+
+def test_update_month_trip_info_empty_sets_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    resp = MagicMock()
+    resp.json.return_value = {"retCode": "S", "resMsg": {"monthTripDayCnt": 0}}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp):
+        api.update_month_trip_info(token, vehicle, "202608")
+    assert vehicle.month_trip_info is None
+
+
+def test_update_day_trip_info_parses():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resMsg": {
+            "dayTripList": [
+                {
+                    "tripDrvTime": 30,
+                    "tripIdleTime": 5,
+                    "tripDist": 12.3,
+                    "tripAvgSpeed": 25,
+                    "tripMaxSpeed": 60,
+                    "tripList": [
+                        {
+                            "tripTime": "081230",
+                            "tripDrvTime": 10,
+                            "tripIdleTime": 1,
+                            "tripDist": 4.5,
+                            "tripAvgSpeed": 20,
+                            "tripMaxSpeed": 45,
+                        }
+                    ],
+                }
+            ]
+        },
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post", return_value=resp):
+        api.update_day_trip_info(token, vehicle, "20260904")
+
+    info = vehicle.day_trip_info
+    assert info is not None
+    assert info.yyyymmdd == "20260904"
+    assert info.summary.drive_time == 30
+    assert info.trip_list[0].hhmmss == "081230"
+    assert info.trip_list[0].distance == 4.5
+
+
+# ---------------------------------------------------------------------------
+# Legacy v1 device registration (D7 — live-proven 2026-09-30)
+# ---------------------------------------------------------------------------
+
+
+def _legacy_register_response_ok(device_id: str = "canonical-device-id") -> MagicMock:
+    resp = MagicMock()
+    resp.json.return_value = {
+        "retCode": "S",
+        "resCode": "0000",
+        "resMsg": {"deviceId": device_id},
+    }
+    return resp
+
+
+def test_register_legacy_device_delegates_to_legacy_api():
+    """Legacy register delegates to the legacy EU register machinery.
+
+    The brand constants, stamp and request shape live on the legacy
+    class (KiaUvoApiEU, inherited from ApiImplType1) — GspaApiEU must
+    not duplicate them. Constructed for the EU legacy region with the
+    same brand+language; the returned canonical device_id passes
+    through. Live shape (2026-09-30): register returns a canonical
+    deviceId accepted by both the :8080 v1 host and GSPA.
+    """
+    api = HyundaiCciApiEU(9, 2, "en")
+    legacy = MagicMock()
+    legacy._get_stamp.return_value = "legacy-stamp"
+    legacy._get_device_id.return_value = "canonical-device-id"
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy
+    ) as mock_cls:
+        device_id = api._register_legacy_device()
+
+    assert device_id == "canonical-device-id"
+    assert mock_cls.call_args[0][0] == 1
+    assert mock_cls.call_args[0][1] == 2
+    assert mock_cls.call_args[0][2] == "en"
+    legacy._get_device_id.assert_called_once_with("legacy-stamp")
+
+
+def test_register_legacy_device_delegate_uses_brand():
+    """Kia CCI delegates with the Kia legacy constants (APNS there)."""
+    api = KiaCciApiEU(9, 1, "en")
+    legacy = MagicMock()
+    legacy._get_device_id.return_value = "canonical-device-id"
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy
+    ) as mock_cls:
+        device_id = api._register_legacy_device()
+
+    assert device_id == "canonical-device-id"
+    assert mock_cls.call_args[0][0] == 1
+    assert mock_cls.call_args[0][1] == 1
+
+
+def test_register_legacy_device_error_propagates():
+    """A legacy register failure (4002 → DeviceIDError) propagates."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    legacy = MagicMock()
+    legacy._get_device_id.side_effect = DeviceIDError("Invalid parameter")
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU", return_value=legacy),
+        pytest.raises(DeviceIDError),
+    ):
+        api._register_legacy_device()
+
+
+def test_register_legacy_device_unconfigured_raises():
+    """Missing CCAPI_BASE_URL → typed DeviceIDError, no legacy call."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.KiaUvoApiEU") as mock_cls,
+        patch.object(api, "CCAPI_BASE_URL", ""),
+        pytest.raises(DeviceIDError),
+    ):
+        api._register_legacy_device()
+    mock_cls.assert_not_called()
+
+
+def test_login_uses_legacy_registered_device_id():
+    """login() carries the legacy-registered device_id into the Token.
+
+    The CCI password login must use the same device_id (client-device-id),
+    so one canonical id serves both the legacy v1 host and CCI/GSPA.
+    """
+    api = HyundaiCciApiEU(9, 2, "en")
+    login_result = {
+        "access_token": "Bearer ccs-token",
+        "refresh_token": "REFRESH123456789012345678901234567890",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "cci_access_token": "cci-token",
+    }
+    with (
+        patch.object(
+            api, "_register_legacy_device", return_value="legacy-registered-id"
+        ) as mock_register,
+        patch.object(
+            api, "_login_with_password", return_value=login_result
+        ) as mock_login,
+        patch.object(api, "_register_device"),
+        patch.object(api, "_fetch_user_id"),
+    ):
+        token = api.login("user@test.com", "MyPassword123!")
+
+    assert token.device_id == "legacy-registered-id"
+    mock_register.assert_called_once()
+    assert mock_login.call_args[0][2] == "legacy-registered-id"

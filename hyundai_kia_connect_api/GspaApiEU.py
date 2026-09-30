@@ -16,7 +16,6 @@ import hashlib
 import json
 import logging
 import re
-import uuid
 from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
@@ -31,6 +30,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
@@ -51,12 +51,14 @@ from .exceptions import (
     APIError,
     AuthenticationError,
     ConsentRequiredError,
+    DeviceIDError,
     DuplicateRequestError,
     InvalidAPIResponseError,
     ServiceTemporaryUnavailable,
     UnsupportedControlError,
 )
 from .gspa import create_tsid
+from .KiaUvoApiEU import KiaUvoApiEU
 from .svm import (
     SVMDetails,
     _parse_bool,
@@ -77,7 +79,13 @@ from .utils import (
     parse_datetime,
     pressure_or_none,
 )
-from .Vehicle import Vehicle
+from .Vehicle import (
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -211,6 +219,10 @@ class GspaApiEU(ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
+    # v1 CCAPI host (prd.eu-ccapi.<brand>.com:8080) - used only by the
+    # legacy /tripinfo read and the legacy device registration; empty
+    # when a subclass does not support it.
+    CCAPI_BASE_URL: str = ""
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
@@ -297,6 +309,8 @@ class GspaApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
+        if self.CCAPI_BASE_URL:
+            self.SPA_API_URL: str = f"https://{self.CCAPI_BASE_URL}/api/v1/spa/"
         if self.CIPHER_BRAND == "hyundai":
             from .gspa.cipher_keys import hyundai_cipher
 
@@ -322,11 +336,12 @@ class GspaApiEU(ApiImpl):
     ) -> Token:
         """Login via CCI flow and return a Token with all CCI fields.
 
-        Generates a local device_id (UUID), runs the CCI password login,
-        registers the device on CCI, and extracts the CCS user-id for
-        GSPA X-Stamp computation.
+        Registers the device on the legacy v1 CCAPI registry first (the
+        canonical device id the CCI login and GSPA calls then carry),
+        runs the CCI password login, registers the device on CCI, and
+        extracts the CCS user-id for GSPA X-Stamp computation.
         """
-        device_id = str(uuid.uuid4())
+        device_id = self._register_legacy_device()
 
         login_result = self._login_with_password(username, password, device_id)
 
@@ -1455,6 +1470,136 @@ class GspaApiEU(ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA prewakeup failed")
             return None
+
+    # ------------------------------------------------------------------
+    # Legacy v1 device registration (D7 — live-proven 2026-09-30)
+    # ------------------------------------------------------------------
+
+    def _register_legacy_device(self) -> str:
+        """Register the device on the legacy v1 CCAPI device registry.
+
+        Delegates to the legacy EU implementation (ApiImplType1 register
+        via KiaUvoApiEU — brand constants, stamp and request shape live
+        there; no duplication here). The CCI flow does not touch the
+        legacy backend's device registry, so v1 endpoints (e.g.
+        /tripinfo) reject a CCI-issued device_id with 4002 "Invalid
+        deviceId"; the legacy registration issues a canonical device_id
+        accepted by both hosts (live-proven 2026-09-30, Hyundai EU:
+        register 200 S 0000; GSPA stored-status accepts the same id).
+
+        Raises:
+            DeviceIDError: When the legacy registry rejects the
+                registration or the brand has no legacy CCAPI host
+                configured; kia_uvo rotates the device_id on
+                DeviceIDError.
+        """
+        if not self.CCAPI_BASE_URL:
+            raise DeviceIDError(
+                f"Legacy device registration is not configured for "
+                f"{BRANDS[self.brand]} (missing CCAPI_BASE_URL)"
+            )
+        legacy = KiaUvoApiEU(
+            1,  # the EU legacy region — brand constants/stamp are per-brand
+            self.brand,
+            self.LANGUAGE,
+        )
+        return legacy._get_device_id(legacy._get_stamp())
+
+    # ------------------------------------------------------------------
+    # Trip info (v1 CCAPI — the app keeps /tripinfo on the legacy host)
+    # ------------------------------------------------------------------
+
+    def _get_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip_period_type: int,
+    ) -> dict[str, Any]:
+        """Fetch trip info from the v1 CCAPI /tripinfo endpoint.
+
+        Requires the legacy-registered device_id from the Token (see
+        _register_legacy_device; a CCI-issued uuid without the legacy
+        registration gets 4002 "Invalid deviceId" — probed 2026-09-04,
+        resolved 2026-09-30 end-to-end on Hyundai EU with real data).
+        """
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
+        if trip_period_type == 0:  # month
+            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
+        else:
+            payload = {"tripPeriodType": 1, "setTripDay": date_string}
+        response = requests.post(
+            url,
+            json=payload,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support or 0
+            ),
+            timeout=(5, 30),
+        )
+        data: dict[str, Any] = response.json()
+        _check_response_for_errors(data)
+        return data
+
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        """Update vehicle.month_trip_info for the specified month."""
+        vehicle.month_trip_info = None
+        json_result = self._get_trip_info(token, vehicle, yyyymm_string, 0)
+        msg = json_result["resMsg"]
+        if msg["monthTripDayCnt"] > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for day in msg["tripDayList"]:
+                result.day_list.append(
+                    DayTripCounts(
+                        yyyymmdd=day["tripDayInMonth"],
+                        trip_count=day["tripCntDay"],
+                    )
+                )
+            vehicle.month_trip_info = result
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        """Update vehicle.day_trip_info for the specified day."""
+        vehicle.day_trip_info = None
+        json_result = self._get_trip_info(token, vehicle, yyyymmdd_string, 1)
+        day_trip_list = json_result["resMsg"]["dayTripList"]
+        if day_trip_list and len(day_trip_list) > 0:
+            msg = day_trip_list[0]
+            result = DayTripInfo(
+                yyyymmdd=yyyymmdd_string,
+                trip_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for trip in msg["tripList"]:
+                result.trip_list.append(
+                    TripInfo(
+                        hhmmss=trip["tripTime"],
+                        drive_time=trip["tripDrvTime"],
+                        idle_time=trip["tripIdleTime"],
+                        distance=trip["tripDist"],
+                        avg_speed=trip["tripAvgSpeed"],
+                        max_speed=trip["tripMaxSpeed"],
+                    )
+                )
+            vehicle.day_trip_info = result
 
     # ------------------------------------------------------------------
     # GSPA stored-status
