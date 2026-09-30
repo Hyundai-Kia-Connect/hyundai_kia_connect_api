@@ -41,7 +41,10 @@ class Token:
     # Client device id (ccId from login; used as MQTT register uuid
     # fallback before device_id).
     client_device_id: str | None = None
-    # MQTT connection state (populated by Service Hub registration).
+    # Device/client registration id (from the Service Hub register call).
+    # Distinct identity levels:
+    #   Token.mqtt_client_id    = device/client registration id (token level)
+    #   Vehicle.mqtt_vehicle_id = per-vehicle topic id (vehicle level)
     mqtt_client_id: str | None = None
     mqtt_broker_host: str | None = None
     mqtt_broker_port: int | None = None
