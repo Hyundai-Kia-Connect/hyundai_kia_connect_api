@@ -97,7 +97,7 @@ class MqttTransport:
         self._broker_host = broker_host
         self._broker_port = broker_port
         self._use_ssl = use_ssl
-        self._client_id = client_id or f"hyundai_kia_{uuid.uuid4().hex[:12]}"
+        self._client_id = client_id or f"{DOMAIN}_{uuid.uuid4().hex[:12]}"
         self._username = username
         self._password = password
 
@@ -156,8 +156,8 @@ class MqttTransport:
 
         Topic selection is the caller's business (provider); the transport
         only carries the broker-facing rules:
-          - QoS 0 only — the Service Hub broker rejects QoS 1 SUBSCRIBEs
-            outright (rc=128) for paho-mqtt clients.
+          - QoS 0 only — some brokers reject QoS 1 SUBSCRIBEs outright
+            (rc=128) for non-native clients.
           - one batch SUBSCRIBE for the whole list (app-confirmed).
         Returns the subscribed topic list.
         """
