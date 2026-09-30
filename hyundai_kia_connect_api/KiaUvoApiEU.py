@@ -5,9 +5,7 @@
 import base64
 import datetime as dt
 import logging
-import random
 import re
-import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -33,7 +31,6 @@ from .const import (
     ENGINE_TYPES,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
-    VALET_MODE_ACTION,
 )
 from .exceptions import (
     AuthenticationError,
@@ -47,11 +44,6 @@ from .utils import (
     parse_datetime,
 )
 from .Vehicle import (
-    DailyDrivingStats,
-    DayTripCounts,
-    DayTripInfo,
-    MonthTripInfo,
-    TripInfo,
     Vehicle,
 )
 
@@ -1232,12 +1224,6 @@ class KiaUvoApiEU(ApiImplType1):
             )
         vehicle.data = state
 
-    def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
-        vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
-        vehicle.total_power_regenerated = get_child_value(state, "regenPwr")
-        vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
-        vehicle.daily_stats = get_child_value(state, "dailyStats")
-
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         if vehicle.ccu_ccs2_protocol_support == 0:
@@ -1335,20 +1321,6 @@ class KiaUvoApiEU(ApiImplType1):
             location_last_updated_at,
         )
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
-        _check_response_for_errors(response)
-        mapped_response = {}
-        mapped_response["vehicleStatus"] = response["resMsg"]
-        return mapped_response
-
     @_retry_on_device_id_error
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
@@ -1364,267 +1336,6 @@ class KiaUvoApiEU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
-
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
-        # Not currently used as value is in the general get.
-        # Most likely this forces the car the update it.
-        url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
-
-        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
-        _check_response_for_errors(response)
-        # API sometimes returns multiple entries per plug type and they conflict.
-        # The car itself says the last entry per plug type is the truth when tested
-        # (EU Ioniq Electric Facelift MY 2019)
-        if response["resMsg"] is not None:
-            return response["resMsg"]
-
-    def _get_trip_info(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        date_string: str,
-        trip_period_type: int,
-    ) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
-        if trip_period_type == 0:  # month
-            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
-        else:
-            payload = {"tripPeriodType": 1, "setTripDay": date_string}
-
-        _LOGGER.debug(f"{DOMAIN} - get_trip_info Request {payload}")
-        response = self.session.post(
-            url,
-            json=payload,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        )
-        response = response.json()
-        _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
-        _check_response_for_errors(response)
-        return response
-
-    def update_month_trip_info(
-        self,
-        token,
-        vehicle,
-        yyyymm_string,
-    ) -> None:
-        """
-        feature only available for some regions.
-        Updates the vehicle.month_trip_info for the specified month.
-
-        Default this information is None:
-
-        month_trip_info: MonthTripInfo = None
-        """
-        vehicle.month_trip_info = None
-        json_result = self._get_trip_info(
-            token,
-            vehicle,
-            yyyymm_string,
-            0,  # month trip info
-        )
-        msg = json_result["resMsg"]
-        if msg["monthTripDayCnt"] > 0:
-            result = MonthTripInfo(
-                yyyymm=yyyymm_string,
-                day_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-
-            for day in msg["tripDayList"]:
-                processed_day = DayTripCounts(
-                    yyyymmdd=day["tripDayInMonth"],
-                    trip_count=day["tripCntDay"],
-                )
-                result.day_list.append(processed_day)
-
-            vehicle.month_trip_info = result
-
-    def update_day_trip_info(
-        self,
-        token,
-        vehicle,
-        yyyymmdd_string,
-    ) -> None:
-        """
-        feature only available for some regions.
-        Updates the vehicle.day_trip_info information for the specified day.
-
-        Default this information is None:
-
-        day_trip_info: DayTripInfo = None
-        """
-        vehicle.day_trip_info = None
-        json_result = self._get_trip_info(
-            token,
-            vehicle,
-            yyyymmdd_string,
-            1,  # day trip info
-        )
-        day_trip_list = json_result["resMsg"]["dayTripList"]
-        if len(day_trip_list) > 0:
-            msg = day_trip_list[0]
-            result = DayTripInfo(
-                yyyymmdd=yyyymmdd_string,
-                trip_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-            for trip in msg["tripList"]:
-                processed_trip = TripInfo(
-                    hhmmss=trip["tripTime"],
-                    drive_time=trip["tripDrvTime"],
-                    idle_time=trip["tripIdleTime"],
-                    distance=trip["tripDist"],
-                    avg_speed=trip["tripAvgSpeed"],
-                    max_speed=trip["tripMaxSpeed"],
-                )
-                result.trip_list.append(processed_trip)
-
-            vehicle.day_trip_info = result
-
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
-
-        responseAlltime = self.session.post(
-            url,
-            json={"periodTarget": 1},
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        )
-        responseAlltime = responseAlltime.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
-        _check_response_for_errors(responseAlltime)
-
-        response30d = self.session.post(
-            url,
-            json={"periodTarget": 0},
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        )
-        response30d = response30d.json()
-        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
-        _check_response_for_errors(response30d)
-        if get_child_value(responseAlltime, "resMsg.drivingInfo.0"):
-            drivingInfo = responseAlltime["resMsg"]["drivingInfo"][0]
-
-            drivingInfo["dailyStats"] = []
-            if get_child_value(response30d, "resMsg.drivingInfoDetail.0"):
-                for day in response30d["resMsg"]["drivingInfoDetail"]:
-                    processedDay = DailyDrivingStats(
-                        date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
-                        total_consumed=get_child_value(day, "totalPwrCsp"),
-                        engine_consumption=get_child_value(day, "motorPwrCsp"),
-                        climate_consumption=get_child_value(day, "climatePwrCsp"),
-                        onboard_electronics_consumption=get_child_value(
-                            day, "eDPwrCsp"
-                        ),
-                        battery_care_consumption=get_child_value(
-                            day, "batteryMgPwrCsp"
-                        ),
-                        regenerated_energy=get_child_value(day, "regenPwr"),
-                        distance=get_child_value(day, "calculativeOdo"),
-                        distance_unit=vehicle.odometer_unit,
-                    )
-                    drivingInfo["dailyStats"].append(processedDay)
-
-            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
-                if (
-                    drivingInfoItem["drivingPeriod"] == 0
-                    and next(
-                        (
-                            v
-                            for k, v in drivingInfoItem.items()
-                            if k.lower() == "calculativeodo"
-                        ),
-                        0,
-                    )
-                    > 0
-                ):
-                    drivingInfo["consumption30d"] = round(
-                        drivingInfoItem["totalPwrCsp"]
-                        / drivingInfoItem["calculativeOdo"]
-                    )
-                    break
-
-            return drivingInfo
-        else:
-            _LOGGER.debug(
-                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."
-            )
-            return None
-
-    @_retry_on_device_id_error
-    def valet_mode_action(
-        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
-    ) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/valet"
-
-        payload = {"action": action.value}
-        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Request: {payload}")
-        response = self.session.post(
-            url, json=payload, headers=self._get_control_headers(token, vehicle)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    def _get_stamp(self) -> str:
-        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
-        result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
-        return base64.b64encode(result).decode("utf-8")
-
-    def _get_device_id(self, stamp: str):
-        my_hex = f"{random.randrange(10**80):064x}"
-        registration_id = my_hex[:64]
-        url = self.SPA_API_URL + "notifications/register"
-        payload = {
-            "pushRegId": registration_id,
-            "pushType": self.PUSH_TYPE,
-            "uuid": str(uuid.uuid4()),
-        }
-
-        headers = {
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": stamp,
-            "Content-Type": "application/json;charset=UTF-8",
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
-        response = self.session.post(url, headers=headers, json=payload)
-        response = response.json()
-        _check_response_for_errors(response)
-        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
-
-        device_id = response["resMsg"]["deviceId"]
-        return device_id
 
     def _get_cookies(self) -> dict:
         # Get Cookies #
