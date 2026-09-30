@@ -164,8 +164,12 @@ class Vehicle:
     _ota_checked: bool = False
     _valet_failed: bool = False
 
-    # MQTT capability fields (populated from MQTTCacheResponse)
-    mqtt_client_id: str | None = None
+    # Push identity fields (per-vehicle level; vehicle is the identity
+    # scope). mqtt_vehicle_id feeds the X-MQTT-Vehicle-Id header and is
+    # the topic infix — NOT the same id as Token.mqtt_client_id (the
+    # device/client registration id on the token level). MQTT capability
+    # flags below come from MQTTCacheResponse.
+    mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
     has_hvac_close_remote: bool = False
     has_media_close_remote: bool = False

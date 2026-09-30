@@ -226,7 +226,7 @@ class MqttServiceHubMixin:
         # X-MQTT-Vehicle-Id uses the MQTT vehicle ID from the vehicleId
         # endpoint, NOT the regular vehicle.id. The vehicleId endpoint
         # response supplies this ID.
-        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_client_id or vehicle.id or ""
+        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_vehicle_id or vehicle.id or ""
 
         from .mqtt_service_hub import (
             MQTT_PROTOCOL_ID_CCU_UPDATE,
@@ -347,7 +347,7 @@ class MqttServiceHubMixin:
         headers["tid"] = self._service_hub_tid or str(uuid.uuid4())
         headers["client-id"] = client_id
         headers["X-MQTT-Client-Id"] = client_id
-        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_client_id or vehicle.id or ""
+        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_vehicle_id or vehicle.id or ""
         headers["X-Ccu-Ccs2-Protocol-Support"] = str(
             vehicle.ccu_ccs2_protocol_support or 0
         )
@@ -407,7 +407,7 @@ class MqttServiceHubMixin:
         headers["client-id"] = client_id
         headers["X-MQTT-Client-Id"] = client_id
         # Note: mqtt_vehicle_id may be empty on first call — that's OK
-        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_client_id or vehicle.id or ""
+        headers["X-MQTT-Vehicle-Id"] = vehicle.mqtt_vehicle_id or vehicle.id or ""
         headers["X-Ccu-Ccs2-Protocol-Support"] = str(
             vehicle.ccu_ccs2_protocol_support or 0
         )
@@ -426,7 +426,7 @@ class MqttServiceHubMixin:
                 data = response.json()
                 vehicle_id = data.get("vehicleId") or data.get("carId")
                 if vehicle_id:
-                    vehicle.mqtt_client_id = vehicle_id
+                    vehicle.mqtt_vehicle_id = vehicle_id
                     _LOGGER.info(f"{DOMAIN} - MQTT vehicle ID: {vehicle_id}")
                 return vehicle_id
             _LOGGER.warning(

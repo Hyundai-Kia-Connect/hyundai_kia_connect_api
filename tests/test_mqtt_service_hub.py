@@ -338,3 +338,13 @@ class TestProductionUrls:
 # paho v2-only contract (no v1 fallback paths)
 # ---------------------------------------------------------------------------
 
+
+
+def test_vehicle_push_identity_fields():
+    """Vehicle-level push identity: mqtt_vehicle_id (renamed from mqtt_client_id)."""
+    from hyundai_kia_connect_api.Vehicle import Vehicle
+
+    v = Vehicle()
+    assert v.mqtt_vehicle_id is None
+    assert v.hu_client_id is None
+    assert not hasattr(v, "mqtt_client_id")  # renamed → mqtt_vehicle_id
