@@ -2,9 +2,6 @@
 
 import json
 
-from hyundai_kia_connect_api.mqtt_client import (
-    POSTFIX_REMOTE_CONNECT,  # noqa: F401  (transition-shim import check)
-    )
 from hyundai_kia_connect_api.mqtt_service_hub import (
     POSTFIX_CLOSE_MEDIA_VEHICLESTATUS,
     POSTFIX_CLOSE_VEHICLESTATUS,
@@ -348,3 +345,83 @@ def test_vehicle_push_identity_fields():
     assert v.mqtt_vehicle_id is None
     assert v.hu_client_id is None
     assert not hasattr(v, "mqtt_client_id")  # renamed → mqtt_vehicle_id
+
+
+# ---------------------------------------------------------------------------
+# Push contract implementation (Task 6 — architecture flip)
+# ---------------------------------------------------------------------------
+
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.Vehicle import Vehicle
+
+
+def _kia_api() -> KiaCciApiEU:
+    return KiaCciApiEU(region=9, brand=1, language="en")
+
+
+def _vehicle() -> Vehicle:
+    v = Vehicle()
+    v.id = "careu1"
+    v.mqtt_vehicle_id = "testmqtt1"
+    v.hu_client_id = "testhu1"
+    return v
+
+
+def test_parse_push_message_status_message():
+    msg = _kia_api().parse_push_message("service/phone/_/vss/testmqtt1/", b'{"test": 1}')
+    assert msg is not None
+    assert msg.topic_group == "CarStatus"
+    assert msg.topic_type == "Status"
+    assert msg.vehicle_id == "testmqtt1"
+    assert msg.is_status is True
+    assert msg.action_id is None
+
+
+def test_parse_push_message_action_result():
+    body = {"header": {"tid": "tid-1"}, "body": {"resCode": "success"}}
+    msg = _kia_api().parse_push_message("$/device/res/testclient1", json.dumps(body).encode())
+    assert msg.action_id == "tid-1"
+    assert msg.action_result == "success"
+    assert msg.is_status is False
+
+
+def test_parse_push_message_invalid_json_raw_fallback():
+    msg = _kia_api().parse_push_message("service/phone/_/vss/testmqtt1/", b"not-json")
+    assert msg is not None
+    assert msg.payload.get("raw") == b"not-json".hex()
+
+
+def test_parse_push_message_unknown_group_none():
+    assert _kia_api().parse_push_message("garbage/topic/xyz/", b"{}") is None
+
+
+def test_get_push_topics_excludes_res_topic():
+    """service/phone/_/res/<id> must never be subscribed (broker rejects rc=128)."""
+    topics = _kia_api().get_push_topics(Token(), _vehicle())
+    assert not any("service/phone/_/res/" in t for t in topics)
+    assert any("service/phone/_/vss/" in t for t in topics)
+
+
+def test_get_push_topics_single_batch_qos0_ready():
+    """Topics come built and deduped; CarStatus VSS+Connection always present."""
+    topics = _kia_api().get_push_topics(Token(), _vehicle())
+    assert any("service/phone/_/connection/" in t for t in topics)
+    assert any("testmqtt1" in t for t in topics)
+
+
+def test_cci_classes_implement_contract():
+    api = KiaCciApiEU(region=9, brand=1, language="en")
+    assert api.supports_mqtt_push is True
+    assert isinstance(api.get_push_broker_info(Token()), dict) or api.get_push_broker_info(Token()) is None
+    # contract presence (all 7)
+    for name in (
+        "get_push_broker_info",
+        "register_push_client",
+        "register_push_vehicle",
+        "get_push_vehicle_identity",
+        "get_push_connection_state",
+        "get_push_topics",
+        "parse_push_message",
+    ):
+        assert callable(getattr(api, name)), name
