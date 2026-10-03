@@ -497,8 +497,10 @@ class KiaUvoApiEU(ApiImplType1):
         ):
             try:
                 return self._refresh_cci_token(token)
-            except Exception:
-                _LOGGER.warning("CCI token refresh failed, falling back to full login")
+            except Exception as ex:
+                _LOGGER.warning(
+                    f"CCI token refresh failed ({ex}), falling back to full login"
+                )
                 return self.login(token.username, token.password, token.pin)
 
         if token.refresh_token:

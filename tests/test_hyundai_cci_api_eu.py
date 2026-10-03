@@ -790,6 +790,30 @@ def test_refresh_4111_logs_info_not_warning(caplog):
     )
 
 
+def test_refresh_failure_warning_includes_response_reason(caplog):
+    """A generic (non-4111) refresh failure logs the server's reason —
+    without it, a ~4h token wall has no visible cause in HA logs (#1338)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    body = 'CCI token refresh failed: HTTP 400 — {"code":"4121","message":"expired"}'
+    with (
+        patch.object(api, "_refresh_cci_token", side_effect=AuthenticationError(body)),
+        patch.object(api, "login", return_value=token) as login,
+        caplog.at_level(logging.DEBUG),
+    ):
+        result = api.refresh_access_token(token)
+    assert result is token
+    assert login.called
+    refresh_warnings = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "refresh" in r.message.lower()
+    ]
+    assert len(refresh_warnings) == 1
+    assert "HTTP 400" in refresh_warnings[0].message
+    assert "4121" in refresh_warnings[0].message
+
+
 # ── _update_vehicle_gspa_data() — sw/ota reads on cached path ──
 
 

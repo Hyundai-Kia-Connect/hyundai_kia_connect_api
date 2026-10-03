@@ -1,6 +1,7 @@
 """Tests for KiaUvoApiEU._login_with_password(), login() flow routing, and refresh_access_token()."""
 
 import datetime as dt
+import logging
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
@@ -555,6 +556,32 @@ def test_refresh_access_token_falls_back_on_exchange_failure():
 
     mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
     assert result.access_token == "Bearer from-login"
+
+
+def test_refresh_cci_failure_warning_includes_response_reason(caplog):
+    """A CCI refresh failure logs the server's reason — without it, a
+    ~4h token wall has no visible cause in HA logs (#1338)."""
+    api = _make_eu_api(brand=1)
+
+    body = 'CCI token refresh failed: HTTP 400 — {"code":"4121","message":"expired"}'
+    with (
+        patch.object(api, "_refresh_cci_token", side_effect=AuthenticationError(body)),
+        patch.object(
+            api, "login", return_value=_make_token(access_token="Bearer from-login")
+        ),
+        caplog.at_level(logging.DEBUG),
+    ):
+        token = _make_token(cci_access_token="eyJhbGciOi.cci.exp")
+        api.refresh_access_token(token)
+
+    refresh_warnings = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "refresh" in r.message.lower()
+    ]
+    assert len(refresh_warnings) == 1
+    assert "HTTP 400" in refresh_warnings[0].message
+    assert "4121" in refresh_warnings[0].message
 
 
 def test_refresh_access_token_does_not_call_get_device_id():

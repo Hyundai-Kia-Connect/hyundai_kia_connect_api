@@ -798,7 +798,7 @@ class GspaApiEU(ApiImpl):
                     )
                 else:
                     _LOGGER.warning(
-                        "CCI token refresh failed, falling back to full login"
+                        f"CCI token refresh failed ({ex}), falling back to full login"
                     )
                 return self.login(token.username, token.password, token.pin)
 
