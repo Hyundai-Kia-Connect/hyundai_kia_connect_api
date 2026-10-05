@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "ccs2",
         "vehicle": "Kia EV3",
         "year": 2025,
         "region": "EU",

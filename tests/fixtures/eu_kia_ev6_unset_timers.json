@@ -1,11 +1,12 @@
 {
     "_fixture_meta": {
+        "parser": "eu",
         "vehicle": "Kia EV6",
         "year": 2023,
         "region": "EU",
         "brand": "Kia",
         "endpoint": "vehicles/{vehicleId}/status/latest",
-        "description": "EU Kia EV6 response with targetSOC and full vehicle status. Uses vehicleStatus root and hex-encoded temperature.",
+        "description": "EU Kia EV6 response whose EV timers are all \"0000\", meaning no scheduled timer; they must parse to None without crashing (issue #1206).",
         "has_target_soc": true,
         "expected": {
             "ev_battery_percentage": 76,
@@ -15,7 +16,11 @@
             "engine_is_running": false,
             "is_locked": true,
             "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0
+            "ev_battery_is_plugged_in": 0,
+            "ev_first_departure_time": null,
+            "ev_second_departure_time": null,
+            "ev_off_peak_start_time": null,
+            "ev_off_peak_end_time": null
         }
     },
     "odometer": {

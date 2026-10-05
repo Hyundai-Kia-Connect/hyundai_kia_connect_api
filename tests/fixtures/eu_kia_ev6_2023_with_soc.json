@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "eu",
         "vehicle": "Kia EV6",
         "year": 2023,
         "region": "EU",

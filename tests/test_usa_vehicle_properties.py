@@ -1,109 +1,19 @@
-"""Tests for USA API _update_vehicle_properties using JSON fixture files.
+"""Regression tests for KiaUvoApiUSA._update_vehicle_properties.
 
-These tests verify that the KiaUvoApiUSA._update_vehicle_properties method
-correctly parses vehicle state dicts (as returned by cmm/gvi) into Vehicle
-objects. Each fixture file represents a real-world API response shape for a
-specific vehicle model and scenario.
-
-To add a new vehicle/scenario:
-  1. Drop a JSON file in tests/fixtures/ following the naming convention
-     (see tests/fixtures/README.md).
-  2. Include a ``_fixture_meta.expected`` block with the values to assert.
-  3. The test will automatically pick it up via ``discover_fixtures``.
+Fixture-driven parsing is covered by tests/test_fixture_parsing.py; this
+module holds targeted cases built from minimal inline payloads.
 """
 
 import pytest
 
 from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from tests.fixture_helpers import (
-    discover_fixtures,
-    get_fixture_expected,
-    get_fixture_meta,
-    load_fixture,
-)
-
-# ---------------------------------------------------------------------------
-# Discover all US fixture files (both cached and force-refresh variants)
-# ---------------------------------------------------------------------------
-US_FIXTURE_FILES = discover_fixtures("us_kia_")
+from tests.fixture_helpers import PARSERS
 
 
 @pytest.fixture
 def usa_api() -> KiaUvoApiUSA:
-    """Create a KiaUvoApiUSA instance for testing property parsing."""
-    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
-    api.data_timezone = None
-    # temperature_range is used when air_temp is "LOW" or "HIGH"
-    api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
-    return api
-
-
-@pytest.fixture
-def vehicle() -> Vehicle:
-    """Create a blank Vehicle instance."""
-    return Vehicle()
-
-
-# ---------------------------------------------------------------------------
-# Parameterized tests — each fixture file is a separate test case
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("fixture_file", US_FIXTURE_FILES, ids=US_FIXTURE_FILES)
-class TestUpdateVehicleProperties:
-    """Parameterized suite that runs against every US fixture file."""
-
-    def test_ev_battery_percentage(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.ev_battery_percentage == expected["ev_battery_percentage"]
-
-    def test_ev_charge_limits(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        meta = get_fixture_meta(data)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-
-        if meta.get("has_target_soc"):
-            assert vehicle.ev_charge_limits_dc == expected["ev_charge_limits_dc"]
-            assert vehicle.ev_charge_limits_ac == expected["ev_charge_limits_ac"]
-        else:
-            # When targetSOC is absent, charge limits should remain None
-            assert vehicle.ev_charge_limits_dc is None
-            assert vehicle.ev_charge_limits_ac is None
-
-    def test_car_battery_percentage(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.car_battery_percentage == expected["car_battery_percentage"]
-
-    def test_engine_is_running(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.engine_is_running == expected["engine_is_running"]
-
-    def test_is_locked(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.is_locked == expected["is_locked"]
-
-    def test_ev_charging_state(self, usa_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.ev_battery_is_charging == expected["ev_battery_is_charging"]
-        assert vehicle.ev_battery_is_plugged_in == expected["ev_battery_is_plugged_in"]
-
-    def test_data_is_stored(self, usa_api, vehicle, fixture_file):
-        """The raw state dict should be stored on vehicle.data."""
-        data = load_fixture(fixture_file)
-        usa_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.data is data
+    return PARSERS["usa_kia"].api()
 
 
 # ---------------------------------------------------------------------------
@@ -127,14 +37,11 @@ def us_kia_status_with_air_temp():
     }
 
 
-def test_usa_air_temperature_string_becomes_float(us_kia_status_with_air_temp):
+def test_usa_air_temperature_string_becomes_float(usa_api, us_kia_status_with_air_temp):
     """Regression for kia_uvo #1755: USA backend must not leave air_temperature
     as a string. The Vehicle setter coerces to float; verify end-to-end."""
-    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
-    api.data_timezone = None
-    api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
     vehicle = Vehicle()
-    api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp)
+    usa_api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp)
     assert vehicle.air_temperature is not None
     assert isinstance(vehicle.air_temperature, float)
     assert vehicle.air_temperature == 72.0
@@ -161,16 +68,13 @@ def us_kia_status_with_air_temp_off():
     }
 
 
-def test_usa_air_temperature_off_yields_none(us_kia_status_with_air_temp_off):
+def test_usa_air_temperature_off_yields_none(usa_api, us_kia_status_with_air_temp_off):
     """Regression for kia_uvo #1790: Kia USA airTemp "OFF" (climate off) must
     leave air_temperature and the raw value slot as None, matching the Hyundai
     USA / Type1 / CA skip-OFF conformance. float_or_none("OFF") already yields
     None, so the real TDD gate is _air_temperature_value staying None (setter
     not called)."""
-    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
-    api.data_timezone = None
-    api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
     vehicle = Vehicle()
-    api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp_off)
+    usa_api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp_off)
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value is None

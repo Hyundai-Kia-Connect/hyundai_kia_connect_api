@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "ccs2",
         "vehicle": "Kia Sportage PHEV",
         "year": 2027,
         "region": "EU",
@@ -13,14 +14,13 @@
         "ccu_ccs2_protocol_support": 1,
         "head_unit_model_name": "NQ5EMY27AP.SCBMC.EU",
         "expected": {
-            "engine_type": "ENGINE_TYPES.PHEV",
             "ev_battery_percentage": 77,
             "car_battery_percentage": 90,
             "fuel_level": 100,
             "is_locked": true,
             "ev_battery_is_charging": false,
             "ev_battery_is_plugged_in": 0,
-            "_total_driving_range": 600.0,
+            "total_driving_range": 600.0,
             "tire_pressure_front_left": null,
             "tire_pressure_unit": 2,
             "drive_mode": "Eco"

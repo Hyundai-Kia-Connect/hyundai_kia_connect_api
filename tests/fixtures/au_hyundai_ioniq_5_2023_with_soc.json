@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "au",
         "vehicle": "Hyundai Ioniq 5",
         "year": 2023,
         "region": "AU",

@@ -1,5 +1,6 @@
 {
     "_fixture_meta": {
+        "parser": "br",
         "description": "BR Hyundai Creta 2025 (ICE, reports ccuCCS2ProtocolSupport=0) cached status from /ccs2/carstatus/latest. Anonymized: GeoCoord replaced with a placeholder, no VIN/tokens.",
         "expected": {
             "car_battery_percentage": 59,

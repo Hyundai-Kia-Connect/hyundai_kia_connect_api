@@ -50,7 +50,7 @@ import inspect as insp
 - **This approach ensures compatibility with all other regions WITHOUT modifying them**
 - Other region APIs (CA, EU, AU, CN, IN, BR, Hyundai USA) remain unchanged
 
-### 3. tests/us_login_test.py
+### 3. tests/test_us_login.py
 
 #### Updated test to verify rmtoken persistence:
 
@@ -95,7 +95,7 @@ Run the test:
 
 ```bash
 source .venv/bin/activate
-pytest tests/us_login_test.py -v -s
+pytest tests/test_us_login.py -v -s
 ```
 
 Expected behavior:
