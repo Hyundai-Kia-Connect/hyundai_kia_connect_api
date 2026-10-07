@@ -6,6 +6,7 @@ import base64
 import datetime as dt
 import logging
 import re
+import uuid
 from time import sleep
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -33,8 +34,10 @@ from .const import (
     TEMPERATURE_UNITS,
 )
 from .exceptions import (
+    APIError,
     AuthenticationError,
     ConsentRequiredError,
+    DeviceIDError,
 )
 from .Token import Token
 from .utils import (
@@ -188,7 +191,18 @@ class KiaUvoApiEU(ApiImplType1):
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
-        device_id = self._get_device_id(stamp)
+        try:
+            device_id = self._get_device_id(stamp)
+        except (AuthenticationError, DeviceIDError, APIError) as ex:
+            # The legacy register endpoint is the first thing login(), and
+            # therefore every full-login recovery, depends on. When it is
+            # down or rejects the request, the CCI login itself is fine —
+            # fall back to a random device identity (the GspaApiEU login
+            # path always used one) instead of failing the whole login.
+            _LOGGER.warning(
+                f"Legacy device register failed ({ex}), using a random device identity"
+            )
+            device_id = str(uuid.uuid4())
         cookies = self._get_cookies()
         self._set_session_language(cookies)
 
