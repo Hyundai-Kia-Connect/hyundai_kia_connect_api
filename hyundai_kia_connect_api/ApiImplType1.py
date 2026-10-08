@@ -1693,7 +1693,7 @@ class ApiImplType1(ApiImpl):
             departures = [options.first_departure, options.second_departure]
             temperature_unit = _vehicle_temperature_unit(vehicle) or 0
 
-            def _build_ev5_hvac_set(
+            def _build_flat_hvac_set(
                 dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
             ) -> dict[str, object]:
                 temp: float = dep.temperature if dep.temperature is not None else 21.0
@@ -1725,7 +1725,7 @@ class ApiImplType1(ApiImpl):
                             ),
                         },
                     },
-                    "reservHVACSet": _build_ev5_hvac_set(departures[i]),
+                    "reservHVACSet": _build_flat_hvac_set(departures[i]),
                 }
                 for i in range(2)
             }
