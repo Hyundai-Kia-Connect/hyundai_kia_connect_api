@@ -79,4 +79,3 @@ def test_departure_climate_temperature_accepts_scalar_or_tuple():
     vehicle.ev_second_departure_climate_temperature = 22.5
     assert vehicle.ev_second_departure_climate_temperature == 22.5
     assert vehicle.ev_second_departure_climate_temperature_unit == "°F"
-

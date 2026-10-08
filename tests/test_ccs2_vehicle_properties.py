@@ -594,4 +594,3 @@ def test_ccs2_departure_climate_parsed(ccs2_api, vehicle):
     assert vehicle.ev_second_departure_climate_temperature == 24.0
     assert vehicle.ev_second_departure_climate_temperature_unit == "°C"
     assert vehicle.ev_second_departure_climate_defrost is False
-
