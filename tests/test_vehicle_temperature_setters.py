@@ -57,3 +57,26 @@ def test_outside_temperature_non_numeric_becomes_none():
     vehicle.outside_temperature = ("n/a", "°C")
     assert vehicle.outside_temperature is None
     assert vehicle._outside_temperature_value == "n/a"
+
+
+def test_departure_climate_temperature_accepts_scalar_or_tuple():
+    vehicle = Vehicle()
+    # tuple assignment
+    vehicle.ev_first_departure_climate_temperature = (21.5, "°C")
+    assert vehicle.ev_first_departure_climate_temperature == 21.5
+    assert vehicle.ev_first_departure_climate_temperature_unit == "°C"
+
+    # scalar float assignment retains unit
+    vehicle.ev_first_departure_climate_temperature = 23.0
+    assert vehicle.ev_first_departure_climate_temperature == 23.0
+    assert vehicle.ev_first_departure_climate_temperature_unit == "°C"
+
+    # second departure
+    vehicle.ev_second_departure_climate_temperature = (19.0, "°F")
+    assert vehicle.ev_second_departure_climate_temperature == 19.0
+    assert vehicle.ev_second_departure_climate_temperature_unit == "°F"
+
+    vehicle.ev_second_departure_climate_temperature = 22.5
+    assert vehicle.ev_second_departure_climate_temperature == 22.5
+    assert vehicle.ev_second_departure_climate_temperature_unit == "°F"
+
