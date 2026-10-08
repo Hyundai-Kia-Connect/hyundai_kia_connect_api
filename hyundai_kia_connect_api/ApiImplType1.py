@@ -1219,10 +1219,9 @@ class ApiImplType1(ApiImpl):
 
         # Departure climate: Green.Reservation.Departure.Climate (Schedule 1)
         # and Green.Reservation.Departure.Schedule2.Climate
-        climate1 = (
-            get_child_value(state, "Green.Reservation.Departure.Schedule1.Climate")
-            or get_child_value(state, "Green.Reservation.Departure.Climate")
-        )
+        climate1 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Climate"
+        ) or get_child_value(state, "Green.Reservation.Departure.Climate")
         if climate1:
             activation = climate1.get("Activation")
             if activation is not None:
