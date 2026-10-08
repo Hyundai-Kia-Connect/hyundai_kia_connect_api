@@ -2257,6 +2257,7 @@ class ApiImplType1(ApiImpl):
 
             vehicle.day_trip_info = result
 
+    @_retry_on_device_id_error
     def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
 
