@@ -1217,12 +1217,65 @@ class ApiImplType1(ApiImpl):
                 if schedule2.get(k) == 1
             ] or None
 
-        # TODO: ev_*_departure_climate_* from Green.Reservation.Departure.Schedule2.Climate
-        # and Green.Reservation.Departure.Climate — needs climate-temp-unit shape check.
-        # Until parsed, CCS2 vehicles report no departure-climate state; a
-        # schedule write that activates the climate scope then requires an
-        # explicit temperature (ValueError otherwise — see
-        # _guard_schedule_temperature in ApiImpl).
+        # Departure climate: Green.Reservation.Departure.Climate (Schedule 1)
+        # and Green.Reservation.Departure.Schedule2.Climate
+        climate1 = (
+            get_child_value(state, "Green.Reservation.Departure.Schedule1.Climate")
+            or get_child_value(state, "Green.Reservation.Departure.Climate")
+        )
+        if climate1:
+            activation = climate1.get("Activation")
+            if activation is not None:
+                vehicle.ev_first_departure_climate_enabled = bool(activation)
+            defrost = climate1.get("Defrost")
+            if defrost is not None:
+                vehicle.ev_first_departure_climate_defrost = bool(defrost)
+            temp_val = climate1.get("Temperature")
+            if temp_val is not None:
+                try:
+                    temp_float = float(temp_val)
+                    unit_int = climate1.get("TemperatureUnit", 0)
+                    unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
+                    vehicle.ev_first_departure_climate_temperature = (
+                        temp_float,
+                        unit_str,
+                    )
+                except (ValueError, TypeError):
+                    pass
+
+        climate2 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Climate"
+        )
+        if climate2:
+            activation = (
+                get_child_value(
+                    state, "Green.Reservation.Departure.Schedule2.Activation"
+                )
+                if get_child_value(
+                    state, "Green.Reservation.Departure.Schedule2.Activation"
+                )
+                is not None
+                else climate2.get("Activation")
+            )
+            if activation is not None:
+                vehicle.ev_second_departure_climate_enabled = bool(activation)
+            defrost = climate2.get("Defrost")
+            if defrost is not None:
+                vehicle.ev_second_departure_climate_defrost = bool(defrost)
+            temp_val = climate2.get("Temperature")
+            if temp_val is not None:
+                try:
+                    temp_float = float(temp_val)
+                    unit_int = climate2.get("TemperatureUnit")
+                    if unit_int is None and climate1:
+                        unit_int = climate1.get("TemperatureUnit", 0)
+                    unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
+                    vehicle.ev_second_departure_climate_temperature = (
+                        temp_float,
+                        unit_str,
+                    )
+                except (ValueError, TypeError):
+                    pass
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1521,15 +1574,27 @@ class ApiImplType1(ApiImpl):
         departures = [options.first_departure, options.second_departure]
 
         temperature_unit = _vehicle_temperature_unit(vehicle) or 0
-        temperature: float = options.temperature
-        if temperature_unit == 0:
-            # Round to nearest 0.5
-            temperature = round(temperature * 2.0) / 2.0
-            # Cap at 27, floor at 17
-            if temperature > 27.0:
-                temperature = 27.0
-            elif temperature < 17.0:
-                temperature = 17.0
+
+        def _build_combined_fatc_set(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, object]:
+            temp: float = dep.temperature if dep.temperature is not None else 21.0
+            if temperature_unit == 0:
+                temp = round(temp * 2.0) / 2.0
+                if temp > 27.0:
+                    temp = 27.0
+                elif temp < 17.0:
+                    temp = 17.0
+            return {
+                "airCtrl": 1 if dep.climate_enabled else 0,
+                "airTemp": {
+                    "value": f"{temp:.1f}",
+                    "hvacTempType": 1,
+                    "unit": temperature_unit,
+                },
+                "heating1": 0,
+                "defrost": dep.defrost if dep.defrost is not None else False,
+            }
 
         payload = {
             "reservChargeInfo" + str(i + 1): {
@@ -1541,16 +1606,7 @@ class ApiImplType1(ApiImpl):
                         "timeSection": 1 if departures[i].time >= dt.time(12, 0) else 0,
                     },
                 },
-                "reservFatcSet": {
-                    "airCtrl": 1 if options.climate_enabled else 0,
-                    "airTemp": {
-                        "value": f"{temperature:.1f}",
-                        "hvacTempType": 1,
-                        "unit": temperature_unit,
-                    },
-                    "heating1": 0,
-                    "defrost": options.defrost,
-                },
+                "reservFatcSet": _build_combined_fatc_set(departures[i]),
             }
             for i in range(2)
         }
@@ -1636,14 +1692,28 @@ class ApiImplType1(ApiImpl):
             _guard_schedule_temperature(options, vehicle)
             _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
             departures = [options.first_departure, options.second_departure]
-            temperature: float = options.temperature
             temperature_unit = _vehicle_temperature_unit(vehicle) or 0
-            if temperature_unit == 0:
-                temperature = round(temperature * 2.0) / 2.0
-                if temperature > 27.0:
-                    temperature = 27.0
-                elif temperature < 17.0:
-                    temperature = 17.0
+
+            def _build_ev5_hvac_set(
+                dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+            ) -> dict[str, object]:
+                temp: float = dep.temperature if dep.temperature is not None else 21.0
+                if temperature_unit == 0:
+                    temp = round(temp * 2.0) / 2.0
+                    if temp > 27.0:
+                        temp = 27.0
+                    elif temp < 17.0:
+                        temp = 17.0
+                return {
+                    "airCtrl": 1 if dep.climate_enabled else 0,
+                    "airTemp": {
+                        "value": f"{temp:.1f}",
+                        "hvacTempType": 1,
+                        "unit": temperature_unit,
+                    },
+                    "defrost": dep.defrost if dep.defrost is not None else False,
+                }
+
             hvac_payload = {
                 "reservedHVACInfo" + str(i + 1): {
                     "reservHVACflag": 1 if departures[i].enabled else 0,
@@ -1656,15 +1726,7 @@ class ApiImplType1(ApiImpl):
                             ),
                         },
                     },
-                    "reservHVACSet": {
-                        "airCtrl": 1 if options.climate_enabled else 0,
-                        "airTemp": {
-                            "value": f"{temperature:.1f}",
-                            "hvacTempType": 1,
-                            "unit": temperature_unit,
-                        },
-                        "defrost": options.defrost,
-                    },
+                    "reservHVACSet": _build_ev5_hvac_set(departures[i]),
                 }
                 for i in range(2)
             }

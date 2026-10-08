@@ -269,6 +269,38 @@ class TestEV5FlatHvacPayload:
         hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
         assert hvac["reservedHVACInfo1"]["reservHVACflag"] == 0
 
+    def test_independent_per_departure_climate_settings(self, api):
+        calls = _mock_post(api)
+        v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
+        opts = ScheduleChargingClimateRequestOptions(
+            first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+                enabled=True,
+                days=[1, 2, 3],
+                time=dt.time(7, 0),
+                climate_enabled=True,
+                temperature=21.5,
+                defrost=False,
+            ),
+            second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+                enabled=False,
+                days=[0, 6],
+                time=dt.time(8, 30),
+                climate_enabled=False,
+                temperature=25.0,
+                defrost=True,
+            ),
+        )
+        api.schedule_charging_and_climate(MagicMock(spec=Token), v, opts)
+        hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
+        set1 = hvac["reservedHVACInfo1"]["reservHVACSet"]
+        set2 = hvac["reservedHVACInfo2"]["reservHVACSet"]
+        assert set1["airCtrl"] == 1
+        assert set1["airTemp"]["value"] == "21.5"
+        assert set1["defrost"] is False
+        assert set2["airCtrl"] == 0
+        assert set2["airTemp"]["value"] == "25.0"
+        assert set2["defrost"] is True
+
 
 class TestEV5Return:
     def test_returns_charge_msgid(self, api):
