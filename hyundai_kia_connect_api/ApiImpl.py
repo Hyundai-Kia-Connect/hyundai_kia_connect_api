@@ -107,6 +107,17 @@ class ScheduleChargingClimateRequestOptions:
 
     @dataclass
     class DepartureOptions:
+        """Options for an individual departure schedule.
+
+        Older vehicle platforms (Gen 2/3) only support scheduling departure days and
+        times, sharing a single global climate setpoint (the known limitation
+        documented in #1302). Modern ccNC/CCS2 architectures (EV3, EV5, EV9, etc.)
+        support independent per-departure climate profiles, where each departure
+        has its own target temperature, defrost toggle, and climate activation state.
+        Top-level climate options on ``ScheduleChargingClimateRequestOptions`` continue
+        to act as defaults/fallbacks for backward compatibility.
+        """
+
         enabled: bool = None
         days: list[int] = None  # Sun=0, Mon=1, ..., Sat=6
         time: dt.time = None
@@ -163,23 +174,6 @@ def _schedule_charging_scopes(
             options.off_peak_charge_only_enabled,
         )
     )
-
-    def _dep_active(
-        dep: ScheduleChargingClimateRequestOptions.DepartureOptions | None,
-    ) -> bool:
-        if dep is None:
-            return False
-        return any(
-            v is not None
-            for v in (
-                dep.enabled,
-                dep.days,
-                dep.time,
-                dep.climate_enabled,
-                dep.temperature,
-                dep.defrost,
-            )
-        )
 
     climate_active = (
         any(
