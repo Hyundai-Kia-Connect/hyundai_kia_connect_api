@@ -753,10 +753,18 @@ class Vehicle:
 
     @ev_first_departure_climate_temperature.setter
     def ev_first_departure_climate_temperature(self, value):
-        self._ev_first_departure_climate_temperature_value = value[0]
-        self._ev_first_departure_climate_temperature = value[0]
-        if value[1] is not None:
-            self._ev_first_departure_climate_temperature_unit = value[1]
+        if isinstance(value, (tuple, list)):
+            val = value[0]
+            unit = value[1] if len(value) > 1 else None
+        else:
+            val = value
+            unit = None
+        self._ev_first_departure_climate_temperature_value = val
+        self._ev_first_departure_climate_temperature = (
+            float(val) if val is not None else None
+        )
+        if unit is not None:
+            self._ev_first_departure_climate_temperature_unit = unit
 
     @property
     def ev_second_departure_climate_temperature(self):
@@ -768,10 +776,18 @@ class Vehicle:
 
     @ev_second_departure_climate_temperature.setter
     def ev_second_departure_climate_temperature(self, value):
-        self._ev_second_departure_climate_temperature_value = value[0]
-        self._ev_second_departure_climate_temperature = value[0]
-        if value[1] is not None:
-            self._ev_second_departure_climate_temperature_unit = value[1]
+        if isinstance(value, (tuple, list)):
+            val = value[0]
+            unit = value[1] if len(value) > 1 else None
+        else:
+            val = value
+            unit = None
+        self._ev_second_departure_climate_temperature_value = val
+        self._ev_second_departure_climate_temperature = (
+            float(val) if val is not None else None
+        )
+        if unit is not None:
+            self._ev_second_departure_climate_temperature_unit = unit
 
     @property
     def fuel_driving_range(self):
