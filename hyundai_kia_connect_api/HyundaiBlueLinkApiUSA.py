@@ -212,6 +212,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # Capability is declared per-region (like supports_window_control); the
     # actual image is fetched on demand via get_svm_details / request_svm_capture.
     supports_svm: bool = True
+    climate_temperature_unit: str = TEMPERATURE_UNITS[1]
+    climate_temperature_step: float = 1.0
 
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of

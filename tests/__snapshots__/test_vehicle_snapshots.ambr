@@ -22,6 +22,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 78,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -221,6 +223,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 92,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -416,6 +420,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 91,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -611,6 +617,8 @@
     'brake_fluid_warning_is_on': 0,
     'car_battery_percentage': 95,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -806,6 +814,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 88,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -1017,6 +1027,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 88,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -1228,6 +1240,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 88,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -1439,6 +1453,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 88,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -1634,6 +1650,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': None,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -1829,6 +1847,8 @@
     'brake_fluid_warning_is_on': 0,
     'car_battery_percentage': 90,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -2024,6 +2044,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 82,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -2223,6 +2245,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 85,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -2422,6 +2446,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 85,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -2621,6 +2647,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 87,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
@@ -2817,6 +2845,8 @@
     'brake_fluid_warning_is_on': False,
     'car_battery_percentage': 90,
     'ccu_ccs2_protocol_support': None,
+    'climate_temperature_step': None,
+    'climate_temperature_unit': None,
     'daily_stats': list([
     ]),
     'day_trip_info': None,
