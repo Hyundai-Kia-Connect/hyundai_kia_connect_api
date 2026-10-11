@@ -5,6 +5,7 @@
 import base64
 import datetime as dt
 import logging
+import math
 import time
 from typing import ClassVar
 
@@ -1239,6 +1240,10 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             options.climate = True
         if options.set_temp is None:
             options.set_temp = 70
+        # Hyundai USA expects whole Fahrenheit degrees. Unit conversion (for
+        # example, HomeKit's Celsius target) can otherwise send rejected values
+        # such as 71.06. Round half degrees up, without changing the range policy.
+        set_temp = math.floor(float(options.set_temp) + 0.5)
         if options.duration is None:
             options.duration = 5
         if options.heating is None:
@@ -1257,7 +1262,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if vehicle.engine_type == ENGINE_TYPES.EV:
             data = {
                 "airCtrl": int(options.climate),
-                "airTemp": {"value": str(options.set_temp), "unit": 1},
+                "airTemp": {"value": str(set_temp), "unit": 1},
                 "defrost": options.defrost,
                 "heating1": int(options.heating),
             }
@@ -1274,7 +1279,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             data = {
                 "Ims": 0,
                 "airCtrl": int(options.climate),
-                "airTemp": {"unit": 1, "value": options.set_temp},
+                "airTemp": {"unit": 1, "value": set_temp},
                 "defrost": options.defrost,
                 "heating1": int(options.heating),
                 "igniOnDuration": options.duration,
