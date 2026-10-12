@@ -330,13 +330,15 @@ def test_connection_state_enum_and_graceful_unknown():
 
 def test_hyundai_and_kia_service_hub_bases_differ():
     """Per-brand SERVICE_HUB_BASE resolves the live-probed H_EU / K_EU hosts."""
+    from urllib.parse import urlparse
+
     hyundai = HyundaiCciApiEU(region=9, brand=2, language="en")
     kia = _kia_api()
     assert hyundai.SERVICE_HUB_BASE != kia.SERVICE_HUB_BASE
-    assert hyundai._get_service_hub_url().endswith(
+    assert urlparse(hyundai._get_service_hub_url()).netloc == (
         "egw-svchub-ccs-h-eu.eu-central.hmgmobility.com:31010"
     )
-    assert kia._get_service_hub_url().endswith(
+    assert urlparse(kia._get_service_hub_url()).netloc == (
         "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010"
     )
 
