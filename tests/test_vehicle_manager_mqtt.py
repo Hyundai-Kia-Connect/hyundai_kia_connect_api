@@ -1,13 +1,18 @@
 """Tests for VehicleManager push glue over the ApiImpl push contract."""
 
+import sys
 import threading
 import time
 from typing import Any, ClassVar
 
 from hyundai_kia_connect_api import VehicleManager
+
+vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
 from hyundai_kia_connect_api.mqtt_service_hub import CciPushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
+
+_ManagerModule = "hyundai_kia_connect_api.VehicleManager"
 
 # ---------------------------------------------------------------------------
 # Fake region API implementing the push contract
@@ -25,7 +30,12 @@ class FakePushApi:
             "mqtt_port": 8883,
             "use_ssl": True,
         }
-        self.reg = {"client_id": "dev-client", "username": None, "password": None}
+        self.reg: dict | None = {
+            "client_id": "dev-client",
+            "username": None,
+            "password": None,
+        }
+        self.register_result: dict | None = {}
         self.topics = [
             "service/phone/_/vss/testmqtt1/",
             "device/dev-client/remotecontroller/connect",
@@ -42,7 +52,7 @@ class FakePushApi:
 
     def register_push_vehicle(self, _token, vehicle):
         self.calls.append("register_vehicle")
-        return {}
+        return self.register_result
 
     def get_push_vehicle_identity(self, _token, vehicle):
         self.calls.append("identity")
@@ -50,7 +60,7 @@ class FakePushApi:
         return {"mqtt_vehicle_id": "testmqtt1", "hu_client_id": "testhu1"}
 
     def get_push_connection_state(self, _token):
-        return "ONLINE"
+        return None
 
     def get_push_topics(self, _token, vehicle):
         self.calls.append("topics")
@@ -86,7 +96,7 @@ class FakeTransport:
         self.on_disconnect = on_disconnect
         self.configured: dict[str, Any] = {}
         self.connected = False
-        self.connection_change = None
+        self.subscribed: list[str] = []
         FakeTransport.instances.append(self)
 
     @property
@@ -107,18 +117,18 @@ class FakeTransport:
         return list(topics)
 
 
-def _fake_transport(monkeypatch, vm, connect_ok: bool = True):
-    t = FakeTransport
-    t.instances = []
-    if connect_ok:
-        monkeypatch.setattr(vm, "_push_transport_factory", _make_connected_transport)
-    return t
+def _connected_transport_factory(monkeypatch):
+    """Patch the module-level MqttTransport in VehicleManager with a
+    connect-success FakeTransport."""
+    FakeTransport.instances = []
 
+    def factory(*args, **kwargs):
+        t = FakeTransport(*args, **kwargs)
+        t.connected = True
+        return t
 
-def _make_connected_transport(*args, **kwargs):
-    t = FakeTransport(*args, **kwargs)
-    t.connected = True
-    return t
+    monkeypatch.setattr(vm_module, "MqttTransport", factory)
+    return FakeTransport
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +138,7 @@ def _make_connected_transport(*args, **kwargs):
 
 def test_start_push_true_and_configures_transport(monkeypatch):
     vm = _make_vm()
-    monkeypatch.setattr(vm, "_push_transport_factory", _make_connected_transport)
+    _connected_transport_factory(monkeypatch)
     assert vm.start_push("careu1") is True
     assert vm._push_client is not None
     assert vm.is_push_supported is True
@@ -142,22 +152,48 @@ def test_start_push_false_when_region_unsupported():
     assert vm.start_push("careu1") is False
 
 
-def test_start_push_true_when_region_contract_noop():
+def test_start_push_false_when_broker_info_missing():
     vm = _make_vm()
     vm.api.broker = None  # type: ignore[attr-defined]
     assert vm.start_push("careu1") is False
 
 
 def test_start_push_second_vehicle_reuses_client(monkeypatch):
-    FakeTransport.instances = []
+    _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-    monkeypatch.setattr(vm, "_push_transport_factory", _make_connected_transport)
     vm.vehicles["careu2"] = Vehicle()
     vm.vehicles["careu2"].id = "careu2"
     assert vm.start_push("careu1") is True
     assert vm.start_push("careu2") is True
     assert len(FakeTransport.instances) == 1
     assert sorted(vm._push_vehicle_ids) == ["careu1", "careu2"]
+
+
+def test_failed_vehicle_registration_subscribes_nothing(monkeypatch):
+    """A failed protocol registration must not subscribe topics."""
+    fake_cls = _connected_transport_factory(monkeypatch)
+    vm = _make_vm()
+    vm.api.register_result = None  # type: ignore[attr-defined]
+    assert vm.start_push("careu1") is False
+    assert vm._push_client is None
+    assert vm._push_vehicle_ids == []
+    assert "topics" not in vm.api.calls
+    assert fake_cls.instances == []
+
+
+def test_failed_identity_subscribes_nothing(monkeypatch):
+    """Identity without a vehicle topic id blocks registration."""
+    fake_cls = _connected_transport_factory(monkeypatch)
+    vm = _make_vm()
+
+    def identity_no_vehicle_id(_token, vehicle):
+        vm.api.calls.append("identity")
+        # no mqtt_vehicle_id set
+
+    vm.api.get_push_vehicle_identity = identity_no_vehicle_id  # type: ignore[assignment]
+    assert vm.start_push("careu1") is False
+    assert "topics" not in vm.api.calls
+    assert fake_cls.instances == []
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +265,6 @@ def test_wait_for_push_result_signaled_by_action_message():
         is_status=False,
         action_id="tid-1",
         action_result="0",
-        action_connected=False,
     )
     vm._on_push_message(msg)
     thread.join(1.0)
@@ -252,8 +287,8 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
     vm._push_vehicle_ids = ["careu1"]
     refreshes = []
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: refreshes.append(1))
-    monkeypatch.setattr(vm, "_push_reconnect_initial_delay", 0.01)
-    monkeypatch.setattr(vm, "_push_reconnect_max_delay", 0.01)
+    monkeypatch.setattr(vm_module, "_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
+    monkeypatch.setattr(vm_module, "_PUSH_RECONNECT_MAX_DELAY", 0.01)
 
     attempts = {"n": 0}
 
@@ -269,7 +304,7 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
         def connect(self):
             attempts["n"] += 1
 
-    monkeypatch.setattr(vm, "_push_transport_factory", _Reconnectable)
+    monkeypatch.setattr(vm_module, "MqttTransport", _Reconnectable)
     vm._push_client = None
     vm._on_push_disconnect("unexpected (rc=7)")
     deadline = time.time() + 2.0
@@ -279,10 +314,8 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
     assert refreshes, "token refresh must be called before each reconnect attempt"
 
 
-def test_clean_disconnect_does_not_reconnect(monkeypatch):
+def test_clean_disconnect_does_not_reconnect():
     vm = _make_vm()
-    monkeypatch.setattr(vm, "_push_reconnect_initial_delay", 60)
-    monkeypatch.setattr(vm, "_push_reconnect_max_delay", 60)
     vm._push_vehicle_ids = ["careu1"]
     vm._push_client = FakeTransport()
     vm._on_push_disconnect("clean disconnect")
@@ -295,8 +328,8 @@ def test_clean_disconnect_does_not_reconnect(monkeypatch):
 
 
 def test_stop_push_clears_state(monkeypatch):
+    _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-    monkeypatch.setattr(vm, "_push_transport_factory", _make_connected_transport)
     vm.start_push("careu1")
     vm._push_action_events["x"] = threading.Event()
     vm.stop_push()

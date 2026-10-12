@@ -55,16 +55,18 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     # bearer headers — confirmed shape {"action": "prewakeup"}).
     GSPA_VERIFIED_ENDPOINTS = frozenset({"door", "temperature", "lamp"})
 
-    # Push contract implemented by MqttServiceHubMixin (live-probed).
+    # Push contract implemented by MqttServiceHubMixin (live-probed:
+    # device/host 200 and device/register 200 with clientId+deviceId on
+    # the Kia EU Service Hub, 2026-09-26).
     supports_mqtt_push: bool = True
 
-    # MQTT Service Hub (live-probed on the Kia EU Service Hub 2026-09-26:
-    # device/host 200, device/register 200 with clientId+deviceId).
-    # ccspServiceId — the service identifier in the X-Service-Id header
-    # (the Kia OneApp OAuth client id). Distinct from CCSP_SERVICE_ID.
+    # Push (Service Hub) REST base, live-probed on production.
+    SERVICE_HUB_BASE = "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010"
+
+    # Service Hub header values (app-confirmed on the Kia EU Service
+    # Hub): X-Service-Id identifier (the Kia OneApp OAuth client id) and
+    # the X-Application-Id (push provider) UUID.
     CCSP_CLIENT_SERVICE_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
-    # pushProviderId — X-Application-Id header value (app-confirmed on
-    # the Kia EU Service Hub).
     PUSH_PROVIDER_ID = "3863bdda-b753-4edb-9fbf-38288a353fe1"
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).

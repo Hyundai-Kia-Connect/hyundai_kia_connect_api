@@ -211,9 +211,9 @@ class GspaApiEU(ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
-    # Service Hub staging flag (class attr — production endpoints only
-    # for now; staging bases live in mqtt_service_hub.SERVICE_HUB_STAGING_BASES).
-    staging: bool = False
+    # Push (Service Hub) REST base — subclasses that declare
+    # supports_mqtt_push MUST override it.
+    SERVICE_HUB_BASE: str = ""
 
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
@@ -316,10 +316,9 @@ class GspaApiEU(ApiImpl):
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
         # regions.
 
-        # MQTT Service Hub state (used by MqttServiceHubMixin on
-        # HyundaiCciApiEU): session tid from device/host response headers,
-        # and a requests.Session keeping cookies/connection state like
-        # OkHttp's ConnectionPool between host → register → protocol.
+        # Push (Service Hub) session state — used by MqttServiceHubMixin:
+        # per-request tid from the device/host response headers, and one
+        # requests.Session keeping cookies across the Service Hub calls.
         self._service_hub_tid: str | None = None
         self._service_hub_session: requests.Session | None = None
 

@@ -25,6 +25,7 @@ from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
+    MQTT_PUSH_CONNECTION_STATE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -57,6 +58,10 @@ from .Token import Token
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
+
+# Push reconnect backoff timing (capped exponential).
+_PUSH_RECONNECT_INITIAL_DELAY: float = 5.0
+_PUSH_RECONNECT_MAX_DELAY: float = 300.0
 
 
 class VehicleManager:
@@ -102,7 +107,6 @@ class VehicleManager:
         self._push_connection_change_callback: Callable[[bool], None] | None = None
         self._push_reconnect_cancel: threading.Event | None = None
         self._push_vehicle_ids: list[str] = []
-        self._push_transport_factory: type = MqttTransport
 
     @DeprecationWarning
     def initialize(self) -> None:
@@ -452,7 +456,7 @@ class VehicleManager:
     # The manager knows nothing about broker schemas: a region API that
     # declares supports_mqtt_push supplies broker info, registration,
     # vehicle identity, topics and the message parser. Regions without
-    # support are a no-op (False / None), never an AttributeError.
+    # support are a no-op (False / None), never a NotImplementedError.
     # ------------------------------------------------------------------
 
     @property
@@ -463,10 +467,10 @@ class VehicleManager:
     def start_push(self, vehicle_id: str) -> bool:
         """Connect to the push broker and subscribe the vehicle's topics.
 
-        Region order (live-probed, app-confirmed):
-        broker → register client → vehicle identity → register vehicle →
-        transport connect → subscribe topics. Returns False when the
-        region API does not support push or setup failed.
+        Setup order (app-confirmed): broker → register client → vehicle
+        identity → register vehicle → transport connect → subscribe
+        topics. Returns False when the region API does not support push
+        or any setup step failed.
         """
         if not self.is_push_supported:
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
@@ -475,14 +479,12 @@ class VehicleManager:
         token = self.token
         vehicle = self.get_vehicle(vehicle_id)
         if self._push_client is not None:
+            if not self._register_new_vehicle(token, vehicle, vehicle_id):
+                return False
             self._push_vehicle_ids.append(vehicle_id)
-            ok = self._register_new_vehicle(token, vehicle, vehicle_id)
-            if ok:
-                if self._push_client.is_connected:
-                    self._subscribe_vehicle_topics(vehicle_id)
-                return True
-            self._push_vehicle_ids.remove(vehicle_id)
-            return False
+            if self._push_client.is_connected:
+                self._subscribe_vehicle_topics(vehicle_id)
+            return True
 
         broker = self.api.get_push_broker_info(token)
         if not broker or not broker.get("mqtt_host"):
@@ -493,12 +495,11 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
             return False
 
-        self._push_vehicle_ids.append(vehicle_id)
         if not self._register_new_vehicle(token, vehicle, vehicle_id):
-            self._push_vehicle_ids.remove(vehicle_id)
             return False
+        self._push_vehicle_ids.append(vehicle_id)
 
-        client = self._push_transport_factory(
+        client = MqttTransport(
             on_message=self._on_push_delivery_raw,
             on_connect=self._on_push_connect,
             on_disconnect=self._on_push_disconnect,
@@ -527,10 +528,25 @@ class VehicleManager:
     def _register_new_vehicle(
         self, token: Token, vehicle: Vehicle, vehicle_id: str
     ) -> bool:
-        """Run the per-vehicle registration steps of the push contract."""
+        """Run the per-vehicle registration steps of the push contract.
+
+        Both steps are validated: identity requires the vehicle topic id
+        (mqtt_vehicle_id), protocol registration requires a non-None
+        result. Failure returns False so no topics get subscribed.
+        """
         try:
             self.api.get_push_vehicle_identity(token, vehicle)
-            self.api.register_push_vehicle(token, vehicle)
+            if not vehicle.mqtt_vehicle_id:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Push identity missing vehicle id for {vehicle_id}"
+                )
+                return False
+            registered = self.api.register_push_vehicle(token, vehicle)
+            if registered is None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Push protocol registration failed for {vehicle_id}"
+                )
+                return False
         except Exception as ex:
             _LOGGER.warning(
                 f"{DOMAIN} - Push registration failed for {vehicle_id}: {ex}"
@@ -575,17 +591,12 @@ class VehicleManager:
         """Dispatch a parsed push message (duck-typed contract shape).
 
         Expected attributes: is_status (bool), vehicle_id (str, push
-        level), topic_type (str), and optional action fields action_id /
-        action_result (str | None), action_connected (bool).
+        level), topic_type (str), and when the message carries an action
+        result: action_id, action_result (str | None).
         """
         action_id = getattr(message, "action_id", None)
         if action_id and action_id in self._push_action_events:
-            result = message.action_result or (
-                "connected"
-                if getattr(message, "action_connected", False)
-                else "success"
-            )
-            self._push_action_results[action_id] = result
+            self._push_action_results[action_id] = message.action_result
             self._push_action_events[action_id].set()
 
         if not getattr(message, "is_status", False) or not self._push_status_callback:
@@ -647,10 +658,9 @@ class VehicleManager:
         if self._push_client:
             self._push_client.set_on_connection_change(callback)
 
-    def get_push_connection_state(self) -> str | None:
+    def get_push_connection_state(self) -> MQTT_PUSH_CONNECTION_STATE | None:
         """Push connection state through the region API (delegator)."""
-        state = self.api.get_push_connection_state(self.token)
-        return str(state) if state is not None else None
+        return self.api.get_push_connection_state(self.token)
 
     def wait_for_push_result(self, action_id: str, timeout: float = 60.0) -> str | None:
         """Wait for an action-result push (designed for asyncio.to_thread callers)."""
@@ -663,10 +673,6 @@ class VehicleManager:
             return None
         finally:
             self._push_action_events.pop(action_id, None)
-
-    # Reconnect timing (overridable in tests)
-    _push_reconnect_initial_delay: float = 5.0
-    _push_reconnect_max_delay: float = 300.0
 
     def _on_push_disconnect(self, reason: str) -> None:
         """Reconnect with capped exponential backoff on unexpected drops.
@@ -685,8 +691,8 @@ class VehicleManager:
         cancel_event = threading.Event()
         self._push_reconnect_cancel = cancel_event
 
-        initial_delay = self._push_reconnect_initial_delay
-        max_delay = self._push_reconnect_max_delay
+        initial_delay = _PUSH_RECONNECT_INITIAL_DELAY
+        max_delay = _PUSH_RECONNECT_MAX_DELAY
         vehicle_ids = list(self._push_vehicle_ids)
 
         def _reconnect_with_backoff() -> None:
