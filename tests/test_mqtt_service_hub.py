@@ -169,19 +169,27 @@ def _token() -> Token:
 
 
 def test_metadata_populates_capabilities_and_topics():
-    """End-to-end: metadata entry → Vehicle capability flags → topics."""
+    """End-to-end: metadata protocol list → Vehicle flags → topics.
+
+    Fixture shape = live-probed metadatalist ({"vehicles": [{unit,
+    clientId, vehicleId, protocols}]}).
+    """
     api = _kia_api()
     vehicle = _vehicle()
     api._service_hub_session = _FakeSession(
         [
             _metadata_response(
                 {
-                    "unit": "mobile",
+                    "unit": "hu",
                     "clientId": "client-1",
-                    "capabilities": {
-                        "isSupportOtaProgress": True,
-                        "isSupportSpeedEvent": True,
-                    },
+                    "vehicleId": "mqtt-v1",
+                    "protocols": [
+                        "service.phone.vss",
+                        "device.remotecontroller.connect",
+                        "device.closeremote.precondition",
+                        "device.closeremote.media.vehiclestatus",
+                        "vehicle.ota.otaprogress",
+                    ],
                 }
             ),
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
@@ -189,20 +197,47 @@ def test_metadata_populates_capabilities_and_topics():
     )
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.mqtt_vehicle_id == "mqtt-v1"
+    # protocol present → True; list read, protocol absent → False
+    assert vehicle.has_hvac_close_remote is True
+    assert vehicle.has_media_close_remote is True
     assert vehicle.is_support_ota_progress is True
-    assert vehicle.is_support_speed_event is True
-    # Unknown in this fixture → None, not a masked False
-    assert vehicle.is_support_schedule_update is None
-    assert vehicle.has_hvac_close_remote is None
+    assert vehicle.is_support_schedule_update is False
+    # protocols have no location-topic counterpart → unknown (None)
+    assert vehicle.is_support_speed_event is None
 
     topics = api.get_push_topics(_token(), vehicle)
-    assert any(t == TOPIC_PREFIX_LOCATION + "mqtt-v1" for t in topics)
+    # location unknown → not subscribed
+    assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
     assert any(POSTFIX_OTA_PROGRESS in t for t in topics)
     assert not any(POSTFIX_OTA_SCHEDULEUPDATE in t for t in topics)
 
 
+def test_metadata_absent_protocol_is_false_not_none():
+    """A read protocol list without the protocol = False (no masking)."""
+    api = _kia_api()
+    vehicle = _vehicle()
+    api._service_hub_session = _FakeSession(
+        [
+            _metadata_response(
+                {
+                    "unit": "hu",
+                    "clientId": "c1",
+                    "vehicleId": "mqtt-v1",
+                    "protocols": ["service.phone.vss"],
+                }
+            ),
+            _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
+        ]
+    )
+    api.get_push_vehicle_identity(Token(), vehicle)
+    assert vehicle.is_support_ota_progress is False
+    assert vehicle.is_support_schedule_update is False
+    topics = api.get_push_topics(_token(), vehicle)
+    assert not any("ota" in t for t in topics)
+
+
 def test_metadata_unknown_shape_leaves_capabilities_unknown():
-    """No recognizable capability keys → fields stay None, debug diagnostic."""
+    """No protocol list in the response → flags stay None (unknown)."""
     api = _kia_api()
     vehicle = _vehicle()
     api._service_hub_session = _FakeSession(
@@ -219,20 +254,25 @@ def test_metadata_unknown_shape_leaves_capabilities_unknown():
 
 
 def test_metadata_entry_level_capabilities():
-    """Capabilities without a sub-dict are still picked up from the entry."""
+    """The hu entry's protocol list is the capability source."""
     api = _kia_api()
     vehicle = _vehicle()
     api._service_hub_session = _FakeSession(
         [
             _metadata_response(
-                {"unit": "hu", "clientId": "hu-1", "isSupportOtaProgress": False}
+                {
+                    "unit": "hu",
+                    "clientId": "hu-1",
+                    "vehicleId": "mqtt-v1",
+                    "protocols": ["vehicle.ota.scheduleupdate"],
+                }
             ),
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.hu_client_id == "hu-1"
-    assert vehicle.is_support_ota_progress is False
+    assert vehicle.is_support_schedule_update is True
 
 
 # ---------------------------------------------------------------------------

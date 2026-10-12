@@ -512,56 +512,49 @@ class MqttServiceHubMixin:
 # NOTE: entries missing any key leave that flag unset.
 #
 # vehicle field name → candidate wire keys
-_CAPS_WIRE_KEYS = {
-    "is_support_ota_progress": ("isSupportOtaProgress",),
-    "is_support_schedule_update": ("isSupportScheduleUpdate",),
-    "is_support_speed_event": ("isSupportSpeedEvent",),
-    "has_hvac_close_remote": ("hasHvacCloseRemote",),
-    "has_media_close_remote": ("hasMediaCloseRemote",),
+# Metadata capability mapping (live-probed on the production Hyundai EU
+# Service Hub, 2026-10-12): the metadatalist response carries no
+# capabilities dict — it lists per-unit protocol membership
+# ({"vehicles": [{unit, clientId, vehicleId, protocols}, ...]}). A
+# capability equals the presence of the matching protocol; a missing
+# protocol means the vehicle does not support that feature. The hu
+# entry carries the remote-control and closeremote protocol sets.
+_CAPS_PROTOCOL_KEYS: dict[str, tuple[str, ...]] = {
+    "has_hvac_close_remote": ("device.closeremote.precondition",),
+    "has_media_close_remote": ("device.closeremote.media.vehiclestatus",),
+    "is_support_ota_progress": ("vehicle.ota.otaprogress",),
+    "is_support_schedule_update": ("vehicle.ota.scheduleupdate",),
 }
+
+# Protocols with no confirmed topic mapping are left None (unknown) —
+# e.g. the location topic has no 1:1 protocol counterpart, so
+# is_support_speed_event is never set from metadata.
 
 
 def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
     """Populate Vehicle capability flags from metadata entries.
 
-    Tolerant by design: each flag is set only when the metadata entry
-    reports an explicit boolean. Unmatched entries leave all flags None
-    (unknown); a debug line lists the keys present in the response for
-    diagnostics. The report may be a capabilities sub-dict or on the
-    entry itself.
+    A flag is True only when its matching protocol appears in the
+    vehicle's protocol list; False when the list was read and the
+    protocol is absent; None when no protocol list was available
+    (response without per-vehicle protocol membership).
     """
-    capability_entries = []
+    protocols: set[str] | None = None
     for entry in entries or []:
         if not isinstance(entry, dict):
             continue
-        caps = entry.get("capabilities")
-        if isinstance(caps, dict):
-            capability_entries.append(caps)
-        capability_entries.append(entry)
-    found = False
-    for field, keys in _CAPS_WIRE_KEYS.items():
-        for raw in capability_entries:
-            for key in keys:
-                if key in raw:
-                    value = raw[key]
-                    if isinstance(value, bool):
-                        setattr(vehicle, field, value)
-                        found = True
-                        break
-        if getattr(vehicle, field) is not None:
-            found = True
-    if not found:
-        unknown_keys = sorted(
-            {
-                k
-                for entry in capability_entries
-                for k in entry
-                if k not in ("unit", "clientId")
-            }
-        )
+        raw = entry.get("protocols")
+        if isinstance(raw, list):
+            protocols = {str(p) for p in raw}
+            break
+    if protocols is None:
         _LOGGER.debug(
-            f"{DOMAIN} - Push metadata: no known capability keys ({unknown_keys})"
+            f"{DOMAIN} - Push metadata: no protocol list in response; "
+            "capability flags stay unknown"
         )
+        return
+    for field, keys in _CAPS_PROTOCOL_KEYS.items():
+        setattr(vehicle, field, any(key in protocols for key in keys))
 
 
 # ---------------------------------------------------------------------------
