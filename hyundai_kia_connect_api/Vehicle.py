@@ -165,17 +165,19 @@ class Vehicle:
     _valet_failed: bool = False
 
     # Push identity fields (per-vehicle level; vehicle is the identity
-    # scope). mqtt_vehicle_id feeds the X-MQTT-Vehicle-Id header and is
-    # the topic infix — NOT the same id as Token.mqtt_client_id (the
-    # device/client registration id on the token level). MQTT capability
-    # flags below come from MQTTCacheResponse.
+    # scope). mqtt_vehicle_id is the topic infix — NOT the same id as
+    # Token.mqtt_client_id (the device/client registration id on the token
+    # level). Capability flags are populated from the push metadata read:
+    # True = supported, False = explicitly not supported, None = the
+    # metadata response did not report the flag (unknown — conditional
+    # topics are only subscribed on True).
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
-    has_hvac_close_remote: bool = False
-    has_media_close_remote: bool = False
-    is_support_speed_event: bool = False
-    is_support_ota_progress: bool = False
-    is_support_schedule_update: bool = False
+    has_hvac_close_remote: bool | None = None
+    has_media_close_remote: bool | None = None
+    is_support_speed_event: bool | None = None
+    is_support_ota_progress: bool | None = None
+    is_support_schedule_update: bool | None = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None

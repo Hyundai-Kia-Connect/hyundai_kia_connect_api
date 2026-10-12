@@ -49,6 +49,8 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
     CCI_API_URL = "https://cci-api-eu.hyundai.com"
     CCI_PACKAGE_ID = "com.hyundai.oneapp.eu"
     GSPA_BASE_URL = "https://gspa-ccs-eu.hyundai.com/"
+    # Push (Service Hub) REST base, live-probed on production.
+    SERVICE_HUB_BASE = "egw-svchub-ccs-h-eu.eu-central.hmgmobility.com:31010"
     LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
     CIPHER_BRAND = "hyundai"
     REQUEST_ID_HEADER = "X-Request-Id"
@@ -61,10 +63,9 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
     # Push contract implemented by MqttServiceHubMixin (live-probed).
     supports_mqtt_push: bool = True
 
-    # ccspServiceId — the service identifier in the X-Service-Id header
-    # (Service Hub). Distinct from CCSP_SERVICE_ID (OAuth client_id).
+    # Service Hub header values (app-confirmed): X-Service-Id identifier
+    # and the X-Application-Id (push provider) UUID.
     CCSP_CLIENT_SERVICE_ID = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
-    # pushProviderId — X-Application-Id header value.
     PUSH_PROVIDER_ID = "33258e5f-b8c8-459e-add1-1e94217ba148"
 
     # CCS2 EU vehicles support GSPA window control.
