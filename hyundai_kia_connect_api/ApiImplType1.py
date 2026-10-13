@@ -52,9 +52,11 @@ from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    float_or_none,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    int_or_none,
     normalize_battery_soc,
     parse_datetime,
     pressure_or_none,
@@ -1279,6 +1281,8 @@ class ApiImplType1(ApiImpl):
                 location_last_updated_at,
             )
 
+        self._update_vehicle_properties_ccs2_extras(vehicle, state)
+
         # Sanitize corrupted ICE values before storing in vehicle.data
         # This prevents issues with oversized integers when serializing to JSON
         # or storing in databases
@@ -1286,6 +1290,246 @@ class ApiImplType1(ApiImpl):
         # self._sanitize_ice_value(state)
 
         vehicle.data = state
+
+    def _update_vehicle_properties_ccs2_extras(
+        self, vehicle: Vehicle, state: dict
+    ) -> None:
+        """Map the remaining CCS2 state.Vehicle fields.
+
+        Everything here is None-when-absent so vehicles that do not publish a
+        field get no entity downstream. Field inventory: live Genesis AU GV70
+        (ICE) plus the EU EV3/EV6/EV9/Sportage PHEV fixtures.
+        """
+
+        def g(path: str):
+            return get_child_value(state, path)
+
+        # -- Body / Cabin
+        vehicle.windshield_front_heater_is_on = bool_or_none(
+            g("Body.Windshield.Front.Heat.State")
+        )
+        vehicle.lights_discharge_alert_is_on = bool_or_none(
+            g("Body.Lights.DischargeAlert.State")
+        )
+        vehicle.turn_signal_left_front_is_on = bool_or_none(
+            g("Body.Lights.Front.Left.TurnSignal.LampState")
+        )
+        vehicle.turn_signal_right_front_is_on = bool_or_none(
+            g("Body.Lights.Front.Right.TurnSignal.LampState")
+        )
+        vehicle.frunk_fault_is_on = bool_or_none(g("Body.Hood.Frunk.Fault"))
+        vehicle.air_cleaning_is_on = bool_or_none(
+            g("Cabin.HVAC.Vent.AirCleaning.Indicator")
+        )
+        vehicle.air_cleaning_symbol_color = int_or_none(
+            g("Cabin.HVAC.Vent.AirCleaning.SymbolColor")
+        )
+        vehicle.fine_dust_level = int_or_none(g("Cabin.HVAC.Vent.FineDust.Level"))
+        vehicle.fine_dust_state = int_or_none(g("Cabin.HVAC.Vent.FineDust.State"))
+        vehicle.hvac_temperature_range_type = int_or_none(
+            g("Cabin.HVAC.Temperature.RangeType")
+        )
+        vehicle.rest_mode_is_on = bool_or_none(g("Cabin.RestMode.State"))
+        vehicle.steering_wheel_heat_step = int_or_none(
+            g("Cabin.SteeringWheel.Heat.RemoteControl.Step")
+        )
+        # Armrest heaters follow the same Row1.Driver -> front_left convention
+        # as the seat climate fields above.
+        vehicle.front_left_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row1.Driver.ArmRest.Heat")
+        )
+        vehicle.front_right_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row1.Passenger.ArmRest.Heat")
+        )
+        vehicle.rear_left_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row2.Left.ArmRest.Heat")
+        )
+        vehicle.rear_right_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row2.Right.ArmRest.Heat")
+        )
+        vehicle.third_row_left_seat_status = SEAT_STATUS.get(
+            g("Cabin.Seat.Row3.Left.Climate.State")
+        )
+        vehicle.third_row_right_seat_status = SEAT_STATUS.get(
+            g("Cabin.Seat.Row3.Right.Climate.State")
+        )
+
+        # -- Chassis / Drivetrain
+        vehicle.awd_controller_state_1 = int_or_none(
+            g("Chassis.Driving.WheelDriveType.ControllerState1")
+        )
+        vehicle.awd_controller_state_2 = int_or_none(
+            g("Chassis.Driving.WheelDriveType.ControllerState2")
+        )
+        vehicle.drivetrain_driving_ready = bool_or_none(g("Drivetrain.DrivingReady"))
+        vehicle.urea_level = int_or_none(g("Drivetrain.ExhaustSystem.UreaLevel"))
+        vehicle.transmission_in_park = bool_or_none(
+            g("Drivetrain.Transmission.ParkingPosition")
+        )
+        vehicle.gear_position = int_or_none(g("Drivetrain.Transmission.GearPosition"))
+        average_fuel_economy = g("Drivetrain.FuelSystem.AverageFuelEconomy")
+        if isinstance(average_fuel_economy, dict):
+            vehicle.average_fuel_economy_accumulated = float_or_none(
+                average_fuel_economy.get("Accumulated")
+            )
+            vehicle.average_fuel_economy_drive = float_or_none(
+                average_fuel_economy.get("Drive")
+            )
+            vehicle.average_fuel_economy_after_refuel = float_or_none(
+                average_fuel_economy.get("AfterRefuel")
+            )
+            vehicle.average_fuel_economy_unit = int_or_none(
+                average_fuel_economy.get("Unit")
+            )
+        # PHEV/HEV publish the fuel-only range separately in DTE.ICE.
+        ice_range = g("Drivetrain.FuelSystem.DTE.ICE")
+        if ice_range is not None and vehicle.total_driving_range_unit is not None:
+            vehicle.fuel_driving_range = (
+                float(ice_range),
+                vehicle.total_driving_range_unit,
+            )
+
+        # -- Electronics / Service
+        vehicle.battery_12v_charging_warning_level = int_or_none(
+            g("Electronics.Battery.Charging.WarningLevel")
+        )
+        vehicle.battery_12v_power_state_alert = int_or_none(
+            g("Electronics.Battery.PowerStateAlert.ClassC")
+        )
+        vehicle.auto_cut_power_mode = int_or_none(g("Electronics.AutoCut.PowerMode"))
+        vehicle.auto_cut_delivery_mode = int_or_none(
+            g("Electronics.AutoCut.DeliveryMode")
+        )
+        vehicle.auto_cut_battery_prewarning_on = bool_or_none(
+            g("Electronics.AutoCut.BatteryPreWarning")
+        )
+        vehicle.ignition1_on = bool_or_none(g("Electronics.PowerSupply.Ignition1"))
+        vehicle.remote_control_available = bool_or_none(
+            g("Service.ConnectedCar.RemoteControl.Available")
+        )
+        vehicle.remote_control_waiting_time = int_or_none(
+            g("Service.ConnectedCar.RemoteControl.WaitingTime")
+        )
+        vehicle.active_alert_available = bool_or_none(
+            g("Service.ConnectedCar.ActiveAlert.Available")
+        )
+        ota = g("ConnectedService.OTA.ControllerStatus")
+        if ota is None:
+            ota = g("Service.ConnectedService.OTA.ControllerStatus")
+        vehicle.ota_controller_status = int_or_none(ota)
+        version = g("Version")
+        vehicle.ccu_version = str(version) if version is not None else None
+
+        # -- Location extras (the embedded snapshot copy)
+        vehicle.location_heading = float_or_none(g("Location.Heading"))
+        vehicle.location_speed = float_or_none(g("Location.Speed.Value"))
+        vehicle.location_speed_unit = int_or_none(g("Location.Speed.Unit"))
+        vehicle.location_altitude = float_or_none(g("Location.GeoCoord.Altitude"))
+        vehicle.location_service_state = int_or_none(g("Location.Servicestate"))
+
+        # -- Green (EV/PHEV); every field is absent on ICE so stays None.
+        vehicle.ev_battery_conditioning_is_on = bool_or_none(
+            g("Green.BatteryManagement.BatteryConditioning")
+        )
+        vehicle.ev_battery_precondition_temperature_level = int_or_none(
+            g("Green.BatteryManagement.BatteryPreCondition.TemperatureLevel")
+        )
+        vehicle.ev_battery_percentage_raw = float_or_none(
+            g("Green.ChargingInformation.Charging.SoC.Raw")
+        )
+        vehicle.ev_charging_sequence_details = int_or_none(
+            g("Green.ChargingInformation.SequenceDetails")
+        )
+        vehicle.ev_charging_sequence_subcode = int_or_none(
+            g("Green.ChargingInformation.SequenceSubcode")
+        )
+        # Expected charge window; the 31:63 sentinel maps to None.
+        expected = g("Green.ChargingInformation.ExpectedTime")
+        if isinstance(expected, dict):
+            try:
+                vehicle.ev_charge_expected_start_time = ccs2_reservation_time_or_none(
+                    expected.get("StartHour"), expected.get("StartMin")
+                )
+                vehicle.ev_charge_expected_end_time = ccs2_reservation_time_or_none(
+                    expected.get("EndHour"), expected.get("EndMin")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning(
+                    "%s - CCS2 ExpectedTime malformed: %s", DOMAIN, expected
+                )
+        complete_alarm = g("Green.ChargingInformation.Setting.CompleteAlarm")
+        if isinstance(complete_alarm, dict):
+            vehicle.ev_charge_complete_alarm_before_10min = bool_or_none(
+                complete_alarm.get("Before10min")
+            )
+            vehicle.ev_charge_complete_alarm_before_20min = bool_or_none(
+                complete_alarm.get("Before20min")
+            )
+            vehicle.ev_charge_complete_alarm_before_30min = bool_or_none(
+                complete_alarm.get("Before30min")
+            )
+            vehicle.ev_charge_complete_alarm_off = bool_or_none(
+                complete_alarm.get("Off")
+            )
+        vehicle.ev_driving_history_average = float_or_none(
+            g("Green.DrivingHistory.Average")
+        )
+        vehicle.ev_driving_history_unit = int_or_none(g("Green.DrivingHistory.Unit"))
+        vehicle.ev_driving_ready = bool_or_none(g("Green.DrivingReady"))
+        vehicle.ev_v2g_mode = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToGrid.Mode")
+        )
+        vehicle.ev_v2l_mode = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.Mode")
+        )
+        vehicle.ev_v2l_discharge_remain_time = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.RemainTime")
+        )
+        vehicle.ev_v2l_discharge_dte = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.DTE")
+        )
+        vehicle.ev_driving_range_invalid = bool_or_none(
+            g("Green.EnergyInformation.DTE.Invalid")
+        )
+        pnc = g("Green.PlugAndCharge.ContractCertificate")
+        if isinstance(pnc, dict):
+            vehicle.ev_plug_and_charge_mode = int_or_none(pnc.get("Mode"))
+            vehicle.ev_plug_and_charge_changeable = bool_or_none(pnc.get("Changeable"))
+            vehicle.ev_plug_and_charge_selected_cert = int_or_none(
+                pnc.get("SelectedCert")
+            )
+        certificates = [
+            g(f"Green.PlugAndCharge.ContractCertificate{i}") for i in range(1, 6)
+        ]
+        certificates = [c for c in certificates if isinstance(c, dict)]
+        if certificates:
+            # Company names are NUL-padded fixed-width strings on the wire
+            # (some captures carry them as literal "\\0" text).
+            def clean_company(value):
+                if not isinstance(value, str):
+                    return value
+                return value.replace("\\0", "").strip("\0 ")
+
+            vehicle.ev_plug_and_charge_certificates = [
+                {**c, "Company": clean_company(c.get("Company"))} for c in certificates
+            ]
+        vehicle.ev_power_consumption_prediction_climate = float_or_none(
+            g("Green.PowerConsumption.Prediction.Climate")
+        )
+        departure_climate = g("Green.Reservation.Departure.Climate")
+        if isinstance(departure_climate, dict):
+            vehicle.ev_departure_climate_enabled = bool_or_none(
+                departure_climate.get("Activation")
+            )
+            vehicle.ev_departure_climate_defrost = bool_or_none(
+                departure_climate.get("Defrost")
+            )
+            vehicle.ev_departure_climate_temperature = float_or_none(
+                departure_climate.get("Temperature")
+            )
+            vehicle.ev_departure_climate_temperature_unit = TEMPERATURE_UNITS.get(
+                departure_climate.get("TemperatureUnit")
+            )
 
     @_retry_on_device_id_error
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:

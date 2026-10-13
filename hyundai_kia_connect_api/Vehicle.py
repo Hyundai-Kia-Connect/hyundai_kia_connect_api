@@ -312,6 +312,113 @@ class Vehicle:
     air_cleaning_is_on: bool | None = None
     steering_wheel_heat_step: int | None = None
 
+    # Remaining CCS2 state.Vehicle fields (Type1 ccs2/carstatus). All None
+    # when the car does not publish the field, so no entity is created for it.
+    # -- Body / Cabin
+    lights_discharge_alert_is_on: bool | None = None  # Body.Lights.DischargeAlert.State
+    turn_signal_left_front_is_on: bool | None = (
+        None  # ...Front.Left.TurnSignal.LampState
+    )
+    turn_signal_right_front_is_on: bool | None = (
+        None  # ...Front.Right.TurnSignal.LampState
+    )
+    frunk_fault_is_on: bool | None = None  # Body.Hood.Frunk.Fault
+    fine_dust_level: int | None = None  # Cabin.HVAC.Vent.FineDust.Level
+    fine_dust_state: int | None = None  # Cabin.HVAC.Vent.FineDust.State
+    air_cleaning_symbol_color: int | None = (
+        None  # Cabin.HVAC.Vent.AirCleaning.SymbolColor
+    )
+    hvac_temperature_range_type: int | None = None  # Cabin.HVAC.Temperature.RangeType
+    rest_mode_is_on: bool | None = None  # Cabin.RestMode.State
+    front_left_armrest_heater_is_on: bool | None = (
+        None  # Cabin.Seat.Row1.Driver.ArmRest.Heat
+    )
+    front_right_armrest_heater_is_on: bool | None = None  # Row1.Passenger.ArmRest.Heat
+    rear_left_armrest_heater_is_on: bool | None = None  # Row2.Left.ArmRest.Heat
+    rear_right_armrest_heater_is_on: bool | None = None  # Row2.Right.ArmRest.Heat
+    third_row_left_seat_status: str | None = None  # Cabin.Seat.Row3.Left.Climate.State
+    third_row_right_seat_status: str | None = (
+        None  # Cabin.Seat.Row3.Right.Climate.State
+    )
+    # -- Chassis / Drivetrain
+    awd_controller_state_1: int | None = (
+        None  # Chassis.Driving.WheelDriveType.ControllerState1
+    )
+    awd_controller_state_2: int | None = (
+        None  # Chassis.Driving.WheelDriveType.ControllerState2
+    )
+    drivetrain_driving_ready: bool | None = None  # Drivetrain.DrivingReady
+    urea_level: int | None = None  # Drivetrain.ExhaustSystem.UreaLevel (diesel)
+    transmission_in_park: bool | None = None  # Drivetrain.Transmission.ParkingPosition
+    # -- Electronics / Service
+    battery_12v_charging_warning_level: int | None = (
+        None  # Electronics.Battery.Charging.WarningLevel
+    )
+    battery_12v_power_state_alert: int | None = (
+        None  # Electronics.Battery.PowerStateAlert.ClassC
+    )
+    auto_cut_power_mode: int | None = None  # Electronics.AutoCut.PowerMode
+    auto_cut_delivery_mode: int | None = None  # Electronics.AutoCut.DeliveryMode
+    ignition1_on: bool | None = None  # Electronics.PowerSupply.Ignition1
+    remote_control_available: bool | None = (
+        None  # Service.ConnectedCar.RemoteControl.Available
+    )
+    remote_control_waiting_time: int | None = (
+        None  # Service.ConnectedCar.RemoteControl.WaitingTime
+    )
+    active_alert_available: bool | None = (
+        None  # Service.ConnectedCar.ActiveAlert.Available
+    )
+    ota_controller_status: int | None = None  # ConnectedService.OTA.ControllerStatus
+    ccu_version: str | None = None  # Version
+    # -- Location (embedded copy in the status snapshot)
+    location_heading: float | None = None  # Location.Heading (degrees)
+    location_speed: float | None = None  # Location.Speed.Value
+    location_speed_unit: int | None = None  # Location.Speed.Unit (raw)
+    location_altitude: float | None = None  # Location.GeoCoord.Altitude
+    location_service_state: int | None = None  # Location.Servicestate
+    # -- Green (EV/PHEV)
+    ev_battery_conditioning_is_on: bool | None = (
+        None  # Green.BatteryManagement.BatteryConditioning
+    )
+    ev_battery_precondition_temperature_level: int | None = (
+        None  # ...BatteryPreCondition.TemperatureLevel
+    )
+    ev_battery_percentage_raw: float | None = (
+        None  # Green.ChargingInformation.Charging.SoC.Raw
+    )
+    ev_charging_sequence_details: int | None = (
+        None  # Green.ChargingInformation.SequenceDetails
+    )
+    ev_charging_sequence_subcode: int | None = (
+        None  # Green.ChargingInformation.SequenceSubcode
+    )
+    ev_driving_history_average: float | None = None  # Green.DrivingHistory.Average
+    ev_driving_history_unit: int | None = None  # Green.DrivingHistory.Unit (raw)
+    ev_driving_ready: bool | None = None  # Green.DrivingReady
+    ev_v2g_mode: int | None = None  # Green.Electric.SmartGrid.VehicleToGrid.Mode
+    ev_driving_range_invalid: bool | None = None  # Green.EnergyInformation.DTE.Invalid
+    ev_plug_and_charge_mode: int | None = (
+        None  # Green.PlugAndCharge.ContractCertificate.Mode
+    )
+    ev_plug_and_charge_changeable: bool | None = (
+        None  # ...ContractCertificate.Changeable
+    )
+    ev_plug_and_charge_selected_cert: int | None = (
+        None  # ...ContractCertificate.SelectedCert
+    )
+    ev_plug_and_charge_certificates: list | None = (
+        None  # ContractCertificate1..5 (raw dicts)
+    )
+    ev_power_consumption_prediction_climate: float | None = (
+        None  # Green.PowerConsumption.Prediction.Climate
+    )
+    # Green.Reservation.Departure.Climate (shared departure-climate preset)
+    ev_departure_climate_enabled: bool | None = None
+    ev_departure_climate_defrost: bool | None = None
+    ev_departure_climate_temperature: float | None = None
+    ev_departure_climate_temperature_unit: str | None = None
+
     @property
     def daily_stats(self):
         return self._daily_stats
