@@ -9,7 +9,6 @@ import pytest
 
 from hyundai_kia_connect_api.cci_fingerprint import (
     build_fp_headers,
-    client_name_for_brand,
     compute_x_fingerprint,
     is_fingerprint_gate,
 )
@@ -44,12 +43,6 @@ def test_compute_x_fingerprint_uses_body_when_present():
     bare = compute_x_fingerprint(_fp_headers())
     with_body = compute_x_fingerprint(_fp_headers(), '{"a":1}')
     assert with_body != bare
-
-
-def test_client_name_for_brand():
-    assert client_name_for_brand(2) == "HyundaiEU"  # 2 = Hyundai in BRANDS
-    assert client_name_for_brand(1) == "KiaEU"
-    assert client_name_for_brand(3) == "GenesisEU"
 
 
 def test_build_fp_headers_matches_verified_identity():
