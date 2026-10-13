@@ -1,12 +1,12 @@
-import json
-
 """Tests for the EU CCI X-Fingerprint helper (cci_fingerprint.py) and the
 per-brand token-exchange paths (live-verified 2026-10-13, kia_uvo #1888):
 Hyundai EU is validation-gated, so /auth/v1/token + X-Fingerprint goes first;
 Kia/Genesis still answer the legacy domain/api exchange. On a failed primary
 the other path runs before raising."""
 
+import json
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -20,6 +20,18 @@ from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 
 GOLDEN_TS = "1736700000000"
 GOLDEN_FP = "aef1b5735838a04aa83a0b5e63b87beb95ce50cf89b30d42405f7db20f0070c7"
+
+
+def _assert_kia_url(call_arg: object, path: str) -> None:
+    """Compare URL components; prefix-substring asserts trip CodeQL
+    incomplete-URL-substring-sanitization."""
+    parsed = urlparse(call_arg)
+    assert (parsed.scheme, parsed.netloc, parsed.path) == (
+        "https",
+        "cci-api-eu.kia.com",
+        path,
+    )
+
 
 GATE_BODY = '{"code":9013,"message":"ctn_externalservice_validation_error"}'
 
@@ -111,7 +123,7 @@ def test_region1_kia_exchange_legacy_primary(mock_post):
     assert resp.json()["accessToken"] == "kia-at"
     assert mock_post.call_count == 1
     assert mock_post.call_args.args[0].endswith("/domain/api/v1/auth/token")
-    assert mock_post.call_args.args[0].startswith("https://cci-api-eu.kia.com")
+    _assert_kia_url(mock_post.call_args.args[0], "/domain/api/v1/auth/token")
 
 
 @patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
@@ -122,11 +134,7 @@ def test_region1_kia_exchange_fallback_to_fp(mock_post):
     ]
     resp = _eu_api(brand=1)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
     assert resp.json()["accessToken"] == "kia-fp-at"
-    assert (
-        mock_post.call_args_list[1]
-        .args[0]
-        .startswith("https://cci-api-eu.kia.com/auth/v1/token")
-    )
+    _assert_kia_url(mock_post.call_args_list[1].args[0], "/auth/v1/token")
     sent = mock_post.call_args_list[1].kwargs["headers"]
     assert sent["client-name"] == "KiaEU"
     assert sent["client-id"] == "com.kia.oneapp.eu"
@@ -187,7 +195,7 @@ def test_region9_kia_exchange_legacy_primary(mock_post):
     assert cci["accessToken"] == "r9k-at"
     assert mock_post.call_count == 1
     assert mock_post.call_args.args[0].endswith("/domain/api/v1/auth/token")
-    assert mock_post.call_args.args[0].startswith("https://cci-api-eu.kia.com")
+    _assert_kia_url(mock_post.call_args.args[0], "/domain/api/v1/auth/token")
 
 
 @patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
@@ -200,9 +208,5 @@ def test_region9_kia_exchange_fallback_to_fp(mock_post):
         region=9, brand=1, language="en"
     )._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
     assert cci["accessToken"] == "r9k-fp"
-    assert (
-        mock_post.call_args_list[1]
-        .args[0]
-        .startswith("https://cci-api-eu.kia.com/auth/v1/token")
-    )
+    _assert_kia_url(mock_post.call_args_list[1].args[0], "/auth/v1/token")
     assert mock_post.call_args_list[1].kwargs["headers"]["client-name"] == "KiaEU"
