@@ -1,8 +1,11 @@
-"""Tests for the EU CCI X-Fingerprint helper (cci_fingerprint.py) and the
-9013 validation-gate fallback on the token exchange and token refresh paths
-(live-verified 2026-10-13, kia_uvo #1888)."""
-
 import json
+
+"""Tests for the EU CCI X-Fingerprint helper (cci_fingerprint.py) and the
+per-brand token-exchange paths (live-verified 2026-10-13, kia_uvo #1888):
+Hyundai EU is validation-gated, so /auth/v1/token + X-Fingerprint goes first;
+Kia/Genesis still answer the legacy domain/api exchange. On a failed primary
+the other path runs before raising."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,13 +13,15 @@ import pytest
 from hyundai_kia_connect_api.cci_fingerprint import (
     build_fp_headers,
     compute_x_fingerprint,
-    is_fingerprint_gate,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 
 GOLDEN_TS = "1736700000000"
 GOLDEN_FP = "aef1b5735838a04aa83a0b5e63b87beb95ce50cf89b30d42405f7db20f0070c7"
+
+GATE_BODY = '{"code":9013,"message":"ctn_externalservice_validation_error"}'
 
 
 def _fp_headers(ts: str = GOLDEN_TS) -> dict[str, str]:
@@ -58,59 +63,13 @@ def test_build_fp_headers_matches_verified_identity():
     assert headers["App-Request-Id"]
 
 
-def test_is_fingerprint_gate():
-    assert is_fingerprint_gate(
-        MagicMock(status_code=400, text='{"code":9013,"message":"x"}')
-    )
-    assert not is_fingerprint_gate(MagicMock(status_code=200, text="{}"))
-    assert not is_fingerprint_gate(
-        MagicMock(status_code=400, text='{"code":4002,"message":"x"}')
-    )
-
-
 def _resp(status: int, text: str) -> MagicMock:
     resp = MagicMock(status_code=status, text=text)
     resp.json.return_value = json.loads(text) if status in (200, 201) else {}
     return resp
 
 
-# ── GspaApiEU fallback (region 9 classes) ───────────────────────
-
-
-def _cci_api() -> HyundaiCciApiEU:
-    return HyundaiCciApiEU(region=1, brand=2, language="en")
-
-
-@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
-def test_gspa_exchange_falls_back_on_9013(mock_post):
-    mock_post.side_effect = [
-        _resp(400, '{"code":9013,"message":"ctn_externalservice_validation_error"}'),
-        _resp(200, '{"accessToken":"cci-at","refreshToken":"cci-rt"}'),
-    ]
-    cci = _cci_api()._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert cci["accessToken"] == "cci-at"
-    assert mock_post.call_count == 2
-    first_url = mock_post.call_args_list[0].args[0]
-    second_url = mock_post.call_args_list[1].args[0]
-    assert first_url.endswith("/domain/api/v1/auth/token")
-    assert second_url.endswith("/auth/v1/token")
-    sent = mock_post.call_args_list[1].kwargs["headers"]
-    assert sent["X-Fingerprint"]
-    assert sent["X-Timestamp"]
-    assert sent["client-version"] == "1.4.1"
-
-
-@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
-def test_gspa_exchange_non_gate_failure_propagates(mock_post):
-    mock_post.return_value = _resp(500, '{"code":5001,"message":"boom"}')
-    from hyundai_kia_connect_api.exceptions import AuthenticationError
-
-    with pytest.raises(AuthenticationError):
-        _cci_api()._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert mock_post.call_count == 1
-
-
-# ── KiaUvoApiEU fallback (region 1, the kia_uvo prod path) ──────
+# ── region 1 (KiaUvoApiEU) ──────────────────────────────────────
 
 
 def _eu_api(brand: int = 2) -> KiaUvoApiEU:
@@ -118,51 +77,51 @@ def _eu_api(brand: int = 2) -> KiaUvoApiEU:
 
 
 @patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
-def test_kiauvo_exchange_falls_back_on_9013(mock_post):
-    mock_post.side_effect = [
-        _resp(400, '{"code":9013,"message":"External service validation error"}'),
-        _resp(200, '{"accessToken":"cci-at","refreshToken":"cci-rt"}'),
-    ]
-    api = _eu_api()
-    resp = api._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+def test_region1_hyundai_exchange_fp_primary(mock_post):
+    mock_post.return_value = _resp(200, '{"accessToken":"cci-at"}')
+    resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
     assert resp.json()["accessToken"] == "cci-at"
-    assert mock_post.call_count == 2
-    assert mock_post.call_args_list[0].args[0].endswith("/domain/api/v1/auth/token")
-    assert mock_post.call_args_list[1].args[0].endswith("/auth/v1/token")
-    sent = mock_post.call_args_list[1].kwargs["headers"]
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/auth/v1/token")
+    sent = mock_post.call_args.kwargs["headers"]
     assert sent["X-Fingerprint"]
+    assert sent["X-Timestamp"]
     assert sent["client-name"] == "HyundaiEU"
-
-
-def test_kiauvo_fp_headers_use_verified_identity():
-    sent = _eu_api()._cci_fp_headers("dev-1")
     assert sent["client-id"] == "com.hyundai.oneapp.eu"
-    assert sent["client-name"] == "HyundaiEU"
-    assert sent["client-version"] == "1.4.1"
-    assert sent["User-Agent"] == (
-        "HyundaiEU/1.4.1 (com.hyundai.oneapp.eu; build:1675; iOS 27.2.0) "
-        "Alamofire/5.12.0"
-    )
 
 
-def test_kiauvo_fp_client_name_kia_brand():
-    assert _eu_api(brand=1)._cci_fp_headers("dev-1")["client-name"] == "KiaEU"
-
-
-# ── Kia brand (region 9 KiaCciApiEU + region 1 KiaUvoApiEU) ─────
-
-
-@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
-def test_kia_cci_exchange_falls_back_on_9013(mock_post):
-    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
-
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_hyundai_exchange_falls_back_to_legacy(mock_post):
     mock_post.side_effect = [
-        _resp(400, '{"code":9013,"message":"ctn_externalservice_validation_error"}'),
-        _resp(200, '{"accessToken":"kia-at","refreshToken":"kia-rt"}'),
+        _resp(400, GATE_BODY),
+        _resp(200, '{"accessToken":"legacy-at"}'),
     ]
-    api = KiaCciApiEU(region=9, brand=1, language="en")
-    cci = api._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert cci["accessToken"] == "kia-at"
+    resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert resp.json()["accessToken"] == "legacy-at"
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0].args[0].endswith("/auth/v1/token")
+    assert mock_post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/token")
+    assert mock_post.call_args_list[1].kwargs["headers"].get("X-Fingerprint") is None
+
+
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_kia_exchange_legacy_primary(mock_post):
+    mock_post.return_value = _resp(200, '{"accessToken":"kia-at"}')
+    resp = _eu_api(brand=1)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert resp.json()["accessToken"] == "kia-at"
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/domain/api/v1/auth/token")
+    assert mock_post.call_args.args[0].startswith("https://cci-api-eu.kia.com")
+
+
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_kia_exchange_fallback_to_fp(mock_post):
+    mock_post.side_effect = [
+        _resp(400, GATE_BODY),
+        _resp(200, '{"accessToken":"kia-fp-at"}'),
+    ]
+    resp = _eu_api(brand=1)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert resp.json()["accessToken"] == "kia-fp-at"
     assert (
         mock_post.call_args_list[1]
         .args[0]
@@ -173,17 +132,77 @@ def test_kia_cci_exchange_falls_back_on_9013(mock_post):
     assert sent["client-id"] == "com.kia.oneapp.eu"
 
 
-def test_kia_cci_fp_headers_use_verified_identity():
-    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_exchange_both_paths_fail_raises(mock_post):
+    from hyundai_kia_connect_api.exceptions import AuthenticationError
 
-    sent = KiaCciApiEU(region=9, brand=1, language="en")._cci_fp_headers("dev-1")
-    assert sent["client-name"] == "KiaEU"
-    assert sent["client-id"] == "com.kia.oneapp.eu"
-    assert sent["User-Agent"] == (
-        "KiaEU/1.4.1 (com.kia.oneapp.eu; build:1675; iOS 27.2.0) Alamofire/5.12.0"
+    mock_post.side_effect = [_resp(400, GATE_BODY), _resp(400, GATE_BODY)]
+    with pytest.raises(AuthenticationError):
+        _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+
+
+def test_region1_fp_client_identities():
+    assert _eu_api(brand=1)._cci_fp_headers("d")["client-name"] == "KiaEU"
+    assert _eu_api(brand=2)._cci_fp_headers("d")["client-name"] == "HyundaiEU"
+    assert _eu_api(brand=3)._cci_fp_headers("d")["client-name"] == "GenesisEU"
+    assert _eu_api(brand=3)._cci_fp_headers("d")["client-id"] == (
+        "com.genesis.oneapp.eu"
     )
 
 
-def test_kiauvo_fp_client_name_genesis_brand():
-    sent = _eu_api(brand=3)._cci_fp_headers("dev-1")
-    assert sent["client-name"] == "GenesisEU"
+# ── region 9 (HyundaiCciApiEU / KiaCciApiEU, shared GspaApiEU base) ──
+
+
+@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
+def test_region9_hyundai_exchange_fp_primary(mock_post):
+    mock_post.return_value = _resp(200, '{"accessToken":"r9-at"}')
+    cci = HyundaiCciApiEU(
+        region=9, brand=2, language="en"
+    )._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert cci["accessToken"] == "r9-at"
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/auth/v1/token")
+    assert mock_post.call_args.kwargs["headers"]["X-Fingerprint"]
+
+
+@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
+def test_region9_hyundai_exchange_falls_back_to_legacy(mock_post):
+    mock_post.side_effect = [
+        _resp(400, GATE_BODY),
+        _resp(200, '{"accessToken":"r9-legacy"}'),
+    ]
+    cci = HyundaiCciApiEU(
+        region=9, brand=2, language="en"
+    )._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert cci["accessToken"] == "r9-legacy"
+    assert mock_post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/token")
+
+
+@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
+def test_region9_kia_exchange_legacy_primary(mock_post):
+    mock_post.return_value = _resp(200, '{"accessToken":"r9k-at"}')
+    cci = KiaCciApiEU(
+        region=9, brand=1, language="en"
+    )._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert cci["accessToken"] == "r9k-at"
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/domain/api/v1/auth/token")
+    assert mock_post.call_args.args[0].startswith("https://cci-api-eu.kia.com")
+
+
+@patch("hyundai_kia_connect_api.GspaApiEU.requests.post")
+def test_region9_kia_exchange_fallback_to_fp(mock_post):
+    mock_post.side_effect = [
+        _resp(400, GATE_BODY),
+        _resp(200, '{"accessToken":"r9k-fp"}'),
+    ]
+    cci = KiaCciApiEU(
+        region=9, brand=1, language="en"
+    )._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert cci["accessToken"] == "r9k-fp"
+    assert (
+        mock_post.call_args_list[1]
+        .args[0]
+        .startswith("https://cci-api-eu.kia.com/auth/v1/token")
+    )
+    assert mock_post.call_args_list[1].kwargs["headers"]["client-name"] == "KiaEU"

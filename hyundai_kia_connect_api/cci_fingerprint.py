@@ -8,10 +8,11 @@ The app-embedded secret pair below rotates with app releases; when the app
 ships a new build identity the constants here need the same update.
 
 Live-verified endpoints (Hyundai EU, 2026-10-13):
-- exchange: cci-api-eu.../auth/v1/token?code=...  → 200 with the legacy
-  app-shaped header set; domain/api/v1/auth/token rejects with 400/9013.
-- refresh: cci-api-eu.../auth/v2/token-refresh     → 200 with the same
-  identity; domain/api/v2/auth/token-refresh rejects with 400/9013.
+- exchange: cci-api-eu.../auth/v1/token?code=... = 200 with the verified
+  app identity; domain/api/v1/auth/token rejects with 400/9013.
+- refresh: un-gated both ways — domain/api/v2/auth/token-refresh and the
+  same-identity /auth/v2/token-refresh both answer 200; the library keeps
+  the legacy refresh path.
 """
 
 from __future__ import annotations
@@ -104,11 +105,3 @@ def build_fp_headers(
         "Accept": "*/*",
         "Accept-Language": locale.lower(),
     }
-
-
-def is_fingerprint_gate(resp) -> bool:
-    """True when the legacy endpoint answered with the 400/9013 validation
-    gate that the fingerprint-gated endpoints supersede."""
-    return getattr(resp, "status_code", None) == 400 and "9013" in (
-        getattr(resp, "text", "") or ""
-    )

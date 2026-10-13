@@ -24,7 +24,6 @@ from .cci_fingerprint import (
     build_fp_headers,
     client_name_for_brand,
     compute_x_fingerprint,
-    is_fingerprint_gate,
 )
 from .const import (
     BRAND_GENESIS,
@@ -454,33 +453,50 @@ class KiaUvoApiEU(ApiImplType1):
         }
 
     def _exchange_auth_code_for_cci_tokens(self, device_id: str, code: str):
-        """Exchange the auth code for CCI tokens.
+        """Exchange the auth code for CCI tokens, primary path per brand.
 
-        Legacy domain/api endpoint first (still valid accounts / brands). On
-        the 400/9013 validation gate introduced on the EU CCI backend, retry
-        via /auth/v1/token with the OneApp X-Fingerprint header (live-verified
-        2026-10-13, see kia_uvo #1888).
+        Hyundai EU is validation-gated (kia_uvo #1888): /auth/v1/token with
+        the X-Fingerprint header goes first. Kia/Genesis still answer the
+        legacy domain/api exchange (live 2026-10-13), so it goes first
+        there. On a failed primary the other path runs before raising, so a
+        gate rollback or a rollout to those brands both keep working.
         """
-        headers = self._get_cci_headers(device_id)
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200 and is_fingerprint_gate(resp):
-            resp = requests.post(
-                f"{self.CCI_API_URL}/auth/v1/token",
-                params={"code": code},
-                headers=self._cci_fp_headers(device_id),
-                timeout=(5, 30),
-            )
+        hyundai = BRANDS[self.brand] == BRAND_HYUNDAI
+        if hyundai:
+            resp = self._fp_exchange_auth_code(device_id, code)
+            if resp.status_code != 200:
+                resp = self._legacy_exchange_auth_code(device_id, code)
+        else:
+            resp = self._legacy_exchange_auth_code(device_id, code)
+            if resp.status_code != 200:
+                resp = self._fp_exchange_auth_code(device_id, code)
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token exchange failed: HTTP {resp.status_code} — "
                 f"{resp.text[:200]}. This may indicate a Hyundai API change."
             )
         return resp
+
+    def _legacy_exchange_auth_code(
+        self, device_id: str, code: str
+    ) -> requests.Response:
+        """POST code to the legacy domain/api exchange (no fingerprint)."""
+        headers = self._get_cci_headers(device_id)
+        return requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
+            params={"code": code},
+            headers=headers,
+            timeout=(5, 30),
+        )
+
+    def _fp_exchange_auth_code(self, device_id: str, code: str) -> requests.Response:
+        """POST code to the fingerprint-gated /auth/v1/token exchange."""
+        return requests.post(
+            f"{self.CCI_API_URL}/auth/v1/token",
+            params={"code": code},
+            headers=self._cci_fp_headers(device_id),
+            timeout=(5, 30),
+        )
 
     def _exchange_ccs_token(
         self,

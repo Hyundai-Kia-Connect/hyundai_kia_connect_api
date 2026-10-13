@@ -35,9 +35,9 @@ from .cci_fingerprint import (
     build_fp_headers,
     client_name_for_brand,
     compute_x_fingerprint,
-    is_fingerprint_gate,
 )
 from .const import (
+    BRAND_HYUNDAI,
     BRANDS,
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -494,21 +494,23 @@ class GspaApiEU(ApiImpl):
     def _exchange_auth_code_for_cci_tokens(
         self, device_id: str, auth_code: str
     ) -> dict[str, Any]:
-        """POST auth code to CCI v1/auth/token (code in URL query, empty body)."""
-        headers = self._get_cci_headers(device_id)
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": auth_code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200 and is_fingerprint_gate(resp):
-            resp = requests.post(
-                f"{self.CCI_API_URL}/auth/v1/token",
-                params={"code": auth_code},
-                headers=self._cci_fp_headers(device_id),
-                timeout=(5, 30),
-            )
+        """POST the auth code for CCI tokens, primary path per brand.
+
+        Hyundai EU is validation-gated (kia_uvo #1888): /auth/v1/token with
+        the X-Fingerprint header goes first. Kia still answers the legacy
+        domain/api exchange (live 2026-10-13), so it goes first there. On a
+        failed primary the other path runs before raising, so a gate
+        rollback or a rollout to Kia both keep working.
+        """
+        hyundai = BRANDS[self.brand] == BRAND_HYUNDAI
+        if hyundai:
+            resp = self._fp_exchange_auth_code(device_id, auth_code)
+            if resp.status_code != 200:
+                resp = self._legacy_exchange_auth_code(device_id, auth_code)
+        else:
+            resp = self._legacy_exchange_auth_code(device_id, auth_code)
+            if resp.status_code != 200:
+                resp = self._fp_exchange_auth_code(device_id, auth_code)
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token exchange failed: HTTP {resp.status_code} — "
@@ -516,6 +518,29 @@ class GspaApiEU(ApiImpl):
             )
         payload: dict[str, Any] = resp.json()
         return payload
+
+    def _legacy_exchange_auth_code(
+        self, device_id: str, auth_code: str
+    ) -> requests.Response:
+        """POST code to the legacy domain/api exchange (no fingerprint)."""
+        headers = self._get_cci_headers(device_id)
+        return requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
+            params={"code": auth_code},
+            headers=headers,
+            timeout=(5, 30),
+        )
+
+    def _fp_exchange_auth_code(
+        self, device_id: str, auth_code: str
+    ) -> requests.Response:
+        """POST code to the fingerprint-gated /auth/v1/token exchange."""
+        return requests.post(
+            f"{self.CCI_API_URL}/auth/v1/token",
+            params={"code": auth_code},
+            headers=self._cci_fp_headers(device_id),
+            timeout=(5, 30),
+        )
 
     # ------------------------------------------------------------------
     # CCI headers
