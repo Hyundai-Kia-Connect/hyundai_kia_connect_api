@@ -13,7 +13,7 @@ import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions, WindowRequestOptions
 from hyundai_kia_connect_api.const import ENGINE_TYPES, WINDOW_STATE
-from hyundai_kia_connect_api.exceptions import UnsupportedControlError
+from hyundai_kia_connect_api.exceptions import APIError, UnsupportedControlError
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -224,22 +224,66 @@ def test_vehicle_manager_keeps_api_derived_flags():
 # ----------------------------------------------------------- force refresh
 
 
-def test_force_refresh_ccs2_wakes_sleeps_then_reads_latest(au_api, token, ccs2_vehicle):
+def _latest(last_update: str) -> dict:
+    return {
+        "retCode": "S",
+        "resCode": "0000",
+        "resMsg": {
+            "lastUpdateTime": last_update,
+            "state": {"Vehicle": {"Date": last_update + ".000"}},
+        },
+    }
+
+
+def test_force_refresh_ccs2_polls_until_snapshot_advances(au_api, token, ccs2_vehicle):
+    """baseline /latest -> wake (ack only) -> poll /latest until lastUpdateTime moves."""
     urls = []
+    latest_responses = iter(
+        [
+            _latest("20261013044043"),
+            _latest("20261013044043"),
+            _latest("20261013044415"),
+        ]
+    )
 
     def mock_get(url, headers=None):
-        urls.append(url)
+        urls.append(url.rsplit("/vid-1", 1)[1])
         resp = MagicMock()
         if url.endswith("/ccs2/carstatus"):
             resp.json.return_value = OK  # async ack, no resMsg (live GCS)
         else:
-            resp.json.return_value = {
-                "retCode": "S",
-                "resCode": "0000",
-                "resMsg": {"state": {"Vehicle": {"Date": "20261013034058.000"}}},
-            }
+            resp.json.return_value = next(latest_responses)
         return resp
 
+    sleeps = []
+    au_api.CCS2_REFRESH_POLL_INTERVAL = 3
+    with (
+        patch.object(au_api.session, "get", side_effect=mock_get),
+        patch("hyundai_kia_connect_api.KiaUvoApiAU.sleep", side_effect=sleeps.append),
+    ):
+        au_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
+
+    assert urls == [
+        "/ccs2/carstatus/latest",  # baseline
+        "/ccs2/carstatus",  # wake
+        "/ccs2/carstatus/latest",  # unchanged
+        "/ccs2/carstatus/latest",  # advanced -> stop
+    ]
+    assert sleeps == [3, 3]
+    au_api._update_vehicle_properties_ccs2.assert_called_once_with(
+        ccs2_vehicle, {"Date": "20261013044415.000"}
+    )
+
+
+def test_force_refresh_ccs2_times_out_and_applies_cached(au_api, token, ccs2_vehicle):
+    def mock_get(url, headers=None):
+        resp = MagicMock()
+        resp.json.return_value = (
+            OK if url.endswith("/ccs2/carstatus") else _latest("20261013044043")
+        )
+        return resp
+
+    au_api.CCS2_REFRESH_TIMEOUT = 0  # deadline already passed after first poll
     sleeps = []
     with (
         patch.object(au_api.session, "get", side_effect=mock_get),
@@ -247,14 +291,28 @@ def test_force_refresh_ccs2_wakes_sleeps_then_reads_latest(au_api, token, ccs2_v
     ):
         au_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
 
-    assert [u.rsplit("/vid-1", 1)[1] for u in urls] == [
-        "/ccs2/carstatus",
-        "/ccs2/carstatus/latest",
-    ]
-    assert sleeps == [25]
+    assert sleeps == [au_api.CCS2_REFRESH_POLL_INTERVAL]
     au_api._update_vehicle_properties_ccs2.assert_called_once_with(
-        ccs2_vehicle, {"Date": "20261013034058.000"}
+        ccs2_vehicle, {"Date": "20261013044043.000"}
     )
+
+
+def test_force_refresh_ccs2_wake_error_propagates(au_api, token, ccs2_vehicle):
+    def mock_get(url, headers=None):
+        resp = MagicMock()
+        if url.endswith("/ccs2/carstatus"):
+            resp.json.return_value = {"retCode": "F", "resCode": "5091", "resMsg": "x"}
+        else:
+            resp.json.return_value = _latest("20261013044043")
+        return resp
+
+    with (
+        patch.object(au_api.session, "get", side_effect=mock_get),
+        patch("hyundai_kia_connect_api.KiaUvoApiAU.sleep"),
+        pytest.raises(APIError),
+    ):
+        au_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
+    au_api._update_vehicle_properties_ccs2.assert_not_called()
 
 
 # ------------------------------------------------------------------ frunk

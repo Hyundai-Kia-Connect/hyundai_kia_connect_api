@@ -104,8 +104,12 @@ a stand-alone toggle.
 
 ## What this branch implements
 
-* `KiaUvoApiAU._force_refresh_vehicle_state_ccs2`: wake → sleep → read
-  `/latest` (ports the EU fix; the old code raised `KeyError: 'resMsg'`).
+* `KiaUvoApiAU._force_refresh_vehicle_state_ccs2`: read `/latest` for a
+  baseline `lastUpdateTime`, wake, then poll `/latest` every 3 s until the
+  timestamp advances (60 s cap, then the cached snapshot is applied). The
+  wake leaves no `/notifications/{id}/records` entry, so the snapshot
+  timestamp is the only completion signal; the GV70 published ~2 s after the
+  wake. The old code raised `KeyError: 'resMsg'`.
 * `KiaUvoApiAU.get_vehicles`: fetches `/profile` per vehicle and fills
   `Vehicle.year`, `vehicle_options`, `service_options` and the derived
   `supports_frunk`, `supports_lamp_control`, `supports_rear_window_curtain`,
