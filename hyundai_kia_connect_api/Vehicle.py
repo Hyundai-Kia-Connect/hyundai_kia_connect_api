@@ -147,6 +147,30 @@ class Vehicle:
     supports_window_control: bool = None
     supports_valet_mode: bool = None
 
+    # Capability flags derived from the vehicle profile (Type1
+    # /vehicles/{id}/profile -> vinInfo[0].option / .serviceOption). None when
+    # the region does not expose a profile; the raw dicts are kept so callers
+    # can inspect flags the library does not model.
+    vehicle_options: dict | None = None
+    service_options: dict | None = None
+    supports_frunk: bool | None = None  # option.frunkOption
+    supports_lamp_control: bool | None = None  # serviceOption.remoteLightControlOption
+    supports_rear_window_curtain: bool | None = None  # option.rearWindowCurtainOption
+    supports_pet_care: bool | None = (
+        None  # serviceOption.petCareService / option.cmsOption
+    )
+    supports_battery_conditioning: bool | None = (
+        None  # option.batteryPreconditioningOption
+    )
+    supports_air_purifier: bool | None = None  # option.airPurifierOption
+    supports_sunroof: bool | None = None  # option.sunRoofOption (status only)
+    supports_third_row_seat_climate: bool | None = None  # seatHeaterVent.thirdl/thirdr
+
+    # Lamp-left-on alerts (CCS2 Body.Lights.TailLamp.Alert / Hazard.Alert).
+    # These are what the apps use to offer the remote "turn lamps off" action.
+    tail_lamp_alert_is_on: bool | None = None
+    hazard_lamp_alert_is_on: bool | None = None
+
     # Valet Status
     valet_mode_active: bool = None
 

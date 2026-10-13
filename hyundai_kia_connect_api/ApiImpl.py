@@ -57,6 +57,10 @@ class ClimateRequestOptions:
     # string "C"/"F" the GSPA API expects on the wire)
     hvac_temp_type: int | None = None  # HVAC temp type (GSPA hvacTempType, typically 1)
     driver_seat_location: SEAT_LOCATION | None = None  # drvSeatLoc override
+    # CCS2 extras (Type1 /ccs2/control/temperature). None = not sent.
+    air_purifier: int | None = None  # 0/1 airPurifierControl (option.airPurifierOption)
+    third_row_left_seat: int | None = None  # thrlSeatClimateState
+    third_row_right_seat: int | None = None  # thrrSeatClimateState
 
 
 @dataclass
@@ -723,6 +727,50 @@ class ApiImpl:
     ) -> str:
         """Send navigation destinations to the vehicle. Returns the tracking ID."""
         raise NotImplementedError("set_navigation is not implemented for this region")
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        """
+        feature only available for some regions / vehicles (option.frunkOption).
+        Open the front trunk. Returns the tracking ID
+        """
+        raise NotImplementedError("open_frunk is not implemented for this region")
+
+    def set_lamp_state(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        tail_lamp: bool | None = None,
+        hazard_lamp: bool | None = None,
+    ) -> str:
+        """
+        feature only available for some regions / vehicles
+        (serviceOption.remoteLightControlOption).
+        Turn the tail lamps and/or hazard lamps on or off; None leaves a lamp
+        unchanged. Returns the tracking ID
+        """
+        raise NotImplementedError("set_lamp_state is not implemented for this region")
+
+    def start_pet_care(
+        self, token: Token, vehicle: Vehicle, temperature: float, temp_unit: str = "C"
+    ) -> str:
+        """
+        feature only available for some regions / vehicles
+        (serviceOption.petCareService). Starts pet care / cabin mode at the
+        given temperature; stop it with stop_climate. Returns the tracking ID
+        """
+        raise NotImplementedError("start_pet_care is not implemented for this region")
+
+    def set_battery_conditioning(
+        self, token: Token, vehicle: Vehicle, enabled: bool
+    ) -> str:
+        """
+        feature only available for some regions / EVs
+        (option.batteryPreconditioningOption).
+        Start or stop battery conditioning. Returns the tracking ID
+        """
+        raise NotImplementedError(
+            "set_battery_conditioning is not implemented for this region"
+        )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""

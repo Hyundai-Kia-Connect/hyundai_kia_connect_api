@@ -133,9 +133,14 @@ class VehicleManager:
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            vehicle.supports_window_control = self.api.supports_window_control
-            vehicle.supports_valet_mode = self.api.supports_valet_mode
-            vehicle.supports_svm = self.api.supports_svm
+            # Region defaults only fill flags the API did not already derive
+            # from the vehicle itself (e.g. the Type1 /profile option flags).
+            if vehicle.supports_window_control is None:
+                vehicle.supports_window_control = self.api.supports_window_control
+            if vehicle.supports_valet_mode is None:
+                vehicle.supports_valet_mode = self.api.supports_valet_mode
+            if vehicle.supports_svm is None:
+                vehicle.supports_svm = self.api.supports_svm
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -430,6 +435,34 @@ class VehicleManager:
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
         return self.api.set_navigation(
             self.token, self.get_vehicle(vehicle_id), poi_list
+        )
+
+    def open_frunk(self, vehicle_id: str) -> str:
+        return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
+
+    def set_lamp_state(
+        self,
+        vehicle_id: str,
+        tail_lamp: bool | None = None,
+        hazard_lamp: bool | None = None,
+    ) -> str:
+        return self.api.set_lamp_state(
+            self.token,
+            self.get_vehicle(vehicle_id),
+            tail_lamp=tail_lamp,
+            hazard_lamp=hazard_lamp,
+        )
+
+    def start_pet_care(
+        self, vehicle_id: str, temperature: float, temp_unit: str = "C"
+    ) -> str:
+        return self.api.start_pet_care(
+            self.token, self.get_vehicle(vehicle_id), temperature, temp_unit
+        )
+
+    def set_battery_conditioning(self, vehicle_id: str, enabled: bool) -> str:
+        return self.api.set_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id), enabled
         )
 
     @staticmethod
