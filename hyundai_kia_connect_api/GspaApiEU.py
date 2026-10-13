@@ -31,6 +31,12 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from .cci_fingerprint import (
+    build_fp_headers,
+    client_name_for_brand,
+    compute_x_fingerprint,
+    is_fingerprint_gate,
+)
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
@@ -496,6 +502,13 @@ class GspaApiEU(ApiImpl):
             headers=headers,
             timeout=(5, 30),
         )
+        if resp.status_code != 200 and is_fingerprint_gate(resp):
+            resp = requests.post(
+                f"{self.CCI_API_URL}/auth/v1/token",
+                params={"code": auth_code},
+                headers=self._cci_fp_headers(device_id),
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token exchange failed: HTTP {resp.status_code} — "
@@ -513,6 +526,26 @@ class GspaApiEU(ApiImpl):
         aware = dt.datetime.now(dt.UTC).astimezone(self.data_timezone)
         off = aware.strftime("%z")
         return f"{off[:3]}:{off[3:]}" if off else "+00:00"
+
+    def _cci_fp_headers(self, device_id: str) -> dict[str, Any]:
+        """Header set for the fingerprint-gated CCI endpoints (see #1888).
+
+        The gate validates the X-Fingerprint HMAC against the client identity
+        in these headers, so this uses the live-verified OneApp build identity
+        (cci_fingerprint module constants), not the legacy CCI header values.
+        """
+        headers = build_fp_headers(
+            package_id=self.CCI_PACKAGE_ID,
+            client_name=client_name_for_brand(self.brand),
+            device_id=device_id,
+            locale=self.LANGUAGE,
+            timezone=self._cci_timezone_offset(),
+            brand_label=BRANDS[self.brand],
+        )
+        ts = str(int(dt.datetime.now(dt.UTC).timestamp() * 1000))
+        headers["X-Timestamp"] = ts
+        headers["X-Fingerprint"] = compute_x_fingerprint(headers)
+        return headers
 
     def _get_cci_headers(
         self,

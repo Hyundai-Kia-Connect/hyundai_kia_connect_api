@@ -20,6 +20,12 @@ from .ApiImplType1 import (
     _check_response_for_errors,
     _retry_on_device_id_error,
 )
+from .cci_fingerprint import (
+    build_fp_headers,
+    client_name_for_brand,
+    compute_x_fingerprint,
+    is_fingerprint_gate,
+)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -259,6 +265,26 @@ class KiaUvoApiEU(ApiImplType1):
         off = aware.strftime("%z")  # e.g. +0200
         return f"{off[:3]}:{off[3:]}" if off else "+00:00"
 
+    def _cci_fp_headers(self, device_id: str) -> dict:
+        """Header set for the fingerprint-gated CCI endpoints (see #1888).
+
+        The gate validates the X-Fingerprint HMAC against the client identity
+        in these headers, so this uses the live-verified OneApp build identity
+        (cci_fingerprint module constants), not the legacy CCI header values.
+        """
+        headers = build_fp_headers(
+            package_id=self._cci_package_id,
+            client_name=client_name_for_brand(self.brand),
+            device_id=device_id,
+            locale=self.LANGUAGE,
+            timezone=self._cci_timezone_offset(),
+            brand_label=BRANDS[self.brand],
+        )
+        ts = str(int(dt.datetime.now(dt.UTC).timestamp() * 1000))
+        headers["X-Timestamp"] = ts
+        headers["X-Fingerprint"] = compute_x_fingerprint(headers)
+        return headers
+
     def _get_cci_headers(
         self,
         device_id: str,
@@ -398,18 +424,7 @@ class KiaUvoApiEU(ApiImplType1):
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens (code in URL query, no body)
-        headers = self._get_cci_headers(device_id)
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCI token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate a Hyundai API change."
-            )
+        resp = self._exchange_auth_code_for_cci_tokens(device_id, code)
         cci = resp.json()
         cci_access_token = cci.get("accessToken", "")
         cci_refresh_token = cci.get("refreshToken", "")
@@ -437,6 +452,35 @@ class KiaUvoApiEU(ApiImplType1):
             "non_ccs_refresh_token": non_ccs_refresh_token,
             "id_token": id_token,
         }
+
+    def _exchange_auth_code_for_cci_tokens(self, device_id: str, code: str):
+        """Exchange the auth code for CCI tokens.
+
+        Legacy domain/api endpoint first (still valid accounts / brands). On
+        the 400/9013 validation gate introduced on the EU CCI backend, retry
+        via /auth/v1/token with the OneApp X-Fingerprint header (live-verified
+        2026-10-13, see kia_uvo #1888).
+        """
+        headers = self._get_cci_headers(device_id)
+        resp = requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
+            params={"code": code},
+            headers=headers,
+            timeout=(5, 30),
+        )
+        if resp.status_code != 200 and is_fingerprint_gate(resp):
+            resp = requests.post(
+                f"{self.CCI_API_URL}/auth/v1/token",
+                params={"code": code},
+                headers=self._cci_fp_headers(device_id),
+                timeout=(5, 30),
+            )
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"CCI token exchange failed: HTTP {resp.status_code} — "
+                f"{resp.text[:200]}. This may indicate a Hyundai API change."
+            )
+        return resp
 
     def _exchange_ccs_token(
         self,
