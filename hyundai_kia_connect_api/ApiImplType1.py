@@ -2170,9 +2170,13 @@ class ApiImplType1(ApiImpl):
         # Missing keys mean the backend did not advertise the feature for this
         # car, so treat them as unsupported rather than unknown.
         vehicle.supports_frunk = bool(flag(option, "frunkOption"))
-        vehicle.supports_lamp_control = bool(
-            flag(service_option, "remoteLightControlOption")
-        )
+        # Remote "lamps left on -> turn off" is offered by the apps whenever
+        # the status reports a TailLamp/Hazard alert; it is NOT gated on
+        # serviceOption.remoteLightControlOption (that flag only switches the
+        # horn+lights command to "lowbeam"). Live-confirmed: the GCS app
+        # offered hazard-off on a GV70 without that flag. Any CCS2 car
+        # publishing the alert fields can use it.
+        vehicle.supports_lamp_control = bool(option.get("remoteControl") in (1, "1"))
         vehicle.supports_rear_window_curtain = bool(
             flag(option, "rearWindowCurtainOption")
         )

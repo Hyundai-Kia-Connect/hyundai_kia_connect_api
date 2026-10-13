@@ -67,7 +67,7 @@ helpers in `repositories/J.java` and the `RemoteRepository$Command` enum
 | Feature | CCS2 path | Body | Legacy path | Body | Gate |
 | --- | --- | --- | --- | --- | --- |
 | Frunk open | `ccs2/control/frunk` | `{"command": 1}` | – | – | `option.frunkOption == 1` |
-| Steady lamp off | `ccs2/control/lamp` | `{"tailLamp": 0/1, "hazardLamp": 0/1}` (omit a key to leave it) | `control/lamp` | `{"tailLamp": 0/1, "hazard": 0/1}` | `serviceOption.remoteLightControlOption`, status `Body.Lights.{TailLamp,Hazard}.Alert` |
+| Steady lamp off | `ccs2/control/lamp` | `{"tailLamp": 0/1, "hazardLamp": 0/1}` (omit a key to leave it) | `control/lamp` | `{"tailLamp": 0/1, "hazard": 0/1}` | status `Body.Lights.{TailLamp,Hazard}.Alert` only (the app's banner offers it whenever an alert is set; `remoteLightControlOption` is NOT involved – live-confirmed on the GV70) |
 | Windows (all) | `ccs2/control/window` | `{"command": "open"\|"close"}` | `control/window` | `{"deviceId", "action": "open"\|"close"}` | `windowSafetyOption2`/`serviceOption.windowControlOption` |
 | Windows + rear curtain | `ccs2/control/windowcurtain` | `{"drvSeatWindow", "psgSeatWindow", "rlSeatWindow", "rrSeatWindow", "rlSeatWindowCurtain", "rrSeatWindowCurtain", "drvSeatLoc"}` (rear keys omitted when `windowSafetyOption2 == 4`) | `control/windowcurtain` | `{"deviceId", "frontLeft", "frontRight", "backLeft", "backRight", "rearCurtainLeft", "rearCurtainRight"}` | `option.rearWindowCurtainOption` for the curtain keys |
 | Pet care / cabin mode | `ccs2/control/petcare` | `{"hvacTemp": "22.0", "tempUnit": "C"\|"F"}` (temperature as a string) | – | – | `serviceOption.petCareService`, `option.cmsOption` |

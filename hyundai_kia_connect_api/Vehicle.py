@@ -154,7 +154,7 @@ class Vehicle:
     vehicle_options: dict | None = None
     service_options: dict | None = None
     supports_frunk: bool | None = None  # option.frunkOption
-    supports_lamp_control: bool | None = None  # serviceOption.remoteLightControlOption
+    supports_lamp_control: bool | None = None  # option.remoteControl (lamp-off action)
     supports_rear_window_curtain: bool | None = None  # option.rearWindowCurtainOption
     supports_pet_care: bool | None = (
         None  # serviceOption.petCareService / option.cmsOption

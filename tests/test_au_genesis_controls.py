@@ -121,7 +121,8 @@ def test_apply_profile_sets_flags_for_ice_gv70(ccs2_vehicle):
     assert v.service_options["scheduleLinkService"] == 1
     # Not advertised on this car
     assert v.supports_frunk is False
-    assert v.supports_lamp_control is False
+    # lamp-off is offered on any remote-control capable car (status-gated)
+    assert v.supports_lamp_control is True
     assert v.supports_rear_window_curtain is False
     assert v.supports_pet_care is False
     assert v.supports_battery_conditioning is False
@@ -136,6 +137,7 @@ def test_apply_profile_ev_flags():
     v = Vehicle()
     profile = {
         "option": {
+            "remoteControl": "1",
             "frunkOption": 1,
             "batteryPreconditioningOption": 1,
             "rearWindowCurtainOption": 1,
