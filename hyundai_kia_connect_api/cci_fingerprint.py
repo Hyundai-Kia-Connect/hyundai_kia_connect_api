@@ -25,8 +25,12 @@ _FINGERPRINT_KEYS: dict[str, tuple[str, str, str]] = {
     BRAND_HYUNDAI: ("OsZDfDuCyVX", "yfqjCoA2JbX", "2MrLpGwNBC"),
     BRAND_KIA: ("yb4Z1n2nlKe", "ukNilE7QEdb", "KB34nStPVa"),
 }
-# Genesis EU is not covered: its login goes through GSPA and the auth-code
-# exchange path in GspaApiEU uses this module only as a fallback.
+# Genesis EU placeholder: the gate is live on cci-api-eu.genesis.com
+# (signed exchange with the Hyundai triple answers 9036 and its legacy
+# exchange answers 9035 on 2026-10-14), and the Genesis signing constants
+# have not been extracted yet. The mapping keeps brand 3 from raising a
+# KeyError on the signed path; the gate rejection then routes to the
+# legacy fallback and the typed error instead.
 _FINGERPRINT_KEYS[BRAND_GENESIS] = _FINGERPRINT_KEYS[BRAND_HYUNDAI]
 
 # Android OneApp build identity the gate validates the fingerprint against.
