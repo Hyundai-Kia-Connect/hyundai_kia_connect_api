@@ -25,6 +25,7 @@ from .cci_fingerprint import (
     build_fp_headers,
     client_name_for_brand,
     compute_x_fingerprint,
+    is_gate_rejection,
 )
 from .const import (
     BRAND_GENESIS,
@@ -463,7 +464,7 @@ class KiaUvoApiEU(ApiImplType1):
         rollback keeps working.
         """
         resp = self._fp_exchange_auth_code(device_id, code)
-        if resp.status_code != 200:
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
             resp = self._legacy_exchange_auth_code(device_id, code)
         if resp.status_code != 200:
             raise AuthenticationError(
@@ -525,7 +526,7 @@ class KiaUvoApiEU(ApiImplType1):
             headers=headers,
             timeout=(5, 30),
         )
-        if resp.status_code != 200:
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
             headers = self._get_cci_headers(
                 device_id,
                 cci_access_token=cci_access_token,
@@ -629,7 +630,7 @@ class KiaUvoApiEU(ApiImplType1):
             headers=headers,
             timeout=(5, 30),
         )
-        if resp.status_code != 200:
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
             headers = self._get_cci_headers(
                 device_id,
                 cci_access_token=token.cci_access_token,

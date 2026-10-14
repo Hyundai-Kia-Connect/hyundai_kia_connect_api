@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import re
 import uuid
 
@@ -63,6 +64,28 @@ def compute_x_fingerprint(
     )
     key = identity + "".join(pieces)
     return hmac.new(key.encode(), msg.encode(), hashlib.sha256).hexdigest()
+
+
+# Fingerprint-gate rejection family: 9035 = header missing, 9036 = bad
+# signature, 9037 = timestamp out of window. The legacy fallback runs only
+# on these, so a server-side 5xx or a business error on the signed path
+# raises instead of being masked by a legacy 200.
+_GATE_REJECTION_CODES = frozenset({9035, 9036, 9037})
+
+
+def is_gate_rejection(status_code: int, body: str | bytes) -> bool:
+    """True when an auth response carries a fingerprint-gate rejection code.
+
+    The gate answers with an HTTP 4xx and one of the codes above; anything
+    else (server-side 5xx, business errors like 9013/9030) stays a real
+    error on the signed path.
+    """
+    if not 400 <= status_code < 500:
+        return False
+    try:
+        return json.loads(body).get("code") in _GATE_REJECTION_CODES
+    except (ValueError, AttributeError):
+        return False
 
 
 def client_name_for_brand(brand: int) -> str:

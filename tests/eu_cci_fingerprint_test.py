@@ -1,8 +1,8 @@
 """Tests for the EU CCI X-Fingerprint helper (cci_fingerprint.py), the
 per-brand token-exchange paths, and the signed token-refresh (live-verified
 2026-10-14, kia_uvo #1888 / #1938 / #1939): all EU OneApp /auth endpoints
-require the X-Fingerprint identity headers; the legacy domain/api exchange
-and refresh run as fallbacks on a failed primary."""
+require the X-Fingerprint identity headers; the legacy domain/api routes
+run as fallbacks only on the gate's own rejection codes (9035/9036/9037)."""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -44,7 +44,21 @@ def _assert_kia_url(call_arg: object, path: str) -> None:
     )
 
 
-GATE_BODY = '{"code":9013,"message":"ctn_externalservice_validation_error"}'
+GATE_BODY = (
+    '{"code":9035,"message":"Unusual activity has been detected so youve been '
+    'logged out. Please restart the app."}'
+)
+
+
+def test_is_gate_rejection_code_family():
+    from hyundai_kia_connect_api.cci_fingerprint import is_gate_rejection
+
+    for code in (9035, 9036, 9037):
+        assert is_gate_rejection(400, f'{{"code":{code},"message":"x"}}')
+    assert not is_gate_rejection(400, '{"code":9013,"message":"x"}')
+    assert not is_gate_rejection(500, '{"code":9035,"message":"x"}')
+    assert not is_gate_rejection(200, '{"code":9035,"message":"x"}')
+    assert not is_gate_rejection(502, "upstream html error")
 
 
 def _fp_headers(ts: str = HYUNDAI_GOLDEN_TS) -> dict[str, str]:
@@ -183,6 +197,17 @@ def test_region1_fp_client_identities():
 
 
 # ── signed token-refresh ────────────────────────────────────────
+
+
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_non_gate_error_does_not_fall_back(mock_post):
+    from hyundai_kia_connect_api.exceptions import AuthenticationError
+
+    mock_post.side_effect = [_resp(502, "bad gateway")]
+    with pytest.raises(AuthenticationError):
+        _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/auth/v1/token")
 
 
 def _refresh_token() -> object:
