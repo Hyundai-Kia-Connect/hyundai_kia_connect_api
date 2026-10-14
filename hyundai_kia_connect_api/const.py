@@ -164,3 +164,11 @@ class VALET_MODE_ACTION(Enum):
 class OTP_NOTIFY_TYPE(Enum):
     EMAIL = "EMAIL"
     SMS = "SMS"
+
+
+class MQTT_PUSH_CONNECTION_STATE(str, Enum):
+    """Push broker connection state (push contract wire values)."""
+
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    UNKNOWN = "UNKNOWN"
