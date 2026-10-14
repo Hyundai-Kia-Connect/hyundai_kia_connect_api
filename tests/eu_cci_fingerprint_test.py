@@ -280,6 +280,59 @@ def test_region1_ccs_exchange_falls_back_to_legacy(mock_post):
     assert legacy_headers["authorization"] == "Bearer cci-at"
 
 
+def test_gspa_pin_fp_primary_signed_over_body():
+    from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+
+    api = HyundaiCciApiEU(region=9, brand=2, language="en")
+    token = _refresh_token()
+    token.pin = "0000"
+    token.control_token = None
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post",
+        return_value=_resp(
+            200,
+            '{"isMatched":true,"controlTokenInfo":{"controlToken":"ctok","expiresTime":3600}}',
+        ),
+    ) as mock_post:
+        control_token, expiry = api._get_control_token(token)
+    assert control_token == "Bearer ctok"
+    assert expiry > 0
+    assert mock_post.call_count == 1
+    assert mock_post.call_args.args[0].endswith("/auth/v1/pin")
+    sent = mock_post.call_args.kwargs
+    assert json.loads(sent["data"]) == {"pin": "0000"}
+    headers = sent["headers"]
+    assert headers["X-Fingerprint"]
+    assert compute_x_fingerprint(headers, 2, sent["data"]) == headers["X-Fingerprint"]
+    assert headers["authorization"] == "Bearer cci-at"
+    assert headers["Authentication"] == "non-ccs-token"
+
+
+def test_gspa_pin_falls_back_to_legacy():
+    from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+
+    api = HyundaiCciApiEU(region=9, brand=2, language="en")
+    token = _refresh_token()
+    token.pin = "0000"
+    token.control_token = None
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.post",
+        side_effect=[
+            _resp(400, GATE_BODY),
+            _resp(
+                200,
+                '{"isMatched":true,"controlTokenInfo":{"controlToken":"ctok","expiresTime":3600}}',
+            ),
+        ],
+    ) as mock_post:
+        api._get_control_token(token)
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0].args[0].endswith("/auth/v1/pin")
+    assert mock_post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/pin")
+    legacy_headers = mock_post.call_args_list[1].kwargs["headers"]
+    assert legacy_headers.get("X-Fingerprint") is None
+
+
 def _refresh_response_json() -> str:
     return json.dumps(
         {

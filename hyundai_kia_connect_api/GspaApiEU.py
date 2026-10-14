@@ -1150,9 +1150,14 @@ class GspaApiEU(ApiImpl):
         serialized Token keeps a still-valid control token across restarts.
 
         Uses the CCI PIN endpoint (confirmed endpoint shape):
-          POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
+          POST {CCI_API_URL}/auth/v1/pin   body: {"pin": "<pin>"}
         Response: {"isMatched": true, "controlTokenInfo":
                    {"controlToken": "...", "expiresTime": <ttl seconds>}}
+
+        The pin endpoint is fingerprint-gated like the other /auth endpoints
+        (same gate list), so the signed primary carries the token headers on
+        the OneApp identity; the legacy domain/api route runs unsigned as
+        fallback.
         """
         now = dt.datetime.now(dt.UTC).timestamp()
         if token.control_token is not None and token.control_token_expiry > now:
@@ -1161,18 +1166,36 @@ class GspaApiEU(ApiImpl):
             raise UnsupportedControlError(
                 "PIN is not configured — remote control requires a PIN"
             )
-        url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
-        headers = self._get_cci_headers(
-            token.device_id or "",
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
+        headers = self._cci_fp_headers(
+            token.device_id or "", body=json.dumps({"pin": token.pin})
         )
-        try:
+        headers["Content-Type"] = "application/json"
+        headers["authorization"] = (
+            "Bearer " + (token.cci_access_token or "").removeprefix("Bearer ").strip()
+        )
+        headers["Authentication"] = token.non_ccs_token or ""
+        if token.exchangeable_token:
+            headers["exchangeable-token"] = token.exchangeable_token
+            headers["non-ccs-token"] = token.non_ccs_token or ""
+        response = requests.post(
+            self.CCI_API_URL + "/auth/v1/pin",
+            data=json.dumps({"pin": token.pin}),
+            headers=headers,
+            timeout=(5, 30),
+        )
+        if response.status_code != 200:
+            headers = self._get_cci_headers(
+                token.device_id or "",
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+            url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
             response = requests.post(
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
             )
+        try:
             resp: dict[str, Any] = response.json()
         except ValueError as e:
             raise APIError("CCI PIN endpoint returned a non-JSON body") from e
