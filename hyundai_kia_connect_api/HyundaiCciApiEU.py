@@ -51,6 +51,12 @@ class HyundaiCciApiEU(GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
+    # Legacy v1 CCAPI host - the /tripinfo read and the legacy device
+    # registration (see GspaApiEU._register_legacy_device; live-proven
+    # 2026-09-30). Legacy brand-side constants (service-id/stamp/push
+    # type) live on the legacy API class — no duplication here.
+    CCAPI_BASE_URL = "prd.eu-ccapi.hyundai.com:8080"
+
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.
     supports_svm: bool = True
