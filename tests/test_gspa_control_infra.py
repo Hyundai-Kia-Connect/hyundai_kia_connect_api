@@ -1,6 +1,7 @@
 """GSPA control infra — maps, error classifier, control token, envelope."""
 
 import datetime as dt
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -152,8 +153,8 @@ def test_control_token_cci_success():
     # Cache lives on the Token (Type1 pattern), not on the API instance.
     assert token.control_token == "Bearer ctrl-token-abc"
     assert token.control_token_expiry == 4_000_000_000
-    assert post.call_args.args[0].endswith("/domain/api/v1/auth/pin")
-    assert post.call_args.kwargs["json"] == {"pin": "1234"}
+    assert post.call_args.args[0].endswith("/auth/v1/pin")
+    assert json.loads(post.call_args.kwargs["data"]) == {"pin": "1234"}
 
 
 def test_control_token_ttl_seconds_live_shape():
@@ -367,7 +368,7 @@ def test_gspa_control_command_401_invalidates_cache_and_retries_once():
     assert action_id == "gspa:sid-1"
     assert post.call_count == 3  # 401 + PIN re-verify + retried command
     assert token.control_token == "Bearer ctrl-token-abc"
-    assert post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/pin")
+    assert post.call_args_list[1].args[0].endswith("/auth/v1/pin")
 
 
 def test_gspa_control_command_path_prefix_override():

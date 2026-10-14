@@ -4,6 +4,7 @@
 
 import base64
 import datetime as dt
+import json
 import logging
 import re
 from time import sleep
@@ -19,6 +20,12 @@ from .ApiImplType1 import (
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
+)
+from .cci_fingerprint import (
+    build_fp_headers,
+    client_name_for_brand,
+    compute_x_fingerprint,
+    is_gate_rejection,
 )
 from .const import (
     BRAND_GENESIS,
@@ -259,6 +266,27 @@ class KiaUvoApiEU(ApiImplType1):
         off = aware.strftime("%z")  # e.g. +0200
         return f"{off[:3]}:{off[3:]}" if off else "+00:00"
 
+    def _cci_fp_headers(self, device_id: str, body: str = "") -> dict:
+        """Header set for the fingerprint-gated CCI endpoints (see #1888).
+
+        The gate validates the X-Fingerprint HMAC against the client identity
+        in these headers, so this uses the live-verified OneApp build identity
+        (cci_fingerprint module constants), not the legacy CCI header values.
+        Pass the exact request body so the signature covers it.
+        """
+        headers = build_fp_headers(
+            package_id=self._cci_package_id,
+            client_name=client_name_for_brand(self.brand),
+            device_id=device_id,
+            locale=self.LANGUAGE,
+            timezone=self._cci_timezone_offset(),
+            brand_label=BRANDS[self.brand],
+        )
+        ts = str(int(dt.datetime.now(dt.UTC).timestamp() * 1000))
+        headers["X-Timestamp"] = ts
+        headers["X-Fingerprint"] = compute_x_fingerprint(headers, self.brand, body)
+        return headers
+
     def _get_cci_headers(
         self,
         device_id: str,
@@ -398,18 +426,7 @@ class KiaUvoApiEU(ApiImplType1):
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens (code in URL query, no body)
-        headers = self._get_cci_headers(device_id)
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCI token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate a Hyundai API change."
-            )
+        resp = self._exchange_auth_code_for_cci_tokens(device_id, code)
         cci = resp.json()
         cci_access_token = cci.get("accessToken", "")
         cci_refresh_token = cci.get("refreshToken", "")
@@ -438,6 +455,51 @@ class KiaUvoApiEU(ApiImplType1):
             "id_token": id_token,
         }
 
+    def _exchange_auth_code_for_cci_tokens(self, device_id: str, code: str):
+        """Exchange the auth code for CCI tokens, primary path per brand.
+
+        All EU OneApp auth endpoints are fingerprint-gated (2026-10-14):
+        /auth/v1/token with the signed X-Fingerprint identity headers goes
+        first; the legacy domain/api exchange runs as fallback so a gate
+        rollback keeps working.
+        """
+        resp = self._fp_exchange_auth_code(device_id, code)
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed auth-code "
+                f"exchange (HTTP {resp.status_code}); fell back to the legacy "
+                "route. This fallback is transitional - report this log so "
+                "the fallback can be removed"
+            )
+            resp = self._legacy_exchange_auth_code(device_id, code)
+        if resp.status_code != 200:
+            raise AuthenticationError(
+                f"CCI token exchange failed: HTTP {resp.status_code} — "
+                f"{resp.text[:200]}. This may indicate a Hyundai API change."
+            )
+        return resp
+
+    def _legacy_exchange_auth_code(
+        self, device_id: str, code: str
+    ) -> requests.Response:
+        """POST code to the legacy domain/api exchange (no fingerprint)."""
+        headers = self._get_cci_headers(device_id)
+        return requests.post(
+            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
+            params={"code": code},
+            headers=headers,
+            timeout=(5, 30),
+        )
+
+    def _fp_exchange_auth_code(self, device_id: str, code: str) -> requests.Response:
+        """POST code to the fingerprint-gated /auth/v1/token exchange."""
+        return requests.post(
+            f"{self.CCI_API_URL}/auth/v1/token",
+            params={"code": code},
+            headers=self._cci_fp_headers(device_id),
+            timeout=(5, 30),
+        )
+
     def _exchange_ccs_token(
         self,
         device_id: str,
@@ -447,21 +509,48 @@ class KiaUvoApiEU(ApiImplType1):
     ) -> tuple[str, dt.datetime]:
         """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
 
+        The token-exchange endpoint is fingerprint-gated like the other /auth
+        endpoints (unsigned calls answer 9035, field-verified 2026-10-14 on
+        Hyundai): the signed primary carries the CCI token headers on the
+        OneApp identity, the legacy domain/api route runs unsigned as
+        fallback.
+
         The CCS token is accepted by the legacy ccapi:8080 vehicle/control
         endpoints as a Bearer access_token. Returns (ccs_token, valid_until).
         """
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=cci_access_token,
-            non_ccs_token=non_ccs_token,
-            exchangeable_token=exchangeable_token,
+        headers = self._cci_fp_headers(device_id)
+        headers["authorization"] = (
+            "Bearer " + (cci_access_token or "").removeprefix("Bearer ").strip()
         )
+        headers["Authentication"] = non_ccs_token or ""
+        if exchangeable_token:
+            headers["exchangeable-token"] = exchangeable_token
+            headers["non-ccs-token"] = non_ccs_token or ""
         resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
+            f"{self.CCI_API_URL}/auth/v1/token-exchange",
             params={"serviceType": "CCS"},
             headers=headers,
             timeout=(5, 30),
         )
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed CCS "
+                f"token-exchange (HTTP {resp.status_code}); fell back to the "
+                "legacy route. This fallback is transitional - report this "
+                "log so the fallback can be removed"
+            )
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=cci_access_token,
+                non_ccs_token=non_ccs_token,
+                exchangeable_token=exchangeable_token,
+            )
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
+                params={"serviceType": "CCS"},
+                headers=headers,
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCS token exchange failed: HTTP {resp.status_code} — "
@@ -528,18 +617,13 @@ class KiaUvoApiEU(ApiImplType1):
     def _refresh_cci_token(self, token: Token) -> Token:
         """Refresh the CCI token set and re-exchange the CCS token.
 
-        POST cci-api-eu/domain/api/v2/auth/token-refresh with the full CCI
-        token set (all fields required in the body), then re-exchange the CCS
-        token. Returns a new Token with updated CCI + CCS fields.
+        POST /auth/v2/token-refresh with the full CCI token set, signed with
+        X-Fingerprint over the exact body bytes (the refresh is on the same
+        fingerprint gate as the exchange, live 2026-10-14); the legacy
+        domain/api route runs as fallback. Returns a new Token with updated
+        CCI + CCS fields.
         """
         device_id = token.device_id or ""
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
-        )
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -549,12 +633,35 @@ class KiaUvoApiEU(ApiImplType1):
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
             "idToken": token.id_token or "",
         }
+        payload = json.dumps(body)
+        headers = self._cci_fp_headers(device_id, body=payload)
+        headers["Content-Type"] = "application/json"
         resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+            f"{self.CCI_API_URL}/auth/v2/token-refresh",
+            data=payload,
             headers=headers,
-            json=body,
             timeout=(5, 30),
         )
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed token "
+                f"refresh (HTTP {resp.status_code}); fell back to the legacy "
+                "route. This fallback is transitional - report this log so "
+                "the fallback can be removed"
+            )
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+                headers=headers,
+                json=body,
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
