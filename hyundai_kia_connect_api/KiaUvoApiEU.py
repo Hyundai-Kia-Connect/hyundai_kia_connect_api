@@ -36,6 +36,7 @@ from .exceptions import (
     AuthenticationError,
     ConsentRequiredError,
 )
+from .kia_cci_fingerprint import _RequestsProxy
 from .Token import Token
 from .utils import (
     get_child_value,
@@ -148,9 +149,9 @@ class KiaUvoApiEU(ApiImplType1):
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
-        # OneApp/CCI login flow (EU Hyundai/Kia/Genesis) — bypasses the IDPConnect
+        # OneApp/CCI login flow (EU Hyundai/Kia/Genesis) â€” bypasses the IDPConnect
         # WAF that blocks the legacy authorize by client_id (#1273). All three EU
-        # brands are blocked (Genesis PORT=443 is not spared — the WAF blocks by
+        # brands are blocked (Genesis PORT=443 is not spared â€” the WAF blocks by
         # client_id, not port), so all three use the CCI flow.
         if BRANDS[self.brand] == BRAND_HYUNDAI:
             self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
@@ -193,7 +194,7 @@ class KiaUvoApiEU(ApiImplType1):
         self._set_session_language(cookies)
 
         # Determine if password is a legacy 48-char refresh_token or plaintext.
-        # (CCI 87-char refresh tokens are not usable as a standalone password —
+        # (CCI 87-char refresh tokens are not usable as a standalone password â€”
         # the CCI token refresh needs the full token set, handled by
         # refresh_access_token with the persisted Token.)
         is_refresh_token = bool(re.match(r"^[A-Z0-9]{48}$", password))
@@ -214,7 +215,7 @@ class KiaUvoApiEU(ApiImplType1):
                 pin=pin,
             )
 
-        # Plaintext password login — CCI flow (Hyundai/Kia) or legacy (Genesis).
+        # Plaintext password login â€” CCI flow (Hyundai/Kia) or legacy (Genesis).
         info = self._login_with_password(username, password, device_id)
         # CCI flow returns the CCS token expiry as valid_until; legacy falls back
         # to expires_in from the token response.
@@ -258,6 +259,12 @@ class KiaUvoApiEU(ApiImplType1):
         aware = dt.datetime.now(dt.UTC).astimezone(self.data_timezone)
         off = aware.strftime("%z")  # e.g. +0200
         return f"{off[:3]}:{off[3:]}" if off else "+00:00"
+
+    def _post_cci(self, url: str, **kwargs):
+        """Sign only Kia EU CCI authentication requests with the app contract."""
+        if BRANDS[self.brand] == BRAND_KIA:
+            return _RequestsProxy(requests).post(url, **kwargs)
+        return requests.post(url, **kwargs)
 
     def _get_cci_headers(
         self,
@@ -305,7 +312,7 @@ class KiaUvoApiEU(ApiImplType1):
     def _login_with_password_cci(
         self, username: str, password: str, device_id: str
     ) -> dict:
-        """OneApp/CCI password login (EU Hyundai/Kia) — bypasses the IDPConnect WAF.
+        """OneApp/CCI password login (EU Hyundai/Kia) â€” bypasses the IDPConnect WAF.
 
         Uses the OneApp client_id (4f4953b5 / 01b36c86) whose authorize is not
         WAF-blocked, then exchanges the resulting CCI token for a CCS token that
@@ -319,7 +326,7 @@ class KiaUvoApiEU(ApiImplType1):
         s = ApiImplSession()
         s.headers.update({"User-Agent": mobile_ua})
 
-        # Step 1: authorize (passes WAF — OneApp client_id is not on the block list)
+        # Step 1: authorize (passes WAF â€” OneApp client_id is not on the block list)
         auth_url = (
             f"{host}/auth/api/v2/user/oauth2/authorize"
             f"?response_type=code&client_id={client_id}"
@@ -368,7 +375,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         if resp.status_code != 302:
             raise AuthenticationError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
+                f"Signin failed: HTTP {resp.status_code} â€” {resp.text[:300]}. "
                 "Check username and password."
             )
         location = resp.headers.get("location", "")
@@ -389,7 +396,7 @@ class KiaUvoApiEU(ApiImplType1):
                 )
             if "authorize" in location:
                 raise AuthenticationError(
-                    "Authentication failed — returned to login page. "
+                    "Authentication failed â€” returned to login page. "
                     "Check username and password."
                 )
             raise AuthenticationError(
@@ -399,7 +406,7 @@ class KiaUvoApiEU(ApiImplType1):
 
         # Step 4: exchange auth code for CCI tokens (code in URL query, no body)
         headers = self._get_cci_headers(device_id)
-        resp = requests.post(
+        resp = self._post_cci(
             f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
             params={"code": code},
             headers=headers,
@@ -407,7 +414,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         if resp.status_code != 200:
             raise AuthenticationError(
-                f"CCI token exchange failed: HTTP {resp.status_code} — "
+                f"CCI token exchange failed: HTTP {resp.status_code} â€” "
                 f"{resp.text[:200]}. This may indicate a Hyundai API change."
             )
         cci = resp.json()
@@ -456,7 +463,7 @@ class KiaUvoApiEU(ApiImplType1):
             non_ccs_token=non_ccs_token,
             exchangeable_token=exchangeable_token,
         )
-        resp = requests.post(
+        resp = self._post_cci(
             f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
             params={"serviceType": "CCS"},
             headers=headers,
@@ -464,7 +471,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         if resp.status_code != 200:
             raise AuthenticationError(
-                f"CCS token exchange failed: HTTP {resp.status_code} — "
+                f"CCS token exchange failed: HTTP {resp.status_code} â€” "
                 f"{resp.text[:200]}. This may indicate a Hyundai API change."
             )
         data = resp.json()
@@ -549,7 +556,7 @@ class KiaUvoApiEU(ApiImplType1):
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
             "idToken": token.id_token or "",
         }
-        resp = requests.post(
+        resp = self._post_cci(
             f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
             headers=headers,
             json=body,
@@ -557,7 +564,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         if resp.status_code != 200:
             raise AuthenticationError(
-                f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
+                f"CCI token refresh failed: HTTP {resp.status_code} â€” {resp.text[:200]}"
             )
         data = resp.json()
         cci_access_token = data.get("accessToken", token.cci_access_token or "")
@@ -699,7 +706,7 @@ class KiaUvoApiEU(ApiImplType1):
         """Force-refresh CCS2 state: wake the vehicle, wait, read the cached snapshot.
 
         GET /ccs2/carstatus (no /latest) wakes the vehicle but returns an async
-        command envelope ({retCode, resCode, msgId}), not state — reading
+        command envelope ({retCode, resCode, msgId}), not state â€” reading
         resMsg.state.Vehicle from it raised KeyError: 'resMsg' (kia_uvo #1786,
         #1806). Instead: wake, sleep for the car to report (~20s live-measured on
         a reachable EU CCS2 car), then read the now-fresh cached /latest snapshot.
