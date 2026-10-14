@@ -29,7 +29,11 @@ from .const import (
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import APIError, AuthenticationError
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    InvalidAPIResponseError,
+)
 from .Token import Token
 from .utils import (
     detect_timezone_for_date,
@@ -192,18 +196,22 @@ class KiaUvoApiCA(ApiImpl):
             "7549": AuthenticationError,  # OTP verification failed (Genesis CA)
             "7602": AuthenticationError,  # Access token deleted - triggers re-login
         }
-        if response["responseHeader"]["responseCode"] == 1:
+        response_code = response.get("responseHeader", {}).get("responseCode")
+        if response_code is None:
+            raise APIError(f"Unexpected response shape: {response}")
+        if response_code == 1:
+            error = response.get("error")
+            if not isinstance(error, dict):
+                raise APIError(f"Unexpected error response shape: {response}")
+            error_code = error.get("errorCode")
             # Don't raise error for 7110 - it's handled in login method
-            if response["error"]["errorCode"] == "7110":
+            if error_code == "7110":
                 return
-            if response["error"]["errorCode"] in error_code_mapping:
-                raise error_code_mapping[response["error"]["errorCode"]](
-                    response["error"].get("errorDesc", response["error"]["errorCode"])
-                )
-            else:
-                raise APIError(
-                    f"Server returned: '{response['error'].get('errorDesc', response['error'].get('errorCode', 'unknown'))}'"
-                )
+            if error_code in error_code_mapping:
+                raise error_code_mapping[error_code](error.get("errorDesc", error_code))
+            raise APIError(
+                f"Server returned: '{error.get('errorDesc', error.get('errorCode', 'unknown'))}'"
+            )
 
     def login(
         self,
@@ -1160,19 +1168,28 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers)
         response = response.json()
 
-        last_action_completed = (
-            response["result"]["transaction"]["apiStatusCode"] != "null"
-        )
+        response = self.sessions.post(url, headers=headers)
+        response = response.json()
 
-        if last_action_completed:
-            action_status = response["result"]["transaction"]["apiStatusCode"]
-            _LOGGER.debug(f"{DOMAIN} - Last action_status: {action_status}")
-
-        if response["responseHeader"]["responseCode"] == 1:
+        response_code = response.get("responseHeader", {}).get("responseCode")
+        if response_code == 1:
+            # Error envelope - no result/transaction block to read
+            _LOGGER.debug(f"{DOMAIN} - Action status error response: {response}")
             return ORDER_STATUS.FAILED
-        elif response["result"]["transaction"]["apiResult"] == "C":
+
+        transaction = response.get("result", {}).get("transaction")
+        if not isinstance(transaction, dict):
+            raise InvalidAPIResponseError(
+                f"Unexpected action status response shape: {response}"
+            )
+
+        api_status_code = transaction.get("apiStatusCode")
+        if api_status_code is not None and api_status_code != "null":
+            _LOGGER.debug(f"{DOMAIN} - Last action_status: {api_status_code}")
+
+        if transaction.get("apiResult") == "C":
             return ORDER_STATUS.SUCCESS
-        elif response["result"]["transaction"]["apiResult"] == "P":
+        elif transaction.get("apiResult") == "P":
             if not synchronous:
                 return ORDER_STATUS.PENDING
             else:

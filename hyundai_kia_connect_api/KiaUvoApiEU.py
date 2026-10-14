@@ -74,7 +74,7 @@ SUPPORTED_LANGUAGES_LIST = [
 
 class KiaUvoApiEU(ApiImplType1):
     data_timezone = ZoneInfo("Europe/Berlin")
-    temperature_range = tuple(x * 0.5 for x in range(28, 60))
+    temperature_range = tuple(x * 0.5 for x in range(28, 64))
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         language = language.lower()
