@@ -503,6 +503,12 @@ class GspaApiEU(ApiImpl):
         """
         resp = self._fp_exchange_auth_code(device_id, auth_code)
         if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed auth-code "
+                f"exchange (HTTP {resp.status_code}); fell back to the legacy "
+                "route. This fallback is transitional - report this log so "
+                "the fallback can be removed"
+            )
             resp = self._legacy_exchange_auth_code(device_id, auth_code)
         if resp.status_code != 200:
             raise AuthenticationError(
@@ -723,6 +729,12 @@ class GspaApiEU(ApiImpl):
             timeout=(5, 30),
         )
         if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed CCS "
+                f"token-exchange (HTTP {resp.status_code}); fell back to the "
+                "legacy route. This fallback is transitional - report this "
+                "log so the fallback can be removed"
+            )
             headers = self._get_cci_headers(
                 device_id,
                 cci_access_token=cci_access_token,
@@ -908,6 +920,12 @@ class GspaApiEU(ApiImpl):
             timeout=(5, 30),
         )
         if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed token "
+                f"refresh (HTTP {resp.status_code}); fell back to the legacy "
+                "route. This fallback is transitional - report this log so "
+                "the fallback can be removed"
+            )
             headers = self._get_cci_headers(
                 device_id,
                 cci_access_token=token.cci_access_token,
@@ -1187,6 +1205,12 @@ class GspaApiEU(ApiImpl):
         if response.status_code != 200 and is_gate_rejection(
             response.status_code, response.text
         ):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed PIN "
+                f"verification (HTTP {response.status_code}); fell back to "
+                "the legacy route. This fallback is transitional - report "
+                "this log so the fallback can be removed"
+            )
             headers = self._get_cci_headers(
                 token.device_id or "",
                 cci_access_token=token.cci_access_token,

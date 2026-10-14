@@ -210,6 +210,19 @@ def test_region1_non_gate_error_does_not_fall_back(mock_post):
     assert mock_post.call_args.args[0].endswith("/auth/v1/token")
 
 
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_gate_fallback_logs_error_level(mock_post, caplog):
+    mock_post.side_effect = [
+        _resp(400, GATE_BODY),
+        _resp(200, '{"accessToken":"legacy-at"}'),
+    ]
+    resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
+    assert resp.json()["accessToken"] == "legacy-at"
+    assert any(
+        r.levelname == "ERROR" and "transitional" in r.message for r in caplog.records
+    )
+
+
 def _refresh_token() -> object:
     from hyundai_kia_connect_api.Token import Token
 
