@@ -698,21 +698,42 @@ class GspaApiEU(ApiImpl):
     ) -> tuple[str, dt.datetime]:
         """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
 
+        The token-exchange endpoint is fingerprint-gated like the other /auth
+        endpoints (unsigned calls answer 9035, field-verified 2026-10-14 on
+        Hyundai): the signed primary carries the CCI token headers on the
+        OneApp identity, the legacy domain/api route runs unsigned as
+        fallback.
+
         The CCS token is accepted by GSPA REST endpoints. Returns
         (ccs_token, valid_until).
         """
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=cci_access_token,
-            non_ccs_token=non_ccs_token,
-            exchangeable_token=exchangeable_token,
+        headers = self._cci_fp_headers(device_id)
+        headers["authorization"] = (
+            "Bearer " + (cci_access_token or "").removeprefix("Bearer ").strip()
         )
+        headers["Authentication"] = non_ccs_token or ""
+        if exchangeable_token:
+            headers["exchangeable-token"] = exchangeable_token
+            headers["non-ccs-token"] = non_ccs_token or ""
         resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
+            f"{self.CCI_API_URL}/auth/v1/token-exchange",
             params={"serviceType": "CCS"},
             headers=headers,
             timeout=(5, 30),
         )
+        if resp.status_code != 200:
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=cci_access_token,
+                non_ccs_token=non_ccs_token,
+                exchangeable_token=exchangeable_token,
+            )
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
+                params={"serviceType": "CCS"},
+                headers=headers,
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCS token exchange failed: HTTP {resp.status_code} — "
