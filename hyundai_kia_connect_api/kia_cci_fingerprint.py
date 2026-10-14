@@ -4,17 +4,14 @@ import hashlib
 import hmac
 import re
 import time
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 _KEY_PIECES = ("yb4Z1n2nlKe", "ukNilE7QEdb", "KB34nStPVa")
 _HOST = "cci-api-eu.kia.com"
 _AUTH_PATHS = {
-    "/domain/api/v1/auth/token",
     "/auth/v1/token",
     "/domain/api/v1/auth/token-exchange",
-    "/auth/v1/token-exchange",
     "/domain/api/v2/auth/token-refresh",
-    "/auth/v2/token-refresh",
 }
 
 
@@ -38,55 +35,45 @@ def _signature(headers, body, timestamp):
     ).hexdigest()
 
 
-class _RequestsProxy:
-    _kia_fingerprint_compat = True
+def _post_signed_auth(http, url, **kwargs):
+    """Sign and send a Kia CCI auth request without changing its route.
 
-    def __init__(self, original):
-        self._original = original
-
-    def __getattr__(self, name):
-        return getattr(self._original, name)
-
-    def post(self, url, **kwargs):
-        parsed = urlsplit(url)
-        if (
-            parsed.scheme != "https"
-            or parsed.hostname != _HOST
-            or parsed.path not in _AUTH_PATHS
-        ):
-            return self._original.post(url, **kwargs)
-        if parsed.path == "/domain/api/v1/auth/token":
-            url = urlunsplit(parsed._replace(path="/auth/v1/token"))
-        headers = self._original.structures.CaseInsensitiveDict(
-            kwargs.pop("headers", {}) or {}
-        )
-        headers.update(
-            {
-                "client-id": "com.kia.oneapp.eu",
-                "client-name": "KiaEU",
-                "client-version": "1.4.0",
-                "client-os-code": "android",
-                "client-os-version": "14",
-                "client-device-model": "SM-S918B",
-                "client-notification-provider-type": "FCM",
-                "User-Agent": "okhttp/4.12.0",
-            }
-        )
-        headers.pop("X-Fingerprint", None)
-        headers.pop("X-Timestamp", None)
-        request = self._original.Request(
-            "POST",
-            url,
-            headers=headers,
-            data=kwargs.pop("data", None),
-            json=kwargs.pop("json", None),
-        )
-        prepared = request.prepare()
-        timestamp = int(time.time() * 1000)
-        prepared.headers["X-Timestamp"] = str(timestamp)
-        prepared.headers["X-Fingerprint"] = _signature(
-            prepared.headers, prepared.body, timestamp
-        )
-        return self._original.post(
-            url, headers=prepared.headers, data=prepared.body, **kwargs
-        )
+    Callers choose the endpoint explicitly. Serialize the body once so the
+    signed bytes are exactly the bytes sent by requests.
+    """
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != _HOST
+        or parsed.path not in _AUTH_PATHS
+    ):
+        return http.post(url, **kwargs)
+    headers = http.structures.CaseInsensitiveDict(kwargs.pop("headers", {}) or {})
+    headers.update(
+        {
+            "client-id": "com.kia.oneapp.eu",
+            "client-name": "KiaEU",
+            "client-version": "1.4.0",
+            "client-os-code": "android",
+            "client-os-version": "14",
+            "client-device-model": "SM-S918B",
+            "client-notification-provider-type": "FCM",
+            "User-Agent": "okhttp/4.12.0",
+        }
+    )
+    headers.pop("X-Fingerprint", None)
+    headers.pop("X-Timestamp", None)
+    request = http.Request(
+        "POST",
+        url,
+        headers=headers,
+        data=kwargs.pop("data", None),
+        json=kwargs.pop("json", None),
+    )
+    prepared = request.prepare()
+    timestamp = int(time.time() * 1000)
+    prepared.headers["X-Timestamp"] = str(timestamp)
+    prepared.headers["X-Fingerprint"] = _signature(
+        prepared.headers, prepared.body, timestamp
+    )
+    return http.post(url, headers=prepared.headers, data=prepared.body, **kwargs)

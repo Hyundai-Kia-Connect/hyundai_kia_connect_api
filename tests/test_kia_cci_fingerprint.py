@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+
 from hyundai_kia_connect_api.kia_cci_fingerprint import _signature
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -181,7 +182,7 @@ def test_other_brand_cci_requests_are_unchanged(calls, brand, host):
         "headers": {"client-os-code": "ios"},
         "timeout": 15,
     }
-    api._post_cci(url, **kwargs)
+    api._post_signed_cci(url, **kwargs)
     assert calls == [(url, kwargs)]
 
 
@@ -192,6 +193,7 @@ def test_other_brand_cci_requests_are_unchanged(calls, brand, host):
         "https://gspa-ccs-eu.kia.com/gspa/v1/vehicles",
         "https://cci-api-eu.kia.com/unrelated",
         "http://cci-api-eu.kia.com/auth/v1/token",
+        "https://cci-api-eu.kia.com/domain/api/v1/auth/token",
     ],
 )
 def test_request_scope_does_not_expand(api, calls, url):
@@ -200,5 +202,5 @@ def test_request_scope_does_not_expand(api, calls, url):
         "json": {"sample": "test-only"},
         "timeout": 15,
     }
-    api._post_cci(url, **kwargs)
+    api._post_signed_cci(url, **kwargs)
     assert calls == [(url, kwargs)]
