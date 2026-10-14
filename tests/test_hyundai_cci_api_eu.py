@@ -428,9 +428,10 @@ def test_refresh_cci_token_uses_v2_endpoint():
         token = _make_token()
         result = api.refresh_access_token(token)
 
-    # First call should be to v2/auth/token-refresh
+    # Primary refresh is the fingerprint-gated /auth route (v2); the legacy
+    # domain/api route is the fallback, not the primary.
     first_call_url = mock_post.call_args_list[0].args[0]
-    assert "v2/auth/token-refresh" in first_call_url
+    assert first_call_url.endswith("/auth/v2/token-refresh")
     assert "v1/auth/token-refresh" not in first_call_url
     assert result.access_token == "Bearer new-ccs-token"
 

@@ -1,18 +1,12 @@
-"""cci_fingerprint.py — X-Fingerprint signing for the fingerprint-gated EU
-CCI endpoints (live-verified 2026-10-13 against prd.eu-ccapi/cci-api-eu for
-kia_uvo #1888).
+"""cci_fingerprint.py — X-Fingerprint signing for the EU CCI auth endpoints.
 
-The EU OneApp app signs requests to cci-api-eu with an X-Fingerprint header:
-HMAC-SHA256 over request-header values, as described in compute_x_fingerprint.
-The app-embedded secret pair below rotates with app releases; when the app
-ships a new build identity the constants here need the same update.
-
-Live-verified endpoints (Hyundai EU, 2026-10-13):
-- exchange: cci-api-eu.../auth/v1/token?code=... = 200 with the verified
-  app identity; domain/api/v1/auth/token rejects with 400/9013.
-- refresh: un-gated both ways — domain/api/v2/auth/token-refresh and the
-  same-identity /auth/v2/token-refresh both answer 200; the library keeps
-  the legacy refresh path.
+The EU OneApp app signs POSTs to cci-api-eu.../auth/* with X-Fingerprint:
+HMAC-SHA256 over the client identity plus app-embedded secret constant
+pairs. The X-Timestamp is in the message only. The key/message shapes and
+the constants below were recovered from the app's Android 1.4.0 build and
+verified live on 2026-10-14 for both Hyundai and Kia EU (exchange and
+token-refresh answer 200; a wrong signature answers 9036, a missing
+X-Fingerprint answers 9035).
 """
 
 from __future__ import annotations
@@ -22,50 +16,52 @@ import hmac
 import re
 import uuid
 
-from .const import BRANDS
+from .const import BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS
 
-# Live-verified OneApp build identity for the fingerprint-gated endpoints.
-# 9013 is returned for other client identities (e.g. app 1.1.5 era values).
-CLIENT_VERSION = "1.4.1"
-OS_VERSION = "27.2.0"
-CLIENT_OS_CODE = "ios"
-BUILD = "1675"
+# Signing constants per brand: (secret, piece, suffix), concatenated into
+# the HMAC key in this order. The pieces rotate with app releases.
+_FINGERPRINT_KEYS: dict[str, tuple[str, str, str]] = {
+    BRAND_HYUNDAI: ("OsZDfDuCyVX", "yfqjCoA2JbX", "2MrLpGwNBC"),
+    BRAND_KIA: ("yb4Z1n2nlKe", "ukNilE7QEdb", "KB34nStPVa"),
+}
+# Genesis EU is not covered: its login goes through GSPA and the auth-code
+# exchange path in GspaApiEU uses this module only as a fallback.
+_FINGERPRINT_KEYS[BRAND_GENESIS] = _FINGERPRINT_KEYS[BRAND_HYUNDAI]
+
+# Android OneApp build identity the gate validates the fingerprint against.
+CLIENT_VERSION = "1.4.0"
+CLIENT_OS_CODE = "android"
+CLIENT_OS_VERSION = "14"
+CLIENT_DEVICE_MODEL = "SM-S918B"
+CLIENT_NOTIFICATION_PROVIDER = "FCM"
+USER_AGENT = "okhttp/4.12.0"
 APP_REGION = "eu"
 
-_HMAC_SECRET = "OsZDfDuCyVX"
-_HMAC_KEY_SUFFIX = "2MrLpGwNBC"
+_IDENTITY_HEADERS = ("client-id", "client-name", "client-version", "client-os-code")
 
 
-def compute_x_fingerprint(headers: dict[str, str], body: str = "") -> str:
-    """HMAC-SHA256 over request header values, per the OneApp signing scheme.
+def compute_x_fingerprint(
+    headers: dict[str, str], brand: int, body: str | bytes = ""
+) -> str:
+    """HMAC-SHA256 over the client identity per the OneApp signing scheme.
 
-    Key: client-id + client-name + client-version + client-os-code
-         + x-timestamp + secret + suffix.
-    Message: client-id + client-name + client-version + client-os-code
-         + client-os-version + x-timestamp (+ regex-stripped body).
-    The X-Timestamp value is read from headers; X-Fingerprint and X-Timestamp
-    are excluded from the lowercase copy used for lookup.
+    Key: identity (client-id + client-name + client-version + client-os-code)
+         + secret + piece + suffix.
+    Message: identity + client-os-version + X-Timestamp
+         (+ request body with Java-ASCII whitespace removed).
     """
-    ts = headers.get("X-Timestamp") or headers.get("x-timestamp") or ""
     lower = {k.lower(): v for k, v in headers.items()}
-    key = (
-        lower["client-id"]
-        + lower["client-name"]
-        + lower["client-version"]
-        + lower["client-os-code"]
-        + ts
-        + _HMAC_SECRET
-        + _HMAC_KEY_SUFFIX
-    )
+    identity = "".join(lower.get(name, "") for name in _IDENTITY_HEADERS)
+    pieces = _FINGERPRINT_KEYS[BRANDS[brand]]
+    if isinstance(body, bytes):
+        body = body.decode("utf-8")
     msg = (
-        lower["client-id"]
-        + lower["client-name"]
-        + lower["client-version"]
-        + lower["client-os-code"]
-        + lower["client-os-version"]
-        + ts
-        + (re.sub(r"\s+", "", body) if body else "")
+        identity
+        + lower.get("client-os-version", "")
+        + lower.get("x-timestamp", "")
+        + re.sub(r"\s+", "", body or "", flags=re.ASCII)
     )
+    key = identity + "".join(pieces)
     return hmac.new(key.encode(), msg.encode(), hashlib.sha256).hexdigest()
 
 
@@ -82,26 +78,23 @@ def build_fp_headers(
     timezone: str,
     brand_label: str,
 ) -> dict[str, str]:
-    """Header set verified live against the fingerprint-gated endpoints."""
-    ua = (
-        f"{client_name}/{CLIENT_VERSION} ({package_id}; build:{BUILD}; "
-        f"iOS {OS_VERSION}) Alamofire/5.12.0"
-    )
+    """Header set for the fingerprint-gated CCI endpoints."""
     return {
         "client-id": package_id,
         "client-name": client_name,
         "client-version": CLIENT_VERSION,
         "client-os-code": CLIENT_OS_CODE,
-        "client-os-version": OS_VERSION,
+        "client-os-version": CLIENT_OS_VERSION,
         "client-device-id": device_id or "",
-        "client-device-model": "iPhone",
-        "client-notification-provider-type": "IOS_APPSTORE",
+        "client-device-model": CLIENT_DEVICE_MODEL,
+        "client-notification-provider-type": CLIENT_NOTIFICATION_PROVIDER,
         "locale": locale.upper(),
         "timezone": timezone,
-        "App-Request-Id": str(uuid.uuid4()),
+        "App-Request-Id": f"{uuid.uuid4().hex[:24].upper()}_"
+        f"{(device_id or '').replace('-', '')}_AOS",
         "X-Brand": brand_label,
         "X-Region": APP_REGION,
-        "User-Agent": ua,
+        "User-Agent": USER_AGENT,
         "Accept": "*/*",
         "Accept-Language": locale.lower(),
     }

@@ -4,6 +4,7 @@
 
 import base64
 import datetime as dt
+import json
 import logging
 import re
 from time import sleep
@@ -264,12 +265,13 @@ class KiaUvoApiEU(ApiImplType1):
         off = aware.strftime("%z")  # e.g. +0200
         return f"{off[:3]}:{off[3:]}" if off else "+00:00"
 
-    def _cci_fp_headers(self, device_id: str) -> dict:
+    def _cci_fp_headers(self, device_id: str, body: str = "") -> dict:
         """Header set for the fingerprint-gated CCI endpoints (see #1888).
 
         The gate validates the X-Fingerprint HMAC against the client identity
         in these headers, so this uses the live-verified OneApp build identity
         (cci_fingerprint module constants), not the legacy CCI header values.
+        Pass the exact request body so the signature covers it.
         """
         headers = build_fp_headers(
             package_id=self._cci_package_id,
@@ -281,7 +283,7 @@ class KiaUvoApiEU(ApiImplType1):
         )
         ts = str(int(dt.datetime.now(dt.UTC).timestamp() * 1000))
         headers["X-Timestamp"] = ts
-        headers["X-Fingerprint"] = compute_x_fingerprint(headers)
+        headers["X-Fingerprint"] = compute_x_fingerprint(headers, self.brand, body)
         return headers
 
     def _get_cci_headers(
@@ -455,21 +457,14 @@ class KiaUvoApiEU(ApiImplType1):
     def _exchange_auth_code_for_cci_tokens(self, device_id: str, code: str):
         """Exchange the auth code for CCI tokens, primary path per brand.
 
-        Hyundai EU is validation-gated (kia_uvo #1888): /auth/v1/token with
-        the X-Fingerprint header goes first. Kia/Genesis still answer the
-        legacy domain/api exchange (live 2026-10-13), so it goes first
-        there. On a failed primary the other path runs before raising, so a
-        gate rollback or a rollout to those brands both keep working.
+        All EU OneApp auth endpoints are fingerprint-gated (2026-10-14):
+        /auth/v1/token with the signed X-Fingerprint identity headers goes
+        first; the legacy domain/api exchange runs as fallback so a gate
+        rollback keeps working.
         """
-        hyundai = BRANDS[self.brand] == BRAND_HYUNDAI
-        if hyundai:
-            resp = self._fp_exchange_auth_code(device_id, code)
-            if resp.status_code != 200:
-                resp = self._legacy_exchange_auth_code(device_id, code)
-        else:
+        resp = self._fp_exchange_auth_code(device_id, code)
+        if resp.status_code != 200:
             resp = self._legacy_exchange_auth_code(device_id, code)
-            if resp.status_code != 200:
-                resp = self._fp_exchange_auth_code(device_id, code)
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token exchange failed: HTTP {resp.status_code} — "
@@ -588,18 +583,13 @@ class KiaUvoApiEU(ApiImplType1):
     def _refresh_cci_token(self, token: Token) -> Token:
         """Refresh the CCI token set and re-exchange the CCS token.
 
-        POST cci-api-eu/domain/api/v2/auth/token-refresh with the full CCI
-        token set (all fields required in the body), then re-exchange the CCS
-        token. Returns a new Token with updated CCI + CCS fields.
+        POST /auth/v2/token-refresh with the full CCI token set, signed with
+        X-Fingerprint over the exact body bytes (the refresh is on the same
+        fingerprint gate as the exchange, live 2026-10-14); the legacy
+        domain/api route runs as fallback. Returns a new Token with updated
+        CCI + CCS fields.
         """
         device_id = token.device_id or ""
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
-        )
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -609,12 +599,29 @@ class KiaUvoApiEU(ApiImplType1):
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
             "idToken": token.id_token or "",
         }
+        payload = json.dumps(body)
+        headers = self._cci_fp_headers(device_id, body=payload)
+        headers["Content-Type"] = "application/json"
         resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+            f"{self.CCI_API_URL}/auth/v2/token-refresh",
+            data=payload,
             headers=headers,
-            json=body,
             timeout=(5, 30),
         )
+        if resp.status_code != 200:
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+                headers=headers,
+                json=body,
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
