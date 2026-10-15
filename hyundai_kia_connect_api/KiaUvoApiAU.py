@@ -6,9 +6,10 @@ import base64
 import datetime as dt
 import logging
 import typing as ty
+from time import sleep
 from zoneinfo import ZoneInfo
 
-from .ApiImpl import ApiImplSession
+from .ApiImpl import ApiImplSession, WindowRequestOptions
 from .ApiImplType1 import ApiImplType1, _check_response_for_errors
 from .const import (
     BRAND_GENESIS,
@@ -92,6 +93,31 @@ class KiaUvoApiAU(ApiImplType1):
 
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
         return self._get_authenticated_headers(token)
+
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Vehicle list plus per-vehicle /profile capability flags.
+
+        GCS/Bluelink AU gate remote controls (frunk, lamp control, rear
+        curtain, pet care, battery conditioning, ...) on the option and
+        serviceOption blocks of /api/v1/spa/vehicles/{id}/profile. Fetch it
+        once at discovery so Vehicle.supports_* reflect what the car reports.
+        """
+        vehicles = super().get_vehicles(token)
+        for vehicle in vehicles:
+            self._apply_vehicle_profile(
+                vehicle, self._get_vehicle_profile(token, vehicle)
+            )
+        return vehicles
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """CCS2 vehicles use the seat-based /ccs2/control/windowcurtain body
+        (the only window endpoint the GCS AU app calls for them); legacy
+        vehicles keep the position-based /control/windowcurtain body."""
+        if vehicle.ccu_ccs2_protocol_support:
+            return self.set_windows_state_ccs2(token, vehicle, options)
+        return super().set_windows_state(token, vehicle, options)
 
     def login(
         self,
@@ -235,18 +261,62 @@ class KiaUvoApiAU(ApiImplType1):
             else:
                 self._update_vehicle_drive_info(vehicle, state)
 
+    # CCS2 force refresh: how often to re-read /latest while waiting for the
+    # car to publish a new snapshot, and when to give up and use what we have.
+    CCS2_REFRESH_POLL_INTERVAL: int = 3
+    CCS2_REFRESH_TIMEOUT: int = 60
+
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
+        """Force-refresh CCS2 state: wake the vehicle, then poll the cached snapshot.
+
+        GET /ccs2/carstatus (no /latest) on the AU backend only returns an
+        async command envelope ({retCode, resCode, msgId}) with no resMsg
+        (live-confirmed on Genesis AU, GV70 2025); reading resMsg from it
+        raised KeyError: 'resMsg'. The wake also leaves no entry in
+        /notifications/{id}/records, so completion is detected by the
+        snapshot's lastUpdateTime moving past its pre-wake value (the GV70
+        published within ~2 s). If nothing changes within
+        CCS2_REFRESH_TIMEOUT the last snapshot read is applied anyway.
+        """
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        latest_url = trigger_url + "/latest"
+
+        def read_latest() -> tuple[dict, str]:
+            response = self.session.get(latest_url, headers=headers).json()
+            _check_response_for_errors(response)
+            return response, str(
+                get_child_value(response, "resMsg.lastUpdateTime") or ""
+            )
+
+        _, baseline = read_latest()
+        wake = self.session.get(trigger_url, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Force refresh CCS2 wake response: {wake}")
+        _check_response_for_errors(wake)
+
+        deadline = dt.datetime.now() + dt.timedelta(seconds=self.CCS2_REFRESH_TIMEOUT)
+        while True:
+            sleep(self.CCS2_REFRESH_POLL_INTERVAL)
+            response, last_update = read_latest()
+            if last_update > baseline:
+                _LOGGER.debug(
+                    f"{DOMAIN} - CCS2 snapshot updated {baseline} -> {last_update}"
+                )
+                break
+            if dt.datetime.now() >= deadline:
+                _LOGGER.warning(
+                    "%s - CCS2 force refresh: vehicle did not publish a new snapshot "
+                    "within %ss (lastUpdateTime still %s); using cached state",
+                    DOMAIN,
+                    self.CCS2_REFRESH_TIMEOUT,
+                    baseline,
+                )
+                break
         _LOGGER.debug(
             f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
         )
-        _check_response_for_errors(response)
         state = response["resMsg"]["state"]["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
         location = self._get_location(token, vehicle)

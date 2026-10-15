@@ -52,9 +52,11 @@ from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    float_or_none,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    int_or_none,
     normalize_battery_soc,
     parse_datetime,
     pressure_or_none,
@@ -787,6 +789,14 @@ class ApiImplType1(ApiImpl):
         vehicle.turn_signal_right_rear = get_child_value(
             state, "Body.Lights.Rear.Right.TurnSignal.Warning"
         )
+        # Lamp-left-on alerts; the apps gate the remote "lamp off" action on
+        # these (live-confirmed Genesis AU GV70 2025 CCS2).
+        vehicle.tail_lamp_alert_is_on = bool_or_none(
+            get_child_value(state, "Body.Lights.TailLamp.Alert")
+        )
+        vehicle.hazard_lamp_alert_is_on = bool_or_none(
+            get_child_value(state, "Body.Lights.Hazard.Alert")
+        )
 
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
@@ -1271,6 +1281,8 @@ class ApiImplType1(ApiImpl):
                 location_last_updated_at,
             )
 
+        self._update_vehicle_properties_ccs2_extras(vehicle, state)
+
         # Sanitize corrupted ICE values before storing in vehicle.data
         # This prevents issues with oversized integers when serializing to JSON
         # or storing in databases
@@ -1278,6 +1290,246 @@ class ApiImplType1(ApiImpl):
         # self._sanitize_ice_value(state)
 
         vehicle.data = state
+
+    def _update_vehicle_properties_ccs2_extras(
+        self, vehicle: Vehicle, state: dict
+    ) -> None:
+        """Map the remaining CCS2 state.Vehicle fields.
+
+        Everything here is None-when-absent so vehicles that do not publish a
+        field get no entity downstream. Field inventory: live Genesis AU GV70
+        (ICE) plus the EU EV3/EV6/EV9/Sportage PHEV fixtures.
+        """
+
+        def g(path: str):
+            return get_child_value(state, path)
+
+        # -- Body / Cabin
+        vehicle.windshield_front_heater_is_on = bool_or_none(
+            g("Body.Windshield.Front.Heat.State")
+        )
+        vehicle.lights_discharge_alert_is_on = bool_or_none(
+            g("Body.Lights.DischargeAlert.State")
+        )
+        vehicle.turn_signal_left_front_is_on = bool_or_none(
+            g("Body.Lights.Front.Left.TurnSignal.LampState")
+        )
+        vehicle.turn_signal_right_front_is_on = bool_or_none(
+            g("Body.Lights.Front.Right.TurnSignal.LampState")
+        )
+        vehicle.frunk_fault_is_on = bool_or_none(g("Body.Hood.Frunk.Fault"))
+        vehicle.air_cleaning_is_on = bool_or_none(
+            g("Cabin.HVAC.Vent.AirCleaning.Indicator")
+        )
+        vehicle.air_cleaning_symbol_color = int_or_none(
+            g("Cabin.HVAC.Vent.AirCleaning.SymbolColor")
+        )
+        vehicle.fine_dust_level = int_or_none(g("Cabin.HVAC.Vent.FineDust.Level"))
+        vehicle.fine_dust_state = int_or_none(g("Cabin.HVAC.Vent.FineDust.State"))
+        vehicle.hvac_temperature_range_type = int_or_none(
+            g("Cabin.HVAC.Temperature.RangeType")
+        )
+        vehicle.rest_mode_is_on = bool_or_none(g("Cabin.RestMode.State"))
+        vehicle.steering_wheel_heat_step = int_or_none(
+            g("Cabin.SteeringWheel.Heat.RemoteControl.Step")
+        )
+        # Armrest heaters follow the same Row1.Driver -> front_left convention
+        # as the seat climate fields above.
+        vehicle.front_left_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row1.Driver.ArmRest.Heat")
+        )
+        vehicle.front_right_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row1.Passenger.ArmRest.Heat")
+        )
+        vehicle.rear_left_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row2.Left.ArmRest.Heat")
+        )
+        vehicle.rear_right_armrest_heater_is_on = bool_or_none(
+            g("Cabin.Seat.Row2.Right.ArmRest.Heat")
+        )
+        vehicle.third_row_left_seat_status = SEAT_STATUS.get(
+            g("Cabin.Seat.Row3.Left.Climate.State")
+        )
+        vehicle.third_row_right_seat_status = SEAT_STATUS.get(
+            g("Cabin.Seat.Row3.Right.Climate.State")
+        )
+
+        # -- Chassis / Drivetrain
+        vehicle.awd_controller_state_1 = int_or_none(
+            g("Chassis.Driving.WheelDriveType.ControllerState1")
+        )
+        vehicle.awd_controller_state_2 = int_or_none(
+            g("Chassis.Driving.WheelDriveType.ControllerState2")
+        )
+        vehicle.drivetrain_driving_ready = bool_or_none(g("Drivetrain.DrivingReady"))
+        vehicle.urea_level = int_or_none(g("Drivetrain.ExhaustSystem.UreaLevel"))
+        vehicle.transmission_in_park = bool_or_none(
+            g("Drivetrain.Transmission.ParkingPosition")
+        )
+        vehicle.gear_position = int_or_none(g("Drivetrain.Transmission.GearPosition"))
+        average_fuel_economy = g("Drivetrain.FuelSystem.AverageFuelEconomy")
+        if isinstance(average_fuel_economy, dict):
+            vehicle.average_fuel_economy_accumulated = float_or_none(
+                average_fuel_economy.get("Accumulated")
+            )
+            vehicle.average_fuel_economy_drive = float_or_none(
+                average_fuel_economy.get("Drive")
+            )
+            vehicle.average_fuel_economy_after_refuel = float_or_none(
+                average_fuel_economy.get("AfterRefuel")
+            )
+            vehicle.average_fuel_economy_unit = int_or_none(
+                average_fuel_economy.get("Unit")
+            )
+        # PHEV/HEV publish the fuel-only range separately in DTE.ICE.
+        ice_range = g("Drivetrain.FuelSystem.DTE.ICE")
+        if ice_range is not None and vehicle.total_driving_range_unit is not None:
+            vehicle.fuel_driving_range = (
+                float(ice_range),
+                vehicle.total_driving_range_unit,
+            )
+
+        # -- Electronics / Service
+        vehicle.battery_12v_charging_warning_level = int_or_none(
+            g("Electronics.Battery.Charging.WarningLevel")
+        )
+        vehicle.battery_12v_power_state_alert = int_or_none(
+            g("Electronics.Battery.PowerStateAlert.ClassC")
+        )
+        vehicle.auto_cut_power_mode = int_or_none(g("Electronics.AutoCut.PowerMode"))
+        vehicle.auto_cut_delivery_mode = int_or_none(
+            g("Electronics.AutoCut.DeliveryMode")
+        )
+        vehicle.auto_cut_battery_prewarning_on = bool_or_none(
+            g("Electronics.AutoCut.BatteryPreWarning")
+        )
+        vehicle.ignition1_on = bool_or_none(g("Electronics.PowerSupply.Ignition1"))
+        vehicle.remote_control_available = bool_or_none(
+            g("Service.ConnectedCar.RemoteControl.Available")
+        )
+        vehicle.remote_control_waiting_time = int_or_none(
+            g("Service.ConnectedCar.RemoteControl.WaitingTime")
+        )
+        vehicle.active_alert_available = bool_or_none(
+            g("Service.ConnectedCar.ActiveAlert.Available")
+        )
+        ota = g("ConnectedService.OTA.ControllerStatus")
+        if ota is None:
+            ota = g("Service.ConnectedService.OTA.ControllerStatus")
+        vehicle.ota_controller_status = int_or_none(ota)
+        version = g("Version")
+        vehicle.ccu_version = str(version) if version is not None else None
+
+        # -- Location extras (the embedded snapshot copy)
+        vehicle.location_heading = float_or_none(g("Location.Heading"))
+        vehicle.location_speed = float_or_none(g("Location.Speed.Value"))
+        vehicle.location_speed_unit = int_or_none(g("Location.Speed.Unit"))
+        vehicle.location_altitude = float_or_none(g("Location.GeoCoord.Altitude"))
+        vehicle.location_service_state = int_or_none(g("Location.Servicestate"))
+
+        # -- Green (EV/PHEV); every field is absent on ICE so stays None.
+        vehicle.ev_battery_conditioning_is_on = bool_or_none(
+            g("Green.BatteryManagement.BatteryConditioning")
+        )
+        vehicle.ev_battery_precondition_temperature_level = int_or_none(
+            g("Green.BatteryManagement.BatteryPreCondition.TemperatureLevel")
+        )
+        vehicle.ev_battery_percentage_raw = float_or_none(
+            g("Green.ChargingInformation.Charging.SoC.Raw")
+        )
+        vehicle.ev_charging_sequence_details = int_or_none(
+            g("Green.ChargingInformation.SequenceDetails")
+        )
+        vehicle.ev_charging_sequence_subcode = int_or_none(
+            g("Green.ChargingInformation.SequenceSubcode")
+        )
+        # Expected charge window; the 31:63 sentinel maps to None.
+        expected = g("Green.ChargingInformation.ExpectedTime")
+        if isinstance(expected, dict):
+            try:
+                vehicle.ev_charge_expected_start_time = ccs2_reservation_time_or_none(
+                    expected.get("StartHour"), expected.get("StartMin")
+                )
+                vehicle.ev_charge_expected_end_time = ccs2_reservation_time_or_none(
+                    expected.get("EndHour"), expected.get("EndMin")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning(
+                    "%s - CCS2 ExpectedTime malformed: %s", DOMAIN, expected
+                )
+        complete_alarm = g("Green.ChargingInformation.Setting.CompleteAlarm")
+        if isinstance(complete_alarm, dict):
+            vehicle.ev_charge_complete_alarm_before_10min = bool_or_none(
+                complete_alarm.get("Before10min")
+            )
+            vehicle.ev_charge_complete_alarm_before_20min = bool_or_none(
+                complete_alarm.get("Before20min")
+            )
+            vehicle.ev_charge_complete_alarm_before_30min = bool_or_none(
+                complete_alarm.get("Before30min")
+            )
+            vehicle.ev_charge_complete_alarm_off = bool_or_none(
+                complete_alarm.get("Off")
+            )
+        vehicle.ev_driving_history_average = float_or_none(
+            g("Green.DrivingHistory.Average")
+        )
+        vehicle.ev_driving_history_unit = int_or_none(g("Green.DrivingHistory.Unit"))
+        vehicle.ev_driving_ready = bool_or_none(g("Green.DrivingReady"))
+        vehicle.ev_v2g_mode = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToGrid.Mode")
+        )
+        vehicle.ev_v2l_mode = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.Mode")
+        )
+        vehicle.ev_v2l_discharge_remain_time = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.RemainTime")
+        )
+        vehicle.ev_v2l_discharge_dte = int_or_none(
+            g("Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.DTE")
+        )
+        vehicle.ev_driving_range_invalid = bool_or_none(
+            g("Green.EnergyInformation.DTE.Invalid")
+        )
+        pnc = g("Green.PlugAndCharge.ContractCertificate")
+        if isinstance(pnc, dict):
+            vehicle.ev_plug_and_charge_mode = int_or_none(pnc.get("Mode"))
+            vehicle.ev_plug_and_charge_changeable = bool_or_none(pnc.get("Changeable"))
+            vehicle.ev_plug_and_charge_selected_cert = int_or_none(
+                pnc.get("SelectedCert")
+            )
+        certificates = [
+            g(f"Green.PlugAndCharge.ContractCertificate{i}") for i in range(1, 6)
+        ]
+        certificates = [c for c in certificates if isinstance(c, dict)]
+        if certificates:
+            # Company names are NUL-padded fixed-width strings on the wire
+            # (some captures carry them as literal "\\0" text).
+            def clean_company(value):
+                if not isinstance(value, str):
+                    return value
+                return value.replace("\\0", "").strip("\0 ")
+
+            vehicle.ev_plug_and_charge_certificates = [
+                {**c, "Company": clean_company(c.get("Company"))} for c in certificates
+            ]
+        vehicle.ev_power_consumption_prediction_climate = float_or_none(
+            g("Green.PowerConsumption.Prediction.Climate")
+        )
+        departure_climate = g("Green.Reservation.Departure.Climate")
+        if isinstance(departure_climate, dict):
+            vehicle.ev_departure_climate_enabled = bool_or_none(
+                departure_climate.get("Activation")
+            )
+            vehicle.ev_departure_climate_defrost = bool_or_none(
+                departure_climate.get("Defrost")
+            )
+            vehicle.ev_departure_climate_temperature = float_or_none(
+                departure_climate.get("Temperature")
+            )
+            vehicle.ev_departure_climate_temperature_unit = TEMPERATURE_UNITS.get(
+                departure_climate.get("TemperatureUnit")
+            )
 
     @_retry_on_device_id_error
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -1804,6 +2056,21 @@ class ApiImplType1(ApiImpl):
                 "tempUnit": "C",
                 "windshieldFrontDefogState": options.defrost,
             }
+            # Optional CCS2 extras, only sent when requested so vehicles
+            # without the option keep the pre-existing body.
+            if options.third_row_left_seat is not None:
+                payload["seatClimateInfo"]["thrlSeatClimateState"] = (
+                    options.third_row_left_seat
+                )
+            if options.third_row_right_seat is not None:
+                payload["seatClimateInfo"]["thrrSeatClimateState"] = (
+                    options.third_row_right_seat
+                )
+            if options.air_purifier is not None:
+                payload["airPurifierControl"] = int(options.air_purifier)
+                # The apps force the front defog off while the purifier runs.
+                if int(options.air_purifier) == 1:
+                    payload["windshieldFrontDefogState"] = False
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
             response = self.session.post(
                 url,
@@ -1898,6 +2165,11 @@ class ApiImplType1(ApiImpl):
             "frontLeft": options.front_left,
             "frontRight": options.front_right,
         }
+        # Rear sunshade keys (apps: rearCurtainLeft/Right), only when asked for.
+        if options.rear_left_curtain is not None:
+            payload["rearCurtainLeft"] = options.rear_left_curtain
+        if options.rear_right_curtain is not None:
+            payload["rearCurtainRight"] = options.rear_right_curtain
         _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
         response = self.session.post(
             url, json=payload, headers=self._get_control_headers(token, vehicle)
@@ -1905,6 +2177,278 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
         return response["msgId"]
+
+    def _window_curtain_payload_ccs2(
+        self, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> dict:
+        """Body for POST /api/v2/spa/vehicles/{id}/ccs2/control/windowcurtain.
+
+        The CCS2 window-curtain endpoint is seat based (drv/psg/rl/rr) rather
+        than position based; the physical front windows map to driver/passenger
+        via drvSeatLoc (RHD: driver = front right). Curtain keys are only sent
+        when requested. Taken from the Genesis/Hyundai global app
+        (RemoteViewModel.doWindowCurtain, CCS2 branch).
+        """
+        drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
+        drv_seat_loc = getattr(drv_seat_loc, "value", drv_seat_loc)
+        if drv_seat_loc == "R":
+            drv_window, psg_window = options.front_right, options.front_left
+        else:
+            drv_window, psg_window = options.front_left, options.front_right
+        payload = {
+            "drvSeatWindow": drv_window,
+            "psgSeatWindow": psg_window,
+            "rlSeatWindow": options.back_left,
+            "rrSeatWindow": options.back_right,
+            "drvSeatLoc": drv_seat_loc,
+        }
+        if options.rear_left_curtain is not None:
+            payload["rlSeatWindowCurtain"] = options.rear_left_curtain
+        if options.rear_right_curtain is not None:
+            payload["rrSeatWindowCurtain"] = options.rear_right_curtain
+        return payload
+
+    @_retry_on_device_id_error
+    def set_windows_state_ccs2(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Window (+ rear curtain) control via the CCS2 window-curtain endpoint."""
+        url = (
+            self.SPA_API_URL_V2
+            + "vehicles/"
+            + vehicle.id
+            + "/ccs2/control/windowcurtain"
+        )
+        payload = self._window_curtain_payload_ccs2(vehicle, options)
+        _LOGGER.debug(f"{DOMAIN} - CCS2 Window State Action Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - CCS2 Window State Action Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    @_retry_on_device_id_error
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        """Open the front trunk (CCS2 only; app: doFrunkOpen -> {"command": 1})."""
+        if vehicle.supports_frunk is False:
+            raise UnsupportedControlError("Vehicle does not report a frunk option")
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError("open_frunk requires CCS2 protocol support")
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/frunk"
+        payload = {"command": 1}
+        _LOGGER.debug(f"{DOMAIN} - Open Frunk Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Open Frunk Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    @_retry_on_device_id_error
+    def set_lamp_state(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        tail_lamp: bool | None = None,
+        hazard_lamp: bool | None = None,
+    ) -> str:
+        """Turn the tail lamps / hazard lamps on or off (steady lamp control).
+
+        The apps expose this as "turn off a lamp that was left on" and gate it
+        on serviceOption.remoteLightControlOption plus the
+        Body.Lights.{TailLamp,Hazard}.Alert status flags. A None argument
+        leaves that lamp unchanged (its key is omitted). CCS2 body uses
+        tailLamp/hazardLamp, the legacy body tailLamp/hazard; both go through
+        the control token (RemoteViewModel.controlLamp).
+        """
+        if vehicle.supports_lamp_control is False:
+            raise UnsupportedControlError(
+                "Vehicle does not report remote lamp control support"
+            )
+        if tail_lamp is None and hazard_lamp is None:
+            raise ValueError("set_lamp_state needs tail_lamp and/or hazard_lamp")
+        payload: dict = {}
+        if tail_lamp is not None:
+            payload["tailLamp"] = int(bool(tail_lamp))
+        if vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/lamp"
+            if hazard_lamp is not None:
+                payload["hazardLamp"] = int(bool(hazard_lamp))
+        else:
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/lamp"
+            if hazard_lamp is not None:
+                payload["hazard"] = int(bool(hazard_lamp))
+        _LOGGER.debug(f"{DOMAIN} - Lamp State Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Lamp State Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    @_retry_on_device_id_error
+    def start_pet_care(
+        self, token: Token, vehicle: Vehicle, temperature: float, temp_unit: str = "C"
+    ) -> str:
+        """Start pet care / cabin mode (CCS2 only; app: doPetCare).
+
+        Body: {"hvacTemp": "<temperature as string>", "tempUnit": "C"|"F"}.
+        The app has no dedicated stop command; stop_climate ends it.
+        """
+        if vehicle.supports_pet_care is False:
+            raise UnsupportedControlError("Vehicle does not report pet care support")
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "start_pet_care requires CCS2 protocol support"
+            )
+        temp_unit = str(temp_unit).upper()
+        if temp_unit not in ("C", "F"):
+            raise ValueError("temp_unit must be 'C' or 'F'")
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/petcare"
+        payload = {"hvacTemp": f"{float(temperature):.1f}", "tempUnit": temp_unit}
+        _LOGGER.debug(f"{DOMAIN} - Pet Care Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Pet Care Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    @_retry_on_device_id_error
+    def set_battery_conditioning(
+        self, token: Token, vehicle: Vehicle, enabled: bool
+    ) -> str:
+        """Start/stop EV battery conditioning (CCS2 only; app: doBatteryConditioning).
+
+        Body: {"command": 1} to start, {"command": 0} to stop.
+        """
+        if vehicle.engine_type not in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
+            raise UnsupportedControlError(
+                "set_battery_conditioning is only available on EV/PHEV vehicles"
+            )
+        if vehicle.supports_battery_conditioning is False:
+            raise UnsupportedControlError(
+                "Vehicle does not report a battery preconditioning option"
+            )
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "set_battery_conditioning requires CCS2 protocol support"
+            )
+        url = (
+            self.SPA_API_URL_V2
+            + "vehicles/"
+            + vehicle.id
+            + "/ccs2/control/batteryconditioning"
+        )
+        payload = {"command": 1 if enabled else 0}
+        _LOGGER.debug(f"{DOMAIN} - Battery Conditioning Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Battery Conditioning Response: {response}")
+        _check_response_for_errors(response)
+        return response["msgId"]
+
+    def _get_vehicle_profile(self, token: Token, vehicle: Vehicle) -> dict | None:
+        """GET /api/v1/spa/vehicles/{id}/profile -> resMsg.vinInfo[0] (or None).
+
+        The profile carries the per-vehicle capability flags (option.* and
+        serviceOption.*) that the official apps use to show or hide remote
+        controls. Live-confirmed on Genesis AU; failures are logged and
+        swallowed so vehicle discovery never depends on it.
+        """
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/profile"
+        try:
+            response = self.session.get(
+                url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - Vehicle profile response: {response}")
+            _check_response_for_errors(response)
+            vin_info = get_child_value(response, "resMsg.vinInfo")
+            if isinstance(vin_info, list) and vin_info:
+                return vin_info[0]
+            return None
+        except Exception as err:  # pylint: disable=broad-except
+            _LOGGER.debug(f"{DOMAIN} - Vehicle profile fetch failed: {err!r}")
+            return None
+
+    @staticmethod
+    def _apply_vehicle_profile(vehicle: Vehicle, profile: dict | None) -> None:
+        """Fill Vehicle capability flags from a /profile vinInfo entry."""
+        if not profile:
+            return
+        option = profile.get("option") or {}
+        service_option = profile.get("serviceOption") or {}
+        vehicle.vehicle_options = option
+        vehicle.service_options = service_option
+
+        model_year = get_child_value(profile, "basic.modelYear")
+        if vehicle.year is None and model_year:
+            try:
+                vehicle.year = int(model_year)
+            except (TypeError, ValueError):
+                pass
+
+        def flag(container: dict, key: str) -> bool | None:
+            value = container.get(key)
+            if value is None:
+                return None
+            try:
+                return int(value) == 1
+            except (TypeError, ValueError):
+                return str(value).lower() in ("1", "true", "y")
+
+        def seat_controllable(value) -> bool | None:
+            # Apps: J.e(v) -> v not in (0, 7) means remote heat/vent control.
+            if value is None:
+                return None
+            try:
+                return int(value) not in (0, 7)
+            except (TypeError, ValueError):
+                return None
+
+        # Missing keys mean the backend did not advertise the feature for this
+        # car, so treat them as unsupported rather than unknown.
+        vehicle.supports_frunk = bool(flag(option, "frunkOption"))
+        # Remote "lamps left on -> turn off" is offered by the apps whenever
+        # the status reports a TailLamp/Hazard alert; it is NOT gated on
+        # serviceOption.remoteLightControlOption (that flag only switches the
+        # horn+lights command to "lowbeam"). Live-confirmed: the GCS app
+        # offered hazard-off on a GV70 without that flag. Any CCS2 car
+        # publishing the alert fields can use it.
+        vehicle.supports_lamp_control = bool(option.get("remoteControl") in (1, "1"))
+        vehicle.supports_rear_window_curtain = bool(
+            flag(option, "rearWindowCurtainOption")
+        )
+        vehicle.supports_pet_care = bool(
+            flag(service_option, "petCareService") or flag(option, "cmsOption")
+        )
+        vehicle.supports_battery_conditioning = bool(
+            flag(option, "batteryPreconditioningOption")
+        )
+        vehicle.supports_air_purifier = bool(flag(option, "airPurifierOption"))
+        vehicle.supports_sunroof = bool(flag(option, "sunRoofOption"))
+        seats = option.get("seatHeaterVent") or {}
+        third_row = [
+            seat_controllable(seats.get("thirdlSeatHeatOption")),
+            seat_controllable(seats.get("thirdrSeatHeatOption")),
+        ]
+        vehicle.supports_third_row_seat_climate = any(bool(x) for x in third_row)
+        # Window control: serviceOption.windowControlOption is explicit; else a
+        # present windowSafetyOption(2) means the car has remote windows. With
+        # neither key the flag is left unknown (None) so the region default
+        # from VehicleManager still applies.
+        window_control = flag(service_option, "windowControlOption")
+        if window_control is None and (
+            "windowSafetyOption2" in option or "windowSafetyOption" in option
+        ):
+            window_control = True
+        if window_control is not None:
+            vehicle.supports_window_control = window_control
 
     @_retry_on_device_id_error
     def set_navigation(
