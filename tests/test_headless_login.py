@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+import uuid
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
@@ -339,6 +340,46 @@ def test_login_plaintext_password_calls_login_with_password():
 
     assert token.access_token == "Bearer headless-access-token"
     assert token.refresh_token == "HEADLESSREFRESHTOKEN123456789012345678"
+
+
+def test_login_survives_legacy_register_failure(caplog):
+    """A failing legacy device register must not kill the full login:
+    fall back to a random device identity and continue (kia_uvo #1888)."""
+    api = _make_eu_api(brand=2)  # Hyundai
+
+    with (
+        patch.object(api, "_get_stamp", return_value="stamp"),
+        patch.object(
+            api,
+            "_get_device_id",
+            side_effect=AuthenticationError("Received unexpected statusCode"),
+        ),
+        patch.object(api, "_get_cookies", return_value={}),
+        patch.object(api, "_set_session_language"),
+        patch.object(
+            api,
+            "_login_with_password",
+            return_value={
+                "access_token": "Bearer headless-access-token",
+                "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
+                "expires_in": 3600,
+            },
+        ) as login_with_password,
+        caplog.at_level(logging.DEBUG),
+    ):
+        token = api.login("user@test.com", "MyPassword123!", pin="1234")
+
+    device_id = login_with_password.call_args.args[2]
+    assert device_id and device_id != "None"
+    uuid.UUID(device_id)  # a valid random UUID, not a register-issued id
+    assert token.device_id == device_id
+    register_warnings = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "register" in r.message.lower()
+    ]
+    assert len(register_warnings) == 1
+    assert "unexpected statusCode" in register_warnings[0].message
     assert token.pin == "1234"
 
 
