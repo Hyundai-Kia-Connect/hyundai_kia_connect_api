@@ -16,7 +16,7 @@ jobs:
             - uses: actions/github-script@v8
               with:
                   script: |
-                      const MAX_OPEN_PRS = 3;
+                      const MAX_OPEN_PRS = 4;
                       const EXEMPT_ASSOCIATIONS = ["OWNER", "MEMBER", "COLLABORATOR"];
 
                       const pr = context.payload.pull_request;
