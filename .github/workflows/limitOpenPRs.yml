@@ -34,13 +34,12 @@ jobs:
                           return;
                       }
 
+                      const otherPrs = authorPrs
+                          .filter((p) => p.number !== pr.number)
+                          .map((p) => `- #${p.number}`)
+                          .join("\n");
                       await github.rest.issues.createComment({
                           ...context.repo,
                           issue_number: pr.number,
-                          body: `Thanks for the contribution! You currently have ${authorPrs.length} open pull requests, and this repository allows at most ${MAX_OPEN_PRS} per author. This PR has been closed automatically; please get your existing PRs merged or closed first, then reopen this one.`,
-                      });
-                      await github.rest.pulls.update({
-                          ...context.repo,
-                          pull_number: pr.number,
-                          state: "closed",
+                          body: `Thanks for the contribution! You currently have ${authorPrs.length} open pull requests, and this repository asks contributors to keep at most ${MAX_OPEN_PRS} open at a time. Please follow up on your existing PRs before opening new ones:\n\n${otherPrs}`,
                       });
