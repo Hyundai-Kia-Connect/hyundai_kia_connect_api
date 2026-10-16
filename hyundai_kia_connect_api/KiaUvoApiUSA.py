@@ -996,12 +996,18 @@ class KiaUvoApiUSA(ApiImpl):
     ) -> ORDER_STATUS:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
-        response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle
-        )
-        response_json = response.json()
-        last_action_completed = all(v == 0 for v in response_json["payload"].values())
-        return last_action_completed
+        attempts = max(1, timeout // 2) if synchronous else 1
+        for attempt in range(attempts):
+            response = self.post_request_with_logging_and_active_session(
+                token=token, url=url, json_body=body, vehicle=vehicle
+            )
+            payload = response.json()["payload"]
+            # Every pending-command counter at 0 means the action finished.
+            if all(v == 0 for v in payload.values()):
+                return ORDER_STATUS.SUCCESS
+            if attempt < attempts - 1:
+                time.sleep(2)
+        return ORDER_STATUS.TIMEOUT if synchronous else ORDER_STATUS.PENDING
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
