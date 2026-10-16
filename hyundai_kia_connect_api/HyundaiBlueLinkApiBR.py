@@ -371,7 +371,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         return self.login(token.username, token.password, pin=token.pin)
 
     @_retry_on_device_id_error
-    def get_vehicles(self, token: Token) -> list:
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Get list of vehicles."""
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
