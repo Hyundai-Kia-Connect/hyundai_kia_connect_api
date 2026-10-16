@@ -56,7 +56,6 @@ import json
 import logging
 import math
 import re
-import typing as ty
 import uuid
 from time import sleep
 from zoneinfo import ZoneInfo
@@ -346,7 +345,6 @@ class KiaUvoApiCN(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Full password login.  Five-step live-verified flow (see module

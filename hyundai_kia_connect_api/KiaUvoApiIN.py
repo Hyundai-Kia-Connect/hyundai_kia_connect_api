@@ -8,7 +8,6 @@ import logging
 import math
 import re
 import time
-import typing as ty
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions
@@ -123,7 +122,6 @@ class KiaUvoApiIN(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()

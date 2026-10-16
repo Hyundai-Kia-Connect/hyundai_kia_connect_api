@@ -5,7 +5,6 @@
 import base64
 import datetime as dt
 import logging
-import typing as ty
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
@@ -98,7 +97,6 @@ class KiaUvoApiAU(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
