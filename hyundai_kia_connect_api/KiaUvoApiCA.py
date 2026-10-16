@@ -941,7 +941,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response["result"]["maintenanceInfo"]
         return response
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.API_URL + "fndmcr"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -960,7 +960,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
-    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "vrfypin"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token

@@ -16,6 +16,7 @@ from .ApiImpl import (
     ApiImpl,
     ApiImplSession,
     ClimateRequestOptions,
+    OTPRequest,
     POIInfo,
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
@@ -1934,7 +1935,7 @@ class ApiImplType1(ApiImpl):
         """
         return {}
 
-    def refresh_access_token(self, token: Token) -> Token:
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh access token using the stored refresh token.
 
         Uses the OAuth2 refresh_token grant to get a new access token
@@ -2100,7 +2101,7 @@ class ApiImplType1(ApiImpl):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict | None:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
@@ -2116,6 +2117,7 @@ class ApiImplType1(ApiImpl):
         # (EU Ioniq Electric Facelift MY 2019)
         if response["resMsg"] is not None:
             return response["resMsg"]
+        return None
 
     @_retry_on_device_id_error
     def valet_mode_action(
@@ -2202,7 +2204,7 @@ class ApiImplType1(ApiImpl):
 
     def _parse_day_trip(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
-    ) -> TripInfo:
+    ) -> TripInfo | None:
         """Build a TripInfo from one entry of a day's tripList.
 
         IN overrides this to fetch /tripinfo/detail for entries that lack
@@ -2261,7 +2263,7 @@ class ApiImplType1(ApiImpl):
             vehicle.day_trip_info = result
 
     @_retry_on_device_id_error
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
 
         responseAlltime = self.session.post(

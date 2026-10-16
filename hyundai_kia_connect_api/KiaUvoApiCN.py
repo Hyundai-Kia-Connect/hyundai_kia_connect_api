@@ -583,7 +583,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         return response
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
