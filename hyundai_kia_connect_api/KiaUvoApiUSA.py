@@ -254,11 +254,9 @@ class KiaUvoApiUSA(ApiImpl):
             raise APIError(f"No final sid returned. Response: {response.text}")
         return final_sid
 
-    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(
-            otp_request.otp_key, notify_type.value, otp_request.request_id
-        )
+        self._send_otp(otp_request.otp_key, notify_type.value, otp_request.request_id)
 
     def verify_otp_and_complete_login(
         self,
