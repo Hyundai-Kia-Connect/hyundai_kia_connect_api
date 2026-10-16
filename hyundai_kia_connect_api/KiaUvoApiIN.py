@@ -479,7 +479,7 @@ class KiaUvoApiIN(ApiImplType1):
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
-        _LOGGER.error(f"Getting location from {url}")
+        _LOGGER.debug(f"{DOMAIN} - Getting location from {url}")
 
         try:
             response = self.session.get(
