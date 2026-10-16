@@ -498,40 +498,6 @@ class KiaUvoApiCN(ApiImplType1):
     # ------------------------------------------------------------------
     # Vehicles / state (business surface --same schema as the old code)
     # ------------------------------------------------------------------
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL + "vehicles"
-        response = self.session.get(
-            url, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=entry_engine_type,
-                # DIFFERENCE vs ApiImplType1.get_vehicles: the China vehicle
-                # list does not include ccuCCS2ProtocolSupport (verified on a
-                # 2025 Custo) --default to 0 so the legacy status path is used.
-                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            )
-            result.append(vehicle)
-        return result
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
