@@ -499,10 +499,10 @@ class KiaUvoApiCA(ApiImpl):
             ):
                 if vehicle.location_latitude is None:
                     vehicle._location_fetch_attempted = True
-                location = self.get_location(token, vehicle)
+                location = self._get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-            location = self.get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
         # Update service after the fact so we still have the old odometer
@@ -557,10 +557,10 @@ class KiaUvoApiCA(ApiImpl):
             ):
                 if vehicle.location_latitude is None:
                     vehicle._location_fetch_attempted = True
-                location = self.get_location(token, vehicle)
+                location = self._get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-            location = self.get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
         # Update service after the fact so we still have the old odometer
@@ -941,7 +941,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response["result"]["maintenanceInfo"]
         return response
 
-    def get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "fndmcr"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
