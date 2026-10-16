@@ -491,7 +491,10 @@ class ApiImpl:
         synchronous: bool = False,
         timeout: int = 0,
     ) -> ORDER_STATUS:
-        pass
+        """Return the status of a previously sent remote command"""
+        raise NotImplementedError(
+            "check_action_status is not implemented for this region"
+        )
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Triggers the system to contact the car and get fresh data"""
