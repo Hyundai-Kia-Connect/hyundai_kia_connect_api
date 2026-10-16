@@ -30,6 +30,7 @@ from .const import (
     ENGINE_TYPES,
     ORDER_STATUS,
     PRESSURE_SCALES,
+    SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VALET_MODE_ACTION,
@@ -1781,7 +1782,7 @@ class ApiImplType1(ApiImpl):
             # For RHD vehicles the driver sits on the right, so the front
             # physical seats map to passenger/driver respectively.
             drv_seat_loc = self._get_drv_seat_loc(vehicle)
-            if drv_seat_loc == "R":
+            if drv_seat_loc == SEAT_LOCATION.RIGHT:
                 drv_seat, psg_seat = options.front_right_seat, options.front_left_seat
             else:
                 drv_seat, psg_seat = options.front_left_seat, options.front_right_seat
