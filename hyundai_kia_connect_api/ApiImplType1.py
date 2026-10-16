@@ -245,7 +245,9 @@ class ApiImplType1(ApiImpl):
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
                 engine_type=entry_engine_type,
-                ccu_ccs2_protocol_support=entry["ccuCCS2ProtocolSupport"],
+                # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
+                # those vehicles on the legacy status path.
+                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
             )
             result.append(vehicle)
         return result
