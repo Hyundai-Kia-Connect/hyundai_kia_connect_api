@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions
 from .ApiImplType1 import (
+    USER_AGENT_OK_HTTP,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -40,28 +41,6 @@ from .Vehicle import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
-
-SUPPORTED_LANGUAGES_LIST = [
-    "en",  # English
-    "de",  # German
-    "fr",  # French
-    "it",  # Italian
-    "es",  # Spanish
-    "sv",  # Swedish
-    "nl",  # Dutch
-    "no",  # Norwegian
-    "cs",  # Czech
-    "sk",  # Slovak
-    "hu",  # Hungarian
-    "da",  # Danish
-    "pl",  # Polish
-    "fi",  # Finnish
-    "pt",  # Portuguese
-]
 
 
 class KiaUvoApiIN(ApiImplType1):

@@ -8,7 +8,11 @@ import logging
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
-from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .ApiImplType1 import (
+    USER_AGENT_OK_HTTP,
+    ApiImplType1,
+    _check_response_for_errors,
+)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -34,9 +38,6 @@ from .Vehicle import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
 
 
 class KiaUvoApiAU(ApiImplType1):
