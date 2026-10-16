@@ -25,6 +25,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
@@ -708,9 +709,9 @@ class KiaUvoApiIN(ApiImplType1):
 
             vehicle.month_trip_info = result
 
-    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """India uses RHD vehicles regardless of the odometer unit."""
-        return "R"
+        return SEAT_LOCATION.RIGHT
 
     def _parse_day_trip(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict

@@ -22,6 +22,7 @@ from .const import (
     REGION_AUSTRALIA,
     REGION_NZ,
     REGIONS,
+    SEAT_LOCATION,
 )
 from .exceptions import AuthenticationError
 from .Token import Token
@@ -286,9 +287,9 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
-        return "R"
+        return SEAT_LOCATION.RIGHT
 
     def _get_cookies(self) -> dict:
         # Get Cookies #
