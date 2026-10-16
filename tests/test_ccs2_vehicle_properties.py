@@ -577,9 +577,20 @@ def test_schedule_charging_off_peak_flag_prioritised(ccs2_api, vehicle):
     ccs2_api._get_control_headers = lambda token, vehicle: {}
     ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
     vehicle.id = "test-vehicle-id"
-    # The flat dispatch writes the climate scope too (departures are set):
-    # report a temperature so the unresolvable-temperature guard passes.
     vehicle.ev_first_departure_climate_temperature = (21.0, "°C")
-
     ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
     assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 1
+
+
+def test_ccs2_departure_climate_parsed(ccs2_api, vehicle):
+    """CCS2 fixture with departure climate settings -> parsed onto Vehicle."""
+    data = load_fixture("eu_kia_ev3_2025_ccs2.json")
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_first_departure_climate_enabled is True
+    assert vehicle.ev_first_departure_climate_temperature == 20.0
+    assert vehicle.ev_first_departure_climate_temperature_unit == "°C"
+    assert vehicle.ev_first_departure_climate_defrost is False
+    assert vehicle.ev_second_departure_climate_enabled is True
+    assert vehicle.ev_second_departure_climate_temperature == 24.0
+    assert vehicle.ev_second_departure_climate_temperature_unit == "°C"
+    assert vehicle.ev_second_departure_climate_defrost is False
