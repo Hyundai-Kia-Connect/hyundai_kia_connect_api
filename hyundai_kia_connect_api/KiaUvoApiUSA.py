@@ -57,10 +57,7 @@ def request_with_active_session(func):
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
             new_token = self.login(
-                token.username,
-                token.password,
-                token,
-                getattr(self, "_otp_handler", None),
+                token.username, token.password, pin=token.pin, token=token
             )
             token.access_token = new_token.access_token
             token.refresh_token = new_token.refresh_token
@@ -118,10 +115,7 @@ def _retry_on_auth_error(func):
             )
             try:
                 new_token = self.login(
-                    token.username,
-                    token.password,
-                    token,
-                    getattr(self, "_otp_handler", None),
+                    token.username, token.password, pin=token.pin, token=token
                 )
             except Exception as e:
                 raise AuthenticationError(f"Re-login failed: {e}") from e
@@ -149,8 +143,6 @@ class KiaUvoApiUSA(ApiImpl):
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
         self.session = ApiImplSession()
         self.session.mount("https://", KiaSSLAdapter())
-
-        self._otp_handler = None
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
@@ -297,8 +289,8 @@ class KiaUvoApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token | None = None,
         pin: str | None = None,
+        token: Token | None = None,
     ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token
 
@@ -308,13 +300,9 @@ class KiaUvoApiUSA(ApiImpl):
             User email address
         password : str
             User password
+        pin : str, optional
         token : Token, optional
             Existing token with stored rmtoken for reuse
-        otp_handler : Callable[[dict], dict], optional
-            Non-interactive OTP handler. Called twice:
-            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'SMS'}
-            - stage='input_code' -> return {'otp_code': '<code>'}
-        pin : str, optional
 
         Returns
         -------
@@ -374,7 +362,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
-        return self.login(token.username, token.password, token)
+        return self.login(token.username, token.password, pin=token.pin, token=token)
 
     @_retry_on_auth_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
