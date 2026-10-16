@@ -257,7 +257,7 @@ class KiaUvoApiAU(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:

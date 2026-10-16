@@ -1389,7 +1389,7 @@ class KiaUvoApiEU(ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:

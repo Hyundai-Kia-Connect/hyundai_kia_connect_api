@@ -451,7 +451,7 @@ class KiaUvoApiIN(ApiImplType1):
         response = response["resMsg"]
         return response
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
         _LOGGER.debug(f"{DOMAIN} - Getting location from {url}")
 
@@ -557,7 +557,7 @@ class KiaUvoApiIN(ApiImplType1):
         vehicle: Vehicle,
         date_string: str,
         trip: dict,
-    ) -> dict:
+    ) -> TripInfo | None:
         if (
             vehicle.engine_type != ENGINE_TYPES.EV
             or BRANDS[self.brand] != BRAND_HYUNDAI
@@ -599,7 +599,7 @@ class KiaUvoApiIN(ApiImplType1):
 
     def _parse_day_trip(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
-    ) -> TripInfo:
+    ) -> TripInfo | None:
         # Hyundai EVs do not provide full trip info. Used "/tripinfo/detail" API instead
         if "tripTime" in trip:
             return super()._parse_day_trip(token, vehicle, yyyymmdd_string, trip)

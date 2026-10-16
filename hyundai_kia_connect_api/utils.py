@@ -260,7 +260,7 @@ def detect_timezone_for_date(
     return None
 
 
-def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime:
+def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime | None:
     """Parse date string in format YYYYMMDD or YYYYMMDDHHMMSS to datetime.
 
     Used by Brazilian API to parse date strings.
