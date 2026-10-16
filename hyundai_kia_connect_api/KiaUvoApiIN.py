@@ -5,9 +5,7 @@
 import base64
 import datetime as dt
 import logging
-import math
 import re
-import time
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions
@@ -578,36 +576,6 @@ class KiaUvoApiIN(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    @_retry_on_device_id_error
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
-
-        payload = {"command": "on"}
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
-        response = self.session.post(
-            url,
-            json=payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
-    @_retry_on_device_id_error
-    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
-
-        payload = {"command": "on"}
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
-        response = self.session.post(
-            url,
-            json=payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
     def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
         try:
             if isinstance(state.get("targetSOClist"), list):
@@ -803,29 +771,3 @@ class KiaUvoApiIN(ApiImplType1):
         token_type = response["token_type"]
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
-
-    def _get_control_token(self, token: Token) -> tuple[str, float]:
-        # Return cached control token if still valid
-        if token.control_token is not None and token.control_token_expiry > time.time():
-            return token.control_token, token.control_token_expiry
-
-        url = self.USER_API_URL + "pin?token="
-        headers = {
-            "Authorization": token.access_token,
-            "Content-type": "application/json",
-            "Host": self.BASE_URL,
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = {"deviceId": token.device_id, "pin": token.pin}
-        response = self.session.put(url, json=data, headers=headers)
-        response = response.json()
-        control_token = "Bearer " + response["controlToken"]
-        control_token_expire_at = math.floor(
-            dt.datetime.now().timestamp() + response["expiresTime"]
-        )
-        # Cache control token and expiry for reuse
-        token.control_token = control_token
-        token.control_token_expiry = control_token_expire_at
-        return control_token, control_token_expire_at
