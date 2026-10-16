@@ -1122,7 +1122,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # Without any timestamp we cannot determine freshness.
         return False
 
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         response = self._get_enrollment_details(token, force_refresh=True)
         result = []
         for entry in response["enrolledVehicleDetails"]:

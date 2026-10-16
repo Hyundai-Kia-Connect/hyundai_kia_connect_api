@@ -184,7 +184,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers["deviceid"] = self.device_id
         return headers
 
-    def authed_api_headers(self, token: Token, vehicle: Vehicle):
+    def authed_api_headers(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self.api_headers()
         headers["sid"] = token.access_token
         headers["vinkey"] = vehicle.key

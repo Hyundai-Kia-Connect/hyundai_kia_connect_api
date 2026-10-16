@@ -2002,7 +2002,7 @@ class ApiImplType1(ApiImpl):
                 )
         return self.login(token.username, token.password, token.pin)
 
-    def _get_control_token(self, token: Token) -> Token:
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
         # Return cached control token if still valid
         if token.control_token is not None and token.control_token_expiry > time.time():
             return token.control_token, token.control_token_expiry
@@ -2043,7 +2043,7 @@ class ApiImplType1(ApiImpl):
         result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
-    def _get_device_id(self, stamp: str):
+    def _get_device_id(self, stamp: str) -> str:
         my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"

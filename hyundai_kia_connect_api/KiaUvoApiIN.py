@@ -806,7 +806,7 @@ class KiaUvoApiIN(ApiImplType1):
         refresh_token = token_type + " " + response["access_token"]
         return token_type, refresh_token
 
-    def _get_control_token(self, token: Token) -> Token:
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
         # Return cached control token if still valid
         if token.control_token is not None and token.control_token_expiry > time.time():
             return token.control_token, token.control_token_expiry
