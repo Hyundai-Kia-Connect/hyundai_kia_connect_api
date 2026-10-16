@@ -846,9 +846,6 @@ class KiaUvoApiUSA(ApiImpl):
         response_body = response.json()
         return response_body["payload"]["vehicleInfoList"][0]
 
-    def get_location(self, token: Token, vehicle_id: str) -> None:
-        pass
-
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rems/rvs"
         body = {
