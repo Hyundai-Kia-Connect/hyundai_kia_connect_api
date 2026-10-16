@@ -264,7 +264,7 @@ class KiaUvoApiUSA(ApiImpl):
         password: str,
         otp_code: str,
         otp_request: OTPRequest,
-        pin: str | None,
+        pin: str | None = None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
         sid, rmtoken = self._verify_otp(
