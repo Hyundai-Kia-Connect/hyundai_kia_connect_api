@@ -32,8 +32,6 @@ from .exceptions import AuthenticationError
 from .Token import Token
 from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import (
-    DayTripCounts,
-    MonthTripInfo,
     TripInfo,
     Vehicle,
 )
@@ -609,50 +607,6 @@ class KiaUvoApiIN(ApiImplType1):
         )
 
         return processed_trip
-
-    def update_month_trip_info(
-        self,
-        token,
-        vehicle,
-        yyyymm_string,
-    ) -> None:
-        """
-        feature only available for some regions.
-        Updates the vehicle.month_trip_info for the specified month.
-
-        Default this information is None:
-
-        month_trip_info: MonthTripInfo = None
-        """
-        vehicle.month_trip_info = None
-        json_result = self._get_trip_info(
-            token,
-            vehicle,
-            yyyymm_string,
-            0,  # month trip info
-        )
-        msg = json_result["resMsg"]
-        if msg.get("monthTripDayCnt", 0) > 0 or len(msg.get("tripDayList", [])) > 0:
-            result = MonthTripInfo(
-                yyyymm=yyyymm_string,
-                day_list=[],
-                summary=TripInfo(
-                    drive_time=msg["tripDrvTime"],
-                    idle_time=msg["tripIdleTime"],
-                    distance=msg["tripDist"],
-                    avg_speed=msg["tripAvgSpeed"],
-                    max_speed=msg["tripMaxSpeed"],
-                ),
-            )
-
-            for day in msg["tripDayList"]:
-                processed_day = DayTripCounts(
-                    yyyymmdd=day["tripDayInMonth"],
-                    trip_count=day["tripCntDay"],
-                )
-                result.day_list.append(processed_day)
-
-            vehicle.month_trip_info = result
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """India uses RHD vehicles regardless of the odometer unit."""

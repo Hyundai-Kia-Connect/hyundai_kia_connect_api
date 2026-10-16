@@ -2178,7 +2178,7 @@ class ApiImplType1(ApiImpl):
             0,  # month trip info
         )
         msg = json_result["resMsg"]
-        if msg["monthTripDayCnt"] > 0:
+        if msg.get("monthTripDayCnt", 0) > 0 or len(msg.get("tripDayList", [])) > 0:
             result = MonthTripInfo(
                 yyyymm=yyyymm_string,
                 day_list=[],
