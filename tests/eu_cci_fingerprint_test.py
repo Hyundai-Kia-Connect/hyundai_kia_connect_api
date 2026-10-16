@@ -143,7 +143,7 @@ def _eu_api(brand: int = 2) -> KiaUvoApiEU:
 def test_region1_hyundai_exchange_fp_primary(mock_post):
     mock_post.return_value = _resp(200, '{"accessToken":"cci-at"}')
     resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert resp.json()["accessToken"] == "cci-at"
+    assert resp["accessToken"] == "cci-at"
     assert mock_post.call_count == 1
     assert mock_post.call_args.args[0].endswith("/auth/v1/token")
     sent = mock_post.call_args.kwargs["headers"]
@@ -157,7 +157,7 @@ def test_region1_hyundai_exchange_fp_primary(mock_post):
 def test_region1_kia_exchange_fp_primary(mock_post):
     mock_post.return_value = _resp(200, '{"accessToken":"kia-at"}')
     resp = _eu_api(brand=1)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert resp.json()["accessToken"] == "kia-at"
+    assert resp["accessToken"] == "kia-at"
     assert mock_post.call_count == 1
     sent = mock_post.call_args.kwargs["headers"]
     assert sent["client-name"] == "KiaEU"
@@ -171,7 +171,7 @@ def test_region1_hyundai_exchange_falls_back_to_legacy(mock_post):
         _resp(200, '{"accessToken":"legacy-at"}'),
     ]
     resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert resp.json()["accessToken"] == "legacy-at"
+    assert resp["accessToken"] == "legacy-at"
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0].args[0].endswith("/auth/v1/token")
     assert mock_post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/token")
@@ -217,7 +217,7 @@ def test_region1_gate_fallback_logs_error_level(mock_post, caplog):
         _resp(200, '{"accessToken":"legacy-at"}'),
     ]
     resp = _eu_api(brand=2)._exchange_auth_code_for_cci_tokens("dev-1", "CODE123")
-    assert resp.json()["accessToken"] == "legacy-at"
+    assert resp["accessToken"] == "legacy-at"
     assert any(
         r.levelname == "ERROR" and "transitional" in r.message for r in caplog.records
     )
