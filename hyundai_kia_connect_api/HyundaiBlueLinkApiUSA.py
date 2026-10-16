@@ -1323,9 +1323,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Start charging..")
 
@@ -1344,9 +1344,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Stop charging..")
 
@@ -1367,9 +1367,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    ) -> str:
+    ) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
         url = self.API_URL + "evc/charge/targetsoc/set"
