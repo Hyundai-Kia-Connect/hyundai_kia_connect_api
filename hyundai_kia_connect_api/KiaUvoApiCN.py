@@ -70,7 +70,6 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
-    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import (
     APIError,
@@ -618,20 +617,6 @@ class KiaUvoApiCN(ApiImplType1):
     # follows the inherited Type1 dispatch: legacy vehicles use the access
     # token, CCS2 vehicles use the PIN-derived control token)
     # ------------------------------------------------------------------
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
-
-        payload = {"action": action.value, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
-        response = self.session.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:

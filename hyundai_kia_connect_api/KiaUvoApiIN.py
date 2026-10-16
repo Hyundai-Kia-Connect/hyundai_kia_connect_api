@@ -26,7 +26,6 @@ from .const import (
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
-    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import AuthenticationError
 from .Token import Token
@@ -469,20 +468,6 @@ class KiaUvoApiIN(ApiImplType1):
         except Exception:
             _LOGGER.warning(f"{DOMAIN} - _get_location failed")
             return None
-
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
-
-        payload = {"action": action.value, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
-        response = self.session.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
 
     @_retry_on_device_id_error
     def charge_port_action(
