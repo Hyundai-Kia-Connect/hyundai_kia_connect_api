@@ -5,7 +5,6 @@
 import datetime as dt
 import logging
 import random
-import typing as ty
 import uuid
 from datetime import timedelta
 from time import sleep
@@ -292,7 +291,6 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login to Brazilian Hyundai API."""
