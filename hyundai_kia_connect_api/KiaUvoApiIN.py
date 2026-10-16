@@ -487,6 +487,8 @@ class KiaUvoApiIN(ApiImplType1):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
+        if vehicle.ccu_ccs2_protocol_support:
+            return super().start_climate(token, vehicle, options)
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/engine"
 
         # Defaults are located here to be region specific
@@ -526,6 +528,8 @@ class KiaUvoApiIN(ApiImplType1):
         return response["msgId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        if vehicle.ccu_ccs2_protocol_support:
+            return super().stop_climate(token, vehicle)
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
         payload = {
             "action": "stop",
