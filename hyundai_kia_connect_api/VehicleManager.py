@@ -5,6 +5,7 @@
 import datetime as dt
 import logging
 import re
+import warnings
 from datetime import timedelta
 
 from .ApiImpl import (
@@ -89,8 +90,12 @@ class VehicleManager:
         self.vehicles: dict = {}
         self.otp_request: OTPRequest = None
 
-    @DeprecationWarning
     def initialize(self) -> None:
+        warnings.warn(
+            "VehicleManager.initialize is deprecated; call login() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.token: Token = self.api.login(
             username=self.username,
             password=self.password,
