@@ -600,8 +600,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
             )
         )
-        # Per-tire pressures. The USA API reports no unit; values are psi.
-        # 255 is the TPMS "no reading" sentinel -> None. See kia_uvo #1963.
         vehicle.tire_pressure_front_left = pressure_or_none(
             float_or_none(
                 get_child_value(
@@ -630,8 +628,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 )
             )
         )
-        # Only set the unit when the vehicle reports pressures, so the HA
-        # tire-pressure sensors aren't created for vehicles without them.
         vehicle.tire_pressure_unit = (
             PressureUnit.PSI
             if get_child_value(state, "vehicleStatus.tirePressure") is not None
