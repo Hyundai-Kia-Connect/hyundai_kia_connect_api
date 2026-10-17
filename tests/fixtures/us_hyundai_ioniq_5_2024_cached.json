@@ -39,6 +39,16 @@
             "rlSeatHeatState": 0,
             "rrSeatHeatState": 0
         },
+        "tirePressure": {
+            "datetimeFrontLeft": "2024-09-01T12:00:00Z",
+            "datetimeFrontRight": "2024-09-01T12:00:00Z",
+            "datetimeRearLeft": "2024-09-01T12:00:00Z",
+            "datetimeRearRight": "2024-09-01T12:00:00Z",
+            "tirePressureFrontLeft": 36,
+            "tirePressureFrontRight": 36,
+            "tirePressureRearLeft": 37,
+            "tirePressureRearRight": 36
+        },
         "tirePressureLamp": {
             "tirePressureWarningLampFrontLeft": false,
             "tirePressureWarningLampFrontRight": false,

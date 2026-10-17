@@ -30,6 +30,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    PressureUnit,
 )
 from .svm import (
     SVMDetails,
@@ -47,6 +48,7 @@ from .utils import (
     get_float,
     normalize_battery_soc,
     parse_datetime,
+    pressure_or_none,
 )
 from .Vehicle import (
     DailyDrivingStats,
@@ -597,6 +599,39 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(
                 state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
             )
+        )
+        vehicle.tire_pressure_front_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_front_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_unit = (
+            PressureUnit.PSI
+            if get_child_value(state, "vehicleStatus.tirePressure") is not None
+            else None
         )
         vehicle.front_left_window_is_open = get_child_value(
             state, "vehicleStatus.windowOpen.frontLeft"
