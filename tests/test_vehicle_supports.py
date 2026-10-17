@@ -37,7 +37,10 @@ def test_vehicle_supports_not_shared_between_vehicles():
 @pytest.mark.parametrize(
     ("api_cls", "expected"),
     [
-        (ApiImpl, VehicleSupports(window_control=False, valet_mode=False, svm=False)),
+        (
+            ApiImpl,
+            VehicleSupports(window_control=False, valet_mode=False, svm=False),
+        ),
         (
             ApiImplType1,
             VehicleSupports(window_control=True, valet_mode=True, svm=False),
@@ -56,11 +59,23 @@ def test_get_vehicle_supports_uses_region_defaults(api_cls, expected):
     assert _resolve(api_cls) == expected
 
 
-def test_get_vehicle_supports_covers_every_item():
-    """A new VehicleSupports field must be resolved by get_vehicle_supports."""
+def test_get_vehicle_supports_maps_every_region_attribute():
+    """Every ApiImpl.supports_<item> region attribute must reach vehicle.supports."""
+    region_items = [
+        name.removeprefix("supports_")
+        for name in vars(ApiImpl)
+        if name.startswith("supports_")
+    ]
+    assert region_items
     supports = _resolve(ApiImpl)
-    for f in dataclasses.fields(VehicleSupports):
-        assert getattr(supports, f.name) is not None, f.name
+    for item in region_items:
+        assert getattr(supports, item) is not None, item
+
+
+def test_items_without_region_attribute_stay_undetermined():
+    supports = _resolve(ApiImpl)
+    assert supports.sunroof is None
+    assert supports.hazard_lights_and_horn is None
 
 
 def test_vehicle_manager_uses_per_vehicle_override():
