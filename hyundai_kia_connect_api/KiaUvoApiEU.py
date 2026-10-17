@@ -23,10 +23,8 @@ from .ApiImplType1 import (
     _check_response_for_errors,
     _retry_on_device_id_error,
 )
+from .cci_auth import CciAuthMixin
 from .cci_fingerprint import (
-    build_fp_headers,
-    client_name_for_brand,
-    compute_x_fingerprint,
     is_gate_rejection,
 )
 from .const import (
@@ -81,7 +79,7 @@ SUPPORTED_LANGUAGES_LIST = [
 ]
 
 
-class KiaUvoApiEU(ApiImplType1):
+class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
     data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = tuple(x * 0.5 for x in range(28, 64))
 
@@ -165,21 +163,20 @@ class KiaUvoApiEU(ApiImplType1):
             self.ONEAPP_CLIENT_ID: str = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
             self.ONEAPP_REDIRECT_URI: str = "https://oneapp.hyundai.com/redirect"
             self.CCI_API_URL: str = "https://cci-api-eu.hyundai.com"
-            self._cci_package_id: str = "com.hyundai.oneapp.eu"
+            self.CCI_PACKAGE_ID: str = "com.hyundai.oneapp.eu"
             self._cci_client_name: str = "hyundai"
         elif BRANDS[self.brand] == BRAND_KIA:
             self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
             self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
             self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
-            self._cci_package_id: str = "com.kia.oneapp.eu"
+            self.CCI_PACKAGE_ID: str = "com.kia.oneapp.eu"
             self._cci_client_name: str = "kia"
         else:  # BRAND_GENESIS
             self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
             self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
             self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
-            self._cci_package_id: str = "com.genesis.oneapp.eu"
+            self.CCI_PACKAGE_ID: str = "com.genesis.oneapp.eu"
             self._cci_client_name: str = "genesis"
-        self.CCI_DOMAIN_API_URL: str = self.CCI_API_URL + "/domain/api/"
         self._cci_client_version: str = "1.3.3"
         self._cci_client_os_version: str = (
             "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
@@ -272,76 +269,6 @@ class KiaUvoApiEU(ApiImplType1):
             AuthenticationError: If login fails.
         """
         return self._login_with_password_cci(username, password, device_id)
-
-    def _cci_timezone_offset(self) -> str:
-        """Current UTC offset of the EU data timezone as '+HH:MM'."""
-        aware = dt.datetime.now(dt.UTC).astimezone(self.data_timezone)
-        off = aware.strftime("%z")  # e.g. +0200
-        return f"{off[:3]}:{off[3:]}" if off else "+00:00"
-
-    def _cci_fp_headers(self, device_id: str, body: str = "") -> dict:
-        """Header set for the fingerprint-gated CCI endpoints (see #1888).
-
-        The gate validates the X-Fingerprint HMAC against the client identity
-        in these headers, so this uses the live-verified OneApp build identity
-        (cci_fingerprint module constants), not the legacy CCI header values.
-        Pass the exact request body so the signature covers it.
-        """
-        headers = build_fp_headers(
-            package_id=self._cci_package_id,
-            client_name=client_name_for_brand(self.brand),
-            device_id=device_id,
-            locale=self.LANGUAGE,
-            timezone=self._cci_timezone_offset(),
-            brand_label=BRANDS[self.brand],
-        )
-        ts = str(int(dt.datetime.now(dt.UTC).timestamp() * 1000))
-        headers["X-Timestamp"] = ts
-        headers["X-Fingerprint"] = compute_x_fingerprint(headers, self.brand, body)
-        return headers
-
-    def _get_cci_headers(
-        self,
-        device_id: str,
-        cci_access_token: str | None = None,
-        non_ccs_token: str | None = None,
-        exchangeable_token: str | None = None,
-        content_type: str | None = None,
-    ) -> dict:
-        """Headers for the CCI API (cci-api-eu.{hyundai,kia}.com).
-
-        - Authentication: raw nonCcsToken (no Bearer prefix)
-        - authorization: "Bearer " + CCI accessToken
-        - exchangeable-token / non-ccs-token (kebab-case)
-        """
-        headers = {
-            "client-id": self._cci_package_id,
-            "client-name": self._cci_client_name,
-            "client-version": self._cci_client_version,
-            "client-os-code": "ios",
-            "client-os-version": self._cci_client_os_version,
-            "client-device-id": device_id or "",
-            "client-device-model": "iPhone",
-            "client-notification-provider-type": self._cci_notification_provider,
-            "locale": self.LANGUAGE.upper(),
-            "timezone": self._cci_timezone_offset(),
-            "Accept": "application/json",
-            "Accept-Language": self.LANGUAGE,
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-        if non_ccs_token is not None:
-            headers["Authentication"] = non_ccs_token
-        if cci_access_token is not None:
-            cci_access_token = cci_access_token.removeprefix("Bearer ").strip()
-            headers["authorization"] = f"Bearer {cci_access_token}"
-        if exchangeable_token is not None:
-            headers["exchangeable-token"] = exchangeable_token
-            headers["non-ccs-token"] = non_ccs_token or ""
-        if content_type:
-            headers["Content-Type"] = content_type
-        else:
-            headers["Content-Length"] = "0"
-        return headers
 
     def _login_with_password_cci(
         self, username: str, password: str, device_id: str
@@ -439,8 +366,7 @@ class KiaUvoApiEU(ApiImplType1):
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens (code in URL query, no body)
-        resp = self._exchange_auth_code_for_cci_tokens(device_id, code)
-        cci = resp.json()
+        cci = self._exchange_auth_code_for_cci_tokens(device_id, code)
         cci_access_token = cci.get("accessToken", "")
         cci_refresh_token = cci.get("refreshToken", "")
         non_ccs_token = cci.get("nonCcsToken", "")
@@ -467,124 +393,6 @@ class KiaUvoApiEU(ApiImplType1):
             "non_ccs_refresh_token": non_ccs_refresh_token,
             "id_token": id_token,
         }
-
-    def _exchange_auth_code_for_cci_tokens(self, device_id: str, code: str):
-        """Exchange the auth code for CCI tokens, primary path per brand.
-
-        All EU OneApp auth endpoints are fingerprint-gated (2026-10-14):
-        /auth/v1/token with the signed X-Fingerprint identity headers goes
-        first; the legacy domain/api exchange runs as fallback so a gate
-        rollback keeps working.
-        """
-        resp = self._fp_exchange_auth_code(device_id, code)
-        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
-            _LOGGER.error(
-                f"{DOMAIN} - Fingerprint gate rejected the signed auth-code "
-                f"exchange (HTTP {resp.status_code}); fell back to the legacy "
-                "route. This fallback is transitional - report this log so "
-                "the fallback can be removed"
-            )
-            resp = self._legacy_exchange_auth_code(device_id, code)
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCI token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate a Hyundai API change."
-            )
-        return resp
-
-    def _legacy_exchange_auth_code(
-        self, device_id: str, code: str
-    ) -> requests.Response:
-        """POST code to the legacy domain/api exchange (no fingerprint)."""
-        headers = self._get_cci_headers(device_id)
-        return requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-
-    def _fp_exchange_auth_code(self, device_id: str, code: str) -> requests.Response:
-        """POST code to the fingerprint-gated /auth/v1/token exchange."""
-        return requests.post(
-            f"{self.CCI_API_URL}/auth/v1/token",
-            params={"code": code},
-            headers=self._cci_fp_headers(device_id),
-            timeout=(5, 30),
-        )
-
-    def _exchange_ccs_token(
-        self,
-        device_id: str,
-        cci_access_token: str,
-        non_ccs_token: str,
-        exchangeable_token: str,
-    ) -> tuple[str, dt.datetime]:
-        """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
-
-        The token-exchange endpoint is fingerprint-gated like the other /auth
-        endpoints (unsigned calls answer 9035, field-verified 2026-10-14 on
-        Hyundai): the signed primary carries the CCI token headers on the
-        OneApp identity, the legacy domain/api route runs unsigned as
-        fallback.
-
-        The CCS token is accepted by the legacy ccapi:8080 vehicle/control
-        endpoints as a Bearer access_token. Returns (ccs_token, valid_until).
-        """
-        headers = self._cci_fp_headers(device_id)
-        headers["authorization"] = (
-            "Bearer " + (cci_access_token or "").removeprefix("Bearer ").strip()
-        )
-        headers["Authentication"] = non_ccs_token or ""
-        if exchangeable_token:
-            headers["exchangeable-token"] = exchangeable_token
-            headers["non-ccs-token"] = non_ccs_token or ""
-        resp = requests.post(
-            f"{self.CCI_API_URL}/auth/v1/token-exchange",
-            params={"serviceType": "CCS"},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
-            _LOGGER.error(
-                f"{DOMAIN} - Fingerprint gate rejected the signed CCS "
-                f"token-exchange (HTTP {resp.status_code}); fell back to the "
-                "legacy route. This fallback is transitional - report this "
-                "log so the fallback can be removed"
-            )
-            headers = self._get_cci_headers(
-                device_id,
-                cci_access_token=cci_access_token,
-                non_ccs_token=non_ccs_token,
-                exchangeable_token=exchangeable_token,
-            )
-            resp = requests.post(
-                f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
-                params={"serviceType": "CCS"},
-                headers=headers,
-                timeout=(5, 30),
-            )
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCS token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate a Hyundai API change."
-            )
-        data = resp.json()
-        ccs_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
-        if not ccs_token:
-            raise AuthenticationError(
-                f"CCS token exchange returned no accessToken: {resp.text[:200]}"
-            )
-        # expiresTime is the CCS token TTL in seconds (e.g. 86400 = 24h), not an
-        # epoch. Treat it as a relative duration from now; fall back to +1h.
-        expires_in = data.get("expiresTime")
-        if expires_in:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
-                seconds=int(expires_in)
-            )
-        else:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
-        return ccs_token, ccs_valid_until
 
     def refresh_access_token(self, token: Token) -> Token:
         """Refresh access token using the stored refresh token.
