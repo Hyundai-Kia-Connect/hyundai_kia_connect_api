@@ -69,6 +69,7 @@ from .Vehicle import (
     MonthTripInfo,
     TripInfo,
     Vehicle,
+    VehicleSupports,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -165,10 +166,14 @@ def _check_response_for_errors(response: dict) -> None:
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
-    supports_window_control: bool = True
-    supports_valet_mode: bool = True
     # resMsg key holding the all-time entry of the drvhistory response.
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        supports.window_control = True
+        supports.valet_mode = True
+        return supports
 
     def __init__(self) -> None:
         """Initialize."""

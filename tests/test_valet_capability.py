@@ -21,11 +21,12 @@ def test_vehicle_supports_valet_mode_default_none():
 
 
 def test_base_api_impl_does_not_support_valet_mode():
-    assert ApiImpl.supports_valet_mode is False
+    assert ApiImpl().get_vehicle_supports(Vehicle()).valet_mode is False
 
 
 def test_type1_api_impl_supports_valet_mode():
-    assert ApiImplType1.supports_valet_mode is True
+    api = ApiImplType1.__new__(ApiImplType1)
+    assert api.get_vehicle_supports(Vehicle()).valet_mode is True
 
 
 def test_vehicle_manager_resolves_supports_valet_mode():

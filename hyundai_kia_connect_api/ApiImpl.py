@@ -430,10 +430,6 @@ class ApiImpl:
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
-    # Region-level defaults for VehicleSupports; subclasses override these.
-    supports_window_control: bool = False
-    supports_valet_mode: bool = False
-    supports_surround_view: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -441,13 +437,14 @@ class ApiImpl:
     def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
         """Resolve what ``vehicle`` supports.
 
-        Defaults to the region-level ``supports_*`` class attributes. Override
-        to refine per vehicle (e.g. from enrollment or capability data).
+        The base marks the region-gated items unsupported and leaves the rest
+        undetermined. Regions override this, call ``super()`` and set what
+        they support, from fixed region facts or per-vehicle data.
         """
         return VehicleSupports(
-            window_control=self.supports_window_control,
-            valet_mode=self.supports_valet_mode,
-            surround_view=self.supports_surround_view,
+            window_control=False,
+            valet_mode=False,
+            surround_view=False,
         )
 
     def login(

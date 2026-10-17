@@ -57,6 +57,7 @@ from .Vehicle import (
     MonthTripInfo,
     TripInfo,
     Vehicle,
+    VehicleSupports,
 )
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -209,11 +210,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _SVM_POLL_TIMEOUT_SECONDS = 120
     _SVM_INITIAL_WAIT_SECONDS = 15
 
-    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
-    # Capability is declared per-region (like supports_window_control); the
-    # actual image is fetched on demand via get_svm_details / request_svm_capture.
-    supports_surround_view: bool = True
-
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
@@ -224,6 +220,13 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # the instance lifetime. get_vehicles force-refreshes (vehicle list
     # can change); _get_vehicle_details uses the cache.
     _enrollment_details_cache: dict | None = None
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        # SVM / Find My Car; the image is fetched on demand via
+        # get_svm_details / request_svm_capture.
+        supports.surround_view = True
+        return supports
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language

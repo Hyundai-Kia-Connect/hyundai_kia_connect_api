@@ -80,9 +80,9 @@ class VehicleSupports:
     API flag (e.g. EU ``/profile`` ``heatingRearWindow`` -> ``back_window_heater``
     to match ``Vehicle.back_window_heater_is_on``).
 
-    To add an item: add a field here and set it in ``ApiImpl.get_vehicle_supports``
-    (or a region's override of it). Use a ``supports_<item>`` class attribute
-    on ``ApiImpl`` when support is fixed for a whole region.
+    To add an item: add a field here and set it in the region overrides of
+    ``ApiImpl.get_vehicle_supports``. The API decides support; the vehicle
+    holds the answer, so library code also checks ``vehicle.supports``.
     """
 
     # Remote commands (gate the ApiImpl action of the same purpose)

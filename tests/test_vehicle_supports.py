@@ -57,21 +57,15 @@ def test_vehicle_supports_not_shared_between_vehicles():
         ),
     ],
 )
-def test_get_vehicle_supports_uses_region_defaults(api_cls, expected):
+def test_get_vehicle_supports_per_region(api_cls, expected):
     assert _resolve(api_cls) == expected
 
 
-def test_get_vehicle_supports_maps_every_region_attribute():
-    """Every ApiImpl.supports_<item> region attribute must reach vehicle.supports."""
-    region_items = [
-        name.removeprefix("supports_")
-        for name in vars(ApiImpl)
-        if name.startswith("supports_")
-    ]
-    assert region_items
-    supports = _resolve(ApiImpl)
-    for item in region_items:
-        assert getattr(supports, item) is not None, item
+def test_api_holds_no_flat_supports_attributes():
+    """Support is resolved by get_vehicle_supports, not stored on the API."""
+    for api_cls in (ApiImpl, ApiImplType1, HyundaiBlueLinkApiBR, HyundaiCciApiEU):
+        flat = [name for name in dir(api_cls) if name.startswith("supports_")]
+        assert flat == [], api_cls.__name__
 
 
 def test_items_without_region_attribute_stay_undetermined():
