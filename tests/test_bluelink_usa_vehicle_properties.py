@@ -7,6 +7,7 @@ the ``vehicleStatus.*`` path structure (different from KiaUvoApiUSA which uses
 
 import pytest
 
+from hyundai_kia_connect_api.const import PressureUnit
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.fixture_helpers import (
@@ -198,3 +199,36 @@ def test_bluelink_odometer_uses_highest_valid_value(
     bluelink_api._update_vehicle_properties(vehicle, state)
 
     assert vehicle.odometer == expected
+
+
+def test_bluelink_tire_pressure_values(bluelink_api):
+    """kia_uvo #1963: per-tire pressures are read from vehicleStatus.tirePressure."""
+    state = {
+        "vehicleStatus": {
+            "tirePressure": {
+                "datetimeFrontLeft": "2026-10-16T22:23:43Z",
+                "tirePressureFrontLeft": 36,
+                "tirePressureFrontRight": 36,
+                "tirePressureRearLeft": 37,
+                "tirePressureRearRight": 255,
+            },
+        },
+    }
+    vehicle = Vehicle()
+    bluelink_api._update_vehicle_properties(vehicle, state)
+
+    assert vehicle.tire_pressure_front_left == 36.0
+    assert vehicle.tire_pressure_front_right == 36.0
+    assert vehicle.tire_pressure_rear_left == 37.0
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_unit == PressureUnit.PSI
+    assert vehicle.tire_pressure_front_left_unit == "psi"
+
+
+def test_bluelink_tire_pressure_missing_leaves_none(bluelink_api):
+    vehicle = Vehicle()
+    bluelink_api._update_vehicle_properties(vehicle, {"vehicleStatus": {}})
+
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_unit is None
