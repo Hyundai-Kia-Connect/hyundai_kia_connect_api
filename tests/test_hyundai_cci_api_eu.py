@@ -569,13 +569,13 @@ def test_test_token_returns_false_on_non_200():
         assert api.test_token(token) is False
 
 
-# ── supports_valet_mode class attribute ────────────────────────
+# ── get_vehicle_supports ────────────────────────
 
 
 def test_supports_valet_mode_is_true():
-    """HyundaiCciApiEU overrides ApiImpl.supports_valet_mode (False) with True."""
+    """HyundaiCciApiEU inherits valet mode support from GspaApiEU."""
     api = _make_hyundai_api()
-    assert api.supports_valet_mode is True
+    assert api.get_vehicle_supports(Vehicle()).valet_mode is True
 
 
 # ── get_vehicles() CCI parsing ────────────────────────

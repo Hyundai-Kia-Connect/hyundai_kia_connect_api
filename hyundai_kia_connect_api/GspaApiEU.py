@@ -83,7 +83,7 @@ from .utils import (
     parse_datetime,
     pressure_or_none,
 )
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -199,7 +199,6 @@ class GspaApiEU(ApiImpl):
     and the GSPA secure-request layer."""
 
     data_timezone = dt.UTC
-    supports_valet_mode = True
 
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
@@ -278,6 +277,11 @@ class GspaApiEU(ApiImpl):
 
     # Path constant used for action status polling (?path=...).
     GSPA_REMOTE_VEHICLES_PATH = "gspa/v1/remote/vehicles"
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        supports.valet_mode = True
+        return supports
 
     @property
     def CCI_DOMAIN_API_URL(self) -> str:
@@ -2615,7 +2619,7 @@ class GspaApiEU(ApiImpl):
         GSPA supports scope commands only (all windows or front windows);
         a mixed per-window request raises UnsupportedControlError.
         """
-        if not self.supports_window_control:
+        if not vehicle.supports.window_control:
             raise APIError("Window control not supported")
         drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
         front = (options.front_left, options.front_right)

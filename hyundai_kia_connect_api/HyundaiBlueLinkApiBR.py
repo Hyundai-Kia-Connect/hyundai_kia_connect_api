@@ -30,7 +30,14 @@ from .const import (
 from .exceptions import APIError, AuthenticationError
 from .Token import Token
 from .utils import get_index_into_hex_temp
-from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
+from .Vehicle import (
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+    VehicleSupports,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,10 +69,13 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     endpoint selection and force-refresh flow.
     """
 
-    supports_window_control: bool = True
-    # BR does not implement valet mode; keep it off (ApiImplType1 defaults True).
-    supports_valet_mode: bool = False
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        # BR does not implement valet mode (ApiImplType1 enables it).
+        supports.valet_mode = False
+        return supports
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
         if BRANDS[brand] != BRAND_HYUNDAI:

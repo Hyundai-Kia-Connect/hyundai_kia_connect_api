@@ -33,7 +33,7 @@ from .const import (
 from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -430,12 +430,22 @@ class ApiImpl:
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
-    supports_window_control: bool = False
-    supports_valet_mode: bool = False
-    supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        """Resolve what ``vehicle`` supports.
+
+        The base marks the region-gated items unsupported and leaves the rest
+        undetermined. Regions override this, call ``super()`` and set what
+        they support, from fixed region facts or per-vehicle data.
+        """
+        return VehicleSupports(
+            window_control=False,
+            valet_mode=False,
+            surround_view=False,
+        )
 
     def login(
         self,
