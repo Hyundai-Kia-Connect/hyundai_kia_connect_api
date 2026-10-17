@@ -30,8 +30,8 @@ def test_vehicle_supports_defaults_to_undetermined():
 
 def test_vehicle_supports_not_shared_between_vehicles():
     first, second = Vehicle(), Vehicle()
-    first.supports.svm = True
-    assert second.supports.svm is None
+    first.supports.surround_view = True
+    assert second.supports.surround_view is None
 
 
 @pytest.mark.parametrize(
@@ -39,19 +39,21 @@ def test_vehicle_supports_not_shared_between_vehicles():
     [
         (
             ApiImpl,
-            VehicleSupports(window_control=False, valet_mode=False, svm=False),
+            VehicleSupports(
+                window_control=False, valet_mode=False, surround_view=False
+            ),
         ),
         (
             ApiImplType1,
-            VehicleSupports(window_control=True, valet_mode=True, svm=False),
+            VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
         ),
         (
             HyundaiBlueLinkApiBR,
-            VehicleSupports(window_control=True, valet_mode=False, svm=False),
+            VehicleSupports(window_control=True, valet_mode=False, surround_view=False),
         ),
         (
             HyundaiCciApiEU,
-            VehicleSupports(window_control=True, valet_mode=True, svm=True),
+            VehicleSupports(window_control=True, valet_mode=True, surround_view=True),
         ),
     ],
 )
@@ -82,7 +84,7 @@ def test_vehicle_manager_uses_per_vehicle_override():
     class PerVehicleApi(ApiImpl):
         def get_vehicle_supports(self, vehicle):
             supports = super().get_vehicle_supports(vehicle)
-            supports.svm = vehicle.id == "with-svm"
+            supports.surround_view = vehicle.id == "with-svm"
             return supports
 
     with_svm, without_svm = Vehicle(id="with-svm"), Vehicle(id="without-svm")
@@ -95,15 +97,22 @@ def test_vehicle_manager_uses_per_vehicle_override():
     with patch.object(api, "get_vehicles", return_value=[with_svm, without_svm]):
         manager.initialize_vehicles()
 
-    assert manager.vehicles["with-svm"].supports.svm is True
-    assert manager.vehicles["without-svm"].supports.svm is False
+    assert manager.vehicles["with-svm"].supports.surround_view is True
+    assert manager.vehicles["without-svm"].supports.surround_view is False
 
 
-@pytest.mark.parametrize("item", ["window_control", "valet_mode", "svm"])
-def test_deprecated_flat_alias_reads_and_writes_supports(item):
+@pytest.mark.parametrize(
+    ("alias", "item"),
+    [
+        ("supports_window_control", "window_control"),
+        ("supports_valet_mode", "valet_mode"),
+        ("supports_svm", "surround_view"),
+    ],
+)
+def test_deprecated_flat_alias_reads_and_writes_supports(alias, item):
     vehicle = Vehicle()
     with pytest.deprecated_call():
-        setattr(vehicle, f"supports_{item}", True)
+        setattr(vehicle, alias, True)
     assert getattr(vehicle.supports, item) is True
     with pytest.deprecated_call():
-        assert getattr(vehicle, f"supports_{item}") is True
+        assert getattr(vehicle, alias) is True

@@ -53,7 +53,7 @@ class HyundaiCciApiEU(GspaApiEU):
 
     # SVM reads confirmed live on the EU GSPA endpoints (na-images);
     # KiaCciApiEU keeps the inherited False until verified there too.
-    supports_svm: bool = True
+    supports_surround_view: bool = True
 
     # CCS2 EU vehicles support GSPA window control.
     supports_window_control: bool = True

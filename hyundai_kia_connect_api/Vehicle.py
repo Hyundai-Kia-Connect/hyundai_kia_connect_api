@@ -88,8 +88,8 @@ class VehicleSupports:
     # Remote commands (gate the ApiImpl action of the same purpose)
     window_control: bool | None = None  # set_windows_state
     valet_mode: bool | None = None  # valet_mode_action
-    # SVM (Surround View Monitor / Find My Car); get_svm_details
-    svm: bool | None = None
+    # Surround View Monitor (SVM) / Find My Car; get_svm_details
+    surround_view: bool | None = None
     hazard_lights: bool | None = None  # start_hazard_lights
     hazard_lights_and_horn: bool | None = None  # start_hazard_lights_and_horn
     climate_control: bool | None = None  # start_climate / stop_climate
@@ -113,11 +113,9 @@ class VehicleSupports:
     ota_update: bool | None = None  # ota_update_available
 
 
-def _deprecated_supports_alias(item: str) -> property:
-    """Map a legacy ``vehicle.supports_<item>`` attribute onto ``vehicle.supports``."""
-    message = (
-        f"Vehicle.supports_{item} is deprecated; use Vehicle.supports.{item} instead"
-    )
+def _deprecated_supports_alias(alias: str, item: str) -> property:
+    """Map a legacy flat ``vehicle.<alias>`` attribute onto ``vehicle.supports``."""
+    message = f"Vehicle.{alias} is deprecated; use Vehicle.supports.{item} instead"
 
     def getter(self):
         warnings.warn(message, DeprecationWarning, stacklevel=2)
@@ -353,9 +351,13 @@ class Vehicle:
     steering_wheel_heat_step: int | None = None
 
     # Deprecated flat aliases; use vehicle.supports.<item>.
-    supports_window_control = _deprecated_supports_alias("window_control")
-    supports_valet_mode = _deprecated_supports_alias("valet_mode")
-    supports_svm = _deprecated_supports_alias("svm")
+    supports_window_control = _deprecated_supports_alias(
+        "supports_window_control", "window_control"
+    )
+    supports_valet_mode = _deprecated_supports_alias(
+        "supports_valet_mode", "valet_mode"
+    )
+    supports_svm = _deprecated_supports_alias("supports_svm", "surround_view")
 
     @property
     def daily_stats(self):

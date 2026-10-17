@@ -251,10 +251,10 @@ def test_get_svm_details_missing_scs_detail(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_supports_svm_flag_per_brand():
-    assert HyundaiCciApiEU.supports_svm is True
+def test_supports_surround_view_flag_per_brand():
+    assert HyundaiCciApiEU.supports_surround_view is True
     # Kia EU SVM awaits live verification — stays False there.
-    assert KiaCciApiEU.supports_svm is False
+    assert KiaCciApiEU.supports_surround_view is False
 
 
 def test_log_redaction_redacts_image_and_gps():

@@ -433,7 +433,7 @@ class ApiImpl:
     # Region-level defaults for VehicleSupports; subclasses override these.
     supports_window_control: bool = False
     supports_valet_mode: bool = False
-    supports_svm: bool = False
+    supports_surround_view: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -447,7 +447,7 @@ class ApiImpl:
         return VehicleSupports(
             window_control=self.supports_window_control,
             valet_mode=self.supports_valet_mode,
-            svm=self.supports_svm,
+            surround_view=self.supports_surround_view,
         )
 
     def login(

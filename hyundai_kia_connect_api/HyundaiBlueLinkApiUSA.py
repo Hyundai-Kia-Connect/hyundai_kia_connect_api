@@ -212,7 +212,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
     # Capability is declared per-region (like supports_window_control); the
     # actual image is fetched on demand via get_svm_details / request_svm_capture.
-    supports_svm: bool = True
+    supports_surround_view: bool = True
 
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
