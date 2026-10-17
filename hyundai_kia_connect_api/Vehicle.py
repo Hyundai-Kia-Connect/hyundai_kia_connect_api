@@ -3,6 +3,7 @@
 
 import datetime
 import logging
+import warnings
 from dataclasses import dataclass, field
 
 from .const import DISTANCE_UNITS, PRESSURE_UNITS, PressureUnit
@@ -64,6 +65,46 @@ class DailyDrivingStats:
 
 
 @dataclass
+class VehicleSupports:
+    """What a vehicle supports, read as ``vehicle.supports.<item>``.
+
+    Resolved once per vehicle by ``ApiImpl.get_vehicle_supports`` when the
+    VehicleManager initializes vehicles. Consumers (e.g. Home Assistant) use
+    these to decide which entities and services to expose.
+
+    Each item is tri-state: ``True`` supported, ``False`` not supported,
+    ``None`` not yet determined. Treat ``None`` as unsupported when gating.
+
+    To add an item: add a field here, declare the region default as a
+    ``supports_<item>`` class attribute on ``ApiImpl`` (overridden per
+    region), and map it in ``ApiImpl.get_vehicle_supports``. Override that
+    method in a region when support depends on the individual vehicle.
+    """
+
+    window_control: bool | None = None
+    valet_mode: bool | None = None
+    # SVM (Surround View Monitor / Find My Car)
+    svm: bool | None = None
+
+
+def _deprecated_supports_alias(item: str) -> property:
+    """Map a legacy ``vehicle.supports_<item>`` attribute onto ``vehicle.supports``."""
+    message = (
+        f"Vehicle.supports_{item} is deprecated; use Vehicle.supports.{item} instead"
+    )
+
+    def getter(self):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        return getattr(self.supports, item)
+
+    def setter(self, value):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        setattr(self.supports, item, value)
+
+    return property(getter, setter, doc=f"Deprecated alias for supports.{item}.")
+
+
+@dataclass
 class Vehicle:
     id: str = None
     name: str = None
@@ -78,6 +119,8 @@ class Vehicle:
     generation: int = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
+    # What this vehicle supports; see VehicleSupports.
+    supports: VehicleSupports = field(default_factory=VehicleSupports)
 
     # Shared (EV/PHEV/HEV/IC)
     # General
@@ -144,14 +187,9 @@ class Vehicle:
     back_left_window_is_open: bool = None
     back_right_window_is_open: bool = None
     sunroof_is_open: bool = None
-    supports_window_control: bool = None
-    supports_valet_mode: bool = None
 
     # Valet Status
     valet_mode_active: bool = None
-
-    # SVM (Surround View Monitor / Find My Car) — USA Hyundai
-    supports_svm: bool | None = None
 
     # Software version (GSPA device-info read)
     software_version: str | None = None
@@ -287,6 +325,11 @@ class Vehicle:
     windshield_front_heater_is_on: bool | None = None
     air_cleaning_is_on: bool | None = None
     steering_wheel_heat_step: int | None = None
+
+    # Deprecated flat aliases; use vehicle.supports.<item>.
+    supports_window_control = _deprecated_supports_alias("window_control")
+    supports_valet_mode = _deprecated_supports_alias("valet_mode")
+    supports_svm = _deprecated_supports_alias("svm")
 
     @property
     def daily_stats(self):

@@ -33,7 +33,7 @@ from .const import (
 from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -430,12 +430,25 @@ class ApiImpl:
     temperature_range = None
     previous_latitude: float = None
     previous_longitude: float = None
+    # Region-level defaults for VehicleSupports; subclasses override these.
     supports_window_control: bool = False
     supports_valet_mode: bool = False
     supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        """Resolve what ``vehicle`` supports.
+
+        Defaults to the region-level ``supports_*`` class attributes. Override
+        to refine per vehicle (e.g. from enrollment or capability data).
+        """
+        return VehicleSupports(
+            window_control=self.supports_window_control,
+            valet_mode=self.supports_valet_mode,
+            svm=self.supports_svm,
+        )
 
     def login(
         self,

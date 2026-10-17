@@ -16,9 +16,9 @@ from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
-def test_vehicle_has_supports_svm_field_default_none():
+def test_vehicle_supports_svm_default_none():
     vehicle = _make_vehicle()
-    assert vehicle.supports_svm is None
+    assert vehicle.supports.svm is None
 
 
 def test_svm_details_can_be_imported():
@@ -200,8 +200,7 @@ def test_vehicle_manager_stamps_supports_svm_from_api():
     with patch.object(manager.api, "get_vehicles", return_value=[vehicle]):
         manager.initialize_vehicles()
     assert manager.api.supports_svm is True
-    assert vehicle.supports_svm is True
-    assert vehicle.supports_svm is manager.api.supports_svm
+    assert vehicle.supports.svm is True
 
 
 def _make_api():

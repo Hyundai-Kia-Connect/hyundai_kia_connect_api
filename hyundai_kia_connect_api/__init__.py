@@ -11,7 +11,7 @@ from .ApiImpl import (
 
 from .svm import SVMDetails
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 from .VehicleManager import VehicleManager
 
 from .HyundaiCciApiEU import HyundaiCciApiEU

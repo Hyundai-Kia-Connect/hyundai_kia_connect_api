@@ -1,0 +1,94 @@
+"""Tests for the vehicle.supports.<item> capability model."""
+
+import dataclasses
+from unittest.mock import patch
+
+import pytest
+
+from hyundai_kia_connect_api import VehicleSupports
+from hyundai_kia_connect_api.ApiImpl import ApiImpl
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.VehicleManager import VehicleManager
+
+
+def _resolve(api_cls) -> VehicleSupports:
+    return api_cls.get_vehicle_supports(api_cls.__new__(api_cls), Vehicle())
+
+
+def test_vehicle_supports_defaults_to_undetermined():
+    vehicle = Vehicle()
+    assert vehicle.supports == VehicleSupports()
+    assert all(
+        getattr(vehicle.supports, f.name) is None
+        for f in dataclasses.fields(VehicleSupports)
+    )
+
+
+def test_vehicle_supports_not_shared_between_vehicles():
+    first, second = Vehicle(), Vehicle()
+    first.supports.svm = True
+    assert second.supports.svm is None
+
+
+@pytest.mark.parametrize(
+    ("api_cls", "expected"),
+    [
+        (ApiImpl, VehicleSupports(window_control=False, valet_mode=False, svm=False)),
+        (
+            ApiImplType1,
+            VehicleSupports(window_control=True, valet_mode=True, svm=False),
+        ),
+        (
+            HyundaiBlueLinkApiBR,
+            VehicleSupports(window_control=True, valet_mode=False, svm=False),
+        ),
+        (
+            HyundaiCciApiEU,
+            VehicleSupports(window_control=True, valet_mode=True, svm=True),
+        ),
+    ],
+)
+def test_get_vehicle_supports_uses_region_defaults(api_cls, expected):
+    assert _resolve(api_cls) == expected
+
+
+def test_get_vehicle_supports_covers_every_item():
+    """A new VehicleSupports field must be resolved by get_vehicle_supports."""
+    supports = _resolve(ApiImpl)
+    for f in dataclasses.fields(VehicleSupports):
+        assert getattr(supports, f.name) is not None, f.name
+
+
+def test_vehicle_manager_uses_per_vehicle_override():
+    class PerVehicleApi(ApiImpl):
+        def get_vehicle_supports(self, vehicle):
+            supports = super().get_vehicle_supports(vehicle)
+            supports.svm = vehicle.id == "with-svm"
+            return supports
+
+    with_svm, without_svm = Vehicle(id="with-svm"), Vehicle(id="without-svm")
+    api = PerVehicleApi()
+    manager = VehicleManager.__new__(VehicleManager)
+    manager.api = api
+    manager.token = Token(access_token="x", refresh_token="y", device_id="z")
+    manager.vehicles = {}
+
+    with patch.object(api, "get_vehicles", return_value=[with_svm, without_svm]):
+        manager.initialize_vehicles()
+
+    assert manager.vehicles["with-svm"].supports.svm is True
+    assert manager.vehicles["without-svm"].supports.svm is False
+
+
+@pytest.mark.parametrize("item", ["window_control", "valet_mode", "svm"])
+def test_deprecated_flat_alias_reads_and_writes_supports(item):
+    vehicle = Vehicle()
+    with pytest.deprecated_call():
+        setattr(vehicle, f"supports_{item}", True)
+    assert getattr(vehicle.supports, item) is True
+    with pytest.deprecated_call():
+        assert getattr(vehicle, f"supports_{item}") is True
