@@ -318,25 +318,13 @@ class MqttServiceHubMixin:
         msg = parse_mqtt_message(topic, payload)
         if msg.topic_group == "Unknown":
             return None
-        out = CciPushMessage(
+        return CciPushMessage(
             topic_group=msg.topic_group,
             topic_type=msg.topic_type,
             vehicle_id=msg.vehicle_id,
             payload=msg.payload,
             is_status=msg.topic_group == "CarStatus",
         )
-        header = out.payload.get("header", {})
-        body = out.payload.get("body", {})
-        tid = header.get("tid") or header.get("tId")
-        if out.topic_type == "Res":
-            out.action_id = tid
-            res_code = body.get("resCode", header.get("resCode"))
-            out.action_result = str(res_code) if res_code is not None else None
-        elif out.topic_type == "Connect":
-            out.action_id = tid
-            out.action_result = "connected"
-            out.action_connected = True
-        return out
 
     # ------------------------------------------------------------------
     # Shared Service Hub helpers
@@ -617,11 +605,8 @@ class CciPushMessage:
     topic_group: str  # "CarStatus", "DeviceRemote", "CarOta", ...
     topic_type: str  # "Status", "Connect", "Res", ...
     vehicle_id: str  # push-level vehicle id (topic infix)
-    payload: dict[str, Any]  # parsed JSON
+    payload: dict[str, Any]  # parsed JSON (header/body as delivered)
     is_status: bool = False
-    action_id: str | None = None
-    action_result: str | None = None
-    action_connected: bool = False
 
 
 # ---------------------------------------------------------------------------

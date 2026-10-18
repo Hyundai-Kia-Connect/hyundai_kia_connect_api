@@ -285,27 +285,22 @@ def test_parse_push_message_status():
     assert msg is not None
     assert (msg.topic_group, msg.topic_type) == ("CarStatus", "Status")
     assert msg.is_status is True
-    assert msg.action_id is None
 
 
-def test_parse_push_message_action_result():
+def test_parse_push_message_res_shape():
+    """Res/Connect parse as plain messages; result extraction is not
+    part of the contract (no consumer)."""
     body = {"header": {"tid": "tid-1"}, "body": {"resCode": "success"}}
     msg = _kia_api().parse_push_message(
         "$/device/res/testclient1", json.dumps(body).encode()
     )
-    assert msg.action_id == "tid-1"
-    assert msg.action_result == "success"
+    assert (msg.topic_group, msg.topic_type) == ("DeviceRemote", "Res")
     assert msg.is_status is False
 
-
-def test_parse_push_message_connect():
-    body = {"header": {"tid": "tid-2"}}
     msg = _kia_api().parse_push_message(
         "device/c1/remotecontroller/connect", json.dumps(body).encode()
     )
-    assert msg.action_id == "tid-2"
-    assert msg.action_result == "connected"
-    assert msg.action_connected is True
+    assert (msg.topic_group, msg.topic_type) == ("DeviceRemote", "Connect")
 
 
 def test_parse_push_message_unknown_group_none():

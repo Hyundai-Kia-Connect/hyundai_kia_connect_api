@@ -538,9 +538,7 @@ class ApiImpl:
 
         Parse result is duck-typed with these attributes: topic_group,
         topic_type, vehicle_id (push-level vehicle id), payload (dict),
-        is_status (bool), and when the message carries an action result:
-        action_id, action_result (str | None). None = unknown topic
-        schema.
+        is_status (bool). None = unknown topic schema.
         """
         raise NotImplementedError(
             "parse_push_message is not implemented for this region"

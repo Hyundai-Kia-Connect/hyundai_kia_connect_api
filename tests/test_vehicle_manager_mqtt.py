@@ -1,7 +1,6 @@
 """Tests for VehicleManager push glue over the ApiImpl push contract."""
 
 import sys
-import threading
 import time
 from typing import Any, ClassVar
 
@@ -242,38 +241,23 @@ def test_message_unknown_topic_schema_dropped():
 
 
 # ---------------------------------------------------------------------------
-# action tracking
+# non-status messages are ignored by the dispatcher (no action consumer)
 # ---------------------------------------------------------------------------
 
 
-def test_wait_for_push_result_signaled_by_action_message():
+def test_res_message_is_ignored_without_callback():
     vm = _make_vm()
-    result_holder: dict = {}
-
-    def waiter():
-        result_holder["r"] = vm.wait_for_push_result("tid-1", timeout=1.0)
-
-    thread = threading.Thread(target=waiter, daemon=True)
-    thread.start()
-    time.sleep(0.05)
-
+    seen = []
+    vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
     msg = CciPushMessage(
         topic_group="DeviceRemote",
         topic_type="Res",
         vehicle_id="mqttv1",
         payload={"header": {"tid": "tid-1"}, "body": {"resCode": "0"}},
         is_status=False,
-        action_id="tid-1",
-        action_result="0",
     )
     vm._on_push_message(msg)
-    thread.join(1.0)
-    assert result_holder["r"] == "0"
-
-
-def test_wait_for_push_result_timeout():
-    vm = _make_vm()
-    assert vm.wait_for_push_result("no-such-tid", timeout=0.05) is None
+    assert seen == []
 
 
 # ---------------------------------------------------------------------------
@@ -331,8 +315,6 @@ def test_stop_push_clears_state(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
     vm.start_push("careu1")
-    vm._push_action_events["x"] = threading.Event()
     vm.stop_push()
     assert vm._push_client is None
-    assert vm._push_action_events == {}
     assert vm._push_vehicle_ids == []

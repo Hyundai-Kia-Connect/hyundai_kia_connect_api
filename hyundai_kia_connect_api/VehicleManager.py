@@ -97,12 +97,10 @@ class VehicleManager:
         self.token: Token = token
         self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
-        # Push (MQTT) transport and action tracking. Connection-scoped
-        # state lives here; all vehicle-level push identity lives on
-        # Vehicle (mqtt_vehicle_id, hu_client_id).
+        # Push (MQTT) transport. Connection-scoped state lives here; all
+        # vehicle-level push identity lives on Vehicle (mqtt_vehicle_id,
+        # hu_client_id).
         self._push_client: MqttTransport | None = None
-        self._push_action_events: dict[str, threading.Event] = {}
-        self._push_action_results: dict[str, str] = {}
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
         self._push_reconnect_cancel: threading.Event | None = None
@@ -582,14 +580,9 @@ class VehicleManager:
         """Dispatch a parsed push message (duck-typed contract shape).
 
         Expected attributes: is_status (bool), vehicle_id (str, push
-        level), topic_type (str), and when the message carries an action
-        result: action_id, action_result (str | None).
+        level), topic_type (str). Messages other than status deliveries
+        are recorded by the provider's parser and ignored here.
         """
-        action_id = getattr(message, "action_id", None)
-        if action_id and action_id in self._push_action_events:
-            self._push_action_results[action_id] = message.action_result
-            self._push_action_events[action_id].set()
-
         if not getattr(message, "is_status", False) or not self._push_status_callback:
             return
         vehicle_id = self._vehicle_id_for_push(getattr(message, "vehicle_id", ""))
@@ -626,8 +619,6 @@ class VehicleManager:
             except Exception:
                 _LOGGER.debug("Push disconnect failed (already disconnected)")
             self._push_client = None
-        self._push_action_events.clear()
-        self._push_action_results.clear()
         self._push_vehicle_ids.clear()
 
     @property
@@ -652,18 +643,6 @@ class VehicleManager:
     def get_push_connection_state(self) -> MQTT_PUSH_CONNECTION_STATE | None:
         """Push connection state through the region API (delegator)."""
         return self.api.get_push_connection_state(self.token)
-
-    def wait_for_push_result(self, action_id: str, timeout: float = 60.0) -> str | None:
-        """Wait for an action-result push (designed for asyncio.to_thread callers)."""
-        event = threading.Event()
-        self._push_action_events[action_id] = event
-        try:
-            if event.wait(timeout=timeout):
-                return self._push_action_results.pop(action_id, None)
-            _LOGGER.debug(f"{DOMAIN} - Push wait timed out for action {action_id}")
-            return None
-        finally:
-            self._push_action_events.pop(action_id, None)
 
     def _on_push_disconnect(self, reason: str) -> None:
         """Reconnect with capped exponential backoff on unexpected drops.
