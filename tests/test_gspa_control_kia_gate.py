@@ -148,3 +148,31 @@ def test_kia_check_action_status_is_gated():
     api = KiaCciApiEU(9, 2, "en")
     with pytest.raises(NotImplementedError):
         api.check_action_status(_make_token(), _make_vehicle(), "gspa:sid-1")
+
+
+def test_kia_windows_accepted():
+    """Kia EU window control ships: the server accepted the scope
+    command with a polling SID on the EV6 (2026-10-18)."""
+    api = KiaCciApiEU(9, 2, "en")
+    assert api.supports_window_control is True
+    token = _make_token()
+    vehicle = _make_vehicle()
+    from hyundai_kia_connect_api.ApiImpl import WindowRequestOptions
+    from hyundai_kia_connect_api.const import WINDOW_STATE
+
+    vehicle.supports_window_control = True
+    options = WindowRequestOptions(
+        front_left=WINDOW_STATE.CLOSED,
+        front_right=WINDOW_STATE.CLOSED,
+        back_left=WINDOW_STATE.CLOSED,
+        back_right=WINDOW_STATE.CLOSED,
+    )
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = api.set_windows_state(token, vehicle, options)
+    assert action_id == "gspa:sid-1"
+    assert post.call_args.args[0].endswith("/window-curtain")

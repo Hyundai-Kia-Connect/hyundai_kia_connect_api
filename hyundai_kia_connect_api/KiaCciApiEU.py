@@ -54,6 +54,12 @@ class KiaCciApiEU(GspaApiEU):
     # prewakeup accepted with HTTP 202 on the same vehicle. Prewakeup is
     # inherited from GspaApiEU (brand-neutral raw POST with the standard
     # bearer headers — confirmed shape {"action": "prewakeup"}).
+    # Verified endpoints (2026-10 vehicle run: EV6, EV3, eNiro 2021,
+    # Inster 2026; doors+climate+lamp also on the earlier PV5/EV6 runs):
+    # hazard lights("light"), horn+hazard("hornlight"), charge start/stop,
+    # and windows via the scope-based "windowcurtain" endpoint (accepted
+    # with a polling SID and confirmed on the car, EV6 2026-10-18; Hyundai
+    # parity: IONIQ 5, Tucson PHEV, Kona 2025). Scope commands only.
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -64,8 +70,11 @@ class KiaCciApiEU(GspaApiEU):
             "light",
             "hornlight",
             "charge",
+            "windowcurtain",
         }
     )
+    supports_window_control = True
+
     # Action-status polling on the EU CCI backend returned PENDING for
     # every poll across the 2026-10 vehicle run (brand-independent), so
     # check_action_status stays gated in this region: outcomes reach the

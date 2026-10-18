@@ -201,7 +201,8 @@ def test_kia_remote_control_gated_not_implemented():
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
-    # Evidence-mapped: the endpoints accepted during the 2026-10 vehicle run.
+    # Evidence-mapped: the endpoints accepted during the 2026-10 vehicle
+    # run, including the Kia-window acceptance (EV6).
     assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset(
         {
             "door",
@@ -212,6 +213,7 @@ def test_kia_remote_control_gated_not_implemented():
             "light",
             "hornlight",
             "charge",
+            "windowcurtain",
         }
     )
 
