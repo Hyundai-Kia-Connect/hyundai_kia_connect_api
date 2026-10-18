@@ -89,15 +89,6 @@ class VehicleManager:
         self.vehicles: dict = {}
         self.otp_request: OTPRequest = None
 
-    @DeprecationWarning
-    def initialize(self) -> None:
-        self.token: Token = self.api.login(
-            username=self.username,
-            password=self.password,
-            pin=self.pin,
-        )
-        self.initialize_vehicles()
-
     def login(self) -> bool | OTPRequest:
         """Returns True if login successful, or OTPOptions if OTP is required"""
         result = self.api.login(
