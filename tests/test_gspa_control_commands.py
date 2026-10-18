@@ -75,14 +75,15 @@ def test_lock_action_unlock():
         HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.UNLOCK
     )
     assert action_id == "gspa:sid-1"
-    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door")
-    assert call.kwargs["json"] == {"command": "open"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-unlock")
+    assert call.kwargs["json"] == {"command": "set"}
     assert call.kwargs["headers"]["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
 
 
 def test_lock_action_lock():
     _, call = _run_command(HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.LOCK)
-    assert call.kwargs["json"] == {"command": "close"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-lock")
+    assert call.kwargs["json"] == {"command": "set"}
 
 
 def test_door_power_off():
@@ -185,10 +186,11 @@ def test_control_command_pre_ccs2_raises_unsupported():
 
 
 def test_kia_remote_control_gated_not_implemented():
-    """Kia EU CCI inherits the GSPA control layer but ships partially
-    gated: only live-proven endpoints pass (door lock + unlock, PV5
-    2026-09-19). Everything else raises NotImplementedError before any
-    request."""
+    """Kia EU CCI ships remote control through the verified-endpoint
+    gate: the 2026-10 vehicle run (EV6, EV3, eNiro 2021, Inster 2026)
+    accepted the hazard, horn, charge and both granular door shapes,
+    so they join the earlier proven set. Everything else raises
+    NotImplementedError before any request."""
     from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
     api = KiaCciApiEU(9, 2, "en")
@@ -199,10 +201,48 @@ def test_kia_remote_control_gated_not_implemented():
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
-    # Evidence-mapped: only the live-proven endpoints pass.
+    # Evidence-mapped: the endpoints accepted during the 2026-10 vehicle run.
     assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset(
-        {"door", "temperature", "lamp"}
+        {
+            "door",
+            "door-lock",
+            "door-unlock",
+            "temperature",
+            "lamp",
+            "light",
+            "hornlight",
+            "charge",
+        }
     )
+
+
+def test_kia_verified_commands_reach_the_wire():
+    """Enabled Kia commands route through the shared implementations
+    (hazard light, horn, charge, granular doors) instead of raising."""
+    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+
+    api = KiaCciApiEU(9, 2, "en")
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        api.start_hazard_lights(token, vehicle)
+        api.start_hazard_lights_and_horn(token, vehicle)
+        api.start_charge(token, vehicle)
+        api.stop_charge(token, vehicle)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.UNLOCK)
+    urls = [c.args[0] for c in post.call_args_list]
+    bodies = [c.kwargs["json"] for c in post.call_args_list]
+    assert urls[0].endswith("/light") and bodies[0] == {"command": "on"}
+    assert urls[1].endswith("/horn-light") and bodies[1] == {"command": "on"}
+    assert urls[2].endswith("/charge") and bodies[2] == {"command": "start"}
+    assert urls[3].endswith("/charge") and bodies[3] == {"command": "stop"}
+    assert urls[4].endswith("/door-lock") and bodies[4] == {"command": "set"}
+    assert urls[5].endswith("/door-unlock") and bodies[5] == {"command": "set"}
 
 
 def test_start_climate_full_options():
@@ -490,14 +530,6 @@ def test_schedule_charging_and_climate_body_shape():
     assert info1["reservInfo"]["time"] == {"time": "0705", "timeSection": 0}
     assert info1["reservFatcSet"]["airTemp"]["value"] == "21.5"
     assert "offPeakPowerInfo" in body
-    assert "AuthorizationCCSP" not in call.kwargs["headers"]
-    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
-
-
-def test_lock_and_start_toggle():
-    _, call = _run_command(HyundaiCciApiEU.lock_and_start_toggle, True)
-    assert call.args[0].endswith("/lock-and-start-toggle")
-    assert call.kwargs["json"] == {"lockAndStartEnable": True}
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 

@@ -268,7 +268,6 @@ class GspaApiEU(ApiImpl):
             "reservation-hvac",
             "reservation-charge-hvac",
             "reservation-engine",
-            "lock-and-start-toggle",
             # OTA commands: the app sends these with the standard
             # authenticated headers — no PIN-derived control token.
             "ota-updates",
@@ -2399,8 +2398,19 @@ class GspaApiEU(ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
-        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+        """Lock/unlock via the granular per-action endpoints.
+
+        POST .../door-lock {"command": "set"} and .../door-unlock: the
+        action lives in the endpoint (the "lock"/"CLOSE" body forms are
+        rejected with 400-002). Accepted live across the 2026-10 EU
+        vehicle run on every tested model (Kia CCI: EV6, EV3, eNiro
+        2021; Hyundai: IONIQ 5 2022, Tucson PHEV, IONIQ 6) with the
+        door state reflecting it in the fresh server data afterwards.
+        The shared legacy "door" + close/open shape stays accepted by
+        the backend, but the EU apps no longer send it.
+        """
+        endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
+        return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
 
     def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -3066,12 +3076,6 @@ class GspaApiEU(ApiImpl):
             "reservFlag": 1 if options.charging_enabled else 0,
             "command": "set",
         }
-
-    def lock_and_start_toggle(
-        self, token: Token, vehicle: Vehicle, enable: bool = True
-    ) -> str:
-        body = {"lockAndStartEnable": enable}
-        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
 
     def set_ota_reservation(
         self, token: Token, vehicle: Vehicle, settings: dict[str, Any]
