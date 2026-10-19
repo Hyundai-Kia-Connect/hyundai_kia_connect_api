@@ -11,6 +11,7 @@ dispatches callbacks on it. Callbacks must be thread-safe.
 """
 
 import logging
+import ssl
 import uuid
 from collections.abc import Callable
 from typing import Any
@@ -95,7 +96,7 @@ class MqttTransport:
                 self._broker_username, self._broker_password or ""
             )
 
-        self._client.tls_set()  # Default CA certs
+        self._client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT)
         self._client.tls_insecure_set(False)
 
         # App-confirmed client settings: connectionTimeout=10,
