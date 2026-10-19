@@ -30,6 +30,7 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
+        "Typing :: Typed",
     ],
     description="Python API for Hyundai, Kia, and Genesis car infotainment systems",
     install_requires=requirements,
