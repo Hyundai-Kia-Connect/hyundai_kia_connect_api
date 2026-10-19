@@ -760,9 +760,12 @@ class Vehicle:
             val = value
             unit = None
         self._ev_first_departure_climate_temperature_value = val
-        self._ev_first_departure_climate_temperature = (
-            float(val) if val is not None else None
-        )
+        try:
+            self._ev_first_departure_climate_temperature = (
+                float(val) if val is not None else None
+            )
+        except (ValueError, TypeError):
+            self._ev_first_departure_climate_temperature = None
         if unit is not None:
             self._ev_first_departure_climate_temperature_unit = unit
 
@@ -783,9 +786,12 @@ class Vehicle:
             val = value
             unit = None
         self._ev_second_departure_climate_temperature_value = val
-        self._ev_second_departure_climate_temperature = (
-            float(val) if val is not None else None
-        )
+        try:
+            self._ev_second_departure_climate_temperature = (
+                float(val) if val is not None else None
+            )
+        except (ValueError, TypeError):
+            self._ev_second_departure_climate_temperature = None
         if unit is not None:
             self._ev_second_departure_climate_temperature_unit = unit
 

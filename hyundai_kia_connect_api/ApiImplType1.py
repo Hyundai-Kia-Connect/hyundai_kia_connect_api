@@ -1226,6 +1226,11 @@ class ApiImplType1(ApiImpl):
         climate1 = get_child_value(
             state, "Green.Reservation.Departure.Schedule1.Climate"
         ) or get_child_value(state, "Green.Reservation.Departure.Climate")
+        default_temp_unit = (
+            climate1.get("TemperatureUnit", 0)
+            if climate1 and climate1.get("TemperatureUnit") is not None
+            else 0
+        )
         if climate1:
             activation = climate1.get("Activation")
             if activation is not None:
@@ -1237,7 +1242,9 @@ class ApiImplType1(ApiImpl):
             if temp_val is not None:
                 try:
                     temp_float = float(temp_val)
-                    unit_int = climate1.get("TemperatureUnit", 0)
+                    unit_int = climate1.get("TemperatureUnit")
+                    if unit_int is None:
+                        unit_int = default_temp_unit
                     unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
                     vehicle.ev_first_departure_climate_temperature = (
                         temp_float,
@@ -1250,14 +1257,12 @@ class ApiImplType1(ApiImpl):
             state, "Green.Reservation.Departure.Schedule2.Climate"
         )
         if climate2:
+            sched2_activation = get_child_value(
+                state, "Green.Reservation.Departure.Schedule2.Activation"
+            )
             activation = (
-                get_child_value(
-                    state, "Green.Reservation.Departure.Schedule2.Activation"
-                )
-                if get_child_value(
-                    state, "Green.Reservation.Departure.Schedule2.Activation"
-                )
-                is not None
+                sched2_activation
+                if sched2_activation is not None
                 else climate2.get("Activation")
             )
             if activation is not None:
@@ -1270,8 +1275,8 @@ class ApiImplType1(ApiImpl):
                 try:
                     temp_float = float(temp_val)
                     unit_int = climate2.get("TemperatureUnit")
-                    if unit_int is None and climate1:
-                        unit_int = climate1.get("TemperatureUnit", 0)
+                    if unit_int is None:
+                        unit_int = default_temp_unit
                     unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
                     vehicle.ev_second_departure_climate_temperature = (
                         temp_float,

@@ -79,3 +79,15 @@ def test_departure_climate_temperature_accepts_scalar_or_tuple():
     vehicle.ev_second_departure_climate_temperature = 22.5
     assert vehicle.ev_second_departure_climate_temperature == 22.5
     assert vehicle.ev_second_departure_climate_temperature_unit == "°F"
+
+
+def test_departure_climate_temperature_off_or_non_numeric_becomes_none():
+    vehicle = Vehicle()
+    vehicle.ev_first_departure_climate_temperature = ("OFF", "°C")
+    assert vehicle.ev_first_departure_climate_temperature is None
+    assert vehicle._ev_first_departure_climate_temperature_value == "OFF"
+    assert vehicle.ev_first_departure_climate_temperature_unit == "°C"
+
+    vehicle.ev_second_departure_climate_temperature = "OFF"
+    assert vehicle.ev_second_departure_climate_temperature is None
+    assert vehicle._ev_second_departure_climate_temperature_value == "OFF"

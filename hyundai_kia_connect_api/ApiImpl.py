@@ -107,16 +107,7 @@ class ScheduleChargingClimateRequestOptions:
 
     @dataclass
     class DepartureOptions:
-        """Options for an individual departure schedule.
-
-        Older vehicle platforms (Gen 2/3) only support scheduling departure days and
-        times, sharing a single global climate setpoint (the known limitation
-        documented in #1302). Modern ccNC/CCS2 architectures (EV3, EV5, EV9, etc.)
-        support independent per-departure climate profiles, where each departure
-        has its own target temperature, defrost toggle, and climate activation state.
-        Top-level climate options on ``ScheduleChargingClimateRequestOptions`` continue
-        to act as defaults/fallbacks for backward compatibility.
-        """
+        """Per-departure schedule options; climate fields override top-level defaults on platforms with per-slot HVAC (see #1302)."""
 
         enabled: bool = None
         days: list[int] = None  # Sun=0, Mon=1, ..., Sat=6
