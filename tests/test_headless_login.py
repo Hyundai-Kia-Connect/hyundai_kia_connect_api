@@ -435,7 +435,7 @@ def test_genesis_uses_cci_login_constants():
     assert api.ONEAPP_REDIRECT_URI == "https://oneapp.genesis.com/redirect"
     assert api.CCI_API_URL == "https://cci-api-eu.genesis.com"
     assert api.CCI_DOMAIN_API_URL == "https://cci-api-eu.genesis.com/domain/api/"
-    assert api._cci_package_id == "com.genesis.oneapp.eu"
+    assert api.CCI_PACKAGE_ID == "com.genesis.oneapp.eu"
     assert api._cci_client_name == "genesis"
 
 
