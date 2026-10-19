@@ -24,7 +24,7 @@ def test_cn_refresh_hook_default_empty() -> None:
 
 def test_in_refresh_hook_default_empty() -> None:
     """IN inherits the base hook and must not send Stamp on refresh."""
-    api = KiaUvoApiIN(brand=2)
+    api = KiaUvoApiIN(region=6, brand=2, language="en")
     assert api._refresh_access_token_headers() == {}
 
 

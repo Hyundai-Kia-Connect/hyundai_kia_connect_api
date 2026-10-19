@@ -455,7 +455,7 @@ class VehicleManager:
                     f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
                 )
         elif REGIONS[region] == REGION_INDIA:
-            return KiaUvoApiIN(brand)
+            return KiaUvoApiIN(region, brand, language)
         elif REGIONS[region] == REGION_BRAZIL:
             return HyundaiBlueLinkApiBR(region, brand, language)
         else:

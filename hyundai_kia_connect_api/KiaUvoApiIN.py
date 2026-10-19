@@ -42,8 +42,7 @@ class KiaUvoApiIN(ApiImplType1):
     data_timezone = ZoneInfo("Asia/Kolkata")
     temperature_range = tuple(x * 0.5 for x in range(28, 60))
 
-    def __init__(self, brand: int) -> None:
-        # Strip language variants (e.g. en-Gb)
+    def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
         self.brand = brand
 
