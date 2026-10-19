@@ -96,3 +96,36 @@ def test_configure_accepts_broker_credential_names():
         broker_password="p",
     )
     assert t._broker_username == "u"
+
+
+def test_connack_refusal_notifies_instead_of_raising():
+    """Refusal on the paho thread must not raise: paho re-raises callback
+    exceptions on its network loop, killing the thread before any glue
+    sees it (live-probed on paho 2.1.0). Surface via on_disconnect +
+    connection-change instead."""
+
+    class _Reason:
+        value = 135
+
+    refused: list[str] = []
+    changes: list[bool] = []
+    t = MqttTransport(
+        on_disconnect=lambda reason: refused.append(reason),
+        on_connect=lambda: refused.append("connected"),  # must NOT fire
+    )
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_connect(None, None, None, _Reason())
+    assert refused == ["broker refused (rc=135)"]
+    assert changes == [False]
+    assert t.is_connected is False
+
+
+def test_connect_fail_routes_to_disconnect_callback():
+    """A failed socket connect (DNS/TLS) goes through the same glue path."""
+    refused: list[str] = []
+    changes: list[bool] = []
+    t = MqttTransport(on_disconnect=lambda reason: refused.append(reason))
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_connect_fail(None, None)
+    assert refused == ["connect failed (unreachable)"]
+    assert changes == [False]

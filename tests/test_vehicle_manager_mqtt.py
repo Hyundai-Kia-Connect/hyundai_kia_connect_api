@@ -175,7 +175,7 @@ def test_failed_vehicle_registration_subscribes_nothing(monkeypatch):
     vm.api.register_result = None  # type: ignore[attr-defined]
     assert vm.start_push("careu1") is False
     assert vm._push_client is None
-    assert vm._push_vehicle_ids == []
+    assert vm._push_vehicle_ids == set()
     assert "topics" not in vm.api.calls
     assert fake_cls.instances == []
 
@@ -268,7 +268,7 @@ def test_res_message_is_ignored_without_callback():
 def test_reconnect_calls_check_and_refresh_token(monkeypatch):
     vm = _make_vm()
     vm.vehicles["careu1"].mqtt_vehicle_id = "testmqtt1"
-    vm._push_vehicle_ids = ["careu1"]
+    vm._push_vehicle_ids = {"careu1"}
     refreshes = []
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: refreshes.append(1))
     from hyundai_kia_connect_api import const as const_mod
@@ -302,7 +302,7 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
 
 def test_clean_disconnect_does_not_reconnect():
     vm = _make_vm()
-    vm._push_vehicle_ids = ["careu1"]
+    vm._push_vehicle_ids = {"careu1"}
     vm._push_client = FakeTransport()
     vm._on_push_disconnect("clean disconnect")
     assert vm._push_reconnect_cancel is None
@@ -319,4 +319,4 @@ def test_stop_push_clears_state(monkeypatch):
     vm.start_push("careu1")
     vm.stop_push()
     assert vm._push_client is None
-    assert vm._push_vehicle_ids == []
+    assert vm._push_vehicle_ids == set()

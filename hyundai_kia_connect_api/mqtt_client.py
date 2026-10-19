@@ -4,7 +4,7 @@
 Uses paho-mqtt 2.x (matches HA 2026.6+). Receive-only: commands are sent
 via the HTTP GSPA layer, never through this client. Carries no topic
 schema knowledge — topics and message parsing belong to the push
-provider (mqtt_service_hub.py for the CCI/EU lineage).
+provider (mqtt_service_hub_eu.py for the CCI/EU lineage).
 
 Thread safety: paho-mqtt runs its own background network thread and
 dispatches callbacks on it. Callbacks must be thread-safe.
@@ -104,6 +104,7 @@ class MqttTransport:
         self._client.connect_timeout = 10
 
         self._client.on_connect = self._on_mqtt_connect
+        self._client.on_connect_fail = self._on_mqtt_connect_fail
         self._client.on_disconnect = self._on_mqtt_disconnect
         self._client.on_message = self._on_mqtt_message
         self._client.on_subscribe = self._on_mqtt_subscribe
@@ -161,7 +162,31 @@ class MqttTransport:
             if self._on_connection_change:
                 self._on_connection_change(True)
         else:
-            raise ConnectionError(f"Push broker refused connection (rc={rc})")
+            # The broker refused the session (credentials/protocol).
+            # paho runs this callback on its network thread and re-raises
+            # callback exceptions there — the caller never sees one, and
+            # the refusal kills the loop. Surface it through the
+            # disconnect callback instead (the glue's retry path).
+            _LOGGER.warning(f"{DOMAIN} - Push broker refused connection (rc={rc})")
+            if self._on_disconnect:
+                self._on_disconnect(f"broker refused (rc={rc})")
+            if self._on_connection_change:
+                self._on_connection_change(False)
+
+    def _on_mqtt_connect_fail(self, client: Any, userdata: Any, **kwargs: Any) -> None:
+        """Handle a failed socket-level connect (DNS, reachability).
+
+        paho retries the TCP connect on its own loop; the glue learns
+        about it through the disconnect callback so the retry policy
+        stays in one place. paho swallows exceptions raised here.
+        """
+        _LOGGER.warning(
+            f"{DOMAIN} - Push TCP connect failed (unreachable or TLS error)"
+        )
+        if self._on_disconnect:
+            self._on_disconnect("connect failed (unreachable)")
+        if self._on_connection_change:
+            self._on_connection_change(False)
 
     def _on_mqtt_disconnect(
         self,

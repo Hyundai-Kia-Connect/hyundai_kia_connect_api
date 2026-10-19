@@ -101,7 +101,9 @@ class VehicleManager:
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
         self._push_reconnect_cancel: threading.Event | None = None
-        self._push_vehicle_ids: list[str] = []
+        # Vehicles for which push was started; rebuilt-subscription set
+        # on reconnect. Push-scoped, distinct from the vehicle registry.
+        self._push_vehicle_ids: set[str] = set()
 
     def login(self) -> bool | OTPRequest:
         """Returns True if login successful, or OTPOptions if OTP is required"""
@@ -450,8 +452,11 @@ class VehicleManager:
 
         Setup order (app-confirmed): broker → register client → vehicle
         identity → register vehicle → transport connect → subscribe
-        topics. Returns False when the region API does not support push
-        or any setup step failed.
+        topics. Returns False when push is unavailable (region without
+        support, missing broker info, rejected registration).
+        ``APIError`` from the setup HTTP calls propagates so callers can
+        manage retries; transport failures surface through the
+        connection-change and disconnect callbacks.
         """
         if not getattr(self.api, "supports_mqtt_push", False):
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
@@ -462,8 +467,7 @@ class VehicleManager:
         if self._push_client is not None:
             if not self._register_new_vehicle(token, vehicle):
                 return False
-            if vehicle_id not in self._push_vehicle_ids:
-                self._push_vehicle_ids.append(vehicle_id)
+            self._push_vehicle_ids.add(vehicle_id)
             if self._push_client.is_connected:
                 self._subscribe_vehicle_topics(vehicle_id)
             return True
@@ -479,8 +483,7 @@ class VehicleManager:
 
         if not self._register_new_vehicle(token, vehicle):
             return False
-        if vehicle_id not in self._push_vehicle_ids:
-            self._push_vehicle_ids.append(vehicle_id)
+        self._push_vehicle_ids.add(vehicle_id)
 
         client = MqttTransport(
             on_message=self._on_push_delivery_raw,
@@ -498,10 +501,12 @@ class VehicleManager:
             client.set_on_connection_change(self._push_connection_change_callback)
         try:
             client.connect()
-        except Exception as ex:
-            _LOGGER.warning(f"{DOMAIN} - Push connection failed: {ex}")
-            self._push_vehicle_ids.remove(vehicle_id)
-            return False
+        except (ValueError, OSError):
+            # Synchronous setup failure — propagate it, do not retry it.
+            # The vehicle id is rolled back; async transport failures
+            # surface through the callbacks instead.
+            self._push_vehicle_ids.discard(vehicle_id)
+            raise
         self._push_client = client
         if client.is_connected:
             self._subscribe_vehicle_topics(vehicle_id)
@@ -512,37 +517,33 @@ class VehicleManager:
 
         Both steps are validated: identity requires the vehicle topic id
         (mqtt_vehicle_id), protocol registration requires a non-None
-        result. Failure returns False so no topics get subscribed.
+        result. HTTP (``APIError``) failures propagate so callers can
+        manage retries; those logical misses return False so no topics
+        get subscribed.
         """
-        try:
-            self.api.get_push_vehicle_identity(token, vehicle)
-            if not vehicle.mqtt_vehicle_id:
-                _LOGGER.warning(
-                    f"{DOMAIN} - Push identity missing vehicle id for {vehicle.id}"
-                )
-                return False
-            registered = self.api.register_push_vehicle(token, vehicle)
-            if registered is None:
-                _LOGGER.warning(
-                    f"{DOMAIN} - Push protocol registration failed for {vehicle.id}"
-                )
-                return False
-        except Exception as ex:
+        self.api.get_push_vehicle_identity(token, vehicle)
+        if not vehicle.mqtt_vehicle_id:
             _LOGGER.warning(
-                f"{DOMAIN} - Push registration failed for {vehicle.id}: {ex}"
+                f"{DOMAIN} - Push identity missing vehicle id for {vehicle.id}"
+            )
+            return False
+        registered = self.api.register_push_vehicle(token, vehicle)
+        if registered is None:
+            _LOGGER.warning(
+                f"{DOMAIN} - Push protocol registration failed for {vehicle.id}"
             )
             return False
         return True
 
     def _subscribe_vehicle_topics(self, vehicle_id: str) -> None:
-        """Subscribe the topics the region API provides for the vehicle."""
+        """Subscribe the topics the region API provides for the vehicle.
+
+        Topic selection is local computation over the Vehicle state —
+        no HTTP, so failures here are bugs and propagate.
+        """
         assert self._push_client is not None
         vehicle = self.get_vehicle(vehicle_id)
-        try:
-            topics = self.api.get_push_topics(self.token, vehicle)
-        except Exception:
-            _LOGGER.exception(f"{DOMAIN} - Push topic build failed for {vehicle_id}")
-            return
+        topics = self.api.get_push_topics(self.token, vehicle)
         if topics:
             self._push_client.subscribe(topics)
 
