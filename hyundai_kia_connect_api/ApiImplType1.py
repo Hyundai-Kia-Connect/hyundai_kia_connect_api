@@ -1226,64 +1226,63 @@ class ApiImplType1(ApiImpl):
         climate1 = get_child_value(
             state, "Green.Reservation.Departure.Schedule1.Climate"
         ) or get_child_value(state, "Green.Reservation.Departure.Climate")
+        climate2 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Climate"
+        )
         default_temp_unit = (
             climate1.get("TemperatureUnit", 0)
             if climate1 and climate1.get("TemperatureUnit") is not None
             else 0
         )
-        if climate1:
-            activation = climate1.get("Activation")
-            if activation is not None:
-                vehicle.ev_first_departure_climate_enabled = bool(activation)
-            defrost = climate1.get("Defrost")
-            if defrost is not None:
-                vehicle.ev_first_departure_climate_defrost = bool(defrost)
-            temp_val = climate1.get("Temperature")
+
+        def _parse_departure_climate(
+            climate: dict,
+            schedule_activation: object = None,
+        ) -> tuple[bool | None, bool | None, tuple[float, str] | None]:
+            activation = (
+                schedule_activation
+                if schedule_activation is not None
+                else climate.get("Activation")
+            )
+            enabled = bool(activation) if activation is not None else None
+            defrost_val = climate.get("Defrost")
+            defrost = bool(defrost_val) if defrost_val is not None else None
+            temp: tuple[float, str] | None = None
+            temp_val = climate.get("Temperature")
             if temp_val is not None:
                 try:
                     temp_float = float(temp_val)
-                    unit_int = climate1.get("TemperatureUnit")
+                    unit_int = climate.get("TemperatureUnit")
                     if unit_int is None:
                         unit_int = default_temp_unit
-                    unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
-                    vehicle.ev_first_departure_climate_temperature = (
-                        temp_float,
-                        unit_str,
-                    )
+                    unit_str = TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0])
+                    temp = (temp_float, unit_str)
                 except (ValueError, TypeError):
                     pass
+            return enabled, defrost, temp
 
-        climate2 = get_child_value(
-            state, "Green.Reservation.Departure.Schedule2.Climate"
-        )
+        if climate1:
+            enabled, defrost, temp = _parse_departure_climate(climate1)
+            if enabled is not None:
+                vehicle.ev_first_departure_climate_enabled = enabled
+            if defrost is not None:
+                vehicle.ev_first_departure_climate_defrost = defrost
+            if temp is not None:
+                vehicle.ev_first_departure_climate_temperature = temp
+
         if climate2:
             sched2_activation = get_child_value(
                 state, "Green.Reservation.Departure.Schedule2.Activation"
             )
-            activation = (
-                sched2_activation
-                if sched2_activation is not None
-                else climate2.get("Activation")
+            enabled, defrost, temp = _parse_departure_climate(
+                climate2, sched2_activation
             )
-            if activation is not None:
-                vehicle.ev_second_departure_climate_enabled = bool(activation)
-            defrost = climate2.get("Defrost")
+            if enabled is not None:
+                vehicle.ev_second_departure_climate_enabled = enabled
             if defrost is not None:
-                vehicle.ev_second_departure_climate_defrost = bool(defrost)
-            temp_val = climate2.get("Temperature")
-            if temp_val is not None:
-                try:
-                    temp_float = float(temp_val)
-                    unit_int = climate2.get("TemperatureUnit")
-                    if unit_int is None:
-                        unit_int = default_temp_unit
-                    unit_str = TEMPERATURE_UNITS.get(unit_int, "°C")
-                    vehicle.ev_second_departure_climate_temperature = (
-                        temp_float,
-                        unit_str,
-                    )
-                except (ValueError, TypeError):
-                    pass
+                vehicle.ev_second_departure_climate_defrost = defrost
+            if temp is not None:
+                vehicle.ev_second_departure_climate_temperature = temp
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"

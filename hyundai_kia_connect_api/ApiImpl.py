@@ -184,9 +184,7 @@ def _schedule_charging_scopes(
 def _vehicle_temperature_unit(vehicle: Vehicle) -> int | None:
     """Wire temperature unit (0=°C, 1=°F) from the vehicle's reported setting.
 
-    ``None`` when the vehicle does not report a departure-climate unit (the
-    CCS2 status does not expose it yet — see the parsing TODO in
-    ``ApiImplType1``).
+    ``None`` when the vehicle does not report a departure-climate unit.
     """
     unit_map = {TEMPERATURE_C: 0, TEMPERATURE_F: 1}
     source_unit = vehicle.ev_first_departure_climate_temperature_unit
@@ -204,8 +202,7 @@ def _guard_schedule_temperature(
     the payload always carries ``airTemp``. When neither the caller nor the
     vehicle provides a temperature, writing the documented default (21 °C)
     would silently reset the car's setting — so raise instead (Lekensteyn,
-    #1303 review; affects CCS2 models, which do not report the departure
-    climate temperature yet).
+    #1303 review).
     """
     has_temp = (
         options.temperature is not None
