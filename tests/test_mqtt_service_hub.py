@@ -1,4 +1,4 @@
-"""Tests for the Service Hub push provider (mqtt_service_hub module)."""
+"""Tests for the Service Hub push provider (mqtt_service_hub_eu module)."""
 
 import json
 

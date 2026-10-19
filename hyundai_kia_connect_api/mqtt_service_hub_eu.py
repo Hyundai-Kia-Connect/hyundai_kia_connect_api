@@ -1,5 +1,5 @@
 # pylint:disable=invalid-name,missing-function-docstring,missing-class-docstring,broad-exception-caught,logging-fstring-interpolation
-"""mqtt_service_hub.py — push provider implementation for the CCI/EU lineage.
+"""mqtt_service_hub_eu.py — push provider implementation for the CCI/EU lineage.
 
 ``MqttServiceHubMixin`` implements the ``ApiImpl`` push contract for the
 EU CCI/GPGA brand classes (``HyundaiCciApiEU`` and ``KiaCciApiEU`` both
@@ -7,11 +7,9 @@ mix it in). It carries the Service Hub HTTP methods that configure and
 register the receive-only MQTT client, plus the Service Hub topic
 schema (constants, builders, parser).
 
-Endpoint wire shapes are live-probed/app-confirmed. Where a shape could
-not be confirmed on production endpoints (the metadata capabilities
-report), parsing is tolerant and the corresponding ``Vehicle`` fields
-stay ``None`` (unknown) — conditional topics are only subscribed on an
-explicit ``True``.
+Endpoint wire shapes are live-probed; parsing is tolerant and shapes
+that could not be confirmed leave the corresponding ``Vehicle`` fields
+unknown (``None``).
 """
 
 from __future__ import annotations
@@ -42,15 +40,10 @@ _LOGGER = logging.getLogger(__name__)
 class MqttServiceHubMixin:
     """Push contract implementation (Service Hub) for the CCI/EU lineage.
 
-    Mixed into both ``HyundaiCciApiEU`` and ``KiaCciApiEU``. All
-    brand-specific values are host-class attributes:
-      - SERVICE_HUB_BASE (REST base, host:port)
-      - CCSP_CLIENT_SERVICE_ID (X-Service-Id header value)
-      - PUSH_PROVIDER_ID (X-Application-Id header value)
-      - supports_mqtt_push (push contract flag)
-    Session state lives on the host instance:
-      - self._service_hub_session (requests.Session | None)
-      - self._service_hub_tid (str | None, set from device/host response)
+    Mixed into both ``HyundaiCciApiEU`` and ``KiaCciApiEU``; all
+    brand-specific values (SERVICE_HUB_BASE, CCSP_CLIENT_SERVICE_ID,
+    PUSH_PROVIDER_ID, supports_mqtt_push) and the session state
+    (_service_hub_session, _service_hub_tid) live on the host class.
     """
 
     if TYPE_CHECKING:
@@ -529,12 +522,8 @@ def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
     live-probed on Hyundai; Kia returns tmu only). The hu entry carries
     the remote-control and closeremote protocol sets, so it is the
     preferred capability source; an entry without a hu falls back to
-    the first one carrying a protocol list.
-
-    A flag is True only when its matching protocol appears in the
-    vehicle's protocol list; False when the list was read and the
-    protocol is absent; None when no protocol list was available
-    (response without per-vehicle protocol membership).
+    the first one carrying a protocol list. True/False/None semantics
+    are documented on the Vehicle capability fields.
     """
     protocols: set[str] | None = None
     candidates = list(entries or [])
@@ -563,10 +552,8 @@ def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Service Hub MQTT topic schema (wire format: topic constants +
-# protocol ids + message data classes + builders + parser).
-# These belong to the CCI/EU Service Hub wire format, NOT to the generic
-# MQTT transport, which stays schema-neutral (mqtt_client.py).
+# Service Hub topic schema (constants, builders, parser) — CCI/EU wire
+# format, distinct from the schema-neutral transport in mqtt_client.py.
 # ---------------------------------------------------------------------------
 
 # Topic prefixes (prefix + infix + postfix = full topic)

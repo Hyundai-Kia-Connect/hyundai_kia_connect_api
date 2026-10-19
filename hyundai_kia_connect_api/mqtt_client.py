@@ -162,11 +162,9 @@ class MqttTransport:
             if self._on_connection_change:
                 self._on_connection_change(True)
         else:
-            # The broker refused the session (credentials/protocol).
-            # paho runs this callback on its network thread and re-raises
-            # callback exceptions there — the caller never sees one, and
-            # the refusal kills the loop. Surface it through the
-            # disconnect callback instead (the glue's retry path).
+            # paho re-raises callback exceptions on its network thread, so
+            # a raise here kills the loop unseen — notify the glue's
+            # retry path instead.
             _LOGGER.warning(f"{DOMAIN} - Push broker refused connection (rc={rc})")
             if self._on_disconnect:
                 self._on_disconnect(f"broker refused (rc={rc})")
@@ -174,12 +172,8 @@ class MqttTransport:
                 self._on_connection_change(False)
 
     def _on_mqtt_connect_fail(self, client: Any, userdata: Any, **kwargs: Any) -> None:
-        """Handle a failed socket-level connect (DNS, reachability).
-
-        paho retries the TCP connect on its own loop; the glue learns
-        about it through the disconnect callback so the retry policy
-        stays in one place. paho swallows exceptions raised here.
-        """
+        """Handle a failed socket-level connect (DNS, reachability) — routed
+        through the disconnect callback like any refusal."""
         _LOGGER.warning(
             f"{DOMAIN} - Push TCP connect failed (unreachable or TLS error)"
         )

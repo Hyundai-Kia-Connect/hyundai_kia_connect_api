@@ -164,13 +164,10 @@ class Vehicle:
     _ota_checked: bool = False
     _valet_failed: bool = False
 
-    # Push identity fields (per-vehicle level; vehicle is the identity
-    # scope). mqtt_vehicle_id is the topic infix — NOT the same id as
-    # Token.mqtt_client_id (the device/client registration id on the token
-    # level). Capability flags are populated from the push metadata read:
-    # True = supported, False = explicitly not supported, None = the
-    # metadata response did not report the flag (unknown — conditional
-    # topics are only subscribed on True).
+    # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
+    # distinct from Token.mqtt_client_id (the device-level registration id).
+    # Capability flags: True = supported, False = not supported, None =
+    # not reported by the metadata read; conditional topics require True.
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
     supports_hvac_close_remote: bool | None = None

@@ -484,12 +484,8 @@ class ApiImpl:
         Use any dummy request to test if token is still valid"""
         return True
 
-    # ------------------------------------------------------------------
-    # Push/MQTT contract (region implementations that support push
-    # override these — today: the CCI/EU lineage via MqttServiceHubMixin).
-    # VehicleManager gates all glue on `supports_mqtt_push` and must
-    # never call these methods on an API that does not declare it.
-    # ------------------------------------------------------------------
+    # Push contract — regions that support push override these
+    # (today: the CCI/EU lineage).
 
     supports_mqtt_push: bool = False
 

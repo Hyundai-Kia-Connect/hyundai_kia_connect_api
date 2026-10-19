@@ -94,15 +94,13 @@ class VehicleManager:
         self.token: Token = token
         self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
-        # Push (MQTT) transport. Connection-scoped state lives here; all
-        # vehicle-level push identity lives on Vehicle (mqtt_vehicle_id,
-        # hu_client_id).
+        # Push transport; connection-scoped state (vehicle identity lives
+        # on Vehicle — mqtt_vehicle_id, hu_client_id).
         self._push_client: MqttTransport | None = None
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
         self._push_reconnect_cancel: threading.Event | None = None
-        # Vehicles for which push was started; rebuilt-subscription set
-        # on reconnect. Push-scoped, distinct from the vehicle registry.
+        # Vehicles with push started; rebuilt-subscription source on reconnect.
         self._push_vehicle_ids: set[str] = set()
 
     def login(self) -> bool | OTPRequest:
@@ -439,24 +437,17 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), poi_list
         )
 
-    # ------------------------------------------------------------------
-    # Push (MQTT) — generic glue over the ApiImpl push contract.
-    # The manager knows nothing about broker schemas: a region API that
-    # declares supports_mqtt_push supplies broker info, registration,
-    # vehicle identity, topics and the message parser. Regions without
-    # support are a no-op (False / None), never a NotImplementedError.
-    # ------------------------------------------------------------------
+    # Push glue — generic over the ApiImpl push contract; the region API
+    # supplies broker info, registration, identity, topics and the parser.
 
     def start_push(self, vehicle_id: str) -> bool:
         """Connect to the push broker and subscribe the vehicle's topics.
 
         Setup order (app-confirmed): broker → register client → vehicle
-        identity → register vehicle → transport connect → subscribe
-        topics. Returns False when push is unavailable (region without
-        support, missing broker info, rejected registration).
-        ``APIError`` from the setup HTTP calls propagates so callers can
-        manage retries; transport failures surface through the
-        connection-change and disconnect callbacks.
+        identity → register vehicle → transport connect → subscribe.
+        Returns False when push is unavailable (unsupported region, no
+        broker info, rejected registration); ``APIError`` propagates and
+        transport failures surface through the callbacks.
         """
         if not getattr(self.api, "supports_mqtt_push", False):
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
@@ -502,9 +493,8 @@ class VehicleManager:
         try:
             client.connect()
         except (ValueError, OSError):
-            # Synchronous setup failure — propagate it, do not retry it.
-            # The vehicle id is rolled back; async transport failures
-            # surface through the callbacks instead.
+            # Programming-level failure — propagate, do not retry;
+            # roll the vehicle id back.
             self._push_vehicle_ids.discard(vehicle_id)
             raise
         self._push_client = client
@@ -515,11 +505,9 @@ class VehicleManager:
     def _register_new_vehicle(self, token: Token, vehicle: Vehicle) -> bool:
         """Run the per-vehicle registration steps of the push contract.
 
-        Both steps are validated: identity requires the vehicle topic id
-        (mqtt_vehicle_id), protocol registration requires a non-None
-        result. HTTP (``APIError``) failures propagate so callers can
-        manage retries; those logical misses return False so no topics
-        get subscribed.
+        Returns False (no subscriptions) when the identity lacks
+        mqtt_vehicle_id or registration is rejected; ``APIError``
+        propagates.
         """
         self.api.get_push_vehicle_identity(token, vehicle)
         if not vehicle.mqtt_vehicle_id:
@@ -538,8 +526,7 @@ class VehicleManager:
     def _subscribe_vehicle_topics(self, vehicle_id: str) -> None:
         """Subscribe the topics the region API provides for the vehicle.
 
-        Topic selection is local computation over the Vehicle state —
-        no HTTP, so failures here are bugs and propagate.
+        Local computation only — no HTTP; a failure here is a bug.
         """
         assert self._push_client is not None
         vehicle = self.get_vehicle(vehicle_id)
