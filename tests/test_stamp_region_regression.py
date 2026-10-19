@@ -40,7 +40,7 @@ def _capture_region(api):
     ``api._cipher`` is a module-level singleton; monkeypatch (used by the
     caller) restores the original method.
     """
-    real_compute = api._cipher.compute_x_stamp
+    real_compute = api._get_cipher().compute_x_stamp
     captured = {}
 
     def spy(region=1, tsid=None, epoch_seconds=None, user_id=""):
@@ -61,7 +61,7 @@ def test_region9_instance_stamps_with_region_1(monkeypatch):
     (regression for C1: region 9 selected the JP IV)."""
     api = HyundaiCciApiEU(9, 2, "en")
     spy, captured = _capture_region(api)
-    monkeypatch.setattr(api._cipher, "compute_x_stamp", spy)
+    monkeypatch.setattr(api._get_cipher(), "compute_x_stamp", spy)
 
     stamp, tsid = api._get_stamp(_make_token())
 
@@ -79,7 +79,7 @@ def test_vehicle_manager_region9_stamps_with_region_1(monkeypatch):
     api = VehicleManager.get_implementation_by_region_brand(9, 2, "en")
     assert isinstance(api, HyundaiCciApiEU)
     spy, captured = _capture_region(api)
-    monkeypatch.setattr(api._cipher, "compute_x_stamp", spy)
+    monkeypatch.setattr(api._get_cipher(), "compute_x_stamp", spy)
 
     stamp, tsid = api._get_stamp(_make_token())
 
