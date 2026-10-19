@@ -37,10 +37,9 @@ class MqttTransport:
         self._on_disconnect = on_disconnect
         self._broker_host: str | None = None
         self._broker_port: int = 8883
-        self._use_ssl: bool = True
         self._client_id: str | None = None
-        self._username: str | None = None
-        self._password: str | None = None
+        self._broker_username: str | None = None
+        self._broker_password: str | None = None
         self._connected: bool = False
         self._subscribed_topics: list[str] = []
         self._on_connection_change: Callable[[bool], None] | None = None
@@ -63,18 +62,21 @@ class MqttTransport:
         self,
         broker_host: str,
         broker_port: int = 8883,
-        use_ssl: bool = True,
         client_id: str | None = None,
-        username: str | None = None,
-        password: str | None = None,
+        broker_username: str | None = None,
+        broker_password: str | None = None,
     ) -> None:
-        """Set broker connection parameters (call before connect())."""
+        """Set broker connection parameters (call before connect()).
+
+        Broker credentials are the device/register response triple, not
+        the account Token. TLS is unconditional — the broker endpoints
+        are TLS-only in practice.
+        """
         self._broker_host = broker_host
         self._broker_port = broker_port
-        self._use_ssl = use_ssl
         self._client_id = client_id or f"{DOMAIN}_{uuid.uuid4().hex[:12]}"
-        self._username = username
-        self._password = password
+        self._broker_username = broker_username
+        self._broker_password = broker_password
 
     def connect(self) -> None:
         """Connect to the MQTT broker (configure() first)."""
@@ -88,12 +90,13 @@ class MqttTransport:
             clean_session=True,
         )
 
-        if self._username:
-            self._client.username_pw_set(self._username, self._password or "")
+        if self._broker_username:
+            self._client.username_pw_set(
+                self._broker_username, self._broker_password or ""
+            )
 
-        if self._use_ssl:
-            self._client.tls_set()  # Default CA certs
-            self._client.tls_insecure_set(False)
+        self._client.tls_set()  # Default CA certs
+        self._client.tls_insecure_set(False)
 
         # App-confirmed client settings: connectionTimeout=10,
         # keepAliveInterval=15.
@@ -105,9 +108,8 @@ class MqttTransport:
         self._client.on_message = self._on_mqtt_message
         self._client.on_subscribe = self._on_mqtt_subscribe
 
-        _LOGGER.info(
-            f"{DOMAIN} - Push connecting to {self._broker_host}:{self._broker_port} "
-            f"(ssl={self._use_ssl})"
+        _LOGGER.debug(
+            f"{DOMAIN} - Push connecting to {self._broker_host}:{self._broker_port}"
         )
         self._client.connect_async(self._broker_host, self._broker_port, keepalive=15)
         self._client.loop_start()

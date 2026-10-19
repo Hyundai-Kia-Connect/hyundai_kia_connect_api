@@ -166,6 +166,11 @@ class OTP_NOTIFY_TYPE(Enum):
     SMS = "SMS"
 
 
+# Push reconnect backoff timing (capped exponential; overridable in tests).
+MQTT_PUSH_RECONNECT_INITIAL_DELAY: float = 5.0
+MQTT_PUSH_RECONNECT_MAX_DELAY: float = 300.0
+
+
 class MQTT_PUSH_CONNECTION_STATE(str, Enum):
     """Push broker connection state (push contract wire values)."""
 

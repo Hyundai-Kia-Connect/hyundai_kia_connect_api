@@ -10,6 +10,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
+from . import const
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
@@ -58,10 +59,6 @@ from .Token import Token
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
-
-# Push reconnect backoff timing (capped exponential).
-_PUSH_RECONNECT_INITIAL_DELAY: float = 5.0
-_PUSH_RECONNECT_MAX_DELAY: float = 300.0
 
 
 class VehicleManager:
@@ -658,7 +655,7 @@ class VehicleManager:
         vehicle_ids = list(self._push_vehicle_ids)
 
         def _reconnect_with_backoff() -> None:
-            delay = _PUSH_RECONNECT_INITIAL_DELAY
+            delay = const.MQTT_PUSH_RECONNECT_INITIAL_DELAY
             while not cancel_event.is_set():
                 _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
                 if cancel_event.wait(delay):
@@ -677,7 +674,7 @@ class VehicleManager:
                         return
                 except Exception as ex:
                     _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
-                delay = min(delay * 2, _PUSH_RECONNECT_MAX_DELAY)
+                delay = min(delay * 2, const.MQTT_PUSH_RECONNECT_MAX_DELAY)
             _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 
         threading.Thread(

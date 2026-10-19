@@ -80,3 +80,19 @@ def test_on_message_receives_raw_topic_payload():
 
     t._on_mqtt_message(None, None, _Msg())
     assert got == [("service/phone/_/vss/v1/", b"j")]
+
+
+def test_configure_accepts_broker_credential_names():
+    """The manager→transport call shape (post-review rename) works on the
+    REAL transport, not just test doubles."""
+    import hyundai_kia_connect_api.mqtt_client as mod
+
+    t = mod.MqttTransport()
+    t.configure(
+        broker_host="broker.example",
+        broker_port=8883,
+        client_id="client-1",
+        broker_username="u",
+        broker_password="p",
+    )
+    assert t._broker_username == "u"

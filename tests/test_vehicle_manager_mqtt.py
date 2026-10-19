@@ -271,8 +271,10 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
     vm._push_vehicle_ids = ["careu1"]
     refreshes = []
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: refreshes.append(1))
-    monkeypatch.setattr(vm_module, "_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
-    monkeypatch.setattr(vm_module, "_PUSH_RECONNECT_MAX_DELAY", 0.01)
+    from hyundai_kia_connect_api import const as const_mod
+
+    monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
+    monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_MAX_DELAY", 0.01)
 
     attempts = {"n": 0}
 

@@ -71,9 +71,10 @@ class MqttServiceHubMixin:
     def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
         """GET api/v3/servicehub/device/host — get the MQTT broker config.
 
-        Returns dict with keys: mqtt_host, mqtt_port, use_ssl, http_host,
-        http_port. The broker credential triple (username/password) comes
-        from device/register, not the account Token. Stores the response tid (header) for the subsequent
+        Returns dict with keys: mqtt_host, mqtt_port, http_host, http_port.
+        The broker credential triple (username/password) comes from
+        device/register, not the account Token; TLS is unconditional on
+        the transport. Stores the response tid (header) for the subsequent
         Service Hub calls.
         """
         url = self._get_service_hub_url() + "/api/v3/servicehub/device/host"
@@ -97,7 +98,9 @@ class MqttServiceHubMixin:
                 self._service_hub_tid = tid
                 _LOGGER.debug(f"{DOMAIN} - Push device/host tid (header): {tid}")
             else:
-                _LOGGER.info(f"{DOMAIN} - Push device/host: no tid header in response")
+                _LOGGER.warning(
+                    f"{DOMAIN} - Push device/host: no tid header in response"
+                )
             data = response.json()
             _LOGGER.debug(f"{DOMAIN} - Push device/host response: {data}")
             mqtt_broker = data.get("mqtt", {})
@@ -112,7 +115,6 @@ class MqttServiceHubMixin:
             return {
                 "mqtt_host": host,
                 "mqtt_port": port,
-                "use_ssl": mqtt_broker.get("ssl") is not None,
                 "http_host": data.get("http", {}).get("host"),
                 "http_port": data.get("http", {}).get("port"),
             }
