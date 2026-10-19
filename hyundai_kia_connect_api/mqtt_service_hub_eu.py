@@ -525,19 +525,33 @@ _CAPS_PROTOCOL_KEYS: dict[str, tuple[str, ...]] = {
 def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
     """Populate Vehicle capability flags from metadata entries.
 
+    The metadata response carries one entry per unit (hu, tmu, ccu —
+    live-probed on Hyundai; Kia returns tmu only). The hu entry carries
+    the remote-control and closeremote protocol sets, so it is the
+    preferred capability source; an entry without a hu falls back to
+    the first one carrying a protocol list.
+
     A flag is True only when its matching protocol appears in the
     vehicle's protocol list; False when the list was read and the
     protocol is absent; None when no protocol list was available
     (response without per-vehicle protocol membership).
     """
     protocols: set[str] | None = None
-    for entry in entries or []:
-        if not isinstance(entry, dict):
-            continue
-        raw = entry.get("protocols")
-        if isinstance(raw, list):
-            protocols = {str(p) for p in raw}
-            break
+    candidates = list(entries or [])
+    for entry in candidates:
+        if isinstance(entry, dict) and entry.get("unit") == "hu":
+            raw = entry.get("protocols")
+            if isinstance(raw, list):
+                protocols = {str(p) for p in raw}
+                break
+    if protocols is None:
+        for entry in candidates:
+            if not isinstance(entry, dict):
+                continue
+            raw = entry.get("protocols")
+            if isinstance(raw, list):
+                protocols = {str(p) for p in raw}
+                break
     if protocols is None:
         _LOGGER.debug(
             f"{DOMAIN} - Push metadata: no protocol list in response; "

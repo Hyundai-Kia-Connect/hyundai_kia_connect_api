@@ -439,3 +439,63 @@ def test_gspa_base_has_no_service_hub_state_leak(brand_cls, brand):
     assert not hasattr(mod, "SERVICE_HUB_PRODUCTION_BASES")
     assert not hasattr(mod, "SERVICE_HUB_STAGING_BASES")
     assert not hasattr(brand_cls, "staging")
+
+
+def test_metadata_prefers_hu_entry_over_tmu():
+    """Multi-unit responses (live-probed Hyundai: hu, tmu, ccu) read the
+    hu protocol list; the tmu list must not shadow it. A response
+    without a hu entry falls back to the first entry with protocols
+    (Kia: tmu only)."""
+    api = _kia_api()
+    vehicle = _vehicle()
+    api._service_hub_session = _FakeSession(
+        [
+            _FakeResponse(
+                json_data={
+                    "vehicles": [
+                        {
+                            "unit": "tmu",
+                            "clientId": "c-t",
+                            "vehicleId": "mqtt-v1",
+                            "protocols": ["statesync.vehicle.ccu.update"],
+                        },
+                        {
+                            "unit": "hu",
+                            "clientId": "client-1",
+                            "vehicleId": "mqtt-v1",
+                            "protocols": [
+                                "vehicle.ota.scheduleupdate",
+                                "device.closeremote.precondition",
+                            ],
+                        },
+                        {"unit": "ccu", "clientId": "c-x", "vehicleId": "mqtt-v1"},
+                    ]
+                }
+            ),
+            _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
+        ]
+    )
+    api.get_push_vehicle_identity(Token(), vehicle)
+    assert vehicle.supports_hvac_close_remote is True  # from hu, not tmu
+    assert vehicle.supports_schedule_update is True  # from hu
+
+    api._service_hub_session = _FakeSession(
+        [
+            _FakeResponse(
+                json_data={
+                    "vehicles": [
+                        {
+                            "unit": "tmu",
+                            "clientId": "c-t",
+                            "vehicleId": "mqtt-v1",
+                            "protocols": ["statesync.vehicle.ccu.update"],
+                        }
+                    ]
+                }
+            ),
+            _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
+        ]
+    )
+    vehicle2 = _vehicle()
+    api.get_push_vehicle_identity(Token(), vehicle2)
+    assert vehicle2.supports_hvac_close_remote is False  # tmu fallback
