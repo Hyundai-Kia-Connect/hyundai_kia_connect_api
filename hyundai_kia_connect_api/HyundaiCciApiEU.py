@@ -20,7 +20,7 @@ from .const import (
 )
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
-from .mqtt_service_hub import MqttServiceHubMixin
+from .mqtt_service_hub_eu import MqttServiceHubMixin
 from .Token import Token
 from .utils import (
     get_child_value,
@@ -60,11 +60,8 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
     # KiaCciApiEU keeps the inherited False until verified there too.
     supports_svm: bool = True
 
-    # Push contract implemented by MqttServiceHubMixin (live-probed).
     supports_mqtt_push: bool = True
 
-    # Service Hub header values (app-confirmed): X-Service-Id identifier
-    # and the X-Application-Id (push provider) UUID.
     CCSP_CLIENT_SERVICE_ID = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
     PUSH_PROVIDER_ID = "33258e5f-b8c8-459e-add1-1e94217ba148"
 

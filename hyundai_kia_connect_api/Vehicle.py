@@ -173,11 +173,11 @@ class Vehicle:
     # topics are only subscribed on True).
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
-    has_hvac_close_remote: bool | None = None
-    has_media_close_remote: bool | None = None
-    is_support_speed_event: bool | None = None
-    is_support_ota_progress: bool | None = None
-    is_support_schedule_update: bool | None = None
+    supports_hvac_close_remote: bool | None = None
+    supports_media_close_remote: bool | None = None
+    supports_speed_event: bool | None = None
+    supports_ota_progress: bool | None = None
+    supports_schedule_update: bool | None = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool = None

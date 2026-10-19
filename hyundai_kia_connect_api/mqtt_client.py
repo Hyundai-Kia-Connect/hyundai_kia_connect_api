@@ -152,14 +152,14 @@ class MqttTransport:
         """Handle MQTT connection (paho v2 signature)."""
         rc = reason_code.value if not isinstance(reason_code, int) else reason_code
         if rc == 0:
-            _LOGGER.info(f"{DOMAIN} - Push CONNECTED")
+            _LOGGER.debug(f"{DOMAIN} - Push CONNECTED")
             self._connected = True
             if self._on_connect:
                 self._on_connect()
             if self._on_connection_change:
                 self._on_connection_change(True)
         else:
-            _LOGGER.warning(f"{DOMAIN} - Push connect FAILED: rc={rc}")
+            raise ConnectionError(f"Push broker refused connection (rc={rc})")
 
     def _on_mqtt_disconnect(
         self,

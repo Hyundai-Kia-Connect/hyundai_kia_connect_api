@@ -448,11 +448,6 @@ class VehicleManager:
     # support are a no-op (False / None), never a NotImplementedError.
     # ------------------------------------------------------------------
 
-    @property
-    def is_push_supported(self) -> bool:
-        """Whether the active region API declares push support."""
-        return bool(getattr(self.api, "supports_mqtt_push", False))
-
     def start_push(self, vehicle_id: str) -> bool:
         """Connect to the push broker and subscribe the vehicle's topics.
 
@@ -461,16 +456,17 @@ class VehicleManager:
         topics. Returns False when the region API does not support push
         or any setup step failed.
         """
-        if not self.is_push_supported:
+        if not getattr(self.api, "supports_mqtt_push", False):
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
             return False
 
         token = self.token
         vehicle = self.get_vehicle(vehicle_id)
         if self._push_client is not None:
-            if not self._register_new_vehicle(token, vehicle, vehicle_id):
+            if not self._register_new_vehicle(token, vehicle):
                 return False
-            self._push_vehicle_ids.append(vehicle_id)
+            if vehicle_id not in self._push_vehicle_ids:
+                self._push_vehicle_ids.append(vehicle_id)
             if self._push_client.is_connected:
                 self._subscribe_vehicle_topics(vehicle_id)
             return True
@@ -484,9 +480,10 @@ class VehicleManager:
             _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
             return False
 
-        if not self._register_new_vehicle(token, vehicle, vehicle_id):
+        if not self._register_new_vehicle(token, vehicle):
             return False
-        self._push_vehicle_ids.append(vehicle_id)
+        if vehicle_id not in self._push_vehicle_ids:
+            self._push_vehicle_ids.append(vehicle_id)
 
         client = MqttTransport(
             on_message=self._on_push_delivery_raw,
@@ -496,10 +493,9 @@ class VehicleManager:
         client.configure(
             broker_host=broker["mqtt_host"],
             broker_port=broker.get("mqtt_port", 8883),
-            use_ssl=broker.get("use_ssl", True),
             client_id=reg.get("client_id"),
-            username=reg.get("username"),
-            password=reg.get("password"),
+            broker_username=reg.get("username"),
+            broker_password=reg.get("password"),
         )
         if self._push_connection_change_callback:
             client.set_on_connection_change(self._push_connection_change_callback)
@@ -514,9 +510,7 @@ class VehicleManager:
             self._subscribe_vehicle_topics(vehicle_id)
         return True
 
-    def _register_new_vehicle(
-        self, token: Token, vehicle: Vehicle, vehicle_id: str
-    ) -> bool:
+    def _register_new_vehicle(self, token: Token, vehicle: Vehicle) -> bool:
         """Run the per-vehicle registration steps of the push contract.
 
         Both steps are validated: identity requires the vehicle topic id
@@ -527,18 +521,18 @@ class VehicleManager:
             self.api.get_push_vehicle_identity(token, vehicle)
             if not vehicle.mqtt_vehicle_id:
                 _LOGGER.warning(
-                    f"{DOMAIN} - Push identity missing vehicle id for {vehicle_id}"
+                    f"{DOMAIN} - Push identity missing vehicle id for {vehicle.id}"
                 )
                 return False
             registered = self.api.register_push_vehicle(token, vehicle)
             if registered is None:
                 _LOGGER.warning(
-                    f"{DOMAIN} - Push protocol registration failed for {vehicle_id}"
+                    f"{DOMAIN} - Push protocol registration failed for {vehicle.id}"
                 )
                 return False
         except Exception as ex:
             _LOGGER.warning(
-                f"{DOMAIN} - Push registration failed for {vehicle_id}: {ex}"
+                f"{DOMAIN} - Push registration failed for {vehicle.id}: {ex}"
             )
             return False
         return True
@@ -661,12 +655,10 @@ class VehicleManager:
         cancel_event = threading.Event()
         self._push_reconnect_cancel = cancel_event
 
-        initial_delay = _PUSH_RECONNECT_INITIAL_DELAY
-        max_delay = _PUSH_RECONNECT_MAX_DELAY
         vehicle_ids = list(self._push_vehicle_ids)
 
         def _reconnect_with_backoff() -> None:
-            delay = initial_delay
+            delay = _PUSH_RECONNECT_INITIAL_DELAY
             while not cancel_event.is_set():
                 _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
                 if cancel_event.wait(delay):
@@ -685,7 +677,7 @@ class VehicleManager:
                         return
                 except Exception as ex:
                     _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
-                delay = min(delay * 2, max_delay)
+                delay = min(delay * 2, _PUSH_RECONNECT_MAX_DELAY)
             _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 
         threading.Thread(
@@ -693,10 +685,9 @@ class VehicleManager:
         ).start()
 
     def _cleanup_push_client(self) -> None:
-        old_client = self._push_client
-        if old_client is not None:
+        if self._push_client is not None:
             try:
-                old_client.disconnect()
+                self._push_client.disconnect()
             except Exception:
                 _LOGGER.debug("Push disconnect during cleanup failed (already down)")
             self._push_client = None

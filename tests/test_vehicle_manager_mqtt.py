@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 from hyundai_kia_connect_api import VehicleManager
 
 vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
-from hyundai_kia_connect_api.mqtt_service_hub import CciPushMessage
+from hyundai_kia_connect_api.mqtt_service_hub_eu import CciPushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -140,7 +140,7 @@ def test_start_push_true_and_configures_transport(monkeypatch):
     _connected_transport_factory(monkeypatch)
     assert vm.start_push("careu1") is True
     assert vm._push_client is not None
-    assert vm.is_push_supported is True
+    assert vm.api.supports_mqtt_push is True
     assert vm._push_client.configured["broker_host"] == "broker.example"
     assert vm._push_client.configured["client_id"] == "dev-client"
 

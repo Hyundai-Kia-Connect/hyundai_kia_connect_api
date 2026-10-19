@@ -72,7 +72,8 @@ class MqttServiceHubMixin:
         """GET api/v3/servicehub/device/host — get the MQTT broker config.
 
         Returns dict with keys: mqtt_host, mqtt_port, use_ssl, http_host,
-        http_port. Stores the response tid (header) for the subsequent
+        http_port. The broker credential triple (username/password) comes
+        from device/register, not the account Token. Stores the response tid (header) for the subsequent
         Service Hub calls.
         """
         url = self._get_service_hub_url() + "/api/v3/servicehub/device/host"
@@ -203,9 +204,9 @@ class MqttServiceHubMixin:
             ]
         )
         # OTA protocols — only when the vehicle reports the capability.
-        if vehicle.is_support_ota_progress is True:
+        if vehicle.supports_ota_progress is True:
             protocols.append("vehicle.ota.otaprogress")
-        if vehicle.is_support_schedule_update is True:
+        if vehicle.supports_schedule_update is True:
             protocols.append("vehicle.ota.scheduleupdate")
 
         body = {
@@ -302,7 +303,7 @@ class MqttServiceHubMixin:
             )
             return []
         topics: list[str] = build_car_status_topics(
-            vid, vehicle.is_support_speed_event is True
+            vid, vehicle.supports_speed_event is True
         )
         topics.extend(build_device_remote_topics(client_id))
         topics.extend(build_ota_topics(vehicle))
@@ -508,15 +509,15 @@ class MqttServiceHubMixin:
 # protocol means the vehicle does not support that feature. The hu
 # entry carries the remote-control and closeremote protocol sets.
 _CAPS_PROTOCOL_KEYS: dict[str, tuple[str, ...]] = {
-    "has_hvac_close_remote": ("device.closeremote.precondition",),
-    "has_media_close_remote": ("device.closeremote.media.vehiclestatus",),
-    "is_support_ota_progress": ("vehicle.ota.otaprogress",),
-    "is_support_schedule_update": ("vehicle.ota.scheduleupdate",),
+    "supports_hvac_close_remote": ("device.closeremote.precondition",),
+    "supports_media_close_remote": ("device.closeremote.media.vehiclestatus",),
+    "supports_ota_progress": ("vehicle.ota.otaprogress",),
+    "supports_schedule_update": ("vehicle.ota.scheduleupdate",),
 }
 
 # Protocols with no confirmed topic mapping are left None (unknown) —
 # e.g. the location topic has no 1:1 protocol counterpart, so
-# is_support_speed_event is never set from metadata.
+# supports_speed_event is never set from metadata.
 
 
 def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
@@ -646,11 +647,11 @@ def build_ota_topics(vehicle: Vehicle) -> list[str]:
     if not vehicle.mqtt_vehicle_id:
         return []
     topics = []
-    if vehicle.is_support_ota_progress is True:
+    if vehicle.supports_ota_progress is True:
         topics.append(
             TOPIC_PREFIX_VEHICLE + vehicle.mqtt_vehicle_id + POSTFIX_OTA_PROGRESS
         )
-    if vehicle.is_support_schedule_update is True:
+    if vehicle.supports_schedule_update is True:
         topics.append(
             TOPIC_PREFIX_VEHICLE + vehicle.mqtt_vehicle_id + POSTFIX_OTA_SCHEDULEUPDATE
         )

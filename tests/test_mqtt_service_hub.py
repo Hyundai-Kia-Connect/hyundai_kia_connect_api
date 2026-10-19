@@ -7,7 +7,7 @@ import pytest
 from hyundai_kia_connect_api.const import MQTT_PUSH_CONNECTION_STATE
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
-from hyundai_kia_connect_api.mqtt_service_hub import (
+from hyundai_kia_connect_api.mqtt_service_hub_eu import (
     POSTFIX_OTA_PROGRESS,
     POSTFIX_OTA_SCHEDULEUPDATE,
     TOPIC_PREFIX_CONNECTION,
@@ -88,14 +88,14 @@ class TestBuildOtaTopics:
     def test_unknown_capability_no_topics(self):
         vehicle = Vehicle()
         vehicle.mqtt_vehicle_id = "v1"
-        vehicle.is_support_ota_progress = None  # unknown → not subscribed
+        vehicle.supports_ota_progress = None  # unknown → not subscribed
         assert build_ota_topics(vehicle) == []
 
     def test_explicit_true_topics(self):
         vehicle = Vehicle()
         vehicle.mqtt_vehicle_id = "v1"
-        vehicle.is_support_ota_progress = True
-        vehicle.is_support_schedule_update = True
+        vehicle.supports_ota_progress = True
+        vehicle.supports_schedule_update = True
         topics = build_ota_topics(vehicle)
         assert POSTFIX_OTA_PROGRESS in topics[0]
         assert POSTFIX_OTA_SCHEDULEUPDATE in topics[1]
@@ -198,12 +198,12 @@ def test_metadata_populates_capabilities_and_topics():
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.mqtt_vehicle_id == "mqtt-v1"
     # protocol present → True; list read, protocol absent → False
-    assert vehicle.has_hvac_close_remote is True
-    assert vehicle.has_media_close_remote is True
-    assert vehicle.is_support_ota_progress is True
-    assert vehicle.is_support_schedule_update is False
+    assert vehicle.supports_hvac_close_remote is True
+    assert vehicle.supports_media_close_remote is True
+    assert vehicle.supports_ota_progress is True
+    assert vehicle.supports_schedule_update is False
     # protocols have no location-topic counterpart → unknown (None)
-    assert vehicle.is_support_speed_event is None
+    assert vehicle.supports_speed_event is None
 
     topics = api.get_push_topics(_token(), vehicle)
     # location unknown → not subscribed
@@ -230,8 +230,8 @@ def test_metadata_absent_protocol_is_false_not_none():
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
-    assert vehicle.is_support_ota_progress is False
-    assert vehicle.is_support_schedule_update is False
+    assert vehicle.supports_ota_progress is False
+    assert vehicle.supports_schedule_update is False
     topics = api.get_push_topics(_token(), vehicle)
     assert not any("ota" in t for t in topics)
 
@@ -247,7 +247,7 @@ def test_metadata_unknown_shape_leaves_capabilities_unknown():
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
-    assert vehicle.is_support_ota_progress is None
+    assert vehicle.supports_ota_progress is None
     topics = api.get_push_topics(_token(), vehicle)
     assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
     assert not any("ota" in t for t in topics)
@@ -272,7 +272,7 @@ def test_metadata_entry_level_capabilities():
     )
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.hu_client_id == "hu-1"
-    assert vehicle.is_support_schedule_update is True
+    assert vehicle.supports_schedule_update is True
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ def test_register_push_vehicle_ota_protocols_conditional():
     session = _FakeSession([_FakeResponse(text="", status_code=200)])
     api._service_hub_session = session
 
-    vehicle.is_support_ota_progress = None
+    vehicle.supports_ota_progress = None
     api.register_push_vehicle(Token(), vehicle)
     assert len(session.calls) == 1
     body = session.calls[0][2]["json"]
@@ -330,8 +330,8 @@ def test_register_push_vehicle_ota_protocols_conditional():
     assert body["carId"] == "careu1"
     assert body["brand"] == "K"
 
-    vehicle.is_support_ota_progress = True
-    vehicle.is_support_schedule_update = True
+    vehicle.supports_ota_progress = True
+    vehicle.supports_schedule_update = True
     api._service_hub_session = _FakeSession([_FakeResponse(text="", status_code=200)])
     api.register_push_vehicle(Token(), vehicle)
     body = api._service_hub_session.calls[0][2]["json"]
@@ -434,7 +434,7 @@ def test_vehicle_push_identity_fields():
 @pytest.mark.parametrize("brand_cls,brand", [(HyundaiCciApiEU, 2), (KiaCciApiEU, 1)])
 def test_gspa_base_has_no_service_hub_state_leak(brand_cls, brand):
     """SERVICE_HUB_BASE is the only push URL config (no region maps, no staging)."""
-    import hyundai_kia_connect_api.mqtt_service_hub as mod
+    import hyundai_kia_connect_api.mqtt_service_hub_eu as mod
 
     assert not hasattr(mod, "SERVICE_HUB_PRODUCTION_BASES")
     assert not hasattr(mod, "SERVICE_HUB_STAGING_BASES")
