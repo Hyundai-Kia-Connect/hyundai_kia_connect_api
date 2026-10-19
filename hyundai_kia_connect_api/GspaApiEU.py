@@ -2971,11 +2971,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     ) -> dict[str, Any]:
         """Schedule or cancel an OTA update reservation via GSPA.
 
-    def set_ota_reservation(
-        self, token: Token, vehicle: Vehicle, settings: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Schedule or cancel an OTA update reservation via GSPA.
-
         POST /gspa/v1/mru/vehicles/{carId}/ota-updates-reservation with
         CCUSoftwareUpdateReservationApiRequest (operation,
         targetReservationTime, originReservationTime). ``settings`` is
