@@ -29,13 +29,22 @@ from .const import (
 )
 from .exceptions import AuthenticationError
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
+from .utils import (
+    bool_or_none,
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+)
 from .Vehicle import (
     TripInfo,
     Vehicle,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Trip details kept in memory; a busy month is well under this.
+TRIP_DETAIL_CACHE_SIZE = 200
 
 
 class KiaUvoApiIN(ApiImplType1):
@@ -76,6 +85,7 @@ class KiaUvoApiIN(ApiImplType1):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
+        self._trip_detail_cache: dict[tuple[str, str], TripInfo] = {}
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
@@ -165,6 +175,13 @@ class KiaUvoApiIN(ApiImplType1):
                 get_child_value(state, "coord.lon"),
                 self.get_last_updated_at(get_child_value(state, "time")),
             )
+            vehicle.location_altitude = get_child_value(state, "coord.alt")
+            vehicle.location_heading = get_child_value(state, "head")
+            # speed.unit 0 is km/h, the only unit IN has been seen to report.
+            if get_child_value(state, "speed.unit") in (0, None):
+                vehicle.location_speed = get_child_value(state, "speed.value")
+            else:
+                vehicle.location_speed = None
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -172,8 +189,10 @@ class KiaUvoApiIN(ApiImplType1):
             self._force_refresh_vehicle_state_ccs2(token, vehicle)
         else:
             state = self._get_forced_vehicle_state(token, vehicle)
-            state["vehicleLocation"] = self._get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
             self._update_vehicle_properties(vehicle, state)
+            if location:
+                self._update_vehicle_location(vehicle, location)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
@@ -350,6 +369,10 @@ class KiaUvoApiIN(ApiImplType1):
         )
 
         vehicle.brake_fluid_warning_is_on = get_child_value(state, "breakOilStatus")
+        vehicle.oil_level_warning_is_on = bool_or_none(
+            get_child_value(state, "engineOilStatus")
+        )
+        vehicle.hazard_lights_on = bool_or_none(get_child_value(state, "hazardStatus"))
         vehicle.fuel_level = get_child_value(state, "fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "airCtrlOn")
@@ -548,8 +571,9 @@ class KiaUvoApiIN(ApiImplType1):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
-    # The "/tripinfo" API in Bluelink India does not provide complete trip info. It just returns the summary info. Instead, it uses the "/tripinfo/detail" API to fetch the trip details.
-    # PS: Since I have tested in Hyundai EV vehicle only, have added check to use the API only for EV vehicles. Can remove the check based on testing on non-EV vehicles
+    # The "/tripinfo" day API in India lists trips with start/end times only;
+    # the per-trip figures come from "/tripinfo/detail". Verified on Hyundai
+    # EVs and a Kia Seltos (ICE); other Hyundai engine types are untested.
     def _get_detailed_trip_info(
         self,
         token: Token,
@@ -558,10 +582,15 @@ class KiaUvoApiIN(ApiImplType1):
         trip: dict,
     ) -> TripInfo | None:
         if (
-            vehicle.engine_type != ENGINE_TYPES.EV
-            or BRANDS[self.brand] != BRAND_HYUNDAI
+            BRANDS[self.brand] == BRAND_HYUNDAI
+            and vehicle.engine_type != ENGINE_TYPES.EV
         ):
             return None
+
+        # A finished trip never changes, so fetch each one's detail once.
+        cache_key = (vehicle.id, str(trip["serviceTID"]))
+        if cache_key in self._trip_detail_cache:
+            return self._trip_detail_cache[cache_key]
 
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo/detail"
         payload = {
@@ -580,16 +609,24 @@ class KiaUvoApiIN(ApiImplType1):
             ),
         )
         response = response.json()
+        _check_response_for_errors(response)
         tripinfo = response["resMsg"]["tripInfo"]
         processed_trip = TripInfo(
             hhmmss=trip["tripStartTime"][8:],
+            end_hhmmss=trip["tripEndTime"][8:],
             drive_time=tripinfo["tripDrvTime"],
             idle_time=tripinfo["tripIdleTime"],
             distance=tripinfo["tripDist"],
             avg_speed=tripinfo["tripAvgSpeed"],
             max_speed=tripinfo["tripMaxSpeed"],
+            hard_braking_count=tripinfo.get("tripHardBreakingTime"),
+            rapid_acceleration_count=tripinfo.get("tripRapidAccelationTime"),
+            excessive_speed_count=tripinfo.get("tripExcessiveSpeedTime"),
         )
 
+        if len(self._trip_detail_cache) >= TRIP_DETAIL_CACHE_SIZE:
+            self._trip_detail_cache.pop(next(iter(self._trip_detail_cache)))
+        self._trip_detail_cache[cache_key] = processed_trip
         return processed_trip
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
@@ -599,10 +636,19 @@ class KiaUvoApiIN(ApiImplType1):
     def _parse_day_trip(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
     ) -> TripInfo | None:
-        # Hyundai EVs do not provide full trip info. Used "/tripinfo/detail" API instead
+        # The IN day list carries only start/end times; the figures come from
+        # "/tripinfo/detail".
         if "tripTime" in trip:
             return super()._parse_day_trip(token, vehicle, yyyymmdd_string, trip)
-        return self._get_detailed_trip_info(token, vehicle, yyyymmdd_string, trip)
+        detailed = self._get_detailed_trip_info(token, vehicle, yyyymmdd_string, trip)
+        if detailed is not None:
+            return detailed
+        # No detail for this vehicle: keep the trip with its times rather than
+        # a None, which Vehicle.day_trip_info cannot sort.
+        return TripInfo(
+            hhmmss=str(trip.get("tripStartTime", ""))[8:] or None,
+            end_hhmmss=str(trip.get("tripEndTime", ""))[8:] or None,
+        )
 
     def _get_cookies(self) -> dict:
         # Get Cookies #

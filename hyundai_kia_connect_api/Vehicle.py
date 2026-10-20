@@ -21,6 +21,12 @@ class TripInfo:
     distance: float = None
     avg_speed: float = None
     max_speed: int = None
+    end_hhmmss: str = None  # trip end time; only where the API reports it
+    # Driving-behaviour counters from trip detail (IN). The API names them
+    # trip*Time; treated as event counts. None where not reported.
+    hard_braking_count: int = None
+    rapid_acceleration_count: int = None
+    excessive_speed_count: int = None
 
 
 @dataclass
@@ -203,6 +209,10 @@ class Vehicle:
     _location_latitude: float = None
     _location_longitude: float = None
     _location_last_set_time: datetime.datetime = None
+    # Motion at the last location fix, where the API reports it.
+    location_speed: float | None = None  # km/h
+    location_heading: int | None = None  # degrees
+    location_altitude: float | None = None  # metres
     # True after an attempt to fetch the (still unknown) location. In-memory
     # like the coordinates themselves: a restart/reload starts a fresh
     # attempt. Bounds the unknown-location fetch to one try per session so a
