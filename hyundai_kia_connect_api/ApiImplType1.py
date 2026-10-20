@@ -48,6 +48,7 @@ from .exceptions import (
     RateLimitingError,
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
+    TokenExpiredError,
     UnsupportedControlError,
 )
 from .Token import Token
@@ -132,8 +133,8 @@ def _check_response_for_errors(response: dict) -> None:
     }
 
     error_message_to_exception_mapping = {
-        "Key not authorized: Token is expired": AuthenticationError,
-        "Key not authorized: token has expired": AuthenticationError,
+        "Key not authorized: Token is expired": TokenExpiredError,
+        "Key not authorized: token has expired": TokenExpiredError,
     }
 
     if not any(
@@ -1930,8 +1931,7 @@ class ApiImplType1(ApiImpl):
     def _refresh_access_token_headers(self) -> dict[str, str]:
         """Extra headers for the refresh_token grant. Default: none.
 
-        AU overrides to add the Stamp header its server requires;
-        IN/CN inherit the empty default (no behavior change).
+        AU and IN override to add the Stamp header.
         """
         return {}
 
@@ -1947,16 +1947,11 @@ class ApiImplType1(ApiImpl):
         KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
         body instead of form-urlencoded.
 
-        No Stamp header is sent. CN's existing _get_refresh_token already
-        omits Stamp and works, which shows the refresh_token grant on this
-        endpoint family does not require it. AU and IN's existing
-        _get_refresh_token do send Stamp, but that appears to be carried
-        over from _get_access_token (authorization_code grant) rather than
-        required for the refresh_token grant. If an AU/IN server turns
-        out to require Stamp, this call fails and falls back to
-        self.login() — no worse than the pre-PR behaviour. A Stamp-adding
-        override can be re-introduced per region once confirmed with live
-        credentials.
+        No Stamp header is sent by default. Regions whose server requires
+        it (AU, confirmed live in kia_uvo #1778; IN, whose login flow has
+        always sent it on this grant) add it via
+        _refresh_access_token_headers. If the exchange fails, this falls
+        back to self.login().
         """
         if token.refresh_token:
             try:

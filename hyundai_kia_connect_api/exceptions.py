@@ -21,6 +21,14 @@ class AuthenticationError(HyundaiKiaException):
     """
 
 
+class TokenExpiredError(AuthenticationError):
+    """
+    Raised when the server rejects a request because the access token has
+    expired. A token refresh resolves it; it does not mean the credentials
+    are wrong.
+    """
+
+
 class AuthenticationOTPRequired(AuthenticationError):
     """
     Raised when OTP is required for authentication.

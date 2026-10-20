@@ -23,6 +23,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -111,11 +112,15 @@ class KiaUvoApiIN(ApiImplType1):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code = self._get_access_token(
+        _, access_token, refresh_token, expires_in = self._get_access_token(
             stamp, authorization_code
         )
-        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=23)
+        if expires_in is not None:
+            valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+                seconds=int(expires_in)
+            )
+        else:
+            valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -150,11 +155,11 @@ class KiaUvoApiIN(ApiImplType1):
 
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
-        _LOGGER.error(f"Getting maintenance alert from {url}")
+        _LOGGER.debug(f"{DOMAIN} - Getting maintenance alert from {url}")
         response = self.session.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
-        _LOGGER.error(response)
+        _LOGGER.debug(f"{DOMAIN} - _get_maintenance_alert response: {response}")
         _check_response_for_errors(response)
         return response["resMsg"]
 
@@ -461,7 +466,7 @@ class KiaUvoApiIN(ApiImplType1):
                     token, vehicle.ccu_ccs2_protocol_support
                 ),
             ).json()
-            _LOGGER.error(f"{DOMAIN} - _get_location response: {response}")
+            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return response["resMsg"]
         except Exception:
@@ -644,8 +649,12 @@ class KiaUvoApiIN(ApiImplType1):
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
-        authorization_code = response["refresh_token"]
-        return token_type, access_token, authorization_code
+        # Keep the refresh token verbatim: the oauth2/token refresh_token grant
+        # rejects "Bearer "-prefixed values and access tokens in the
+        # refresh_token slot with 4002 "Invalid parameters".
+        refresh_token = response["refresh_token"]
+        expires_in = response.get("expires_in")
+        return token_type, access_token, refresh_token, expires_in
 
     def get_last_updated_at(self, value) -> dt.datetime:
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
@@ -666,25 +675,7 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def _get_refresh_token(self, stamp, authorization_code):
-        # Get Refresh Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": stamp,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
-            + authorization_code
-        )
-        response = self.session.post(url, data=data, headers=headers)
-        response = response.json()
-        token_type = response["token_type"]
-        refresh_token = token_type + " " + response["access_token"]
-        return token_type, refresh_token
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """IN sends the Stamp header on the refresh_token grant, as its
+        login flow always has."""
+        return {"Stamp": self._get_stamp()}

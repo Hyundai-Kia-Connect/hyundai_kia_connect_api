@@ -22,10 +22,11 @@ def test_cn_refresh_hook_default_empty() -> None:
     assert api._refresh_access_token_headers() == {}
 
 
-def test_in_refresh_hook_default_empty() -> None:
-    """IN inherits the base hook and must not send Stamp on refresh."""
+def test_in_refresh_hook_sends_stamp() -> None:
+    """IN overrides the hook: its login flow always sent Stamp on this grant."""
     api = KiaUvoApiIN(region=6, brand=2, language="en")
-    assert api._refresh_access_token_headers() == {}
+    api._get_stamp = lambda: "STAMP-FAKE"  # type: ignore[assignment]
+    assert api._refresh_access_token_headers() == {"Stamp": "STAMP-FAKE"}
 
 
 def _au_api_with_mock_session() -> KiaUvoApiAU:

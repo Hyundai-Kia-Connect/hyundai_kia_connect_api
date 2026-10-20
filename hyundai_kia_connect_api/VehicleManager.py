@@ -37,7 +37,12 @@ from .const import (
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
 )
-from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    AuthenticationOTPRequired,
+    TokenExpiredError,
+)
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
@@ -140,7 +145,9 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
-            self.api.update_vehicle_with_cached_state(self.token, vehicle)
+            self._call_with_token_retry(
+                lambda: self.api.update_vehicle_with_cached_state(self.token, vehicle)
+            )
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
                     token=self.token,
@@ -184,7 +191,9 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
-            self.api.force_refresh_vehicle_state(self.token, vehicle)
+            self._call_with_token_retry(
+                lambda: self.api.force_refresh_vehicle_state(self.token, vehicle)
+            )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
@@ -207,6 +216,23 @@ class VehicleManager:
         return self.api.request_svm_capture(
             self.token, self.get_vehicle(vehicle_id), acknowledged_warning
         )
+
+    def _call_with_token_retry(self, call):
+        """Run call(); if the server reports the access token expired before
+        our valid_until says it should, refresh the token and retry once.
+
+        call must read self.token when invoked so the retry uses the new token.
+        """
+        try:
+            return call()
+        except TokenExpiredError:
+            _LOGGER.debug(
+                f"{DOMAIN} - Server rejected access token as expired, refreshing"
+            )
+            if self.token is not None:
+                self.token.valid_until = dt.datetime.min.replace(tzinfo=dt.UTC)
+            self.check_and_refresh_token()
+            return call()
 
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
