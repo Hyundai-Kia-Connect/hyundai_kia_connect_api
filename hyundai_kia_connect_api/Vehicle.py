@@ -76,6 +76,11 @@ class Vehicle:
     model: str = None
     registration_date: str = None
     year: int = None
+    # Codes from the vehicle list's detailInfo, where reported. They are
+    # Kia/Hyundai codes (e.g. EWE = Pewter Olive), not display names.
+    trim_code: str | None = None
+    exterior_color_code: str | None = None
+    interior_color_code: str | None = None
     VIN: str = None
     key: str = None
     # EU or Type 1 version:
@@ -296,6 +301,12 @@ class Vehicle:
     # GSPA cabin extras (flat CCS2 schema)
     windshield_front_heater_is_on: bool | None = None
     air_cleaning_is_on: bool | None = None
+    # Cabin fine-dust sensor (IN). PM2.5 in ug/m3; level is the colour band
+    # Hyundai/Kia use for it: 1 blue 0-15, 2 green 16-35, 3 orange 36-75,
+    # 4 red 76+.
+    cabin_pm25: int | None = None
+    cabin_air_quality_level: int | None = None
+    cabin_air_quality_measured_at: datetime.datetime | None = None
     steering_wheel_heat_step: int | None = None
 
     @property

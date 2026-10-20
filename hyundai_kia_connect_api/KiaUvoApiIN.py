@@ -168,6 +168,28 @@ class KiaUvoApiIN(ApiImplType1):
         _check_response_for_errors(response)
         return response["resMsg"]
 
+    def _update_cabin_air_quality(self, vehicle: Vehicle, state: dict) -> None:
+        """Cabin PM2.5 from the air purifier's fine-dust sensor.
+
+        fineDustLevel2 is a list of PM2.5 readings in ug/m3 (latest first);
+        fineDustColor the matching colour band. fineDustLevel (PM10) has only
+        been seen empty.
+        """
+        readings = get_child_value(state, "airCleaning.fineDustLevel2")
+        if isinstance(readings, list) and readings:
+            vehicle.cabin_pm25 = readings[0]
+            vehicle.cabin_air_quality_level = get_child_value(
+                state, "airCleaning.fineDustColor"
+            )
+            measured_at = get_child_value(state, "airCleaning.dateTime")
+            vehicle.cabin_air_quality_measured_at = (
+                self.get_last_updated_at(measured_at) if measured_at else None
+            )
+        else:
+            vehicle.cabin_pm25 = None
+            vehicle.cabin_air_quality_level = None
+            vehicle.cabin_air_quality_measured_at = None
+
     def _update_vehicle_location(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
@@ -373,6 +395,7 @@ class KiaUvoApiIN(ApiImplType1):
             get_child_value(state, "engineOilStatus")
         )
         vehicle.hazard_lights_on = bool_or_none(get_child_value(state, "hazardStatus"))
+        self._update_cabin_air_quality(vehicle, state)
         vehicle.fuel_level = get_child_value(state, "fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "airCtrlOn")

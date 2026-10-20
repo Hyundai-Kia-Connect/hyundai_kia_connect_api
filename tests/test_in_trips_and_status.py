@@ -267,3 +267,89 @@ def test_forced_refresh_updates_location():
 
     assert vehicle.location_latitude == 12.5
     assert vehicle.location_speed == 23
+
+
+AIR_CLEANING = {
+    "airPurifierStatus": 1,
+    "fineDustLevel": [],
+    "dateTime": "20261017215820",
+    "fineDustColor": 2,
+    "fineDustLevel2": [24, 21, 21, 21],
+}
+
+
+def test_cabin_pm25_from_air_cleaning():
+    api = _api()
+    vehicle = _vehicle()
+
+    api._update_vehicle_properties(vehicle, {**STATUS, "airCleaning": AIR_CLEANING})
+
+    assert vehicle.cabin_pm25 == 24  # latest reading
+    assert vehicle.cabin_air_quality_level == 2  # green band, 16-35
+    assert vehicle.cabin_air_quality_measured_at.isoformat() == (
+        "2026-10-17T21:58:20+05:30"
+    )
+
+
+def test_cabin_pm25_cleared_when_no_readings():
+    api = _api()
+    vehicle = _vehicle()
+    api._update_vehicle_properties(vehicle, {**STATUS, "airCleaning": AIR_CLEANING})
+
+    api._update_vehicle_properties(
+        vehicle, {**STATUS, "airCleaning": {**AIR_CLEANING, "fineDustLevel2": []}}
+    )
+
+    assert vehicle.cabin_pm25 is None
+    assert vehicle.cabin_air_quality_level is None
+    assert vehicle.cabin_air_quality_measured_at is None
+
+
+VEHICLE_ENTRY = {
+    "vin": "VIN",
+    "vehicleId": "veh-1",
+    "vehicleName": "SELTOS",
+    "type": "GN",
+    "nickname": "SELTOS",
+    "year": "2025",
+    "regDate": "2025-09-01 09:19:43.418",
+    "detailInfo": {
+        "inColor": "WK",
+        "outColor": "EWE",
+        "carPackageType": "GL",
+        "saleCarmdlEnNm": "SELTOS",
+        "prodCarmdlCd": "TI",
+        "bodyType": "2",
+        "saleCarmdlCd": "TI",
+    },
+    "protocolType": 0,
+    "ccuCCS2ProtocolSupport": 0,
+}
+
+
+def test_vehicle_list_reads_year_trim_and_colours():
+    api = _api()
+    api.session.get = MagicMock(  # type: ignore[assignment]
+        return_value=_json({**OK, "resMsg": {"vehicles": [VEHICLE_ENTRY]}})
+    )
+
+    (vehicle,) = api.get_vehicles(_token())
+
+    assert vehicle.year == 2025
+    assert vehicle.trim_code == "GL"
+    assert vehicle.exterior_color_code == "EWE"
+    assert vehicle.interior_color_code == "WK"
+
+
+def test_vehicle_list_tolerates_missing_details():
+    api = _api()
+    entry = {k: v for k, v in VEHICLE_ENTRY.items() if k not in ("year", "detailInfo")}
+    api.session.get = MagicMock(  # type: ignore[assignment]
+        return_value=_json({**OK, "resMsg": {"vehicles": [entry]}})
+    )
+
+    (vehicle,) = api.get_vehicles(_token())
+
+    assert vehicle.year is None
+    assert vehicle.trim_code is None
+    assert vehicle.exterior_color_code is None
