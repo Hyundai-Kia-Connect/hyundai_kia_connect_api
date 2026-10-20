@@ -36,6 +36,7 @@ from .utils import (
     get_index_into_hex_temp,
 )
 from .Vehicle import (
+    MaintenanceAlertItem,
     TripInfo,
     Vehicle,
 )
@@ -157,6 +158,23 @@ class KiaUvoApiIN(ApiImplType1):
     def _update_vehicle_maintenance_alert(self, vehicle: Vehicle, state: dict) -> None:
         if get_child_value(state, "odometer"):
             vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
+
+        main_list = get_child_value(state, "mainList")
+        if isinstance(main_list, list):
+            alerts = []
+            for item in main_list:
+                name = get_child_value(item, "itemId")
+                if not name:
+                    continue
+                alerts.append(
+                    MaintenanceAlertItem(
+                        name=name,
+                        interval_km=get_child_value(item, "items.distValue") or None,
+                        interval_months=get_child_value(item, "items.termValue")
+                        or None,
+                    )
+                )
+            vehicle.maintenance_alerts = alerts or None
 
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"

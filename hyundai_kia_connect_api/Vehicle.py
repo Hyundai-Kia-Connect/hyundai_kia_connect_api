@@ -30,6 +30,20 @@ class TripInfo:
 
 
 @dataclass
+class MaintenanceAlertItem:
+    """One scheduled-maintenance item and its interval.
+
+    From the India maintenance-alert endpoint. The intervals are the
+    manufacturer's schedule; the endpoint does not report service history,
+    so "due" has to be derived from odometer and vehicle age.
+    """
+
+    name: str = None
+    interval_km: int = None  # 0 or None when there is no distance interval
+    interval_months: int = None  # 0 or None when there is no time interval
+
+
+@dataclass
 class DayTripCounts:
     """Day trip counts"""
 
@@ -307,6 +321,8 @@ class Vehicle:
     cabin_pm25: int | None = None
     cabin_air_quality_level: int | None = None
     cabin_air_quality_measured_at: datetime.datetime | None = None
+    # Scheduled-maintenance intervals (IN), where reported.
+    maintenance_alerts: list[MaintenanceAlertItem] | None = None
     steering_wheel_heat_step: int | None = None
 
     @property

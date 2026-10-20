@@ -353,3 +353,58 @@ def test_vehicle_list_tolerates_missing_details():
     assert vehicle.year is None
     assert vehicle.trim_code is None
     assert vehicle.exterior_color_code is None
+
+
+MAINTENANCE = {
+    **OK,
+    "resMsg": {
+        "odometer": 11192,
+        "mainList": [
+            {
+                "itemId": "Engine oil",
+                "enable": True,
+                "items": {"distValue": 10000, "termValue": 12},
+            },
+            {
+                "itemId": "Oil Filter",
+                "enable": True,
+                "items": {"distValue": 10000, "termValue": 12},
+            },
+            {
+                "itemId": "Cooling water",
+                "enable": True,
+                "items": {"distValue": 210000, "termValue": 0},
+            },
+            {
+                "itemId": "Ignition plug",
+                "enable": True,
+                "items": {"distValue": 60000, "termValue": 0},
+            },
+        ],
+    },
+}
+
+
+def test_maintenance_alerts_parsed_with_intervals():
+    api = _api()
+    vehicle = _vehicle()
+    api.session.get = MagicMock(return_value=_json(MAINTENANCE))  # type: ignore[assignment]
+
+    state = api._get_maintenance_alert(_token(), vehicle)
+    api._update_vehicle_maintenance_alert(vehicle, state)
+
+    assert vehicle.odometer == 11192
+    items = {a.name: a for a in vehicle.maintenance_alerts}
+    assert items["Engine oil"].interval_km == 10000
+    assert items["Engine oil"].interval_months == 12
+    # termValue 0 means "no time interval" -> None, not 0.
+    assert items["Cooling water"].interval_months is None
+    assert items["Cooling water"].interval_km == 210000
+    assert items["Ignition plug"].interval_months is None
+
+
+def test_maintenance_alerts_none_when_no_list():
+    api = _api()
+    vehicle = _vehicle()
+    api._update_vehicle_maintenance_alert(vehicle, {"odometer": 100})
+    assert vehicle.maintenance_alerts is None
