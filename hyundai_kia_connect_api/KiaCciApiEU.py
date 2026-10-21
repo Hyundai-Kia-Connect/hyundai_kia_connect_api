@@ -60,6 +60,11 @@ class KiaCciApiEU(GspaApiEU):
     # and windows via the scope-based "windowcurtain" endpoint (accepted
     # with a polling SID and confirmed on the car, EV6 2026-10-18; Hyundai
     # parity: IONIQ 5, Tucson PHEV, Kona 2025). Scope commands only.
+    # Charge limits and charging current live-proven on a Kia PV5 (2026,
+    # 2026-10-20): 202 S 202-000, applied values confirmed in the stored
+    # status (TargetSoC.Quick/Standard follow the plugType 0=DC/1=AC
+    # mapping; ElectricCurrentLevel.State 2 -> 1 for 100 %). Both use the
+    # bearer auth mode and need no cable connected.
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -71,6 +76,8 @@ class KiaCciApiEU(GspaApiEU):
             "hornlight",
             "charge",
             "windowcurtain",
+            "charge-target",
+            "charging-current",
         }
     )
     supports_window_control = True

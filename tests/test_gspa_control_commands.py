@@ -25,6 +25,7 @@ from hyundai_kia_connect_api.exceptions import (
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -53,6 +54,19 @@ def _make_vehicle(ccs2: int = 1) -> Vehicle:
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
     return vehicle
+
+
+def _run_command_on(api, meth, *args, **kwargs):
+    """Same as _run_command but for a caller-provided api instance."""
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = meth(token, vehicle, *args, **kwargs)
+    return action_id, post.call_args
 
 
 def _run_command(meth, *args, **kwargs):
@@ -214,6 +228,8 @@ def test_kia_remote_control_gated_not_implemented():
             "hornlight",
             "charge",
             "windowcurtain",
+            "charge-target",
+            "charging-current",
         }
     )
 
@@ -751,3 +767,29 @@ def test_set_ota_update_uses_bearer_headers():
         HyundaiCciApiEU.set_ota_update(api, token, vehicle, True)
     get_ct.assert_not_called()
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_kia_charge_limits_use_the_live_proven_plugtype_mapping():
+    """Kia GSPA charge-target: plugType 0 = DC, 1 = AC with the
+    targetSOClist / targetSOClevel fields — live-proven on a PV5
+    (2026-10-20): the library body applied (TargetSoC.Quick 100 -> 80,
+    TargetSoC.Standard 70 -> 90), while the 1=AC / 2=DC variant from
+    the issue tables was rejected with 400-002."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_limits, 90, 80)
+    body = call.kwargs["json"]
+    assert body["command"] == "set"
+    assert body["targetSOClist"] == [
+        {"plugType": 0, "targetSOClevel": 80},
+        {"plugType": 1, "targetSOClevel": 90},
+    ]
+
+
+def test_kia_charging_current_sends_the_level_field():
+    """Kia GSPA charging-current: {"chargingCurrent": level, "command":
+    "set"} — live-proven on a PV5 (2026-10-20), 202 S 202-000 with the
+    stored ElectricCurrentLevel.State following the value (1 = 100 %)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charging_current, 1)
+    body = call.kwargs["json"]
+    assert body == {"chargingCurrent": 1, "command": "set"}
