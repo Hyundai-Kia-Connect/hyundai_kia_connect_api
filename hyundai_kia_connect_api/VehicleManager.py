@@ -5,8 +5,12 @@
 import datetime as dt
 import logging
 import re
+import threading
+from collections.abc import Callable
 from datetime import timedelta
+from typing import Any
 
+from . import const
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
@@ -22,6 +26,7 @@ from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
+    MQTT_PUSH_CONNECTION_STATE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -48,6 +53,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .mqtt_client import MqttTransport
 from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
@@ -86,8 +92,16 @@ class VehicleManager:
         )
 
         self.token: Token = token
-        self.vehicles: dict = {}
+        self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
+        # Push transport; connection-scoped state (vehicle identity lives
+        # on Vehicle — mqtt_vehicle_id, hu_client_id).
+        self._push_client: MqttTransport | None = None
+        self._push_status_callback: Callable[[str, str], None] | None = None
+        self._push_connection_change_callback: Callable[[bool], None] | None = None
+        self._push_reconnect_cancel: threading.Event | None = None
+        # Vehicles with push started; rebuilt-subscription source on reconnect.
+        self._push_vehicle_ids: set[str] = set()
 
     def login(self) -> bool | OTPRequest:
         """Returns True if login successful, or OTPOptions if OTP is required"""
@@ -422,6 +436,246 @@ class VehicleManager:
         return self.api.set_navigation(
             self.token, self.get_vehicle(vehicle_id), poi_list
         )
+
+    # Push glue — generic over the ApiImpl push contract; the region API
+    # supplies broker info, registration, identity, topics and the parser.
+
+    def start_push(self, vehicle_id: str) -> bool:
+        """Connect to the push broker and subscribe the vehicle's topics.
+
+        Setup order (app-confirmed): broker → register client → vehicle
+        identity → register vehicle → transport connect → subscribe.
+        Returns False when push is unavailable (unsupported region, no
+        broker info, rejected registration); ``APIError`` propagates and
+        transport failures surface through the callbacks.
+        """
+        if not getattr(self.api, "supports_mqtt_push", False):
+            _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
+            return False
+
+        token = self.token
+        vehicle = self.get_vehicle(vehicle_id)
+        if self._push_client is not None:
+            if not self._register_new_vehicle(token, vehicle):
+                return False
+            self._push_vehicle_ids.add(vehicle_id)
+            if self._push_client.is_connected:
+                self._subscribe_vehicle_topics(vehicle_id)
+            return True
+
+        broker = self.api.get_push_broker_info(token)
+        if not broker or not broker.get("mqtt_host"):
+            _LOGGER.debug(f"{DOMAIN} - Push broker info not available")
+            return False
+        reg = self.api.register_push_client(token)
+        if not reg:
+            _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
+            return False
+
+        if not self._register_new_vehicle(token, vehicle):
+            return False
+        self._push_vehicle_ids.add(vehicle_id)
+
+        client = MqttTransport(
+            on_message=self._on_push_delivery_raw,
+            on_connect=self._on_push_connect,
+            on_disconnect=self._on_push_disconnect,
+        )
+        client.configure(
+            broker_host=broker["mqtt_host"],
+            broker_port=broker.get("mqtt_port", 8883),
+            client_id=reg.get("client_id"),
+            broker_username=reg.get("username"),
+            broker_password=reg.get("password"),
+        )
+        if self._push_connection_change_callback:
+            client.set_on_connection_change(self._push_connection_change_callback)
+        try:
+            client.connect()
+        except (ValueError, OSError):
+            # Programming-level failure — propagate, do not retry;
+            # roll the vehicle id back.
+            self._push_vehicle_ids.discard(vehicle_id)
+            raise
+        self._push_client = client
+        if client.is_connected:
+            self._subscribe_vehicle_topics(vehicle_id)
+        return True
+
+    def _register_new_vehicle(self, token: Token, vehicle: Vehicle) -> bool:
+        """Run the per-vehicle registration steps of the push contract.
+
+        Returns False (no subscriptions) when the identity lacks
+        mqtt_vehicle_id or registration is rejected; ``APIError``
+        propagates.
+        """
+        self.api.get_push_vehicle_identity(token, vehicle)
+        if not vehicle.mqtt_vehicle_id:
+            _LOGGER.warning(
+                f"{DOMAIN} - Push identity missing vehicle id for {vehicle.id}"
+            )
+            return False
+        registered = self.api.register_push_vehicle(token, vehicle)
+        if registered is None:
+            _LOGGER.warning(
+                f"{DOMAIN} - Push protocol registration failed for {vehicle.id}"
+            )
+            return False
+        return True
+
+    def _subscribe_vehicle_topics(self, vehicle_id: str) -> None:
+        """Subscribe the topics the region API provides for the vehicle.
+
+        Local computation only — no HTTP; a failure here is a bug.
+        """
+        assert self._push_client is not None
+        vehicle = self.get_vehicle(vehicle_id)
+        topics = self.api.get_push_topics(self.token, vehicle)
+        if topics:
+            self._push_client.subscribe(topics)
+
+    def _on_push_connect(self) -> None:
+        """Subscribe topics for each started push vehicle on (re)connect."""
+        for vehicle_id in list(self._push_vehicle_ids):
+            if vehicle_id in self.vehicles:
+                try:
+                    self._subscribe_vehicle_topics(vehicle_id)
+                except Exception:
+                    _LOGGER.exception(
+                        f"{DOMAIN} - Push subscribe failed for {vehicle_id}"
+                    )
+
+    def _on_push_delivery_raw(self, topic: str, payload: bytes) -> None:
+        """Raw delivery from the transport; parse via the region API.
+
+        Called from the paho background thread — must be thread-safe.
+        """
+        message = self.api.parse_push_message(topic, payload)
+        if message is None:
+            return
+        self._on_push_message(message)
+
+    def _on_push_message(self, message: Any) -> None:
+        """Dispatch a parsed push message (duck-typed contract shape).
+
+        Expected attributes: is_status (bool), vehicle_id (str, push
+        level), topic_type (str). Messages other than status deliveries
+        are recorded by the provider's parser and ignored here.
+        """
+        if not getattr(message, "is_status", False) or not self._push_status_callback:
+            return
+        vehicle_id = self._vehicle_id_for_push(getattr(message, "vehicle_id", ""))
+        if vehicle_id is None:
+            _LOGGER.debug(
+                f"{DOMAIN} - Push vehicle id {message.vehicle_id} unknown, dropping"
+            )
+            return
+        try:
+            self._push_status_callback(vehicle_id, message.topic_type)
+        except Exception:
+            _LOGGER.exception(f"{DOMAIN} - Push status callback error")
+
+    def _vehicle_id_for_push(self, mqtt_vehicle_id: str) -> str | None:
+        """Map the push-level vehicle id to a ``self.vehicles`` key.
+
+        ``self.vehicles`` is keyed by ``vehicle.id``; push messages carry
+        the topic-level id. Multi-vehicle safe: no manager-side
+        per-vehicle state — the identity lives on each Vehicle.
+        """
+        for vehicle_id, vehicle in self.vehicles.items():
+            if vehicle.mqtt_vehicle_id and vehicle.mqtt_vehicle_id == mqtt_vehicle_id:
+                return vehicle_id
+        return None
+
+    def stop_push(self) -> None:
+        """Disconnect push and reset orchestration state."""
+        if self._push_reconnect_cancel:
+            self._push_reconnect_cancel.set()
+            self._push_reconnect_cancel = None
+        if self._push_client:
+            try:
+                self._push_client.disconnect()
+            except Exception:
+                _LOGGER.debug("Push disconnect failed (already disconnected)")
+            self._push_client = None
+        self._push_vehicle_ids.clear()
+
+    @property
+    def is_push_connected(self) -> bool:
+        """Whether the push transport is connected."""
+        return self._push_client is not None and self._push_client.is_connected
+
+    def set_push_status_callback(
+        self, callback: Callable[[str, str], None] | None = None
+    ) -> None:
+        """Register a callback for status pushes: (vehicle_id, topic_type)."""
+        self._push_status_callback = callback
+
+    def set_push_connection_change_callback(
+        self, callback: Callable[[bool], None] | None = None
+    ) -> None:
+        """Register a callback for push connection changes: (connected: bool)."""
+        self._push_connection_change_callback = callback
+        if self._push_client:
+            self._push_client.set_on_connection_change(callback)
+
+    def get_push_connection_state(self) -> MQTT_PUSH_CONNECTION_STATE | None:
+        """Push connection state through the region API (delegator)."""
+        return self.api.get_push_connection_state(self.token)
+
+    def _on_push_disconnect(self, reason: str) -> None:
+        """Reconnect with capped exponential backoff on unexpected drops.
+
+        Called from the paho background thread. Clean disconnects are not
+        retried (that is stop_push()).
+        """
+        _LOGGER.debug(f"{DOMAIN} - Push disconnected: {reason}")
+        if reason == "clean disconnect":
+            return
+        if not self._push_vehicle_ids:
+            return
+        if self._push_reconnect_cancel:
+            self._push_reconnect_cancel.set()
+        self._cleanup_push_client()
+        cancel_event = threading.Event()
+        self._push_reconnect_cancel = cancel_event
+
+        vehicle_ids = list(self._push_vehicle_ids)
+
+        def _reconnect_with_backoff() -> None:
+            delay = const.MQTT_PUSH_RECONNECT_INITIAL_DELAY
+            while not cancel_event.is_set():
+                _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
+                if cancel_event.wait(delay):
+                    return
+                try:
+                    try:
+                        self.check_and_refresh_token()
+                    except Exception as token_ex:
+                        _LOGGER.warning(
+                            f"{DOMAIN} - Push reconnect token refresh failed: {token_ex}"
+                        )
+                    self._push_client = None
+                    ok = all(self.start_push(vid) for vid in vehicle_ids)
+                    if ok and self.is_push_connected:
+                        _LOGGER.debug(f"{DOMAIN} - Push reconnected")
+                        return
+                except Exception as ex:
+                    _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
+                delay = min(delay * 2, const.MQTT_PUSH_RECONNECT_MAX_DELAY)
+            _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
+
+        threading.Thread(
+            target=_reconnect_with_backoff, name="push-reconnect", daemon=True
+        ).start()
+
+    def _cleanup_push_client(self) -> None:
+        if self._push_client is not None:
+            try:
+                self._push_client.disconnect()
+            except Exception:
+                _LOGGER.debug("Push disconnect during cleanup failed (already down)")
+            self._push_client = None
 
     @staticmethod
     def get_implementation_by_region_brand(
