@@ -48,7 +48,6 @@ from .exceptions import (
     RateLimitingError,
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
-    TokenExpiredError,
     UnsupportedControlError,
 )
 from .Token import Token
@@ -133,8 +132,8 @@ def _check_response_for_errors(response: dict) -> None:
     }
 
     error_message_to_exception_mapping = {
-        "Key not authorized: Token is expired": TokenExpiredError,
-        "Key not authorized: token has expired": TokenExpiredError,
+        "Key not authorized: Token is expired": AuthenticationError,
+        "Key not authorized: token has expired": AuthenticationError,
     }
 
     if not any(

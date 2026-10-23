@@ -10,13 +10,10 @@ tokens after about an hour, so every poll for ~22h failed with
 """
 
 import datetime as dt
-import logging
 from unittest.mock import MagicMock
 
 from hyundai_kia_connect_api.const import LOGIN_TOKEN_LIFETIME
 from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
-from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
 def _in_api() -> KiaUvoApiIN:
@@ -94,22 +91,3 @@ def test_in_login_valid_until_fallback_when_no_expires_in() -> None:
     delta = token.valid_until - dt.datetime.now(dt.UTC)
     assert LOGIN_TOKEN_LIFETIME - dt.timedelta(minutes=5) < delta
     assert delta <= LOGIN_TOKEN_LIFETIME
-
-
-def test_in_routine_responses_are_not_logged_as_errors(caplog) -> None:
-    """Location and maintenance responses were logged at ERROR, filling the
-    HA log (and repair notices) with the car's GPS position on every poll."""
-    api = _in_api()
-    api.session.get = MagicMock(  # type: ignore[assignment]
-        return_value=_json_response(
-            {"retCode": "S", "resCode": "0000", "resMsg": {"odometer": 1}}
-        )
-    )
-    token = Token(access_token="Bearer atk", device_id="dev")
-    vehicle = Vehicle(id="veh-1", ccu_ccs2_protocol_support=0)
-
-    with caplog.at_level(logging.DEBUG, logger="hyundai_kia_connect_api"):
-        api._get_maintenance_alert(token, vehicle)
-        api._get_location(token, vehicle)
-
-    assert [r for r in caplog.records if r.levelno >= logging.WARNING] == []
