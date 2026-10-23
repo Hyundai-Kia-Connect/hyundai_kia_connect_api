@@ -99,18 +99,6 @@ def _retry_on_device_id_error(func):
     return wrapper
 
 
-def _apply_vehicle_details(vehicle: Vehicle, entry: dict) -> None:
-    """Copy model year and trim/colour codes from a vehicle-list entry."""
-    try:
-        vehicle.year = int(entry["year"])
-    except (KeyError, TypeError, ValueError):
-        pass
-    details = entry.get("detailInfo") or {}
-    vehicle.trim_code = details.get("carPackageType") or None
-    vehicle.exterior_color_code = details.get("outColor") or None
-    vehicle.interior_color_code = details.get("inColor") or None
-
-
 def _check_response_for_errors(response: dict) -> None:
     """
     Checks for errors in the API response.
@@ -261,8 +249,13 @@ class ApiImplType1(ApiImpl):
                 # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
                 # those vehicles on the legacy status path.
                 ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
+                year=int(entry["year"]) if str(entry.get("year")).isdigit() else None,
+                trim_code=get_child_value(entry, "detailInfo.carPackageType") or None,
+                exterior_color_code=get_child_value(entry, "detailInfo.outColor")
+                or None,
+                interior_color_code=get_child_value(entry, "detailInfo.inColor")
+                or None,
             )
-            _apply_vehicle_details(vehicle, entry)
             result.append(vehicle)
         return result
 
