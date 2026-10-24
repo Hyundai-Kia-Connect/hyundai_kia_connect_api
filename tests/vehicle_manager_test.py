@@ -43,3 +43,17 @@ def test_check_and_refresh_token_handles_min_datetime(monkeypatch):
     manager.token = Token(valid_until=dt.datetime.min)
     assert manager.check_and_refresh_token() is True
     assert dummy_api.login_calls == 1
+
+
+def test_login_returns_false_without_token_or_otp(monkeypatch):
+    dummy_api = DummyApi()
+    monkeypatch.setattr(dummy_api, "login", lambda **kwargs: None)
+    monkeypatch.setattr(
+        VehicleManager,
+        "get_implementation_by_region_brand",
+        lambda *args, **kwargs: dummy_api,
+    )
+    manager = VehicleManager(
+        region=3, brand=1, username="user", password="pass", pin="1234"
+    )
+    assert manager.login() is False
