@@ -1406,8 +1406,8 @@ class KiaUvoApiEU(ApiImplType1):
             # (GET /location/park already parses the same flat shape, #1301).
             gps_detail = res_msg.get("gpsDetail") or res_msg
             return gps_detail
-        except Exception as e:
-            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
+        except Exception:
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed")
             return None
 
     def _set_location_from_gps_detail(
