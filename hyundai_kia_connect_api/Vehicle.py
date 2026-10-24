@@ -475,24 +475,27 @@ class Vehicle:
     def total_driving_range_unit(self) -> str | None:
         return self._total_driving_range_unit
 
-    @property
-    def tire_pressure_front_left_unit(self) -> str | None:
-        """Display-unit label for tire pressure (shared across all tires)."""
+    def _tire_pressure_unit_label(self) -> str | None:
+        """Display-unit label for tire_pressure_unit (shared across all tires)."""
         if self.tire_pressure_unit is None:
             return None
         return PRESSURE_UNITS.get(self.tire_pressure_unit)
 
     @property
+    def tire_pressure_front_left_unit(self) -> str | None:
+        return self._tire_pressure_unit_label()
+
+    @property
     def tire_pressure_front_right_unit(self) -> str | None:
-        return self.tire_pressure_front_left_unit
+        return self._tire_pressure_unit_label()
 
     @property
     def tire_pressure_rear_left_unit(self) -> str | None:
-        return self.tire_pressure_front_left_unit
+        return self._tire_pressure_unit_label()
 
     @property
     def tire_pressure_rear_right_unit(self) -> str | None:
-        return self.tire_pressure_front_left_unit
+        return self._tire_pressure_unit_label()
 
     @property
     def next_service_distance(self) -> float | None:
