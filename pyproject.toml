@@ -27,7 +27,6 @@ module = [
     "hyundai_kia_connect_api.GspaApiEU",
     "hyundai_kia_connect_api.HyundaiBlueLinkApiBR",
     "hyundai_kia_connect_api.HyundaiBlueLinkApiUSA",
-    "hyundai_kia_connect_api.HyundaiCciApiEU",
     "hyundai_kia_connect_api.KiaUvoApiAU",
     "hyundai_kia_connect_api.KiaUvoApiCA",
     "hyundai_kia_connect_api.KiaUvoApiEU",
