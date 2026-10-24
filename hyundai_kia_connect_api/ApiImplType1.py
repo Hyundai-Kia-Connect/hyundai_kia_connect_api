@@ -9,7 +9,9 @@ import random
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from time import sleep
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 from .ApiImpl import (
@@ -76,7 +78,7 @@ USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 _LOGGER = logging.getLogger(__name__)
 
 
-def _retry_on_device_id_error(func):
+def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
     """On DeviceIDError, re-register device_id and retry once.
 
     EU server invalidates device_id when push delivery fails. Instead of
@@ -96,7 +98,7 @@ def _retry_on_device_id_error(func):
                 token.device_id = self._get_device_id(stamp)
             return func(self, token, *args, **kwargs)
 
-    return wrapper
+    return cast(F, wrapper)
 
 
 def _check_response_for_errors(response: dict) -> None:
@@ -2392,7 +2394,9 @@ class ApiImplType1(ApiImpl):
             )
             return None
 
-    def _update_vehicle_drive_info(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_drive_info(
+        self, vehicle: Vehicle, state: dict[str, Any] | None
+    ) -> None:
         vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
         vehicle.total_power_regenerated = get_child_value(state, "regenPwr")
         vehicle.power_consumption_30d = get_child_value(state, "consumption30d")

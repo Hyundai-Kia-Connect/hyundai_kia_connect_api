@@ -126,10 +126,10 @@ class Vehicle:
     steering_wheel_heater_is_on: bool = None
     back_window_heater_is_on: bool = None
     side_mirror_heater_is_on: bool = None
-    front_left_seat_status: str = None
-    front_right_seat_status: str = None
-    rear_left_seat_status: str = None
-    rear_right_seat_status: str = None
+    front_left_seat_status: str | None = None
+    front_right_seat_status: str | None = None
+    rear_left_seat_status: str | None = None
+    rear_right_seat_status: str | None = None
 
     # Door Status
     is_locked: bool = None

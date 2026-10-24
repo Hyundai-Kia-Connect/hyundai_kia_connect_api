@@ -32,7 +32,6 @@ module = [
     "hyundai_kia_connect_api.KiaUvoApiAU",
     "hyundai_kia_connect_api.KiaUvoApiCA",
     "hyundai_kia_connect_api.KiaUvoApiEU",
-    "hyundai_kia_connect_api.KiaUvoApiIN",
     "hyundai_kia_connect_api.KiaUvoApiUSA",
     "hyundai_kia_connect_api.Token",
     "hyundai_kia_connect_api.Vehicle",
