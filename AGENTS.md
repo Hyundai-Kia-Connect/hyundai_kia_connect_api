@@ -23,6 +23,10 @@ signatures, `Vehicle` attributes) can break kia_uvo.
   pattern, open an issue to discuss it before writing the code.
 - **Scope changes to one region.** A fix for one region must not change
   behaviour in another region unless that is the explicit, stated goal.
+- **Keep comments and docstrings short.** Write them only when they help
+  whoever changes the code next: why something non-obvious is done, a vendor
+  quirk, a constraint. Don't restate the code, describe the change history,
+  or explain the PR. Those belong in the commit message or PR description.
 - **PR titles use Conventional Commits.** CI enforces this
   (`lintPR.yaml`), and releases are versioned from it: `fix(ca): ...`,
   `feat(eu): ...`, `refactor: ...`, `chore: ...`, `test: ...`, `docs: ...`.
