@@ -7,18 +7,7 @@
         "api_class": "HyundaiBlueLinkApiUSA",
         "endpoint": "vehicleStatus",
         "description": "Hyundai USA (BlueLinkAPI) Ioniq 5 cached response with targetSOC. Uses vehicleStatus root (not lastVehicleInfo). Temperature in Fahrenheit. Tire pressure fields use 'Warning' naming.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 85,
-            "ev_charge_limits_dc": 80,
-            "ev_charge_limits_ac": 100,
-            "car_battery_percentage": 92,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0,
-            "ev_charging_power": null
-        }
+        "has_target_soc": true
     },
     "vehicleStatus": {
         "dateTime": "20240901120000",

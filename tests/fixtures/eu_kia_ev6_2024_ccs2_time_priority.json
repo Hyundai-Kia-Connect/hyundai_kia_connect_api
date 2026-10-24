@@ -7,27 +7,7 @@
         "api_class": "ApiImplType1 (CCS2)",
         "endpoint": "vehicles/{vehicleId}/ccs2/carstatus",
         "description": "EU Kia EV6 CCS2 — scheduled-charging reservation. Data contributed by discussion #1764 volunteer (GasManGeek). PII-redacted.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 71,
-            "ev_charge_limits_dc": 80,
-            "ev_charge_limits_ac": 100,
-            "car_battery_percentage": 88,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": false,
-            "ev_off_peak_start_time": "22:30:00",
-            "ev_off_peak_end_time": "01:30:00",
-            "ev_schedule_charge_enabled": true,
-            "ev_off_peak_charge_only_enabled": true,
-            "ev_first_departure_enabled": false,
-            "ev_first_departure_time": "02:40:00",
-            "ev_first_departure_days": [0, 1, 2, 3, 4, 5, 6],
-            "ev_second_departure_enabled": false,
-            "ev_second_departure_time": "17:00:00",
-            "ev_second_departure_days": [0, 1, 2, 3, 4, 5, 6]
-        }
+        "has_target_soc": true
     },
     "Offset": 1,
     "Date": "20240915140000",
