@@ -5,7 +5,7 @@ import datetime
 import logging
 from dataclasses import dataclass, field
 
-from .const import DISTANCE_UNITS, PRESSURE_UNITS, PressureUnit
+from .const import DISTANCE_UNITS, ENGINE_TYPES, PRESSURE_UNITS, PressureUnit
 from .utils import float_or_none, get_float, get_safe_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ class Vehicle:
     accessory_on: bool = None
     ign3: bool = None
     remote_ignition: bool = None
-    transmission_condition: str = None
+    transmission_condition: int | None = None
     gear_position: int | None = None  # raw Transmission.GearPosition
     sleep_mode_check: bool = None
     auto_cut_battery_prewarning_on: bool | None = None
@@ -297,7 +297,7 @@ class Vehicle:
     average_fuel_economy_unit: int | None = None
 
     # Lamp status fields (KiaUvoApiEU and CA)
-    headlamp_status: str = None
+    headlamp_status: int | None = None
     headlamp_left_low: bool = None
     headlamp_right_low: bool = None
     headlamp_left_high: bool = None
@@ -472,7 +472,7 @@ class Vehicle:
     fuel_level_is_low: bool = None
 
     # Calculated fields
-    engine_type: str = None
+    engine_type: ENGINE_TYPES | None = None
 
     # Debug fields
     data: dict = None
