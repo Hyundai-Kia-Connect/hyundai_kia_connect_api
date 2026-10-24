@@ -120,6 +120,18 @@ def pressure_or_none(value: float | None) -> int | float | None:
     return value
 
 
+def battery_soh_or_none(value: Any) -> Any:
+    """Return an EV battery state of health, or None if it isn't a real reading.
+
+    Vehicles that don't report it send 0, and some send 255 (0xFF), so only
+    values in (0, 100] are kept. See kia_uvo #1935.
+    """
+    soh = float_or_none(value)
+    if soh is None or not 0 < soh <= 100:
+        return None
+    return value
+
+
 def ccs2_reservation_time_or_none(hour: Any, minute: Any) -> datetime.time | None:
     """Parse a CCS2 Green.Reservation time field (OffPeakTime, Schedule{1,2}).
 

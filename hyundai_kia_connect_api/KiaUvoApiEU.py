@@ -49,6 +49,7 @@ from .exceptions import (
 )
 from .Token import Token
 from .utils import (
+    battery_soh_or_none,
     get_child_value,
     get_hex_temp_into_index,
     normalize_battery_soc,
@@ -994,10 +995,9 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "vehicleStatus.evStatus.batterySoh"):
+        if battery_soh := battery_soh_or_none(
+            get_child_value(state, "vehicleStatus.evStatus.batterySoh")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
         vehicle.ev_battery_is_charging = get_child_value(
             state, "vehicleStatus.evStatus.batteryCharge"

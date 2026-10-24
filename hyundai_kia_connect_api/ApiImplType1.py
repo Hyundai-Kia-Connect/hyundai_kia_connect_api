@@ -54,6 +54,7 @@ from .exceptions import (
 )
 from .Token import Token
 from .utils import (
+    battery_soh_or_none,
     bool_or_none,
     ccs2_reservation_time_or_none,
     get_child_value,
@@ -1026,10 +1027,9 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "Green.BatteryManagement.SoH.Ratio"):
+        if battery_soh := battery_soh_or_none(
+            get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
