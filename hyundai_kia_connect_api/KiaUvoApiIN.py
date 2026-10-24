@@ -30,14 +30,8 @@ from .const import (
 )
 from .exceptions import AuthenticationError
 from .Token import Token
-from .utils import (
-    bool_or_none,
-    get_child_value,
-    get_hex_temp_into_index,
-    get_index_into_hex_temp,
-)
+from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
 from .Vehicle import (
-    MaintenanceAlertItem,
     TripInfo,
     Vehicle,
 )
@@ -164,23 +158,6 @@ class KiaUvoApiIN(ApiImplType1):
         if get_child_value(state, "odometer"):
             vehicle.odometer = (get_child_value(state, "odometer"), DISTANCE_UNITS[1])
 
-        main_list = get_child_value(state, "mainList")
-        if isinstance(main_list, list):
-            alerts = []
-            for item in main_list:
-                name = get_child_value(item, "itemId")
-                if not name:
-                    continue
-                alerts.append(
-                    MaintenanceAlertItem(
-                        name=name,
-                        interval_km=get_child_value(item, "items.distValue") or None,
-                        interval_months=get_child_value(item, "items.termValue")
-                        or None,
-                    )
-                )
-            vehicle.maintenance_alerts = alerts or None
-
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
         _LOGGER.error(f"Getting maintenance alert from {url}")
@@ -198,13 +175,6 @@ class KiaUvoApiIN(ApiImplType1):
                 get_child_value(state, "coord.lon"),
                 self.get_last_updated_at(get_child_value(state, "time")),
             )
-            vehicle.location_altitude = get_child_value(state, "coord.alt")
-            vehicle.location_heading = get_child_value(state, "head")
-            # speed.unit 0 is km/h, the only unit IN has been seen to report.
-            if get_child_value(state, "speed.unit") in (0, None):
-                vehicle.location_speed = get_child_value(state, "speed.value")
-            else:
-                vehicle.location_speed = None
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -212,10 +182,8 @@ class KiaUvoApiIN(ApiImplType1):
             self._force_refresh_vehicle_state_ccs2(token, vehicle)
         else:
             state = self._get_forced_vehicle_state(token, vehicle)
-            location = self._get_location(token, vehicle)
+            state["vehicleLocation"] = self._get_location(token, vehicle)
             self._update_vehicle_properties(vehicle, state)
-            if location:
-                self._update_vehicle_location(vehicle, location)
         # Only call for driving info on cars we know have a chance of supporting it.
         # Could be expanded if other types do support it.
         if (
@@ -392,21 +360,6 @@ class KiaUvoApiIN(ApiImplType1):
         )
 
         vehicle.brake_fluid_warning_is_on = get_child_value(state, "breakOilStatus")
-        vehicle.oil_level_warning_is_on = bool_or_none(
-            get_child_value(state, "engineOilStatus")
-        )
-        vehicle.hazard_lights_on = bool_or_none(get_child_value(state, "hazardStatus"))
-        # Cabin PM2.5 (ug/m3) from the air purifier: fineDustLevel2 lists
-        # readings latest first; fineDustColor is the matching colour band.
-        vehicle.cabin_pm25 = get_child_value(state, "airCleaning.fineDustLevel2.0")
-        has_pm25 = vehicle.cabin_pm25 is not None
-        vehicle.cabin_air_quality_level = (
-            get_child_value(state, "airCleaning.fineDustColor") if has_pm25 else None
-        )
-        pm25_time = get_child_value(state, "airCleaning.dateTime")
-        vehicle.cabin_air_quality_measured_at = (
-            self.get_last_updated_at(pm25_time) if has_pm25 and pm25_time else None
-        )
         vehicle.fuel_level = get_child_value(state, "fuelLevel")
         vehicle.fuel_level_is_low = get_child_value(state, "lowFuelLight")
         vehicle.air_control_is_on = get_child_value(state, "airCtrlOn")
@@ -670,19 +623,10 @@ class KiaUvoApiIN(ApiImplType1):
     def _parse_day_trip(
         self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
     ) -> TripInfo | None:
-        # The IN day list carries only start/end times; the figures come from
-        # "/tripinfo/detail".
+        # Hyundai EVs do not provide full trip info. Used "/tripinfo/detail" API instead
         if "tripTime" in trip:
             return super()._parse_day_trip(token, vehicle, yyyymmdd_string, trip)
-        detailed = self._get_detailed_trip_info(token, vehicle, yyyymmdd_string, trip)
-        if detailed is not None:
-            return detailed
-        # No detail for this vehicle: keep the trip with its times rather than
-        # a None, which Vehicle.day_trip_info cannot sort.
-        return TripInfo(
-            hhmmss=str(trip.get("tripStartTime", ""))[8:] or None,
-            end_hhmmss=str(trip.get("tripEndTime", ""))[8:] or None,
-        )
+        return self._get_detailed_trip_info(token, vehicle, yyyymmdd_string, trip)
 
     def _get_cookies(self) -> dict:
         # Get Cookies #

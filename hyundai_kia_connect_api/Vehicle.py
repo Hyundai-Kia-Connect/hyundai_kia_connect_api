@@ -30,20 +30,6 @@ class TripInfo:
 
 
 @dataclass
-class MaintenanceAlertItem:
-    """One scheduled-maintenance item and its interval.
-
-    From the India maintenance-alert endpoint. The intervals are the
-    manufacturer's schedule; the endpoint does not report service history,
-    so "due" has to be derived from odometer and vehicle age.
-    """
-
-    name: str = None
-    interval_km: int = None  # 0 or None when there is no distance interval
-    interval_months: int = None  # 0 or None when there is no time interval
-
-
-@dataclass
 class DayTripCounts:
     """Day trip counts"""
 
@@ -90,11 +76,6 @@ class Vehicle:
     model: str = None
     registration_date: str = None
     year: int = None
-    # Codes from the vehicle list's detailInfo, where reported. They are
-    # Kia/Hyundai codes (e.g. EWE = Pewter Olive), not display names.
-    trim_code: str | None = None
-    exterior_color_code: str | None = None
-    interior_color_code: str | None = None
     VIN: str = None
     key: str = None
     # EU or Type 1 version:
@@ -228,10 +209,6 @@ class Vehicle:
     _location_latitude: float = None
     _location_longitude: float = None
     _location_last_set_time: datetime.datetime = None
-    # Motion at the last location fix, where the API reports it.
-    location_speed: float | None = None  # km/h
-    location_heading: int | None = None  # degrees
-    location_altitude: float | None = None  # metres
     # True after an attempt to fetch the (still unknown) location. In-memory
     # like the coordinates themselves: a restart/reload starts a fresh
     # attempt. Bounds the unknown-location fetch to one try per session so a
@@ -315,14 +292,6 @@ class Vehicle:
     # GSPA cabin extras (flat CCS2 schema)
     windshield_front_heater_is_on: bool | None = None
     air_cleaning_is_on: bool | None = None
-    # Cabin fine-dust sensor (IN). PM2.5 in ug/m3; level is the colour band
-    # Hyundai/Kia use for it: 1 blue 0-15, 2 green 16-35, 3 orange 36-75,
-    # 4 red 76+.
-    cabin_pm25: int | None = None
-    cabin_air_quality_level: int | None = None
-    cabin_air_quality_measured_at: datetime.datetime | None = None
-    # Scheduled-maintenance intervals (IN), where reported.
-    maintenance_alerts: list[MaintenanceAlertItem] | None = None
     steering_wheel_heat_step: int | None = None
 
     @property

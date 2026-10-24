@@ -148,15 +148,7 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
                     for trip in reversed(vehicle.day_trip_info.trip_list):  # show oldest first
                         print(f"{day.yyyymmdd},{trip.hhmmss},{trip.drive_time},{trip.idle_time},{trip.distance},{trip.avg_speed},{trip.max_speed}")
 
-India specifics:
-
-- The day trip list only carries start/end times, so each trip's figures come from a per-trip detail call (cached per trip, as a finished trip never changes). This works for Kia vehicles of any engine type and for Hyundai EVs; other Hyundai engine types keep the trip with its start/end times only.
-- India trips also report driving-behaviour counters: ``trip.hard_braking_count``, ``trip.rapid_acceleration_count`` and ``trip.excessive_speed_count``, plus ``trip.end_hhmmss``. The API names these ``trip*Time``; they are treated as event counts, which has not yet been confirmed against a non-zero value.
-- ``vehicle.maintenance_alerts`` lists the manufacturer's service schedule (``name``, ``interval_km``, ``interval_months``). The API reports no service history, so whether an item is due has to be derived from the odometer and vehicle age.
-- ``vehicle.cabin_pm25`` is the cabin PM2.5 reading (µg/m³) from the air purifier, with ``cabin_air_quality_level`` (1 blue, 2 green, 3 orange, 4 red) and ``cabin_air_quality_measured_at``.
-- ``vehicle.location_speed``, ``location_heading`` and ``location_altitude`` are set from the parked-location fix.
-
-In all regions that use the shared vehicle list, ``vehicle.year``, ``trim_code``, ``exterior_color_code`` and ``interior_color_code`` are filled where reported. They are manufacturer codes, not display names (for example ``EWE`` is Pewter Olive).
+In India the day trip list only carries start/end times, so each trip's figures come from a per-trip detail call (cached per trip). India trips also report ``trip.end_hhmmss`` and the driving-behaviour counters ``trip.hard_braking_count``, ``trip.rapid_acceleration_count`` and ``trip.excessive_speed_count``.
 
 CLI Usage
 =========
