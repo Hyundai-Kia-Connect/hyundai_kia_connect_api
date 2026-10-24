@@ -15,34 +15,34 @@ _LOGGER = logging.getLogger(__name__)
 class TripInfo:
     """Trip Info"""
 
-    hhmmss: str = None  # will not be filled by summary
-    drive_time: int = None  # minutes
-    idle_time: int = None  # minutes
-    distance: float = None
-    avg_speed: float = None
-    max_speed: int = None
-    end_hhmmss: str = None  # trip end time; only where the API reports it
+    hhmmss: str | None = None  # will not be filled by summary
+    drive_time: int | None = None  # minutes
+    idle_time: int | None = None  # minutes
+    distance: float | None = None
+    avg_speed: float | None = None
+    max_speed: int | None = None
+    end_hhmmss: str | None = None  # trip end time; only where the API reports it
     # Driving-behaviour counters from trip detail (IN). The API names them
     # trip*Time; treated as event counts. None where not reported.
-    hard_braking_count: int = None
-    rapid_acceleration_count: int = None
-    excessive_speed_count: int = None
+    hard_braking_count: int | None = None
+    rapid_acceleration_count: int | None = None
+    excessive_speed_count: int | None = None
 
 
 @dataclass
 class DayTripCounts:
     """Day trip counts"""
 
-    yyyymmdd: str = None
-    trip_count: int = None
+    yyyymmdd: str | None = None
+    trip_count: int | None = None
 
 
 @dataclass
 class MonthTripInfo:
     """Month Trip Info"""
 
-    yyyymm: str = None
-    summary: TripInfo = None
+    yyyymm: str | None = None
+    summary: TripInfo | None = None
     day_list: list[DayTripCounts] = field(default_factory=list)
 
 
@@ -50,99 +50,99 @@ class MonthTripInfo:
 class DayTripInfo:
     """Day Trip Info"""
 
-    yyyymmdd: str = None
-    summary: TripInfo = None
+    yyyymmdd: str | None = None
+    summary: TripInfo | None = None
     trip_list: list[TripInfo] = field(default_factory=list)
 
 
 @dataclass
 class DailyDrivingStats:
     # energy stats are expressed in watthours (Wh)
-    date: datetime.datetime = None
-    total_consumed: int = None
-    engine_consumption: int = None
-    climate_consumption: int = None
-    onboard_electronics_consumption: int = None
-    battery_care_consumption: int = None
-    regenerated_energy: int = None
-    distance: float = None
+    date: datetime.datetime | None = None
+    total_consumed: int | None = None
+    engine_consumption: int | None = None
+    climate_consumption: int | None = None
+    onboard_electronics_consumption: int | None = None
+    battery_care_consumption: int | None = None
+    regenerated_energy: int | None = None
+    distance: float | None = None
     distance_unit: str = DISTANCE_UNITS[1]  # set to kms by default
 
 
 @dataclass
 class Vehicle:
     id: str = None
-    name: str = None
-    model: str = None
-    registration_date: str = None
-    year: int = None
-    VIN: str = None
-    key: str = None
+    name: str | None = None
+    model: str | None = None
+    registration_date: str | None = None
+    year: int | None = None
+    VIN: str | None = None
+    key: str | None = None
     # EU or Type 1 version:
-    ccu_ccs2_protocol_support: int = None
+    ccu_ccs2_protocol_support: int | None = None
     # Hyundai USA:
-    generation: int = None
+    generation: int | None = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
 
     # Shared (EV/PHEV/HEV/IC)
     # General
-    _total_driving_range: float = None
-    _total_driving_range_value: float = None
-    _total_driving_range_unit: str = None
+    _total_driving_range: float | None = None
+    _total_driving_range_value: float | None = None
+    _total_driving_range_unit: str | None = None
 
-    _odometer: float = None
-    _odometer_value: float = None
-    _odometer_unit: str = None
+    _odometer: float | None = None
+    _odometer_value: float | None = None
+    _odometer_unit: str | None = None
 
-    _geocode_address: str = None
-    _geocode_name: str = None
+    _geocode_address: str | None = None
+    _geocode_name: str | None = None
 
-    car_battery_percentage: int = None
-    engine_is_running: bool = None
+    car_battery_percentage: int | None = None
+    engine_is_running: bool | None = None
 
-    _last_updated_at: datetime.datetime = None
-    _last_scanned_at: datetime.datetime = None
+    _last_updated_at: datetime.datetime | None = None
+    _last_scanned_at: datetime.datetime | None = None
     timezone: datetime.timezone = datetime.UTC  # default UTC
 
     dtc_count: int | None = None
     dtc_descriptions: dict | None = None
 
-    smart_key_battery_warning_is_on: bool = None
-    washer_fluid_warning_is_on: bool = None
-    brake_fluid_warning_is_on: bool = None
+    smart_key_battery_warning_is_on: bool | None = None
+    washer_fluid_warning_is_on: bool | None = None
+    brake_fluid_warning_is_on: bool | None = None
 
-    _outside_temperature: float = None
-    _outside_temperature_value: float = None
-    _outside_temperature_unit: str = None
+    _outside_temperature: float | None = None
+    _outside_temperature_value: float | None = None
+    _outside_temperature_unit: str | None = None
 
     # Climate
     _air_temperature: float = None
     _air_temperature_value: float = None
     _air_temperature_unit: str = None
 
-    air_control_is_on: bool = None
-    defrost_is_on: bool = None
-    steering_wheel_heater_is_on: bool = None
-    back_window_heater_is_on: bool = None
-    side_mirror_heater_is_on: bool = None
+    air_control_is_on: bool | None = None
+    defrost_is_on: bool | None = None
+    steering_wheel_heater_is_on: bool | None = None
+    back_window_heater_is_on: bool | None = None
+    side_mirror_heater_is_on: bool | None = None
     front_left_seat_status: str | None = None
     front_right_seat_status: str | None = None
     rear_left_seat_status: str | None = None
     rear_right_seat_status: str | None = None
 
     # Door Status
-    is_locked: bool = None
-    front_left_door_is_locked: bool = None
-    front_right_door_is_locked: bool = None
-    back_left_door_is_locked: bool = None
-    back_right_door_is_locked: bool = None
-    front_left_door_is_open: bool = None
-    front_right_door_is_open: bool = None
-    back_left_door_is_open: bool = None
-    back_right_door_is_open: bool = None
-    trunk_is_open: bool = None
-    hood_is_open: bool = None
+    is_locked: bool | None = None
+    front_left_door_is_locked: bool | None = None
+    front_right_door_is_locked: bool | None = None
+    back_left_door_is_locked: bool | None = None
+    back_right_door_is_locked: bool | None = None
+    front_left_door_is_open: bool | None = None
+    front_right_door_is_open: bool | None = None
+    back_left_door_is_open: bool | None = None
+    back_right_door_is_open: bool | None = None
+    trunk_is_open: bool | None = None
+    hood_is_open: bool | None = None
 
     # Window Status
     front_left_window_is_open: bool = None
@@ -154,7 +154,7 @@ class Vehicle:
     supports_valet_mode: bool = None
 
     # Valet Status
-    valet_mode_active: bool = None
+    valet_mode_active: bool | None = None
 
     # SVM (Surround View Monitor / Find My Car) — USA Hyundai
     supports_svm: bool | None = None
@@ -171,44 +171,44 @@ class Vehicle:
     _valet_failed: bool = False
 
     # Tire Pressure
-    tire_pressure_all_warning_is_on: bool = None
-    tire_pressure_rear_left_warning_is_on: bool = None
-    tire_pressure_front_left_warning_is_on: bool = None
-    tire_pressure_front_right_warning_is_on: bool = None
-    tire_pressure_rear_right_warning_is_on: bool = None
+    tire_pressure_all_warning_is_on: bool | None = None
+    tire_pressure_rear_left_warning_is_on: bool | None = None
+    tire_pressure_front_left_warning_is_on: bool | None = None
+    tire_pressure_front_right_warning_is_on: bool | None = None
+    tire_pressure_rear_right_warning_is_on: bool | None = None
     # Tire pressure values (CCS2 Chassis.Axle.*.Tire.Pressure). Model B: raw is
     # in the car's display unit; value = raw x PRESSURE_SCALES[PressureUnit].
     # See const.PRESSURE_UNITS / PRESSURE_SCALES. None when unreported.
-    tire_pressure_front_left: float = None
-    tire_pressure_front_right: float = None
-    tire_pressure_rear_left: float = None
-    tire_pressure_rear_right: float = None
+    tire_pressure_front_left: float | None = None
+    tire_pressure_front_right: float | None = None
+    tire_pressure_rear_left: float | None = None
+    tire_pressure_rear_right: float | None = None
     # Tire-pressure display unit (PressureUnit IntEnum). Single source of truth;
     # the per-tire *_unit properties below derive the label from this (no
     # duplicate storage). HA entities read tire_pressure_<pos>_unit for
     # native_unit via the DYNAMIC_UNIT pattern.
     tire_pressure_unit: PressureUnit | None = None
     # Drive mode (CCS2 Chassis.DrivingMode.State): Eco/Sport/Comfort/Snow/Smart…
-    drive_mode: str = None
+    drive_mode: str | None = None
     # Low oil level warning (HEV/ICE, CCS2 Drivetrain.InternalCombustionEngine.OilLevelWarning).
     # None when unreported so the entity is not created for vehicles without the sensor.
-    oil_level_warning_is_on: bool = None
+    oil_level_warning_is_on: bool | None = None
     # 12V auxiliary battery fault warning (CCS2 Electronics.Battery.Auxiliary.FailWarning).
     # None when unreported so the entity is not created for vehicles without the sensor.
-    battery_auxiliary_fail_warning_is_on: bool = None
+    battery_auxiliary_fail_warning_is_on: bool | None = None
 
     # Service Data
-    _next_service_distance: float = None
-    _next_service_distance_value: float = None
-    _next_service_distance_unit: str = None
-    _last_service_distance: float = None
-    _last_service_distance_value: float = None
-    _last_service_distance_unit: str = None
+    _next_service_distance: float | None = None
+    _next_service_distance_value: float | None = None
+    _next_service_distance_unit: str | None = None
+    _last_service_distance: float | None = None
+    _last_service_distance_value: float | None = None
+    _last_service_distance_unit: str | None = None
 
     # Location
-    _location_latitude: float = None
-    _location_longitude: float = None
-    _location_last_set_time: datetime.datetime = None
+    _location_latitude: float | None = None
+    _location_longitude: float | None = None
+    _location_last_set_time: datetime.datetime | None = None
     # True after an attempt to fetch the (still unknown) location. In-memory
     # like the coordinates themselves: a restart/reload starts a fresh
     # attempt. Bounds the unknown-location fetch to one try per session so a
