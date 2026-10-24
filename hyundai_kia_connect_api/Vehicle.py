@@ -568,8 +568,9 @@ class Vehicle:
 
     @location.setter
     def location(self, value: Any) -> None:
-        self._location_latitude = value[0]
-        self._location_longitude = value[1]
+        # Regions pass the raw API values through; normalise them to float.
+        self._location_latitude = float_or_none(value[0])
+        self._location_longitude = float_or_none(value[1])
         self._location_last_set_time = get_safe_local_datetime(value[2])
 
     @property
