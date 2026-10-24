@@ -11,6 +11,8 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
+from .utils import float_or_none, int_or_none
+
 # Keys redacted wherever they appear in an SVM payload. "coord" covers
 # lat/lon/alt for every region's response shape.
 SVM_IMAGE_REDACT_KEYS = ("svmImage",)
@@ -26,24 +28,6 @@ def _parse_bool(value: str | int | bool | None) -> bool | None:
     return str(value).lower() in ("true", "1", "yes", "on")
 
 
-def _parse_int(value: str | int | None) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
-
-
-def _parse_float(value: str | float | None) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return None
-
-
 def _parse_image_sizes(
     raw: Any,
 ) -> tuple[tuple[int, int] | None, tuple[int, ...] | None]:
@@ -57,12 +41,12 @@ def _parse_image_sizes(
     """
     if not isinstance(raw, list) or len(raw) < 2:
         return None, None
-    width = _parse_int(raw[0])
-    height = _parse_int(raw[1])
+    width = int_or_none(raw[0])
+    height = int_or_none(raw[1])
     image_size = (width, height) if width is not None and height is not None else None
     parsed: list[int] = []
     for value in raw:
-        item = _parse_int(value)
+        item = int_or_none(value)
         if item is None:
             return image_size, None
         parsed.append(item)
@@ -75,7 +59,7 @@ def _parse_float_list(raw: Any) -> tuple[float, ...] | None:
         return None
     parsed: list[float] = []
     for value in raw:
-        item = _parse_float(value)
+        item = float_or_none(value)
         if item is None:
             return None
         parsed.append(item)

@@ -119,6 +119,16 @@ class ENGINE_TYPES(Enum):
     HEV = "HEV"
 
 
+# Vehicle-list "type" codes; codes not listed leave engine_type as None.
+ENGINE_TYPES_BY_VEHICLE_TYPE = {
+    "GN": ENGINE_TYPES.ICE,
+    "EV": ENGINE_TYPES.EV,
+    "PHEV": ENGINE_TYPES.PHEV,
+    "PE": ENGINE_TYPES.PHEV,
+    "HV": ENGINE_TYPES.HEV,
+}
+
+
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"

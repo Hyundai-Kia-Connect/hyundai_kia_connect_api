@@ -28,7 +28,7 @@ from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DOMAIN,
-    ENGINE_TYPES,
+    ENGINE_TYPES_BY_VEHICLE_TYPE,
     ORDER_STATUS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
@@ -405,19 +405,6 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             raise APIError("Missing resMsg or vehicles in response")
         result = []
         for entry in response["resMsg"]["vehicles"]:
-            # Map vehicle type to engine type
-            vehicle_type = entry["type"]
-            if vehicle_type == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif vehicle_type == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif vehicle_type in ["PHEV", "PE"]:
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif vehicle_type == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            else:
-                entry_engine_type = ENGINE_TYPES.ICE
-
             vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -425,7 +412,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 registration_date=entry["regDate"],
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
-                engine_type=entry_engine_type,
+                engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
                 ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
             )
             result.append(vehicle)

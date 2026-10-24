@@ -31,6 +31,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    ENGINE_TYPES_BY_VEHICLE_TYPE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -182,48 +183,6 @@ class ApiImplType1(ApiImpl):
         """Initialize."""
         self.session = ApiImplSession()
 
-    def _sanitize_ice_value(self, state: dict) -> None:
-        """
-        Sanitize oversized ICE (Internal Combustion Engine) values in DTE data.
-
-        Hyundai's API sometimes returns corrupted ICE values that are too large
-        (beyond 64-bit integer limits), which can cause issues when:
-        - Serializing to JSON for JavaScript consumers
-        - Storing in databases with 64-bit integer limits
-        - Processing in other systems
-
-        This function replaces invalid ICE values with None and logs a warning.
-
-        Args:
-            state: The vehicle state dictionary (modified in place)
-        """
-        try:
-            # Navigate to DTE.ICE in the nested structure
-            fuel_system = state.get("Drivetrain", {}).get("FuelSystem", {})
-            dte = fuel_system.get("DTE", {})
-            ice_value = dte.get("ICE")
-
-            # Check if the value is a number and unreasonably large
-            # A reasonable ICE range should be < 1,000,000 km/miles
-            # Values larger than this are likely corrupted API data
-            if ice_value is not None and isinstance(ice_value, (int, float)):
-                # Also check if it exceeds JavaScript's Number.MAX_SAFE_INTEGER
-                # (2^53 - 1 = 9,007,199,254,740,991) to prevent JSON issues
-                max_safe_integer = 9007199254740991
-                max_reasonable_range = 1000000
-
-                if ice_value > max_safe_integer or ice_value > max_reasonable_range:
-                    _LOGGER.warning(
-                        f"{DOMAIN} - Invalid ICE value detected ({ice_value}), "
-                        "too large to be valid. Replacing with None. "
-                        "This appears to be corrupted data from Hyundai's API."
-                    )
-                    dte["ICE"] = None
-        except (KeyError, TypeError, AttributeError):  # fmt: skip
-            # If the structure doesn't exist or is malformed, silently continue
-            # This is defensive programming in case the API structure changes
-            pass
-
     @_retry_on_device_id_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
         url = self.SPA_API_URL + "vehicles"
@@ -235,17 +194,6 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -253,7 +201,7 @@ class ApiImplType1(ApiImpl):
                 registration_date=entry["regDate"],
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
-                engine_type=entry_engine_type,
+                engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
                 # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
                 # those vehicles on the legacy status path.
                 ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
@@ -1337,12 +1285,6 @@ class ApiImplType1(ApiImpl):
                 get_child_value(state, "Location.GeoCoord.Longitude"),
                 location_last_updated_at,
             )
-
-        # Sanitize corrupted ICE values before storing in vehicle.data
-        # This prevents issues with oversized integers when serializing to JSON
-        # or storing in databases
-        # May cause update failure.  Commenting out to test.
-        # self._sanitize_ice_value(state)
 
         vehicle.data = state
 
