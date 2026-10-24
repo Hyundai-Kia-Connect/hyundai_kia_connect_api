@@ -3,7 +3,9 @@ name: Release
 on:
     workflow_dispatch:
     schedule:
-        - cron: "0 8 * * *"
+        # kia_uvo's bump-api-dependency runs at 01:30 UTC and its weekly
+        # release at 08:00 UTC Sunday; releasing first lets both pick this up.
+        - cron: "30 0 * * *"
 jobs:
     build:
         runs-on: ubuntu-latest

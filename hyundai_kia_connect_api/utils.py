@@ -170,6 +170,18 @@ def normalize_battery_soc(
     return int(value)
 
 
+def normalize_battery_soh(value: Any) -> Any:
+    """Return an EV battery state of health, or None if it isn't a real reading.
+
+    Vehicles that don't report it send 0, and some send 255 (0xFF), so only
+    values in (0, 100] are kept. See kia_uvo #1935.
+    """
+    soh = float_or_none(value)
+    if soh is None or not 0 < soh <= 100:
+        return None
+    return value
+
+
 def get_hex_temp_into_index(value: str | None) -> int | None:
     if value is not None:
         return int(value.replace("H", ""), 16)

@@ -60,6 +60,7 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
     pressure_or_none,
     window_is_open,
@@ -1031,10 +1032,9 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "Green.BatteryManagement.SoH.Ratio"):
+        if battery_soh := normalize_battery_soh(
+            get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ElectricCurrentLevel.State"
