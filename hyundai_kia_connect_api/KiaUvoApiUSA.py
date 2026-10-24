@@ -7,6 +7,7 @@ import ssl
 import time
 import uuid
 from datetime import datetime
+from typing import Any, cast
 
 import certifi
 from requests import RequestException, Response
@@ -362,9 +363,7 @@ class KiaUvoApiUSA(ApiImpl):
         """Refresh the token using the refresh token"""
         return self.login(token.username, token.password, pin=token.pin, token=token)
 
-    @_retry_on_auth_error
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        """Return all Vehicle instances for a given Token"""
+    def _get_vehicle_summary(self, token: Token) -> list[dict[str, Any]]:
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
@@ -381,8 +380,13 @@ class KiaUvoApiUSA(ApiImpl):
             raise AuthenticationError("Session invalid")
         if "payload" not in response:
             raise APIError("Missing payload in response")
+        return cast(list[dict[str, Any]], response["payload"]["vehicleSummary"])
+
+    @_retry_on_auth_error
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Return all Vehicle instances for a given Token"""
         result = []
-        for entry in response["payload"]["vehicleSummary"]:
+        for entry in self._get_vehicle_summary(token):
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleIdentifier"],
                 name=entry["nickName"],
@@ -410,26 +414,11 @@ class KiaUvoApiUSA(ApiImpl):
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
         """
-        url = self.API_URL + "ownr/gvl"
-        headers = self.api_headers()
-        headers["sid"] = token.access_token
-        response = self.session.get(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
-        response = response.json()
-        status = response.get("status")
-        status = status if isinstance(status, dict) else {}
-        if (
-            status.get("statusCode") == 1
-            and status.get("errorType") == 1
-            and status.get("errorCode") in (1003, 1005)
-        ):
-            raise AuthenticationError("Session invalid")
-        if "payload" not in response:
-            raise APIError("Missing payload in response")
+        summary = self._get_vehicle_summary(token)
         if isinstance(vehicles, dict):
-            for entry in response["payload"]["vehicleSummary"]:
+            for entry in summary:
                 vid = entry.get("vehicleIdentifier")
                 if vid is None:
                     continue
@@ -450,7 +439,7 @@ class KiaUvoApiUSA(ApiImpl):
         else:
             # For readability work with vehicle without s
             vehicle = vehicles
-            for entry in response["payload"]["vehicleSummary"]:
+            for entry in summary:
                 if vehicle.id == entry["vehicleIdentifier"]:
                     vehicle.name = entry["nickName"]
                     vehicle.model = entry["modelName"]
