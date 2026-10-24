@@ -62,4 +62,4 @@ repos:
       hooks:
           - id: mypy
             args: [--strict, --ignore-missing-imports]
-            files: ^(/.+)?[^/]+\.py$
+            files: ^hyundai_kia_connect_api/.+\.py$
