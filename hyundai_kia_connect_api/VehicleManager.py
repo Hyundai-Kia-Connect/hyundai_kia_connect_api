@@ -89,8 +89,8 @@ class VehicleManager:
         self.vehicles: dict = {}
         self.otp_request: OTPRequest = None
 
-    def login(self) -> bool | OTPRequest | None:
-        """Return True on success, an OTPRequest if OTP is required, else None."""
+    def login(self) -> bool | OTPRequest:
+        """Return True on success, an OTPRequest if OTP is required, else False."""
         result = self.api.login(
             username=self.username,
             password=self.password,
@@ -103,6 +103,7 @@ class VehicleManager:
         if isinstance(result, OTPRequest):
             self.otp_request = result
             return result
+        return False
 
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
         self.api.send_otp(self.otp_request, notify_type)
