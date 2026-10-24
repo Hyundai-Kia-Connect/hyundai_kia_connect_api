@@ -4,7 +4,7 @@
         "brand": "Kia",
         "endpoint": "spa/vehicles",
         "vehicles": "2025 库斯途 (ICE, type GN)",
-        "source": "Live capture in tests/test_kia_uvo_api_cn.py (library #1295)",
+        "source": "Live China capture added with the CN rewrite (library #1295)",
         "description": "Real vehicle list. VIN, vehicle id and plate in the nickname replaced. China omits ccuCCS2ProtocolSupport."
     },
     "retCode": "S",
