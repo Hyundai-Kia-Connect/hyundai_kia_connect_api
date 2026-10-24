@@ -4,6 +4,7 @@
 import datetime
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from .const import DISTANCE_UNITS, ENGINE_TYPES, PRESSURE_UNITS, PressureUnit
 from .utils import float_or_none, get_float, get_safe_local_datetime
@@ -106,7 +107,7 @@ class Vehicle:
     timezone: datetime.timezone = datetime.UTC  # default UTC
 
     dtc_count: int | None = None
-    dtc_descriptions: dict | None = None
+    dtc_descriptions: dict[str, Any] | None = None
 
     smart_key_battery_warning_is_on: bool | None = None
     washer_fluid_warning_is_on: bool | None = None
@@ -295,11 +296,11 @@ class Vehicle:
     steering_wheel_heat_step: int | None = None
 
     @property
-    def daily_stats(self):
+    def daily_stats(self) -> list[DailyDrivingStats]:
         return self._daily_stats
 
     @daily_stats.setter
-    def daily_stats(self, value):
+    def daily_stats(self, value: Any) -> None:
         result = value
         if result is not None and len(result) > 0:  # sort on decreasing date
             _LOGGER.debug(f"before daily_stats: {result}")
@@ -311,11 +312,11 @@ class Vehicle:
     _month_trip_info: MonthTripInfo | None = None
 
     @property
-    def month_trip_info(self):
+    def month_trip_info(self) -> MonthTripInfo | None:
         return self._month_trip_info
 
     @month_trip_info.setter
-    def month_trip_info(self, value):
+    def month_trip_info(self, value: Any) -> None:
         result = value
         if (
             result is not None
@@ -331,11 +332,11 @@ class Vehicle:
     _day_trip_info: DayTripInfo | None = None
 
     @property
-    def day_trip_info(self):
+    def day_trip_info(self) -> DayTripInfo | None:
         return self._day_trip_info
 
     @day_trip_info.setter
-    def day_trip_info(self, value):
+    def day_trip_info(self, value: Any) -> None:
         result = value
         if (
             result is not None
@@ -406,8 +407,8 @@ class Vehicle:
     ev_first_departure_enabled: bool | None = None
     ev_second_departure_enabled: bool | None = None
 
-    ev_first_departure_days: list | None = None
-    ev_second_departure_days: list | None = None
+    ev_first_departure_days: list[int] | None = None
+    ev_second_departure_days: list[int] | None = None
 
     ev_first_departure_time: datetime.time | None = None
     ev_second_departure_time: datetime.time | None = None
@@ -444,14 +445,14 @@ class Vehicle:
     engine_type: ENGINE_TYPES | None = None
 
     # Debug fields
-    data: dict | None = None
+    data: dict[str, Any] | None = None
 
     @property
-    def geocode(self):
+    def geocode(self) -> tuple[str | None, str | None]:
         return self._geocode_name, self._geocode_address
 
     @geocode.setter
-    def geocode(self, value):
+    def geocode(self, value: Any) -> None:
         if value:
             self._geocode_name = value[0]
             self._geocode_address = value[1]
@@ -460,65 +461,70 @@ class Vehicle:
             self._geocode_address = None
 
     @property
-    def total_driving_range(self):
+    def total_driving_range(self) -> float | None:
         return self._total_driving_range
 
     @total_driving_range.setter
-    def total_driving_range(self, value):
+    def total_driving_range(self, value: Any) -> None:
         self._total_driving_range_value = value[0]
         self._total_driving_range = value[0]
         if value[1] is not None:
             self._total_driving_range_unit = value[1]
 
     @property
-    def total_driving_range_unit(self):
+    def total_driving_range_unit(self) -> str | None:
         return self._total_driving_range_unit
+
+    def _tire_pressure_unit_label(self) -> str | None:
+        """Display-unit label for tire_pressure_unit (shared across all tires)."""
+        if self.tire_pressure_unit is None:
+            return None
+        return PRESSURE_UNITS.get(self.tire_pressure_unit)
 
     @property
     def tire_pressure_front_left_unit(self) -> str | None:
-        """Display-unit label for tire pressure (shared across all tires)."""
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self._tire_pressure_unit_label()
 
     @property
     def tire_pressure_front_right_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self._tire_pressure_unit_label()
 
     @property
     def tire_pressure_rear_left_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self._tire_pressure_unit_label()
 
     @property
     def tire_pressure_rear_right_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self._tire_pressure_unit_label()
 
     @property
-    def next_service_distance(self):
+    def next_service_distance(self) -> float | None:
         return self._next_service_distance
 
     @next_service_distance.setter
-    def next_service_distance(self, value):
+    def next_service_distance(self, value: Any) -> None:
         self._next_service_distance_value = value[0]
         self._next_service_distance = value[0]
         if value[1] is not None:
             self._next_service_distance_unit = value[1]
 
     @property
-    def last_service_distance(self):
+    def last_service_distance(self) -> float | None:
         return self._last_service_distance
 
     @last_service_distance.setter
-    def last_service_distance(self, value):
+    def last_service_distance(self, value: Any) -> None:
         self._last_service_distance_value = value[0]
         self._last_service_distance = value[0]
         if value[1] is not None:
             self._last_service_distance_unit = value[1]
 
     @property
-    def last_updated_at(self):
+    def last_updated_at(self) -> datetime.datetime | None:
         return self._last_updated_at
 
     @last_updated_at.setter
-    def last_updated_at(self, value):
+    def last_updated_at(self, value: Any) -> None:
         # workaround for: Timestamp of "last_updated_at" sensor is wrong #931
         # https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/931#issuecomment-2381569934
         newest_updated_at = get_safe_local_datetime(value)
@@ -529,16 +535,17 @@ class Vehicle:
             and newest_updated_at < previous_updated_at
         ):
             utcoffset = newest_updated_at.utcoffset()
-            newest_updated_at_corrected = newest_updated_at + utcoffset
-            if newest_updated_at_corrected >= previous_updated_at:
-                newest_updated_at = newest_updated_at_corrected
+            if utcoffset is not None:
+                newest_updated_at_corrected = newest_updated_at + utcoffset
+                if newest_updated_at_corrected >= previous_updated_at:
+                    newest_updated_at = newest_updated_at_corrected
             newest_updated_at = max(
                 newest_updated_at, previous_updated_at
             )  # keep old because newer
         self._last_updated_at = newest_updated_at
 
     @property
-    def last_scanned_at(self):
+    def last_scanned_at(self) -> datetime.datetime | None:
         """When the integration last polled the server for this vehicle.
 
         Unlike last_updated_at (which comes from the car's syncDate),
@@ -547,29 +554,30 @@ class Vehicle:
         return self._last_scanned_at
 
     @last_scanned_at.setter
-    def last_scanned_at(self, value):
+    def last_scanned_at(self, value: Any) -> None:
         self._last_scanned_at = value
 
     @property
-    def location_latitude(self):
+    def location_latitude(self) -> float | None:
         return self._location_latitude
 
     @property
-    def location_longitude(self):
+    def location_longitude(self) -> float | None:
         return self._location_longitude
 
     @property
-    def location(self):
+    def location(self) -> tuple[float | None, float | None]:
         return self._location_longitude, self._location_latitude
 
     @location.setter
-    def location(self, value):
-        self._location_latitude = value[0]
-        self._location_longitude = value[1]
+    def location(self, value: Any) -> None:
+        # Regions pass the raw API values through; normalise them to float.
+        self._location_latitude = float_or_none(value[0])
+        self._location_longitude = float_or_none(value[1])
         self._location_last_set_time = get_safe_local_datetime(value[2])
 
     @property
-    def location_last_updated_at(self):
+    def location_last_updated_at(self) -> datetime.datetime | None:
         """
         return last location datetime.
         last_updated_at and location_last_updated_at can be different.
@@ -578,11 +586,11 @@ class Vehicle:
         return self._location_last_set_time
 
     @property
-    def odometer(self):
+    def odometer(self) -> float | None:
         return self._odometer
 
     @odometer.setter
-    def odometer(self, value):
+    def odometer(self, value: Any) -> None:
         float_value = get_float(value[0])
         self._odometer_value = float_value
         self._odometer = float_value
@@ -590,175 +598,171 @@ class Vehicle:
             self._odometer_unit = value[1]
 
     @property
-    def odometer_unit(self):
+    def odometer_unit(self) -> str | None:
         return self._odometer_unit
 
     @property
-    def outside_temperature(self):
+    def outside_temperature(self) -> float | None:
         return self._outside_temperature
 
     @outside_temperature.setter
-    def outside_temperature(self, value):
+    def outside_temperature(self, value: Any) -> None:
         self._outside_temperature_value = value[0]
         self._outside_temperature = float_or_none(value[0])
         if value[1] is not None:
             self._outside_temperature_unit = value[1]
 
     @property
-    def air_temperature(self):
+    def air_temperature(self) -> float:
         return self._air_temperature
 
     @air_temperature.setter
-    def air_temperature(self, value):
+    def air_temperature(self, value: Any) -> None:
         self._air_temperature_value = value[0]
         self._air_temperature = float_or_none(value[0])
         if value[1] is not None:
             self._air_temperature_unit = value[1]
 
     @property
-    def ev_battery_water_temperature(self):
+    def ev_battery_water_temperature(self) -> int | None:
         return self._ev_battery_water_temperature
 
     @ev_battery_water_temperature.setter
-    def ev_battery_water_temperature(self, value):
+    def ev_battery_water_temperature(self, value: Any) -> None:
         self._ev_battery_water_temperature_value = value[0]
         self._ev_battery_water_temperature = value[0]
         if value[1] is not None:
             self._ev_battery_water_temperature_unit = value[1]
 
     @property
-    def ev_battery_water_temperature_unit(self):
+    def ev_battery_water_temperature_unit(self) -> str | None:
         return self._ev_battery_water_temperature_unit
 
     @property
-    def ev_battery_temperature_min(self):
+    def ev_battery_temperature_min(self) -> int | None:
         return self._ev_battery_temperature_min
 
     @ev_battery_temperature_min.setter
-    def ev_battery_temperature_min(self, value):
+    def ev_battery_temperature_min(self, value: Any) -> None:
         self._ev_battery_temperature_min_value = value[0]
         self._ev_battery_temperature_min = value[0]
         if value[1] is not None:
             self._ev_battery_temperature_min_unit = value[1]
 
     @property
-    def ev_battery_temperature_min_unit(self):
+    def ev_battery_temperature_min_unit(self) -> str | None:
         return self._ev_battery_temperature_min_unit
 
     @property
-    def ev_battery_temperature_max(self):
+    def ev_battery_temperature_max(self) -> int | None:
         return self._ev_battery_temperature_max
 
     @ev_battery_temperature_max.setter
-    def ev_battery_temperature_max(self, value):
+    def ev_battery_temperature_max(self, value: Any) -> None:
         self._ev_battery_temperature_max_value = value[0]
         self._ev_battery_temperature_max = value[0]
         if value[1] is not None:
             self._ev_battery_temperature_max_unit = value[1]
 
     @property
-    def ev_battery_temperature_max_unit(self):
+    def ev_battery_temperature_max_unit(self) -> str | None:
         return self._ev_battery_temperature_max_unit
 
     @property
-    def ev_driving_range(self):
+    def ev_driving_range(self) -> float | None:
         return self._ev_driving_range
 
     @ev_driving_range.setter
-    def ev_driving_range(self, value):
+    def ev_driving_range(self, value: Any) -> None:
         self._ev_driving_range_value = value[0]
         self._ev_driving_range = value[0]
         if value[1] is not None:
             self._ev_driving_range_unit = value[1]
 
     @property
-    def ev_driving_range_unit(self):
+    def ev_driving_range_unit(self) -> str | None:
         return self._ev_driving_range_unit
 
     @property
-    def ev_estimated_current_charge_duration(self):
+    def ev_estimated_current_charge_duration(self) -> int | None:
         return self._ev_estimated_current_charge_duration
 
     @ev_estimated_current_charge_duration.setter
-    def ev_estimated_current_charge_duration(self, value):
+    def ev_estimated_current_charge_duration(self, value: Any) -> None:
         self._ev_estimated_current_charge_duration_value = value[0]
         self._ev_estimated_current_charge_duration = value[0]
         if value[1] is not None:
             self._ev_estimated_current_charge_duration_unit = value[1]
 
     @property
-    def ev_estimated_fast_charge_duration(self):
+    def ev_estimated_fast_charge_duration(self) -> int | None:
         return self._ev_estimated_fast_charge_duration
 
     @ev_estimated_fast_charge_duration.setter
-    def ev_estimated_fast_charge_duration(self, value):
+    def ev_estimated_fast_charge_duration(self, value: Any) -> None:
         self._ev_estimated_fast_charge_duration_value = value[0]
         self._ev_estimated_fast_charge_duration = value[0]
         if value[1] is not None:
             self._ev_estimated_fast_charge_duration_unit = value[1]
 
     @property
-    def ev_estimated_portable_charge_duration(self):
+    def ev_estimated_portable_charge_duration(self) -> int | None:
         return self._ev_estimated_portable_charge_duration
 
     @ev_estimated_portable_charge_duration.setter
-    def ev_estimated_portable_charge_duration(self, value):
+    def ev_estimated_portable_charge_duration(self, value: Any) -> None:
         self._ev_estimated_portable_charge_duration_value = value[0]
         self._ev_estimated_portable_charge_duration = value[0]
         if value[1] is not None:
             self._ev_estimated_portable_charge_duration_unit = value[1]
 
     @property
-    def ev_estimated_station_charge_duration(self):
+    def ev_estimated_station_charge_duration(self) -> int | None:
         return self._ev_estimated_station_charge_duration
 
     @ev_estimated_station_charge_duration.setter
-    def ev_estimated_station_charge_duration(self, value):
+    def ev_estimated_station_charge_duration(self, value: Any) -> None:
         self._ev_estimated_station_charge_duration_value = value[0]
         self._ev_estimated_station_charge_duration = value[0]
         if value[1] is not None:
             self._ev_estimated_station_charge_duration_unit = value[1]
 
     @property
-    def ev_target_range_charge_AC(self):
+    def ev_target_range_charge_AC(self) -> float | None:
         return self._ev_target_range_charge_AC
 
     @ev_target_range_charge_AC.setter
-    def ev_target_range_charge_AC(self, value):
+    def ev_target_range_charge_AC(self, value: Any) -> None:
         self._ev_target_range_charge_AC_value = value[0]
         self._ev_target_range_charge_AC = value[0]
         if value[1] is not None:
             self._ev_target_range_charge_AC_unit = value[1]
 
     @property
-    def ev_target_range_charge_AC_unit(self):
+    def ev_target_range_charge_AC_unit(self) -> str | None:
         return self._ev_target_range_charge_AC_unit
 
     @property
-    def ev_target_range_charge_DC(self):
+    def ev_target_range_charge_DC(self) -> float | None:
         return self._ev_target_range_charge_DC
 
     @ev_target_range_charge_DC.setter
-    def ev_target_range_charge_DC(self, value):
+    def ev_target_range_charge_DC(self, value: Any) -> None:
         self._ev_target_range_charge_DC_value = value[0]
         self._ev_target_range_charge_DC = value[0]
         if value[1] is not None:
             self._ev_target_range_charge_DC_unit = value[1]
 
     @property
-    def ev_target_range_charge_DC_unit(self):
+    def ev_target_range_charge_DC_unit(self) -> str | None:
         return self._ev_target_range_charge_DC_unit
 
     @property
-    def ev_first_departure_climate_temperature(self):
+    def ev_first_departure_climate_temperature(self) -> float | None:
         return self._ev_first_departure_climate_temperature
 
-    @property
-    def ev_first_departure_climate_temperature_unit(self):
-        return self._ev_first_departure_climate_temperature_unit
-
     @ev_first_departure_climate_temperature.setter
-    def ev_first_departure_climate_temperature(self, value):
+    def ev_first_departure_climate_temperature(self, value: Any) -> None:
         if isinstance(value, (tuple, list)):
             val = value[0]
             unit = value[1] if len(value) > 1 else None
@@ -776,15 +780,15 @@ class Vehicle:
             self._ev_first_departure_climate_temperature_unit = unit
 
     @property
-    def ev_second_departure_climate_temperature(self):
-        return self._ev_second_departure_climate_temperature
+    def ev_first_departure_climate_temperature_unit(self) -> str | None:
+        return self._ev_first_departure_climate_temperature_unit
 
     @property
-    def ev_second_departure_climate_temperature_unit(self):
-        return self._ev_second_departure_climate_temperature_unit
+    def ev_second_departure_climate_temperature(self) -> float | None:
+        return self._ev_second_departure_climate_temperature
 
     @ev_second_departure_climate_temperature.setter
-    def ev_second_departure_climate_temperature(self, value):
+    def ev_second_departure_climate_temperature(self, value: Any) -> None:
         if isinstance(value, (tuple, list)):
             val = value[0]
             unit = value[1] if len(value) > 1 else None
@@ -802,11 +806,15 @@ class Vehicle:
             self._ev_second_departure_climate_temperature_unit = unit
 
     @property
-    def fuel_driving_range(self):
+    def ev_second_departure_climate_temperature_unit(self) -> str | None:
+        return self._ev_second_departure_climate_temperature_unit
+
+    @property
+    def fuel_driving_range(self) -> float | None:
         return self._fuel_driving_range
 
     @fuel_driving_range.setter
-    def fuel_driving_range(self, value):
+    def fuel_driving_range(self, value: Any) -> None:
         self._fuel_driving_range_value = value[0]
         self._fuel_driving_range = value[0]
         if value[1] is not None:
