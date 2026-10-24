@@ -107,9 +107,14 @@ class ScheduleChargingClimateRequestOptions:
 
     @dataclass
     class DepartureOptions:
+        """Per-departure schedule options; climate fields override top-level defaults on platforms with per-slot HVAC (see #1302)."""
+
         enabled: bool | None = None
         days: list[int] | None = None  # Sun=0, Mon=1, ..., Sat=6
         time: dt.time | None = None
+        climate_enabled: bool | None = None
+        temperature: float | None = None
+        defrost: bool | None = None
 
     first_departure: DepartureOptions | None = None
     second_departure: DepartureOptions | None = None
@@ -157,6 +162,7 @@ def _schedule_charging_scopes(
             options.off_peak_charge_only_enabled,
         )
     )
+
     climate_active = (
         any(
             value is not None
@@ -175,9 +181,7 @@ def _schedule_charging_scopes(
 def _vehicle_temperature_unit(vehicle: Vehicle) -> int | None:
     """Wire temperature unit (0=°C, 1=°F) from the vehicle's reported setting.
 
-    ``None`` when the vehicle does not report a departure-climate unit (the
-    CCS2 status does not expose it yet — see the parsing TODO in
-    ``ApiImplType1``).
+    ``None`` when the vehicle does not report a departure-climate unit.
     """
     unit_map = {TEMPERATURE_C: 0, TEMPERATURE_F: 1}
     source_unit = vehicle.ev_first_departure_climate_temperature_unit
@@ -195,13 +199,22 @@ def _guard_schedule_temperature(
     the payload always carries ``airTemp``. When neither the caller nor the
     vehicle provides a temperature, writing the documented default (21 °C)
     would silently reset the car's setting — so raise instead (Lekensteyn,
-    #1303 review; affects CCS2 models, which do not report the departure
-    climate temperature yet).
+    #1303 review).
     """
-    if (
-        options.temperature is None
-        and vehicle.ev_first_departure_climate_temperature is None
-    ):
+    has_temp = (
+        options.temperature is not None
+        or (
+            options.first_departure is not None
+            and options.first_departure.temperature is not None
+        )
+        or (
+            options.second_departure is not None
+            and options.second_departure.temperature is not None
+        )
+        or vehicle.ev_first_departure_climate_temperature is not None
+        or vehicle.ev_second_departure_climate_temperature is not None
+    )
+    if not has_temp:
         raise ValueError(
             f"{DOMAIN} - {vehicle.id}: vehicle does not report the departure "
             "climate temperature; pass an explicit temperature to avoid "
@@ -234,6 +247,9 @@ def _fill_departure_options(
     vehicle: Vehicle,
     number: int,
     *,
+    fallback_climate_enabled: bool | None = None,
+    fallback_temperature: float | None = None,
+    fallback_defrost: bool | None = None,
     missing: list[str],
 ) -> None:
     """Fill a departure's None fields from the matching vehicle state."""
@@ -241,11 +257,17 @@ def _fill_departure_options(
         v_enabled = vehicle.ev_first_departure_enabled
         v_days = vehicle.ev_first_departure_days
         v_time = vehicle.ev_first_departure_time
+        v_climate = vehicle.ev_first_departure_climate_enabled
+        v_temp = vehicle.ev_first_departure_climate_temperature
+        v_defrost = vehicle.ev_first_departure_climate_defrost
         prefix = "first_departure"
     else:
         v_enabled = vehicle.ev_second_departure_enabled
         v_days = vehicle.ev_second_departure_days
         v_time = vehicle.ev_second_departure_time
+        v_climate = vehicle.ev_second_departure_climate_enabled
+        v_temp = vehicle.ev_second_departure_climate_temperature
+        v_defrost = vehicle.ev_second_departure_climate_defrost
         prefix = "second_departure"
     departure.enabled = _fill_option_value(
         departure.enabled, v_enabled, False, f"{prefix}.enabled", missing
@@ -263,6 +285,28 @@ def _fill_departure_options(
         departure.days = [9]
     departure.time = _fill_option_value(
         departure.time, v_time, dt.time(), f"{prefix}.time", missing
+    )
+    curr_climate = (
+        departure.climate_enabled
+        if departure.climate_enabled is not None
+        else fallback_climate_enabled
+    )
+    departure.climate_enabled = _fill_option_value(
+        curr_climate, v_climate, False, f"{prefix}.climate_enabled", missing
+    )
+    curr_temp = (
+        departure.temperature
+        if departure.temperature is not None
+        else fallback_temperature
+    )
+    departure.temperature = _fill_option_value(
+        curr_temp, v_temp, 21.0, f"{prefix}.temperature", missing
+    )
+    curr_defrost = (
+        departure.defrost if departure.defrost is not None else fallback_defrost
+    )
+    departure.defrost = _fill_option_value(
+        curr_defrost, v_defrost, False, f"{prefix}.defrost", missing
     )
 
 
@@ -326,29 +370,22 @@ def _fill_schedule_options_from_vehicle(
                     options.first_departure = departure
                 else:
                     options.second_departure = departure
-            _fill_departure_options(departure, vehicle, number, missing=missing)
-        # One climate set models both departures (known limitation, #1302).
-        options.climate_enabled = _fill_option_value(
-            options.climate_enabled,
-            vehicle.ev_first_departure_climate_enabled,
-            False,
-            "climate_enabled",
-            missing,
-        )
-        options.temperature = _fill_option_value(
-            options.temperature,
-            vehicle.ev_first_departure_climate_temperature,
-            21.0,
-            "temperature",
-            missing,
-        )
-        options.defrost = _fill_option_value(
-            options.defrost,
-            vehicle.ev_first_departure_climate_defrost,
-            False,
-            "defrost",
-            missing,
-        )
+            _fill_departure_options(
+                departure,
+                vehicle,
+                number,
+                fallback_climate_enabled=options.climate_enabled,
+                fallback_temperature=options.temperature,
+                fallback_defrost=options.defrost,
+                missing=missing,
+            )
+        # Mirror first departure climate fields to top-level for backward compatibility
+        if options.climate_enabled is None:
+            options.climate_enabled = options.first_departure.climate_enabled
+        if options.temperature is None:
+            options.temperature = options.first_departure.temperature
+        if options.defrost is None:
+            options.defrost = options.first_departure.defrost
     if missing:
         _LOGGER.warning(
             f"{DOMAIN} - {vehicle.id}: schedule options not reported by "
