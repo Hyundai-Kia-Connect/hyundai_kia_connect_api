@@ -82,42 +82,18 @@ class VehicleSupports:
     Each item is tri-state: ``True`` supported, ``False`` not supported,
     ``None`` not yet determined. Treat ``None`` as unsupported when gating.
 
-    Names are region-neutral: each item is named after the library action it
-    gates or the ``Vehicle`` status it exposes, never after a region's raw
-    API flag (e.g. EU ``/profile`` ``heatingRearWindow`` -> ``back_window_heater``
-    to match ``Vehicle.back_window_heater_is_on``).
+    Each item gates a library call (a remote command or a support fetch such
+    as SVM) and is named after it, never after a region's raw API flag.
 
-    To add an item: add a field here and set it in the region overrides of
-    ``ApiImpl.get_vehicle_supports``. The API decides support; the vehicle
+    Add an item only together with a region that decides it: add a field
+    here and set it in that region's ``ApiImpl.get_vehicle_supports``. The API decides support; the vehicle
     holds the answer, so library code also checks ``vehicle.supports``.
     """
 
-    # Remote commands (gate the ApiImpl action of the same purpose)
     window_control: bool | None = None  # set_windows_state
     valet_mode: bool | None = None  # valet_mode_action
     # Surround View Monitor (SVM) / Find My Car; get_svm_details
     surround_view: bool | None = None
-    hazard_lights: bool | None = None  # start_hazard_lights
-    hazard_lights_and_horn: bool | None = None  # start_hazard_lights_and_horn
-    climate_control: bool | None = None  # start_climate / stop_climate
-    charge_port_door: bool | None = None  # charge_port_action
-    charging_current: bool | None = None  # set_charging_current
-    v2l_discharge_limit: bool | None = None  # set_vehicle_to_load_discharge_limit
-    navigation: bool | None = None  # set_navigation (send destination to car)
-
-    # Climate options (ClimateRequestOptions / matching *_is_on status)
-    steering_wheel_heater: bool | None = None
-    side_mirror_heater: bool | None = None
-    back_window_heater: bool | None = None
-    windshield_front_heater: bool | None = None
-    seat_climate: bool | None = None  # seat heating / ventilation
-    air_cleaning: bool | None = None  # air purifier
-
-    # Equipment with status the library reports
-    sunroof: bool | None = None
-    battery_preconditioning: bool | None = None  # ev_battery_precondition_enabled
-    v2l: bool | None = None  # vehicle-to-load; ev_v2l_*
-    ota_update: bool | None = None  # ota_update_available
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:

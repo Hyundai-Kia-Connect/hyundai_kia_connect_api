@@ -79,12 +79,6 @@ def test_api_holds_no_flat_supports_attributes():
         assert flat == [], api_cls.__name__
 
 
-def test_items_without_region_attribute_stay_undetermined():
-    supports = _resolve(ApiImpl)
-    assert supports.sunroof is None
-    assert supports.hazard_lights_and_horn is None
-
-
 def test_vehicle_manager_uses_per_vehicle_override():
     class PerVehicleApi(ApiImpl):
         def get_vehicle_supports(self, vehicle):

@@ -473,9 +473,9 @@ class ApiImpl:
     def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
         """Resolve what ``vehicle`` supports.
 
-        The base marks the region-gated items unsupported and leaves the rest
-        undetermined. Regions override this, call ``super()`` and set what
-        they support, from fixed region facts or per-vehicle data.
+        The base marks every item unsupported. Regions override this, call
+        ``super()`` and set what they support, from fixed region facts or
+        per-vehicle data.
         """
         return VehicleSupports(
             window_control=False,
