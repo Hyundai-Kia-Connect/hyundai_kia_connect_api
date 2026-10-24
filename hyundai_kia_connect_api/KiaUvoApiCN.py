@@ -504,7 +504,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types (ex: ICE cars) provide this
                 # information. We also don't know what the API returns if the
@@ -518,7 +518,7 @@ class KiaUvoApiCN(ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -531,7 +531,7 @@ class KiaUvoApiCN(ApiImplType1):
         # Only call for driving info on cars we know have a chance of supporting it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 _LOGGER.exception(
                     """Failed to parse driving info. Possible reasons:
@@ -541,7 +541,7 @@ class KiaUvoApiCN(ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
         # CN-UNVERIFIED for the China region (no CCS2 vehicle in the test
