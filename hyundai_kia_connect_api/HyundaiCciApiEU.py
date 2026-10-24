@@ -24,7 +24,7 @@ from .Token import Token
 from .utils import (
     get_child_value,
 )
-from .Vehicle import DailyDrivingStats, Vehicle
+from .Vehicle import DailyDrivingStats, Vehicle, VehicleSupports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,15 +51,17 @@ class HyundaiCciApiEU(GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
-    # SVM reads confirmed live on the EU GSPA endpoints (na-images);
-    # KiaCciApiEU keeps the inherited False until verified there too.
-    supports_svm: bool = True
-
-    # CCS2 EU vehicles support GSPA window control.
-    supports_window_control: bool = True
-
     # Hyundai EU CCI remote control is live-verified.
     GSPA_REMOTE_CONTROL_VERIFIED = True
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        # CCS2 EU vehicles support GSPA window control.
+        supports.window_control = True
+        # SVM reads confirmed live on the EU GSPA endpoints (na-images);
+        # KiaCciApiEU keeps the inherited False until verified there too.
+        supports.surround_view = True
+        return supports
 
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)

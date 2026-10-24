@@ -154,13 +154,13 @@ def test_kia_windows_accepted():
     """Kia EU window control ships: the server accepted the scope
     command with a polling SID on the EV6 (2026-10-18)."""
     api = KiaCciApiEU(9, 2, "en")
-    assert api.supports_window_control is True
     token = _make_token()
     vehicle = _make_vehicle()
+    assert api.get_vehicle_supports(vehicle).window_control is True
     from hyundai_kia_connect_api.ApiImpl import WindowRequestOptions
     from hyundai_kia_connect_api.const import WINDOW_STATE
 
-    vehicle.supports_window_control = True
+    vehicle.supports.window_control = True
     options = WindowRequestOptions(
         front_left=WINDOW_STATE.CLOSED,
         front_right=WINDOW_STATE.CLOSED,

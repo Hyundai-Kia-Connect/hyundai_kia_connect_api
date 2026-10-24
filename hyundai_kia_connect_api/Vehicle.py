@@ -3,6 +3,7 @@
 
 import datetime
 import logging
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -71,6 +72,70 @@ class DailyDrivingStats:
 
 
 @dataclass
+class VehicleSupports:
+    """What a vehicle supports, read as ``vehicle.supports.<item>``.
+
+    Resolved once per vehicle by ``ApiImpl.get_vehicle_supports`` when the
+    VehicleManager initializes vehicles. Consumers (e.g. Home Assistant) use
+    these to decide which entities and services to expose.
+
+    Each item is tri-state: ``True`` supported, ``False`` not supported,
+    ``None`` not yet determined. Treat ``None`` as unsupported when gating.
+
+    Names are region-neutral: each item is named after the library action it
+    gates or the ``Vehicle`` status it exposes, never after a region's raw
+    API flag (e.g. EU ``/profile`` ``heatingRearWindow`` -> ``back_window_heater``
+    to match ``Vehicle.back_window_heater_is_on``).
+
+    To add an item: add a field here and set it in the region overrides of
+    ``ApiImpl.get_vehicle_supports``. The API decides support; the vehicle
+    holds the answer, so library code also checks ``vehicle.supports``.
+    """
+
+    # Remote commands (gate the ApiImpl action of the same purpose)
+    window_control: bool | None = None  # set_windows_state
+    valet_mode: bool | None = None  # valet_mode_action
+    # Surround View Monitor (SVM) / Find My Car; get_svm_details
+    surround_view: bool | None = None
+    hazard_lights: bool | None = None  # start_hazard_lights
+    hazard_lights_and_horn: bool | None = None  # start_hazard_lights_and_horn
+    climate_control: bool | None = None  # start_climate / stop_climate
+    charge_port_door: bool | None = None  # charge_port_action
+    charging_current: bool | None = None  # set_charging_current
+    v2l_discharge_limit: bool | None = None  # set_vehicle_to_load_discharge_limit
+    navigation: bool | None = None  # set_navigation (send destination to car)
+
+    # Climate options (ClimateRequestOptions / matching *_is_on status)
+    steering_wheel_heater: bool | None = None
+    side_mirror_heater: bool | None = None
+    back_window_heater: bool | None = None
+    windshield_front_heater: bool | None = None
+    seat_climate: bool | None = None  # seat heating / ventilation
+    air_cleaning: bool | None = None  # air purifier
+
+    # Equipment with status the library reports
+    sunroof: bool | None = None
+    battery_preconditioning: bool | None = None  # ev_battery_precondition_enabled
+    v2l: bool | None = None  # vehicle-to-load; ev_v2l_*
+    ota_update: bool | None = None  # ota_update_available
+
+
+def _deprecated_supports_alias(alias: str, item: str) -> property:
+    """Map a legacy flat ``vehicle.<alias>`` attribute onto ``vehicle.supports``."""
+    message = f"Vehicle.{alias} is deprecated; use Vehicle.supports.{item} instead"
+
+    def getter(self):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        return getattr(self.supports, item)
+
+    def setter(self, value):
+        warnings.warn(message, DeprecationWarning, stacklevel=2)
+        setattr(self.supports, item, value)
+
+    return property(getter, setter, doc=f"Deprecated alias for supports.{item}.")
+
+
+@dataclass
 class Vehicle:
     id: str = None
     name: str | None = None
@@ -85,6 +150,8 @@ class Vehicle:
     generation: int | None = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
+    # What this vehicle supports; see VehicleSupports.
+    supports: VehicleSupports = field(default_factory=VehicleSupports)
 
     # Shared (EV/PHEV/HEV/IC)
     # General
@@ -151,14 +218,9 @@ class Vehicle:
     back_left_window_is_open: bool | None = None
     back_right_window_is_open: bool | None = None
     sunroof_is_open: bool | None = None
-    supports_window_control: bool | None = None
-    supports_valet_mode: bool | None = None
 
     # Valet Status
     valet_mode_active: bool | None = None
-
-    # SVM (Surround View Monitor / Find My Car) — USA Hyundai
-    supports_svm: bool | None = None
 
     # Software version (GSPA device-info read)
     software_version: str | None = None
@@ -294,6 +356,15 @@ class Vehicle:
     windshield_front_heater_is_on: bool | None = None
     air_cleaning_is_on: bool | None = None
     steering_wheel_heat_step: int | None = None
+
+    # Deprecated flat aliases; use vehicle.supports.<item>.
+    supports_window_control = _deprecated_supports_alias(
+        "supports_window_control", "window_control"
+    )
+    supports_valet_mode = _deprecated_supports_alias(
+        "supports_valet_mode", "valet_mode"
+    )
+    supports_svm = _deprecated_supports_alias("supports_svm", "surround_view")
 
     @property
     def daily_stats(self) -> list[DailyDrivingStats]:
