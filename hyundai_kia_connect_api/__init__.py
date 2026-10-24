@@ -27,5 +27,6 @@ __all__ = [
     "Token",
     "Vehicle",
     "VehicleManager",
+    "VehicleSupports",
     "WindowRequestOptions",
 ]
