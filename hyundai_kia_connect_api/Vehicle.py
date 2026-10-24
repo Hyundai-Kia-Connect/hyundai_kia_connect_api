@@ -67,7 +67,7 @@ class DailyDrivingStats:
     battery_care_consumption: int | None = None
     regenerated_energy: int | None = None
     distance: float | None = None
-    distance_unit: str = DISTANCE_UNITS[1]  # set to kms by default
+    distance_unit: str | None = DISTANCE_UNITS[1]  # set to kms by default
 
 
 @dataclass
@@ -146,13 +146,13 @@ class Vehicle:
     hood_is_open: bool | None = None
 
     # Window Status
-    front_left_window_is_open: bool = None
-    front_right_window_is_open: bool = None
-    back_left_window_is_open: bool = None
-    back_right_window_is_open: bool = None
-    sunroof_is_open: bool = None
-    supports_window_control: bool = None
-    supports_valet_mode: bool = None
+    front_left_window_is_open: bool | None = None
+    front_right_window_is_open: bool | None = None
+    back_left_window_is_open: bool | None = None
+    back_right_window_is_open: bool | None = None
+    sunroof_is_open: bool | None = None
+    supports_window_control: bool | None = None
+    supports_valet_mode: bool | None = None
 
     # Valet Status
     valet_mode_active: bool | None = None
