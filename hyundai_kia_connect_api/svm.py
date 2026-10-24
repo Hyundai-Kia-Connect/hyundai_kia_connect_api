@@ -82,7 +82,7 @@ def _parse_float_list(raw: Any) -> tuple[float, ...] | None:
     return tuple(parsed)
 
 
-def _parse_door_open(door_open: dict | None) -> dict[str, bool | None] | None:
+def _parse_door_open(door_open: dict[str, Any] | None) -> dict[str, bool | None] | None:
     """Map an SVM doorOpen object onto the shared door keys.
 
     Both the USA and EU GSPA responses carry the same door keys; door
@@ -115,7 +115,7 @@ class SVMDetails:
     # GSPA responses carry a per-camera field-of-view array; present only
     # on some regions, None when absent or malformed.
     valid_angle_of_view: tuple[float, ...] | None = None
-    raw_metadata: dict | None = None
+    raw_metadata: dict[str, Any] | None = None
 
 
 def redact_svm_metadata(data: dict[str, Any], *, gps: bool = True) -> dict[str, Any]:
@@ -142,4 +142,5 @@ def redact_svm_metadata(data: dict[str, Any], *, gps: bool = True) -> dict[str, 
             return [_redact(item) for item in value]
         return value
 
-    return _redact(data)
+    redacted: dict[str, Any] = _redact(data)
+    return redacted
