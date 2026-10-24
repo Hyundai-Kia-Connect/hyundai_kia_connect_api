@@ -27,7 +27,7 @@ from hyundai_kia_connect_api.const import BRANDS, ENGINE_TYPES, REGIONS
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
-from tests.fixture_helpers import FIXTURES_DIR
+from tests.fixture_helpers import FIXTURES_DIR, discover_fixtures
 from tests.vehicle_snapshot_serializer import vehicle_to_dict
 
 if TYPE_CHECKING:
@@ -70,6 +70,27 @@ def _vehicle(spec: dict[str, Any]) -> Vehicle:
     if spec.get("engine_type"):
         spec["engine_type"] = ENGINE_TYPES[spec["engine_type"]]
     return Vehicle(**spec)
+
+
+def _refs(value: Any) -> list[str]:
+    """Fixture paths a scenario value references, as ``_resolve`` reads them."""
+    if isinstance(value, str) and value.startswith(REF + ":"):
+        return [value[len(REF) + 1 :].partition("#")[0]]
+    if isinstance(value, dict):
+        own = [value[REF].partition("#")[0]] if REF in value else []
+        return own + [r for k, v in value.items() if k != REF for r in _refs(v)]
+    if isinstance(value, list):
+        return [r for v in value for r in _refs(v)]
+    return []
+
+
+def test_every_status_fixture_has_a_scenario() -> None:
+    referenced = {
+        ref
+        for scenario in SCENARIOS
+        for ref in _refs(json.loads((UPDATES_DIR / f"{scenario}.json").read_text()))
+    }
+    assert set(discover_fixtures("")) <= referenced
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS)

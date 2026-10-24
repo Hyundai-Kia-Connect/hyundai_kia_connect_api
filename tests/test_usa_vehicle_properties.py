@@ -2,7 +2,7 @@
 
 These tests verify that the KiaUvoApiUSA._update_vehicle_properties method
 correctly parses vehicle state dicts (as returned by cmm/gvi) into Vehicle
-objects. Fixture-wide parsing is covered by test_vehicle_snapshots.py.
+objects. Fixture-wide parsing is covered by test_vehicle_update_snapshots.py.
 """
 
 import pytest

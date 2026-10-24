@@ -1,10 +1,8 @@
-"""Tests for KiaCciApiEU.update_vehicle_with_cached_state — the shared
-CCS2 property parser applied to live Kia GSPA stored-status fixtures
-(EV6 2024, PV5 2026; zero network). The EV6 fixture leaf values are
-synthetic (replaced by the volunteer before sharing); the PV5 fixture
-keeps the real values except the identifying leaves (Date, Version,
-Drivetrain.Odometer, envelope msgId/lastUpdateTime). Structure and key
-names are real in both."""
+"""Tests for KiaCciApiEU cached-state edge cases and CCS2 parser paths.
+
+Parsing of the live Kia GSPA stored-status fixtures (EV6 2024, PV5 2026) is
+covered by tests/test_vehicle_update_snapshots.py; these tests cover token
+and empty-response handling and parser paths the fixtures don't carry."""
 
 from unittest.mock import patch
 
@@ -13,10 +11,6 @@ import pytest
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from tests.fixture_helpers import load_fixture
-
-FIXTURE = "eu_kia_gspa_ev6_2024_stored_status.json"
-PV5_FIXTURE = "eu_kia_gspa_pv5_2026_stored_status.json"
 
 
 @pytest.fixture
@@ -27,83 +21,6 @@ def api() -> KiaCciApiEU:
 @pytest.fixture
 def vehicle() -> Vehicle:
     return Vehicle()
-
-
-def test_ccs2_parser_on_kia_stored_status(api: KiaCciApiEU, vehicle: Vehicle) -> None:
-    """The shared CCS2 parser handles the Kia EV6 state tree."""
-    data = load_fixture(FIXTURE)
-    api._update_vehicle_properties_ccs2(vehicle, data)
-
-    assert vehicle.ev_battery_percentage == 70.0
-    assert vehicle.car_battery_percentage == 70
-    # Kia sends DrivingReady as 0/1, Hyundai as a bool — both falsy.
-    assert not vehicle.engine_is_running
-    assert vehicle.front_left_door_is_locked is True
-    assert vehicle.is_locked is True
-    # HVAC temperature is 'OFF' → no temperature set.
-    assert vehicle.air_temperature is None
-    # Hyundai-specific sections absent from the Kia tree stay None
-    # (graceful degradation, not masking): OutsideTemperature is not in
-    # the EV6 payload.
-    assert vehicle.outside_temperature is None
-
-
-def test_ccs2_parser_on_pv5_stored_status(api: KiaCciApiEU, vehicle: Vehicle) -> None:
-    """The shared CCS2 parser handles the second live Kia schema (PV5
-    Passenger, 2026). Sections absent from the PV5 payload (Location,
-    SoH, charging door, seat climate) stay None — no crash — while the
-    PV5-only leaves (OutsideTemperature, pack voltage, chiller, water
-    temperature, V2L, sunroof) parse."""
-    import datetime as dt
-
-    from hyundai_kia_connect_api.const import PressureUnit
-
-    data = load_fixture(PV5_FIXTURE)
-    api._update_vehicle_properties_ccs2(vehicle, data)
-
-    assert vehicle.ev_battery_percentage == 56.5
-    assert vehicle.car_battery_percentage == 88
-    # PV5 carries OutsideTemperature (EV6 does not).
-    assert vehicle.outside_temperature == 19.5
-    # OffPeakTime Mode=2 (live): schedule on, off-peak-only off.
-    assert vehicle.ev_off_peak_start_time == dt.time(14, 20)
-    assert vehicle.ev_off_peak_end_time == dt.time(17, 30)
-    assert vehicle.ev_schedule_charge_enabled is True
-    assert vehicle.ev_off_peak_charge_only_enabled is False
-    # PV5-only BMS/SmartGrid leaves.
-    assert vehicle.ev_battery_pack_voltage == 413
-    assert vehicle.ev_battery_chiller_rpm == 0
-    assert vehicle.ev_battery_water_temperature == 20
-    assert vehicle.ev_v2l_discharge_limit == 20
-    assert vehicle.sunroof_is_open is True
-    assert vehicle.tire_pressure_unit == PressureUnit.BAR
-    assert vehicle.is_locked is True
-    # HVAC temperature is 'OFF' -> no temperature set.
-    assert vehicle.air_temperature is None
-    # Absent from the PV5 payload -> None (graceful degradation, not
-    # masking): SoH, charging door.
-    assert vehicle.ev_battery_soh_percentage is None
-    assert vehicle.ev_battery_is_plugged_in == 0
-
-
-def test_update_vehicle_with_cached_state(api: KiaCciApiEU, vehicle: Vehicle) -> None:
-    """update_vehicle_with_cached_state feeds stored-status state.Vehicle
-    to the shared parser and does not call the Hyundai-only driving
-    parsers (they are not part of the Kia API surface)."""
-    state_vehicle = {
-        k: v for k, v in load_fixture(FIXTURE).items() if k != "_fixture_meta"
-    }
-    stored = {"serviceNo": "RVS-K 1789000000000", "state": {"Vehicle": state_vehicle}}
-    with patch.object(
-        KiaCciApiEU, "get_stored_status", return_value=stored
-    ) as get_status:
-        token = Token()
-        token.access_token = "ccs-token"
-        api.update_vehicle_with_cached_state(token, vehicle)
-    get_status.assert_called_once()
-
-    assert vehicle.ev_battery_percentage == 70.0
-    assert vehicle.car_battery_percentage == 70
 
 
 def test_update_vehicle_with_cached_state_no_ccs_token(
@@ -217,71 +134,6 @@ def test_ccs2_parser_offpeak_absent_stays_none(
     assert vehicle.ev_off_peak_charge_only_enabled is None
     assert vehicle.ev_battery_precondition_enabled is True
     assert vehicle.ev_battery_winter_mode is True
-
-
-def test_ccs2_parser_ev6_offpeak_mode_zero(api: KiaCciApiEU, vehicle: Vehicle) -> None:
-    """The live EV6 GSPA stored-status fixture carries OffPeakTime Mode=0:
-    window parsed, schedule flag False, off-peak-only None."""
-    import datetime as dt
-
-    data = load_fixture(FIXTURE)
-    api._update_vehicle_properties_ccs2(vehicle, data)
-
-    assert vehicle.ev_off_peak_start_time == dt.time(22, 0)
-    assert vehicle.ev_off_peak_end_time == dt.time(1, 30)
-    assert vehicle.ev_schedule_charge_enabled is False
-    assert vehicle.ev_off_peak_charge_only_enabled is None
-    # EV6 sends BatteryPreCondition.Status=0 → precondition off (was
-    # wrongly True via object truthiness).
-    assert vehicle.ev_battery_precondition_enabled is False
-    assert vehicle.ev_battery_winter_mode is None
-    assert vehicle.headlamp_status == 0
-
-
-def test_ccs2_parser_bucket_a_fields(api: KiaCciApiEU, vehicle: Vehicle) -> None:
-    """Remaining stored-status fields with clear semantics (issue #1321,
-    bucket A) on the PV5 fixture, which carries every block."""
-    data = load_fixture(PV5_FIXTURE)
-    api._update_vehicle_properties_ccs2(vehicle, data)
-
-    # Charge-complete alarm presets.
-    assert vehicle.ev_charge_complete_alarm_before_10min is True
-    assert vehicle.ev_charge_complete_alarm_before_20min is False
-    assert vehicle.ev_charge_complete_alarm_before_30min is False
-    assert vehicle.ev_charge_complete_alarm_off is False
-    # Unconfigured ExpectedTime sentinel (Hour 31 / Min 63) -> None.
-    assert vehicle.ev_charge_expected_start_time is None
-    assert vehicle.ev_charge_expected_end_time is None
-    # Cabin / lamp / auto-cut booleans.
-    assert vehicle.hazard_lights_on is False
-    assert vehicle.windshield_front_heater_is_on is False
-    assert vehicle.air_cleaning_is_on is True
-    assert vehicle.auto_cut_battery_prewarning_on is False
-    assert vehicle.steering_wheel_heat_step == 0
-    # Drivetrain + V2L (raw values; unit/enum semantics stay unmapped).
-    assert vehicle.gear_position == 0
-    assert vehicle.ev_v2l_discharge_remain_time == 0
-    assert vehicle.ev_v2l_discharge_dte == 78
-    assert vehicle.ev_v2l_mode == 1
-    assert vehicle.average_fuel_economy_accumulated == 19.3
-    assert vehicle.average_fuel_economy_drive == 16.6
-    assert vehicle.average_fuel_economy_after_refuel == 16.7
-    assert vehicle.average_fuel_economy_unit == 5
-
-
-def test_ccs2_parser_absent_blocks_stay_none(
-    api: KiaCciApiEU, vehicle: Vehicle
-) -> None:
-    """The EV6 fixture lacks the CompleteAlarm block and VehicleToLoad.
-    Mode — those fields stay None (no synthesized defaults)."""
-    data = load_fixture(FIXTURE)
-    api._update_vehicle_properties_ccs2(vehicle, data)
-
-    assert vehicle.ev_charge_complete_alarm_before_10min is None
-    assert vehicle.ev_charge_complete_alarm_before_20min is None
-    assert vehicle.ev_charge_complete_alarm_before_30min is None
-    assert vehicle.ev_charge_complete_alarm_off is None
-    assert vehicle.ev_v2l_mode is None
 
 
 def test_ccs2_parser_expected_time_in_range(api: KiaCciApiEU, vehicle: Vehicle) -> None:

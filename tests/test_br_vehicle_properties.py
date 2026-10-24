@@ -1,8 +1,8 @@
 """Tests for the Brazilian Hyundai BlueLink API.
 
-Covers:
-  * the cached-status endpoint (regression for the /status/latest 503 bug),
-  * the asynchronous force-refresh flow (wake + sleep + read + staleness guard).
+Covers the asynchronous force-refresh flow (wake + sleep + read + staleness
+guard). The cached-status endpoint (/ccs2/carstatus/latest, never
+/status/latest) is covered by tests/test_vehicle_update_snapshots.py.
 
 BR reports ``ccuCCS2ProtocolSupport: 0`` but serves status in CCS2 format at
 ``/ccs2/carstatus/latest``, so BR extends ``ApiImplType1`` and reuses its
@@ -71,23 +71,6 @@ class TestBRInheritance:
 
 class TestBRCachedEndpoint:
     """The cached read must use /ccs2/carstatus/latest (never /status*)."""
-
-    def test_cached_state_uses_ccs2_latest(self, br_api, token):
-        state = _fixture_state()
-        br_api.session = MagicMock()
-        br_api.session.get.return_value = _response(
-            {"resMsg": {"state": {"Vehicle": state}}}
-        )
-        vehicle = Vehicle(id="VID", ccu_ccs2_protocol_support=0)
-
-        br_api.update_vehicle_with_cached_state(token, vehicle)
-
-        urls = _called_urls(br_api.session.get)
-        assert any(u.endswith("/spa/vehicles/VID/ccs2/carstatus/latest") for u in urls)
-        assert not any("/status/latest" in u for u in urls)
-        assert not any(u.endswith("/status") for u in urls)
-        # Parsed via the inherited CCS2 parser.
-        assert vehicle.car_battery_percentage == 59
 
 
 class TestBRForceRefresh:
