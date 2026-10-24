@@ -3,6 +3,7 @@
 # pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,logging-fstring-interpolation
 import datetime as dt
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import requests
@@ -422,8 +423,8 @@ class ApiImplSession(requests.Session):
 
 
 class ApiImpl:
-    data_timezone = dt.UTC
-    temperature_range = None
+    data_timezone: dt.tzinfo = dt.UTC
+    temperature_range: Sequence[float] | None = None
     previous_latitude: float = None
     previous_longitude: float = None
     supports_window_control: bool = False
