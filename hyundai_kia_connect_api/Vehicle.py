@@ -236,22 +236,22 @@ class Vehicle:
     # energy consumed and regenerated since the vehicle was paired with the account
     # (so not necessarily for the vehicle's lifetime)
     # expressed in watt-hours (Wh)
-    total_power_consumed: float = None  # Europe feature only
-    total_power_regenerated: float = None  # Europe feature only
+    total_power_consumed: float | None = None  # Europe feature only
+    total_power_regenerated: float | None = None  # Europe feature only
     # energy consumed in the last ~30 days
     # expressed in watt-hours (Wh)
-    power_consumption_30d: float = None  # Europe feature only
+    power_consumption_30d: float | None = None  # Europe feature only
 
     # feature only available for some regions (getter/setter for sorting)
     _daily_stats: list[DailyDrivingStats] = field(default_factory=list)
 
     # Other statuses from KiaCA logs
-    accessory_on: bool = None
-    ign3: bool = None
-    remote_ignition: bool = None
+    accessory_on: bool | None = None
+    ign3: bool | None = None
+    remote_ignition: bool | None = None
     transmission_condition: int | None = None
     gear_position: int | None = None  # raw Transmission.GearPosition
-    sleep_mode_check: bool = None
+    sleep_mode_check: bool | None = None
     auto_cut_battery_prewarning_on: bool | None = None
 
     # Charge-complete alarm options (GSPA ChargingInformation.Setting.
@@ -275,18 +275,18 @@ class Vehicle:
 
     # Lamp status fields (KiaUvoApiEU and CA)
     headlamp_status: int | None = None
-    headlamp_left_low: bool = None
-    headlamp_right_low: bool = None
-    headlamp_left_high: bool = None
-    headlamp_right_high: bool = None
-    headlamp_left_bifunc: bool = None
-    headlamp_right_bifunc: bool = None
-    stop_lamp_left: bool = None
-    stop_lamp_right: bool = None
-    turn_signal_left_front: bool = None
-    turn_signal_right_front: bool = None
-    turn_signal_left_rear: bool = None
-    turn_signal_right_rear: bool = None
+    headlamp_left_low: bool | None = None
+    headlamp_right_low: bool | None = None
+    headlamp_left_high: bool | None = None
+    headlamp_right_high: bool | None = None
+    headlamp_left_bifunc: bool | None = None
+    headlamp_right_bifunc: bool | None = None
+    stop_lamp_left: bool | None = None
+    stop_lamp_right: bool | None = None
+    turn_signal_left_front: bool | None = None
+    turn_signal_right_front: bool | None = None
+    turn_signal_left_rear: bool | None = None
+    turn_signal_right_rear: bool | None = None
     hazard_lights_on: bool | None = None
 
     # GSPA cabin extras (flat CCS2 schema)
@@ -308,7 +308,7 @@ class Vehicle:
         self._daily_stats = result
 
     # feature only available for some regions (getter/setter for sorting)
-    _month_trip_info: MonthTripInfo = None
+    _month_trip_info: MonthTripInfo | None = None
 
     @property
     def month_trip_info(self):
@@ -328,7 +328,7 @@ class Vehicle:
         self._month_trip_info = result
 
     # feature only available for some regions (getter/setter for sorting)
-    _day_trip_info: DayTripInfo = None
+    _day_trip_info: DayTripInfo | None = None
 
     @property
     def day_trip_info(self):
@@ -347,49 +347,49 @@ class Vehicle:
             _LOGGER.debug(f"after day_trip_info: {result}")
         self._day_trip_info = result
 
-    ev_battery_percentage: int = None
-    ev_battery_pack_voltage: int = None
-    ev_battery_chiller_rpm: int = None
-    ev_battery_heating_state: bool = None
-    _ev_battery_water_temperature: int = None
-    _ev_battery_water_temperature_value: int = None
-    _ev_battery_water_temperature_unit: str = None
+    ev_battery_percentage: int | None = None
+    ev_battery_pack_voltage: int | None = None
+    ev_battery_chiller_rpm: int | None = None
+    ev_battery_heating_state: bool | None = None
+    _ev_battery_water_temperature: int | None = None
+    _ev_battery_water_temperature_value: int | None = None
+    _ev_battery_water_temperature_unit: str | None = None
 
-    _ev_battery_temperature_min: int = None
-    _ev_battery_temperature_min_value: int = None
-    _ev_battery_temperature_min_unit: str = None
+    _ev_battery_temperature_min: int | None = None
+    _ev_battery_temperature_min_value: int | None = None
+    _ev_battery_temperature_min_unit: str | None = None
 
-    _ev_battery_temperature_max: int = None
-    _ev_battery_temperature_max_value: int = None
-    _ev_battery_temperature_max_unit: str = None
-    ev_battery_winter_mode: bool = None
-    ev_battery_soh_percentage: int = None
-    ev_battery_remain: int = None
-    ev_battery_capacity: int = None
-    ev_battery_is_charging: bool = None
-    ev_battery_is_plugged_in: bool = None
+    _ev_battery_temperature_max: int | None = None
+    _ev_battery_temperature_max_value: int | None = None
+    _ev_battery_temperature_max_unit: str | None = None
+    ev_battery_winter_mode: bool | None = None
+    ev_battery_soh_percentage: int | None = None
+    ev_battery_remain: int | None = None
+    ev_battery_capacity: int | None = None
+    ev_battery_is_charging: bool | None = None
+    ev_battery_is_plugged_in: bool | None = None
 
-    _ev_driving_range: float = None
-    _ev_driving_range_value: float = None
-    _ev_driving_range_unit: str = None
+    _ev_driving_range: float | None = None
+    _ev_driving_range_value: float | None = None
+    _ev_driving_range_unit: str | None = None
 
-    _ev_estimated_current_charge_duration: int = None
-    _ev_estimated_current_charge_duration_value: int = None
-    _ev_estimated_current_charge_duration_unit: str = None
+    _ev_estimated_current_charge_duration: int | None = None
+    _ev_estimated_current_charge_duration_value: int | None = None
+    _ev_estimated_current_charge_duration_unit: str | None = None
 
-    _ev_estimated_fast_charge_duration: int = None
-    _ev_estimated_fast_charge_duration_value: int = None
-    _ev_estimated_fast_charge_duration_unit: str = None
+    _ev_estimated_fast_charge_duration: int | None = None
+    _ev_estimated_fast_charge_duration_value: int | None = None
+    _ev_estimated_fast_charge_duration_unit: str | None = None
 
-    _ev_estimated_portable_charge_duration: int = None
-    _ev_estimated_portable_charge_duration_value: int = None
-    _ev_estimated_portable_charge_duration_unit: str = None
+    _ev_estimated_portable_charge_duration: int | None = None
+    _ev_estimated_portable_charge_duration_value: int | None = None
+    _ev_estimated_portable_charge_duration_unit: str | None = None
 
-    ev_battery_precondition_enabled: bool = None
+    ev_battery_precondition_enabled: bool | None = None
 
-    _ev_estimated_station_charge_duration: int = None
-    _ev_estimated_station_charge_duration_value: int = None
-    _ev_estimated_station_charge_duration_unit: str = None
+    _ev_estimated_station_charge_duration: int | None = None
+    _ev_estimated_station_charge_duration_value: int | None = None
+    _ev_estimated_station_charge_duration_unit: str | None = None
 
     _ev_target_range_charge_AC: float | None = None
     _ev_target_range_charge_AC_value: float | None = None
@@ -433,18 +433,18 @@ class Vehicle:
     ev_schedule_charge_enabled: bool | None = None
 
     # IC fields (PHEV/HEV/IC)
-    _fuel_driving_range: float = None
-    _fuel_driving_range_value: float = None
-    _fuel_driving_range_unit: str = None
-    fuel_level: float = None
+    _fuel_driving_range: float | None = None
+    _fuel_driving_range_value: float | None = None
+    _fuel_driving_range_unit: str | None = None
+    fuel_level: float | None = None
 
-    fuel_level_is_low: bool = None
+    fuel_level_is_low: bool | None = None
 
     # Calculated fields
     engine_type: ENGINE_TYPES | None = None
 
     # Debug fields
-    data: dict = None
+    data: dict | None = None
 
     @property
     def geocode(self):
