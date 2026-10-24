@@ -12,7 +12,13 @@ from urllib.parse import parse_qs, urljoin, urlparse
 
 from requests import Response
 
-from .ApiImpl import ApiImplSession, ClimateRequestOptions, WindowRequestOptions
+from .ApiImpl import (
+    ApiImplSession,
+    ClimateRequestOptions,
+    POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
 from .ApiImplType1 import (
     ApiImplType1,
     _check_response_for_errors,
@@ -24,6 +30,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
+    VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
@@ -757,6 +764,56 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             )
 
         return data.get("msgId")
+
+    # Commands below are inherited from ApiImplType1 but have no BR endpoint
+    # (the inherited versions build URLs from SPA_API_URL, which BR never
+    # sets), so they raise NotImplementedError like the ApiImpl base.
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("start_charge is not implemented for Brazil")
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("stop_charge is not implemented for Brazil")
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        raise NotImplementedError("set_charging_current is not implemented for Brazil")
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        raise NotImplementedError("set_charge_limits is not implemented for Brazil")
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        raise NotImplementedError(
+            "set_vehicle_to_load_discharge_limit is not implemented for Brazil"
+        )
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_charging_and_climate is not implemented for Brazil"
+        )
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "start_hazard_lights_and_horn is not implemented for Brazil"
+        )
+
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        raise NotImplementedError("set_navigation is not implemented for Brazil")
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        raise NotImplementedError("valet_mode_action is not implemented for Brazil")
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str
