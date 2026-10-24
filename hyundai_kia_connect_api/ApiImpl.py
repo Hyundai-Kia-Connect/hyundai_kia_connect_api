@@ -74,7 +74,7 @@ class WindowRequestOptions:
     rear_right_curtain: WINDOW_STATE | None = None
     driver_seat_location: SEAT_LOCATION | None = None  # drvSeatLoc override
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Convert string/int values to WINDOW_STATE enums."""
         self.back_left = to_int_enum(WINDOW_STATE, self.back_left)
         self.back_right = to_int_enum(WINDOW_STATE, self.back_right)
@@ -380,6 +380,7 @@ def _fill_schedule_options_from_vehicle(
                 missing=missing,
             )
         # Mirror first departure climate fields to top-level for backward compatibility
+        assert options.first_departure is not None  # filled in by the loop above
         if options.climate_enabled is None:
             options.climate_enabled = options.first_departure.climate_enabled
         if options.temperature is None:
@@ -395,8 +396,8 @@ def _fill_schedule_options_from_vehicle(
 
 @dataclass
 class POICoord:
-    lat: float = None
-    lon: float = None
+    lat: float | None = None
+    lon: float | None = None
     alt: int = 0
     type: int = 0
 
@@ -407,23 +408,24 @@ class POIInfo:
     waypoint_id: int = 1
     lang: int = 1
     src: str = "HERE"
-    coord: POICoord = None
+    coord: POICoord | None = None
     addr: str = ""
     zip: str = ""
     place_id: str = ""
     name: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
+        coord = self.coord or POICoord()
         return {
             "phone": self.phone,
             "waypointID": self.waypoint_id,
             "lang": self.lang,
             "src": self.src,
             "coord": {
-                "lat": self.coord.lat,
-                "alt": self.coord.alt,
-                "lon": self.coord.lon,
-                "type": self.coord.type,
+                "lat": coord.lat,
+                "alt": coord.alt,
+                "lon": coord.lon,
+                "type": coord.type,
             },
             "addr": self.addr,
             "zip": self.zip,
@@ -432,7 +434,7 @@ class POIInfo:
         }
 
 
-class ApiImplSession(requests.Session):
+class ApiImplSession(requests.Session):  # type: ignore[misc]
     """Shared HTTP session with default timeout and connection pooling.
 
     All regions should use this session (or a subclass) for HTTP calls.
@@ -447,7 +449,7 @@ class ApiImplSession(requests.Session):
     HTTP_CONNECT_TIMEOUT = 10
     HTTP_READ_TIMEOUT = 30
 
-    def request(self, method, url, **kwargs):
+    def request(self, method: str, url: str, **kwargs: object) -> requests.Response:
         kwargs.setdefault(
             "timeout", (self.HTTP_CONNECT_TIMEOUT, self.HTTP_READ_TIMEOUT)
         )
@@ -462,8 +464,8 @@ class ApiImplSession(requests.Session):
 class ApiImpl:
     data_timezone: dt.tzinfo = dt.UTC
     temperature_range: Sequence[float] | None = None
-    previous_latitude: float = None
-    previous_longitude: float = None
+    previous_latitude: float | None = None
+    previous_longitude: float | None = None
     supports_window_control: bool = False
     supports_valet_mode: bool = False
     supports_svm: bool = False
