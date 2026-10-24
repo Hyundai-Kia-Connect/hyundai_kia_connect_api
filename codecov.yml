@@ -1,0 +1,62 @@
+# Informational for now: statuses report but never fail a PR.
+coverage:
+    status:
+        project:
+            default:
+                informational: true
+        patch:
+            default:
+                target: 80%
+                informational: true
+
+comment:
+    layout: "diff, components, files"
+
+# Per-region coverage, so weakly tested regions stay visible.
+component_management:
+    individual_components:
+        - component_id: shared
+          name: shared
+          paths:
+              - hyundai_kia_connect_api/ApiImpl.py
+              - hyundai_kia_connect_api/ApiImplType1.py
+              - hyundai_kia_connect_api/Vehicle.py
+              - hyundai_kia_connect_api/VehicleManager.py
+              - hyundai_kia_connect_api/utils.py
+        - component_id: au
+          name: au
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiAU.py
+        - component_id: br
+          name: br
+          paths:
+              - hyundai_kia_connect_api/HyundaiBlueLinkApiBR.py
+        - component_id: ca
+          name: ca
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiCA.py
+        - component_id: cn
+          name: cn
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiCN.py
+        - component_id: eu
+          name: eu
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiEU.py
+        - component_id: gspa
+          name: gspa
+          paths:
+              - hyundai_kia_connect_api/GspaApiEU.py
+              - hyundai_kia_connect_api/KiaCciApiEU.py
+              - hyundai_kia_connect_api/HyundaiCciApiEU.py
+              - hyundai_kia_connect_api/cci_fingerprint.py
+              - hyundai_kia_connect_api/gspa/**
+        - component_id: in
+          name: in
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiIN.py
+        - component_id: usa
+          name: usa
+          paths:
+              - hyundai_kia_connect_api/KiaUvoApiUSA.py
+              - hyundai_kia_connect_api/HyundaiBlueLinkApiUSA.py
