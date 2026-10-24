@@ -28,7 +28,6 @@ from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DOMAIN,
-    ENGINE_TYPES_BY_VEHICLE_TYPE,
     ORDER_STATUS,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
@@ -393,21 +392,10 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         _check_response_for_errors(response)
         if "resMsg" not in response or "vehicles" not in response.get("resMsg", {}):
             raise APIError("Missing resMsg or vehicles in response")
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
-                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            )
-            result.append(vehicle)
-
-        return result
+        return [
+            self._vehicle_from_spa_entry(entry)
+            for entry in response["resMsg"]["vehicles"]
+        ]
 
     def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         """Return the server-cached CCS2 vehicle status (does not wake the car).

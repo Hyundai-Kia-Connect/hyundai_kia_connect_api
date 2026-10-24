@@ -187,22 +187,24 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
         _check_response_for_errors(response)
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
-                # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
-                # those vehicles on the legacy status path.
-                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            )
-            result.append(vehicle)
-        return result
+        return [
+            self._vehicle_from_spa_entry(entry)
+            for entry in response["resMsg"]["vehicles"]
+        ]
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        return Vehicle(
+            id=entry["vehicleId"],
+            name=entry["nickname"],
+            model=entry["vehicleName"],
+            registration_date=entry["regDate"],
+            VIN=entry["vin"],
+            timezone=self.data_timezone,
+            engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
+            # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
+            # those vehicles on the legacy status path.
+            ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
+        )
 
     def _get_time_from_string(self, value, timesection) -> dt.time | None:
         if value is None:
