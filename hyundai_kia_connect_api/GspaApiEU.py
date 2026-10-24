@@ -1805,7 +1805,11 @@ class GspaApiEU(ApiImpl):
                     _pu_raw,
                 )
                 vehicle.tire_pressure_unit = None
-        _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+        _scale = (
+            PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+            if vehicle.tire_pressure_unit is not None
+            else None
+        )
         _pfl = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         )
@@ -3026,6 +3030,7 @@ class GspaApiEU(ApiImpl):
         set_default_departure_options(options.first_departure)
         set_default_departure_options(options.second_departure)
         departures = [options.first_departure, options.second_departure]
+        departure_times = [d.time or dt.time() for d in departures]
 
         if options.off_peak_start_time is None:
             options.off_peak_start_time = dt.time()
@@ -3055,9 +3060,9 @@ class GspaApiEU(ApiImpl):
                     "reservInfo": {
                         "day": departures[i].days,
                         "time": {
-                            "time": departures[i].time.strftime("%I%M"),
+                            "time": departure_times[i].strftime("%I%M"),
                             "timeSection": (
-                                1 if departures[i].time >= dt.time(12, 0) else 0
+                                1 if departure_times[i] >= dt.time(12, 0) else 0
                             ),
                         },
                     },

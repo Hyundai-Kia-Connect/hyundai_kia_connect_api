@@ -106,7 +106,7 @@ class SVMDetails:
     longitude: float | None = None
     heading: int | None = None
     speed: tuple[float | None, str | None] = (None, None)
-    door_open: dict[str, bool] | None = None
+    door_open: dict[str, bool | None] | None = None
     trunk_open: bool | None = None
     image_size: tuple[int, int] | None = None
     # Full imageSize array: panorama size followed by the width of each
