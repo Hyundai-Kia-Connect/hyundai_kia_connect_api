@@ -30,6 +30,15 @@ jobs:
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  python -m pip install -e .[image] pytest syrupy
+                  python -m pip install -e .[image] pytest pytest-cov syrupy
             - name: Run tests
-              run: pytest
+              run: pytest --cov=hyundai_kia_connect_api --cov-report=term-missing --cov-report=xml
+            # Coverage is the same on every Python version, so upload it once.
+            # Fork PRs have no secrets; the action then uploads tokenless.
+            - name: Upload coverage to Codecov
+              if: matrix.python-version == '3.13'
+              uses: codecov/codecov-action@v5
+              with:
+                  files: coverage.xml
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  fail_ci_if_error: false
