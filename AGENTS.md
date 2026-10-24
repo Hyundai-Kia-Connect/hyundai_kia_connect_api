@@ -81,5 +81,4 @@ pre-commit run --all-files   # ruff, ruff-format, codespell, pyupgrade, mypy --s
 - New fixtures must be anonymised: no VINs, tokens, emails, coordinates,
   or account IDs.
 - New code must pass `mypy --strict`.
-- Never commit credentials. `.env` is git-ignored, and `.env.example` shows
-  the expected variables.
+- Never commit credentials. `.env` is git-ignored.
