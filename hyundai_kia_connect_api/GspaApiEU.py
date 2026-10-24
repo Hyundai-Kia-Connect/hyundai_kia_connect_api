@@ -73,7 +73,6 @@ from .svm import (
     _parse_door_open,
     _parse_float_list,
     _parse_image_sizes,
-    _parse_int,
     redact_svm_metadata,
 )
 from .Token import Token
@@ -186,7 +185,7 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
         captured_at_raw=captured_at_raw if isinstance(captured_at_raw, str) else None,
         latitude=float_or_none(coord.get("lat")),
         longitude=float_or_none(coord.get("lon")),
-        heading=_parse_int(gps.get("head")),
+        heading=int_or_none(gps.get("head")),
         speed=(float_or_none(speed.get("value")), speed.get("unit")),
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
