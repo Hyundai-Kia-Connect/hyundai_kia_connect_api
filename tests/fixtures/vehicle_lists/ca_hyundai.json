@@ -1,0 +1,86 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "brand": "Hyundai",
+        "endpoint": "tods/api/vhcllst",
+        "vehicles": "2021 Kona EV (EV), 2020 Kona EV (EV, response without modelName/modelYear), 2024 Kona EV (EV, newer response with V2L/precondition options)",
+        "source": "Get Vehicles Response debug logs in kia_uvo #459 (2021 Kona EV) and #1041 (2020 Kona EV), #899 (2024 Kona EV)",
+        "description": "Real vehicle lists. Identifiers replaced, photoUrl removed; #1041's defaultVehicle set false since both are merged into one list."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "vehicles": [
+            {
+                "vehicleId": "VEHICLE-1",
+                "nickName": "Kona VÉ",
+                "modelCode": "KE1SEFEMEX51",
+                "modelName": "KONA EV",
+                "modelYear": "2021",
+                "fuelKindCode": "E",
+                "trim": "Preferred Two-Tone",
+                "engine": "",
+                "exteriorColor": "Y21",
+                "dtcCount": 0,
+                "subscriptionStatus": "A",
+                "subscriptionEndDate": "20240715",
+                "mileageForNextService": 5082.0,
+                "daysForNextService": "20230219",
+                "overviewMessage": "",
+                "defaultVehicle": true,
+                "enrollmentStatus": "4",
+                "genType": "G3",
+                "valetParkingModeOn": 1,
+                "vin": "TESTVIN0000000001"
+            },
+            {
+                "vehicleId": "VEHICLE-2",
+                "nickName": "KONA EV",
+                "fuelKindCode": "E",
+                "trim": "Preferred -",
+                "engine": "",
+                "exteriorColor": "SS7",
+                "dtcCount": 0,
+                "subscriptionStatus": "A",
+                "subscriptionEndDate": "20230630",
+                "mileageForNextService": 10978.699999999997,
+                "daysForNextService": "20250630",
+                "overviewMessage": "",
+                "defaultVehicle": false,
+                "enrollmentStatus": "4",
+                "genType": "G0",
+                "valetParkingModeOn": 1,
+                "vin": "TESTVIN0000000002"
+            },
+            {
+                "vehicleId": "VEHICLE-3",
+                "nickName": "KONA EV",
+                "modelCode": "KE2SEFEMEP20",
+                "modelName": "KONA EV",
+                "modelYear": "2024",
+                "fuelKindCode": "E",
+                "trim": "Preferred -",
+                "engine": "",
+                "exteriorColor": "RRR",
+                "dtcCount": 0,
+                "subscriptionStatus": "A",
+                "subscriptionEndDate": "20270531",
+                "mileageForNextService": 11999.2,
+                "daysForNextService": "20250626",
+                "overviewMessage": "",
+                "defaultVehicle": false,
+                "enrollmentStatus": "4",
+                "genType": "G3",
+                "valetParkingModeOn": 1,
+                "mainBatteryType": 0,
+                "chrgPortDoorOption": 0,
+                "v2loption": 0,
+                "v2lSetSocOption": 1,
+                "preConditioningOption": 2,
+                "vin": "TESTVIN0000000003"
+            }
+        ]
+    }
+}

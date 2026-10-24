@@ -18,6 +18,12 @@ This directory contains JSON files representing real API response shapes from th
 | AU           | `KiaUvoApiAU._update_vehicle_properties`               | `au_`                   | `status.*`                                         |
 | CN           | `KiaUvoApiCN._update_vehicle_properties`               | `cn_`                   | `status.*`                                         |
 
+## Vehicle lists
+
+`vehicle_lists/` holds one real vehicle-list response per implementation, named after its key in `IMPLEMENTATIONS` in `tests/test_vehicle_list_snapshots.py` (`eu_hyundai.json`, `usa_kia.json`, ...). That test runs `get_vehicles` and `refresh_vehicles` on each one and snapshots the requests sent and the Vehicle fields set.
+
+Use captured responses only, such as the `Get Vehicles Response` debug log line, which Type1 (EU/AU/CN/IN), CA, Kia USA and Hyundai USA print. BR and the EU CCI (GSPA) classes don't log this response. Several captures may be merged into one file's vehicle list. Each file has a `_fixture_meta` block with `region`, `brand`, `endpoint`, `vehicles`, `source` (where each capture came from) and `description`. Replace VINs, vehicle ids, keys and registration ids with placeholders such as `TESTVIN0000000001` and `VEHICLE-1`, and drop account, driver and address blocks. Then run `pytest tests/test_vehicle_list_snapshots.py --snapshot-update`.
+
 ## Naming Convention
 
 ```
