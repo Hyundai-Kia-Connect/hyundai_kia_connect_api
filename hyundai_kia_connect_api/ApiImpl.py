@@ -3,8 +3,8 @@
 # pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,logging-fstring-interpolation
 import datetime as dt
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TypeVar
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -40,16 +40,16 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ClimateRequestOptions:
-    set_temp: float = None
-    duration: int = None
-    defrost: bool = None
-    climate: bool = None
-    heating: int = None
-    front_left_seat: int = None
-    front_right_seat: int = None
-    rear_left_seat: int = None
-    rear_right_seat: int = None
-    steering_wheel: int = None
+    set_temp: float | None = None
+    duration: int | None = None
+    defrost: bool | None = None
+    climate: bool | None = None
+    heating: int | None = None
+    front_left_seat: int | None = None
+    front_right_seat: int | None = None
+    rear_left_seat: int | None = None
+    rear_right_seat: int | None = None
+    steering_wheel: int | None = None
     side_rear_mirror_heating: int | None = (
         None  # 0/1 rear-mirror heating (GSPA sideRearMirrorHeating)
     )
@@ -66,10 +66,10 @@ class WindowRequestOptions:
     # ones. The GSPA window-curtain endpoint's seat-based body keys
     # (drvSeatWindow/psgSeatWindow) are derived from these in the API
     # implementation using drvSeatLoc — callers never touch seat keys.
-    back_left: WINDOW_STATE = None
-    back_right: WINDOW_STATE = None
-    front_left: WINDOW_STATE = None
-    front_right: WINDOW_STATE = None
+    back_left: WINDOW_STATE | None = None
+    back_right: WINDOW_STATE | None = None
+    front_left: WINDOW_STATE | None = None
+    front_right: WINDOW_STATE | None = None
     rear_left_curtain: WINDOW_STATE | None = None
     rear_right_curtain: WINDOW_STATE | None = None
     driver_seat_location: SEAT_LOCATION | None = None  # drvSeatLoc override
@@ -109,27 +109,27 @@ class ScheduleChargingClimateRequestOptions:
     class DepartureOptions:
         """Per-departure schedule options; climate fields override top-level defaults on platforms with per-slot HVAC (see #1302)."""
 
-        enabled: bool = None
-        days: list[int] = None  # Sun=0, Mon=1, ..., Sat=6
-        time: dt.time = None
-        climate_enabled: bool = None
-        temperature: float = None
-        defrost: bool = None
+        enabled: bool | None = None
+        days: list[int] | None = None  # Sun=0, Mon=1, ..., Sat=6
+        time: dt.time | None = None
+        climate_enabled: bool | None = None
+        temperature: float | None = None
+        defrost: bool | None = None
 
-    first_departure: DepartureOptions = None
-    second_departure: DepartureOptions = None
-    charging_enabled: bool = None
-    off_peak_start_time: dt.time = None
-    off_peak_end_time: dt.time = None
-    off_peak_charge_only_enabled: bool = None
-    climate_enabled: bool = None
-    temperature: float = None
+    first_departure: DepartureOptions | None = None
+    second_departure: DepartureOptions | None = None
+    charging_enabled: bool | None = None
+    off_peak_start_time: dt.time | None = None
+    off_peak_end_time: dt.time | None = None
+    off_peak_charge_only_enabled: bool | None = None
+    climate_enabled: bool | None = None
+    temperature: float | None = None
     # Deprecated (no-op): the temperature unit is always resolved from the
     # vehicle's reported settings. The field is kept for backward
     # compatibility with callers that still pass it and will be removed in a
     # future version (#1303 review).
-    temperature_unit: int = None
-    defrost: bool = None
+    temperature_unit: int | None = None
+    defrost: bool | None = None
 
     @classmethod
     def from_vehicle(cls, vehicle: Vehicle) -> "ScheduleChargingClimateRequestOptions":
@@ -143,9 +143,6 @@ class ScheduleChargingClimateRequestOptions:
             options, vehicle, scopes=("charge", "climate")
         )
         return options
-
-
-_T = TypeVar("_T")
 
 
 def _schedule_charging_scopes(
@@ -225,13 +222,13 @@ def _guard_schedule_temperature(
         )
 
 
-def _fill_option_value(  # noqa: UP047  # TypeVar required for py3.10 floor
-    current: _T | None,
-    source: _T | None,
-    default: _T,
+def _fill_option_value[T](
+    current: T | None,
+    source: T | None,
+    default: T,
     label: str,
     missing: list[str],
-) -> _T:
+) -> T:
     """None = leave unchanged: explicit value, else vehicle value, else default.
 
     Falls back to ``default`` and records ``label`` in ``missing`` when the
@@ -463,8 +460,8 @@ class ApiImplSession(requests.Session):
 
 
 class ApiImpl:
-    data_timezone = dt.UTC
-    temperature_range = None
+    data_timezone: dt.tzinfo = dt.UTC
+    temperature_range: Sequence[float] | None = None
     previous_latitude: float = None
     previous_longitude: float = None
     supports_window_control: bool = False

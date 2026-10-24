@@ -302,7 +302,7 @@ def test_region1_ccs_exchange_falls_back_to_legacy(mock_post):
         _resp(400, GATE_BODY),
         _resp(200, '{"accessToken":"ccs-legacy","expiresTime":86400}'),
     ]
-    ccs_token, valid_until = _eu_api(brand=2)._exchange_ccs_token(  # noqa: RUF059
+    ccs_token, _valid_until = _eu_api(brand=2)._exchange_ccs_token(
         "dev-1", "Bearer cci-at", "non-ccs-token", ""
     )
     assert ccs_token == "ccs-legacy"

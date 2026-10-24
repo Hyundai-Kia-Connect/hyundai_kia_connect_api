@@ -23,6 +23,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LOGIN_TOKEN_LIFETIME,
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
@@ -36,6 +37,10 @@ from .Vehicle import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Trip details kept in memory; a busy month is well under this.
+TRIP_DETAIL_CACHE_SIZE = 200
 
 
 class KiaUvoApiIN(ApiImplType1):
@@ -76,6 +81,7 @@ class KiaUvoApiIN(ApiImplType1):
         self.SPA_API_URL_V2: str = "https://" + self.BASE_URL + "/api/v2/spa/"
 
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
+        self._trip_detail_cache: dict[tuple[str, str], TripInfo] = {}
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
@@ -111,11 +117,15 @@ class KiaUvoApiIN(ApiImplType1):
         if authorization_code is None:
             raise AuthenticationError("Login Failed")
 
-        _, access_token, authorization_code = self._get_access_token(
+        _, access_token, refresh_token, expires_in = self._get_access_token(
             stamp, authorization_code
         )
-        _, refresh_token = self._get_refresh_token(stamp, authorization_code)
-        valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=23)
+        if expires_in is not None:
+            valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+                seconds=int(expires_in)
+            )
+        else:
+            valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
 
         return Token(
             username=username,
@@ -548,8 +558,9 @@ class KiaUvoApiIN(ApiImplType1):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
-    # The "/tripinfo" API in Bluelink India does not provide complete trip info. It just returns the summary info. Instead, it uses the "/tripinfo/detail" API to fetch the trip details.
-    # PS: Since I have tested in Hyundai EV vehicle only, have added check to use the API only for EV vehicles. Can remove the check based on testing on non-EV vehicles
+    # The "/tripinfo" day API in India lists trips with start/end times only;
+    # the per-trip figures come from "/tripinfo/detail". Verified on Hyundai
+    # EVs and a Kia Seltos (ICE); other Hyundai engine types are untested.
     def _get_detailed_trip_info(
         self,
         token: Token,
@@ -558,10 +569,15 @@ class KiaUvoApiIN(ApiImplType1):
         trip: dict,
     ) -> TripInfo | None:
         if (
-            vehicle.engine_type != ENGINE_TYPES.EV
-            or BRANDS[self.brand] != BRAND_HYUNDAI
+            BRANDS[self.brand] == BRAND_HYUNDAI
+            and vehicle.engine_type != ENGINE_TYPES.EV
         ):
             return None
+
+        # A finished trip never changes, so fetch each one's detail once.
+        cache_key = (vehicle.id, str(trip["serviceTID"]))
+        if cache_key in self._trip_detail_cache:
+            return self._trip_detail_cache[cache_key]
 
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo/detail"
         payload = {
@@ -580,16 +596,24 @@ class KiaUvoApiIN(ApiImplType1):
             ),
         )
         response = response.json()
+        _check_response_for_errors(response)
         tripinfo = response["resMsg"]["tripInfo"]
         processed_trip = TripInfo(
             hhmmss=trip["tripStartTime"][8:],
+            end_hhmmss=trip["tripEndTime"][8:],
             drive_time=tripinfo["tripDrvTime"],
             idle_time=tripinfo["tripIdleTime"],
             distance=tripinfo["tripDist"],
             avg_speed=tripinfo["tripAvgSpeed"],
             max_speed=tripinfo["tripMaxSpeed"],
+            hard_braking_count=tripinfo.get("tripHardBreakingTime"),
+            rapid_acceleration_count=tripinfo.get("tripRapidAccelationTime"),
+            excessive_speed_count=tripinfo.get("tripExcessiveSpeedTime"),
         )
 
+        if len(self._trip_detail_cache) >= TRIP_DETAIL_CACHE_SIZE:
+            self._trip_detail_cache.pop(next(iter(self._trip_detail_cache)))
+        self._trip_detail_cache[cache_key] = processed_trip
         return processed_trip
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
@@ -644,8 +668,12 @@ class KiaUvoApiIN(ApiImplType1):
 
         token_type = response["token_type"]
         access_token = token_type + " " + response["access_token"]
-        authorization_code = response["refresh_token"]
-        return token_type, access_token, authorization_code
+        # Keep the refresh token verbatim: the oauth2/token refresh_token grant
+        # rejects "Bearer "-prefixed values and access tokens in the
+        # refresh_token slot with 4002 "Invalid parameters".
+        refresh_token = response["refresh_token"]
+        expires_in = response.get("expires_in")
+        return token_type, access_token, refresh_token, expires_in
 
     def get_last_updated_at(self, value) -> dt.datetime:
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - before {value}")
@@ -666,25 +694,7 @@ class KiaUvoApiIN(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - last_updated_at - after {value}")
         return value
 
-    def _get_refresh_token(self, stamp, authorization_code):
-        # Get Refresh Token #
-        url = self.USER_API_URL + "oauth2/token"
-        headers = {
-            "Authorization": self.BASIC_AUTHORIZATION,
-            "Stamp": stamp,
-            "Content-type": "application/x-www-form-urlencoded",
-            "Host": self.BASE_URL,
-            "Connection": "close",
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-
-        data = (
-            "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
-            + authorization_code
-        )
-        response = self.session.post(url, data=data, headers=headers)
-        response = response.json()
-        token_type = response["token_type"]
-        refresh_token = token_type + " " + response["access_token"]
-        return token_type, refresh_token
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """IN sends the Stamp header on the refresh_token grant, as its
+        login flow always has."""
+        return {"Stamp": self._get_stamp()}

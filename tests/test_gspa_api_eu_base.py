@@ -8,6 +8,7 @@ import pytest
 
 from hyundai_kia_connect_api.exceptions import APIError
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -58,9 +59,9 @@ def test_hyundai_ccsp_api_url_derived():
 def test_base_stamp_uses_brand_cipher():
     """_get_stamp delegates to the brand-specific cipher instance."""
     api = HyundaiCciApiEU(9, 2, "en")
-    assert api._cipher is not None
+    assert api._get_cipher() is not None  # lazy: first use = load
     # Stamp is base64 and non-empty for valid inputs
-    stamp = api._cipher.compute_x_stamp(
+    stamp = api._get_cipher().compute_x_stamp(
         region=1, tsid="AAAAAAAAAAAAAAAA", epoch_seconds=1700000000, user_id="u1"
     )
     assert len(stamp) > 0
@@ -206,3 +207,31 @@ def test_get_software_version_returns_data():
     assert mock_get.call_args[0][0].endswith(
         "/gspa/v1/device-info/vehicles/test123/software-version"
     )
+
+
+def test_manager_init_does_not_read_cipher_files(monkeypatch):
+    """#1388: constructing the manager must not read the cipher JSON files —
+    kia_uvo builds the manager inside async_setup_entry (event loop), so the
+    read belongs to the first stamp use instead."""
+    from hyundai_kia_connect_api.gspa import cipher_keys
+
+    reads: list[str] = []
+    orig = cipher_keys._load_json
+
+    def counting(filename: str):
+        reads.append(filename)
+        return orig(filename)
+
+    monkeypatch.setattr(cipher_keys, "_load_json", counting)
+    # reset the module singletons so this test observes its own loads
+    monkeypatch.setattr(cipher_keys, "_hyundai_cipher", None)
+    monkeypatch.setattr(cipher_keys, "_kia_cipher", None)
+    HyundaiCciApiEU(9, 2, "en")
+    KiaCciApiEU(9, 1, "en")
+    assert reads == []  # nothing read during construction
+
+    api = HyundaiCciApiEU(9, 2, "en")
+    api._get_cipher()  # first cipher use
+    assert sorted(reads) == ["hyundai_cipher_params.json"]
+    api._get_cipher()  # singleton: no second read
+    assert sorted(reads) == ["hyundai_cipher_params.json"]

@@ -58,6 +58,7 @@ import math
 import re
 import uuid
 from time import sleep
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ClimateRequestOptions
@@ -102,7 +103,7 @@ USER_AGENT_BLUELINK_CN: str = "BlueLink/109 CFNetwork/3896.100.1.2.1 Darwin/27.0
 # no actionable signal and are ignored here.
 
 
-def _extract_uars_login_bundle(html: str) -> dict:
+def _extract_uars_login_bundle(html: str) -> dict[str, Any]:
     """Extract the UARS login token bundle embedded in the callback HTML page.
 
     The ``loginCallback.do`` response embeds a JSON document inside a JS
@@ -125,7 +126,7 @@ def _extract_uars_login_bundle(html: str) -> dict:
         except ValueError:
             continue
         if candidate.get("data", {}).get("uarsToken"):
-            return candidate
+            return cast(dict[str, Any], candidate)
     # Fallback: brace-matched scan for any JSON containing a uarsToken.
     # Walk outward from the nearest "{" so both the bare data object and the
     # full wrapper are recognised (normalised to {"data": ...} on return).
@@ -147,7 +148,7 @@ def _extract_uars_login_bundle(html: str) -> dict:
                         except ValueError:
                             break
                         if candidate.get("data", {}).get("uarsToken"):
-                            return candidate
+                            return cast(dict[str, Any], candidate)
                         if candidate.get("uarsToken"):
                             # bare data object (matched from its own "{")
                             return {"data": candidate}
@@ -178,10 +179,10 @@ class KiaUvoApiCN(ApiImplType1):
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "5519a969-295f-4c5a-a27e-9d9fab2bd50c"
         elif brand_name == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
-            self.UARS_DOMAIN: str = "uars-h.hmgmobility.com.cn"
-            self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
-            self.APP_ID: str = "b09e4d17-c30c-40f1-a1ec-8ac11d6665cf"
+            self.BASE_DOMAIN = "prd.cn-ccapi.hyundai.com"
+            self.UARS_DOMAIN = "uars-h.hmgmobility.com.cn"
+            self.CCSP_SERVICE_ID = "72b3d019-5bc7-443d-a437-08f307cf06e2"
+            self.APP_ID = "b09e4d17-c30c-40f1-a1ec-8ac11d6665cf"
         else:
             raise ValueError(f"Unsupported brand for the China region: {brand!r}")
         # DIFFERENCE vs old implementation: the old APP_IDs (eea8762c---for Kia,
@@ -198,7 +199,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         # Per-username UARS state (uarsToken/tokenCode/profile).  Kept off the
         # Token dataclass because Token is shared across all regions.
-        self._uars_state: dict[str, dict] = {}
+        self._uars_state: dict[str, dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Headers
@@ -210,7 +211,7 @@ class KiaUvoApiCN(ApiImplType1):
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         # DIFFERENCE vs old implementation: no Stamp header, CN app UA, and the
         # device id header is what the servers actually require.
         headers = {
@@ -227,7 +228,7 @@ class KiaUvoApiCN(ApiImplType1):
             headers["Ccuccs2protocolsupport"] = str(ccs2_support)
         return headers
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token)
 
     def _get_control_token(self, token: Token) -> tuple[str, float]:
@@ -306,7 +307,7 @@ class KiaUvoApiCN(ApiImplType1):
         if response.get("retCode") == "F":
             raise APIError(f"Device registration failed: {response.get('resMsg')}")
         device_id = response["resMsg"]["deviceId"]
-        return device_id
+        return cast(str, device_id)
 
     @staticmethod
     def _uars_state_param(device_uuid: str, interface_id: str) -> str:
@@ -323,7 +324,7 @@ class KiaUvoApiCN(ApiImplType1):
             .rstrip("=")
         )
 
-    def _exchange_uars_callback(self, redirect_url: str) -> dict:
+    def _exchange_uars_callback(self, redirect_url: str) -> dict[str, Any]:
         """Follow the UARS loginCallback.do redirect and harvest the tokens.
 
         The UARS server performs the OAuth code exchange server-side and
@@ -571,7 +572,9 @@ class KiaUvoApiCN(ApiImplType1):
     # The property mapping below is carried over from the previous
     # implementation unchanged: the live /status/latest response (verified on
     # a 2025 Custo) uses exactly the same field layout.
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
 
         response = self.session.get(
@@ -581,9 +584,9 @@ class KiaUvoApiCN(ApiImplType1):
         _check_response_for_errors(response)
         response = response["resMsg"]
 
-        return response
+        return cast(dict[str, Any], response)
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
@@ -594,12 +597,14 @@ class KiaUvoApiCN(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return cast(dict[str, Any], response["resMsg"])
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         # CN-UNVERIFIED: legacy "force refresh" path, presumed intact for
         # non-CCS2 vehicles (the cache endpoint /status/latest is verified).
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
@@ -629,7 +634,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -669,7 +674,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
@@ -682,7 +687,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -694,7 +699,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -706,7 +711,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -733,7 +738,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def check_action_status(
         self,
