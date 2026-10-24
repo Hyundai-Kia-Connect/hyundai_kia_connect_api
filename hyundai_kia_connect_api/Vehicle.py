@@ -117,6 +117,10 @@ class Vehicle:
     _outside_temperature_unit: str = None
 
     # Climate
+    # Request capabilities, available before the first valid temperature.
+    # They do not imply a measured temperature or that climate is running.
+    climate_temperature_unit: str | None = field(default=None, kw_only=True)
+    climate_temperature_step: float | None = field(default=None, kw_only=True)
     _air_temperature: float = None
     _air_temperature_value: float = None
     _air_temperature_unit: str = None

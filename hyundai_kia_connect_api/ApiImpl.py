@@ -467,6 +467,10 @@ class ApiImpl:
     supports_window_control: bool = False
     supports_valet_mode: bool = False
     supports_svm: bool = False
+    # Native units/increments for climate requests, when known independently
+    # of cached telemetry. None leaves consumers' existing fallbacks intact.
+    climate_temperature_unit: str | None = None
+    climate_temperature_step: float | None = None
 
     def __init__(self) -> None:
         """Initialize."""

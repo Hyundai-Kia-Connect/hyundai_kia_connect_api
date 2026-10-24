@@ -128,6 +128,8 @@ class VehicleManager:
             vehicle.supports_window_control = self.api.supports_window_control
             vehicle.supports_valet_mode = self.api.supports_valet_mode
             vehicle.supports_svm = self.api.supports_svm
+            vehicle.climate_temperature_unit = self.api.climate_temperature_unit
+            vehicle.climate_temperature_step = self.api.climate_temperature_step
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
