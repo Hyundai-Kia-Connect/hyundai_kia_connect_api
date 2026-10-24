@@ -38,7 +38,6 @@ from .svm import (
     _parse_door_open,
     _parse_float_list,
     _parse_image_sizes,
-    _parse_int,
     redact_svm_metadata,
 )
 from .Token import Token
@@ -46,6 +45,7 @@ from .utils import (
     float_or_none,
     get_child_value,
     get_float,
+    int_or_none,
     normalize_battery_soc,
     parse_datetime,
     pressure_or_none,
@@ -165,7 +165,7 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         captured_at_raw=captured_at_raw,
         latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
         longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
-        heading=_parse_int(get_child_value(detail, "gpsDetail.head")),
+        heading=int_or_none(get_child_value(detail, "gpsDetail.head")),
         speed=(speed_value, speed_unit),
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
