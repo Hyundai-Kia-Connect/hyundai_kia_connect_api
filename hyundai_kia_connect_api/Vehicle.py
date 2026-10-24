@@ -4,6 +4,7 @@
 import datetime
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from .const import DISTANCE_UNITS, ENGINE_TYPES, PRESSURE_UNITS, PressureUnit
 from .utils import float_or_none, get_float, get_safe_local_datetime
@@ -106,7 +107,7 @@ class Vehicle:
     timezone: datetime.timezone = datetime.UTC  # default UTC
 
     dtc_count: int | None = None
-    dtc_descriptions: dict | None = None
+    dtc_descriptions: dict[str, Any] | None = None
 
     smart_key_battery_warning_is_on: bool | None = None
     washer_fluid_warning_is_on: bool | None = None
@@ -406,8 +407,8 @@ class Vehicle:
     ev_first_departure_enabled: bool | None = None
     ev_second_departure_enabled: bool | None = None
 
-    ev_first_departure_days: list | None = None
-    ev_second_departure_days: list | None = None
+    ev_first_departure_days: list[int] | None = None
+    ev_second_departure_days: list[int] | None = None
 
     ev_first_departure_time: datetime.time | None = None
     ev_second_departure_time: datetime.time | None = None
@@ -444,7 +445,7 @@ class Vehicle:
     engine_type: ENGINE_TYPES | None = None
 
     # Debug fields
-    data: dict | None = None
+    data: dict[str, Any] | None = None
 
     @property
     def geocode(self):
@@ -477,19 +478,21 @@ class Vehicle:
     @property
     def tire_pressure_front_left_unit(self) -> str | None:
         """Display-unit label for tire pressure (shared across all tires)."""
+        if self.tire_pressure_unit is None:
+            return None
         return PRESSURE_UNITS.get(self.tire_pressure_unit)
 
     @property
     def tire_pressure_front_right_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self.tire_pressure_front_left_unit
 
     @property
     def tire_pressure_rear_left_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self.tire_pressure_front_left_unit
 
     @property
     def tire_pressure_rear_right_unit(self) -> str | None:
-        return PRESSURE_UNITS.get(self.tire_pressure_unit)
+        return self.tire_pressure_front_left_unit
 
     @property
     def next_service_distance(self):
@@ -529,9 +532,10 @@ class Vehicle:
             and newest_updated_at < previous_updated_at
         ):
             utcoffset = newest_updated_at.utcoffset()
-            newest_updated_at_corrected = newest_updated_at + utcoffset
-            if newest_updated_at_corrected >= previous_updated_at:
-                newest_updated_at = newest_updated_at_corrected
+            if utcoffset is not None:
+                newest_updated_at_corrected = newest_updated_at + utcoffset
+                if newest_updated_at_corrected >= previous_updated_at:
+                    newest_updated_at = newest_updated_at_corrected
             newest_updated_at = max(
                 newest_updated_at, previous_updated_at
             )  # keep old because newer
@@ -753,10 +757,6 @@ class Vehicle:
     def ev_first_departure_climate_temperature(self):
         return self._ev_first_departure_climate_temperature
 
-    @property
-    def ev_first_departure_climate_temperature_unit(self):
-        return self._ev_first_departure_climate_temperature_unit
-
     @ev_first_departure_climate_temperature.setter
     def ev_first_departure_climate_temperature(self, value):
         if isinstance(value, (tuple, list)):
@@ -776,12 +776,12 @@ class Vehicle:
             self._ev_first_departure_climate_temperature_unit = unit
 
     @property
-    def ev_second_departure_climate_temperature(self):
-        return self._ev_second_departure_climate_temperature
+    def ev_first_departure_climate_temperature_unit(self):
+        return self._ev_first_departure_climate_temperature_unit
 
     @property
-    def ev_second_departure_climate_temperature_unit(self):
-        return self._ev_second_departure_climate_temperature_unit
+    def ev_second_departure_climate_temperature(self):
+        return self._ev_second_departure_climate_temperature
 
     @ev_second_departure_climate_temperature.setter
     def ev_second_departure_climate_temperature(self, value):
@@ -800,6 +800,10 @@ class Vehicle:
             self._ev_second_departure_climate_temperature = None
         if unit is not None:
             self._ev_second_departure_climate_temperature_unit = unit
+
+    @property
+    def ev_second_departure_climate_temperature_unit(self):
+        return self._ev_second_departure_climate_temperature_unit
 
     @property
     def fuel_driving_range(self):
