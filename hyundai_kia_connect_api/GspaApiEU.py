@@ -80,13 +80,13 @@ from .svm import (
 )
 from .Token import Token
 from .utils import (
-    battery_soh_or_none,
     bool_or_none,
     ccs2_reservation_time_or_none,
     float_or_none,
     get_child_value,
     int_or_none,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
     pressure_or_none,
 )
@@ -1906,7 +1906,7 @@ class GspaApiEU(ApiImpl):
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        if battery_soh := battery_soh_or_none(
+        if battery_soh := normalize_battery_soh(
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh

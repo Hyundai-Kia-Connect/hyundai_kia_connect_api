@@ -49,10 +49,10 @@ from .exceptions import (
 )
 from .Token import Token
 from .utils import (
-    battery_soh_or_none,
     get_child_value,
     get_hex_temp_into_index,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
 )
 from .Vehicle import (
@@ -995,7 +995,7 @@ class KiaUvoApiEU(ApiImplType1):
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
         )
-        if battery_soh := battery_soh_or_none(
+        if battery_soh := normalize_battery_soh(
             get_child_value(state, "vehicleStatus.evStatus.batterySoh")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
