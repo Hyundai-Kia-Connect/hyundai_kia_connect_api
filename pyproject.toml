@@ -39,6 +39,5 @@ module = [
     "hyundai_kia_connect_api.Vehicle",
     "hyundai_kia_connect_api.VehicleManager",
     "hyundai_kia_connect_api.bluelink",
-    "hyundai_kia_connect_api.utils",
 ]
 ignore_errors = true

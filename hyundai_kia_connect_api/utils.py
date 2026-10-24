@@ -30,7 +30,7 @@ def to_int_enum[T: IntEnum](
         raise ValueError(f"Invalid {enum_class.__name__} value: {value}") from e
 
 
-def get_child_value(data, key):
+def get_child_value(data: Any, key: str) -> Any:
     value = data
     for x in key.split("."):
         try:
@@ -60,7 +60,7 @@ def window_is_open(
     return bool(open_value) or bool(open_level)
 
 
-def get_float(value):
+def get_float(value: Any) -> Any:
     if value is None:
         return None
     if isinstance(value, float):
@@ -170,26 +170,23 @@ def normalize_battery_soc(
     return int(value)
 
 
-def get_hex_temp_into_index(value):
+def get_hex_temp_into_index(value: str | None) -> int | None:
     if value is not None:
-        value = value.replace("H", "")
-        value = int(value, 16)
-        return value
+        return int(value.replace("H", ""), 16)
     else:
         return None
 
 
-def get_index_into_hex_temp(value):
+def get_index_into_hex_temp(value: int | None) -> str | None:
     if value is not None:
-        value = hex(value).split("x")
-        value = value[1] + "H"
-        value = value.zfill(3).upper()
-        return value
+        return (hex(value).split("x")[1] + "H").zfill(3).upper()
     else:
         return None
 
 
-def parse_datetime(value, timezone) -> datetime.datetime | None:
+def parse_datetime(
+    value: str | None, timezone: datetime.tzinfo | None
+) -> datetime.datetime | None:
     """Parse an API timestamp into an aware datetime.
 
     The two accepted formats are not equivalent. "Tue, 24 Jun 2025 16:18:10
@@ -235,7 +232,9 @@ def parse_datetime(value, timezone) -> datetime.datetime | None:
             raise ValueError(f"Unable to parse datetime value: {value}")
 
 
-def get_safe_local_datetime(date: datetime) -> datetime:
+def get_safe_local_datetime(
+    date: datetime.datetime | None,
+) -> datetime.datetime | None:
     """get safe local datetime"""
     if date is not None and hasattr(date, "tzinfo") and date.tzinfo is not None:
         date = date.astimezone()
