@@ -26,13 +26,3 @@ def discover_fixtures(prefix: str) -> list[str]:
     found by ``discover_fixtures("us_")``.
     """
     return sorted(p.name for p in FIXTURES_DIR.glob(f"{prefix}*.json"))
-
-
-def get_fixture_expected(fixture_data: dict) -> dict:
-    """Return the ``_fixture_meta.expected`` block from a fixture."""
-    return fixture_data.get("_fixture_meta", {}).get("expected", {})
-
-
-def get_fixture_meta(fixture_data: dict) -> dict:
-    """Return the ``_fixture_meta`` block from a fixture."""
-    return fixture_data.get("_fixture_meta", {})

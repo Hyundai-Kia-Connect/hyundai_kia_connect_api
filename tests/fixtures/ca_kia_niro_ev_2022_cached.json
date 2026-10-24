@@ -6,17 +6,7 @@
         "brand": "Kia",
         "endpoint": "lststatus",
         "description": "CA Kia Niro EV cached status response. Uses status root with hex-encoded temperature. Charge limits are handled via a separate evc/selsoc call, not in this response.",
-        "has_target_soc": false,
-        "expected": {
-            "ev_battery_percentage": 82,
-            "ev_charge_limits_dc": null,
-            "ev_charge_limits_ac": null,
-            "car_battery_percentage": 91,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": true,
-            "ev_battery_is_plugged_in": 1
-        }
+        "has_target_soc": false
     },
     "status": {
         "lastStatusDate": "20240801093000",
