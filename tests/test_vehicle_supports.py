@@ -10,6 +10,7 @@ from hyundai_kia_connect_api.ApiImpl import ApiImpl
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -55,6 +56,10 @@ def test_vehicle_supports_not_shared_between_vehicles():
             HyundaiCciApiEU,
             VehicleSupports(window_control=True, valet_mode=True, surround_view=True),
         ),
+        (
+            KiaCciApiEU,
+            VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
+        ),
     ],
 )
 def test_get_vehicle_supports_per_region(api_cls, expected):
@@ -63,7 +68,13 @@ def test_get_vehicle_supports_per_region(api_cls, expected):
 
 def test_api_holds_no_flat_supports_attributes():
     """Support is resolved by get_vehicle_supports, not stored on the API."""
-    for api_cls in (ApiImpl, ApiImplType1, HyundaiBlueLinkApiBR, HyundaiCciApiEU):
+    for api_cls in (
+        ApiImpl,
+        ApiImplType1,
+        HyundaiBlueLinkApiBR,
+        HyundaiCciApiEU,
+        KiaCciApiEU,
+    ):
         flat = [name for name in dir(api_cls) if name.startswith("supports_")]
         assert flat == [], api_cls.__name__
 
