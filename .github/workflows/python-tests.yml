@@ -30,13 +30,41 @@ jobs:
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  python -m pip install -e .[image] pytest pytest-cov syrupy
+                  python -m pip install -e .[image] pytest syrupy
             - name: Run tests
+              run: pytest
+
+    # Its own job so coverage shows as a separate "Coverage" check, with the
+    # report on the run's summary page.
+    coverage:
+        runs-on: ubuntu-latest
+        name: Coverage
+        steps:
+            - uses: actions/checkout@v7
+            - name: Set up Python 3.13
+              uses: actions/setup-python@v7
+              with:
+                  python-version: "3.13"
+                  cache: pip
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  python -m pip install -e .[image] pytest pytest-cov syrupy
+            - name: Run tests with coverage
               run: pytest --cov=hyundai_kia_connect_api --cov-report=term-missing --cov-report=xml
-            # Coverage is the same on every Python version, so upload it once.
+            - name: Write coverage summary
+              env:
+                  CODECOV_URL: ${{ github.event_name == 'pull_request' && format('https://app.codecov.io/gh/{0}/pull/{1}', github.repository, github.event.pull_request.number) || format('https://app.codecov.io/gh/{0}/commit/{1}', github.repository, github.sha) }}
+              run: |
+                  {
+                    echo "## Coverage: $(coverage report --format=total)%"
+                    echo
+                    echo "Full report: [Codecov]($CODECOV_URL)"
+                    echo
+                    coverage report --format=markdown --skip-covered
+                  } >> "$GITHUB_STEP_SUMMARY"
             # Fork PRs have no secrets; the action then uploads tokenless.
             - name: Upload coverage to Codecov
-              if: matrix.python-version == '3.13'
               uses: codecov/codecov-action@v5
               with:
                   files: coverage.xml
