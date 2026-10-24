@@ -1,0 +1,43 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/eu_kia_sportage_phev_2027_ccs2.json (Kia Sportage PHEV 2027)",
+        "follow_up_sources": "location/park: library #1301 shape; drvhistory: kia_uvo #1031",
+        "not_captured": [],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "PHEV",
+        "ccu_ccs2_protocol_support": 1
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "state": {
+                        "Vehicle": "$fixture:eu_kia_sportage_phev_2027_ccs2.json"
+                    }
+                },
+                "msgId": "MSG-1"
+            }
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "body": "$fixture:updates/responses/eu_location_park.json"
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": [
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_alltime.json"
+            },
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_30d.json"
+            }
+        ]
+    }
+}

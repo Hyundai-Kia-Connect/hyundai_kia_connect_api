@@ -1,0 +1,30 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/fndmcr",
+        "source": "Get Vehicle Location debug log in kia_uvo #459 (2021 Kona EV)",
+        "description": "Real response; coordinates replaced."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "head": 211,
+        "coord": {
+            "lat": 45.5,
+            "lon": -73.5,
+            "alt": 12.7,
+            "type": 0
+        },
+        "accuracy": {
+            "hdop": 0,
+            "pdop": 1
+        },
+        "time": "20221130110833",
+        "speed": {
+            "value": 0,
+            "unit": 0
+        }
+    }
+}

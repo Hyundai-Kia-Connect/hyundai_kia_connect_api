@@ -1,0 +1,59 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "endpoint": "POST spa/vehicles/{id}/drvhistory periodTarget=1",
+        "source": "get_driving_info responseAlltime debug log in kia_uvo #1031 (2022 IONIQ 5)",
+        "description": "Real response; msgId replaced."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "drivingInfo": [
+            {
+                "drivingPeriod": 0,
+                "totalPwrCsp": 283603,
+                "motorPwrCsp": 206373,
+                "climatePwrCsp": 57740,
+                "eDPwrCsp": 19490,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 76868,
+                "calculativeOdo": 1530
+            },
+            {
+                "drivingPeriod": 1,
+                "totalPwrCsp": 10907,
+                "motorPwrCsp": 7937,
+                "climatePwrCsp": 2220,
+                "eDPwrCsp": 749,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 2956,
+                "calculativeOdo": 58.84615384615385
+            }
+        ],
+        "drivingInfoDetail": [
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202502",
+                "totalPwrCsp": 41595,
+                "motorPwrCsp": 30406,
+                "climatePwrCsp": 8269,
+                "eDPwrCsp": 2920,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 10887,
+                "calculativeOdo": 239
+            },
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202501",
+                "totalPwrCsp": 242008,
+                "motorPwrCsp": 175967,
+                "climatePwrCsp": 49471,
+                "eDPwrCsp": 16570,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 65981,
+                "calculativeOdo": 1291
+            }
+        ]
+    },
+    "msgId": "MSG-1"
+}

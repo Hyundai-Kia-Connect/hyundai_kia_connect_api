@@ -1,0 +1,29 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "endpoint": "GET spa/vehicles/{id}/location/park",
+        "source": "Flat resMsg shape reported in library #1301, as recorded in tests/test_eu_location_flat_resmsg.py",
+        "description": "Real response shape; coordinates already replaced in the recorded copy."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "coord": {
+            "lat": 52.52,
+            "lon": 13.405,
+            "alt": 0,
+            "type": 0
+        },
+        "head": 127,
+        "speed": {
+            "value": 0,
+            "unit": 0
+        },
+        "accuracy": {
+            "hdop": 0,
+            "pdop": 0
+        },
+        "time": "20260903105844"
+    },
+    "msgId": "MSG-1"
+}
