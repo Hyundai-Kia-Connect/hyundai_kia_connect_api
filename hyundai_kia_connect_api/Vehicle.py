@@ -21,6 +21,12 @@ class TripInfo:
     distance: float = None
     avg_speed: float = None
     max_speed: int = None
+    end_hhmmss: str = None  # trip end time; only where the API reports it
+    # Driving-behaviour counters from trip detail (IN). The API names them
+    # trip*Time; treated as event counts. None where not reported.
+    hard_braking_count: int = None
+    rapid_acceleration_count: int = None
+    excessive_speed_count: int = None
 
 
 @dataclass
