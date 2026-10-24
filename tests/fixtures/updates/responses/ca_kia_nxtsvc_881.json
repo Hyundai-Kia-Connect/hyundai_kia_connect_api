@@ -1,0 +1,28 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "brand": "Kia",
+        "endpoint": "POST tods/api/nxtsvc",
+        "source": "Get Service status data debug log in kia_uvo #881 (2024 Sportage PHEV)",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "maintenanceInfo": {
+            "msopServiceOdometer": 109.0,
+            "msopServiceOdometerUnit": 1,
+            "mtspServiceDate": "20240516",
+            "imatServiceOdometer": 10109.0,
+            "imatServiceOdometerUnit": 1,
+            "mtitServiceDate": "20250516",
+            "currentOdometer": 244.6,
+            "currentOdometerUnit": 1,
+            "serviceOdometerDuration": 10000.0,
+            "serviceDaysDuration": 365,
+            "serviceMonthsThreshold": 12
+        }
+    }
+}

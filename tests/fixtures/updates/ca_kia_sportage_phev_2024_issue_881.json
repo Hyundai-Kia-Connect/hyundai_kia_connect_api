@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2024 Sportage (PHEV)",
+        "source": "kia_uvo #881 debug log: cached status, nxtsvc",
+        "follow_up_sources": "vrfypin: kia_uvo #459; fndmcr: real 6504 location error from kia_uvo #906",
+        "not_captured": [],
+        "description": "Location lookup fails, so the update keeps no location; identifiers replaced."
+    },
+    "implementation": {
+        "region": "Canada",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "PHEV",
+        "year": 2024
+    },
+    "responses": {
+        "POST /tods/api/lstvhclsts": {
+            "body": "$fixture:updates/responses/ca_kia_lstvhclsts_881.json"
+        },
+        "POST /tods/api/nxtsvc": {
+            "body": "$fixture:updates/responses/ca_kia_nxtsvc_881.json"
+        },
+        "POST /tods/api/vrfypin": {
+            "body": "$fixture:updates/responses/ca_vrfypin.json"
+        },
+        "POST /tods/api/fndmcr": {
+            "body": "$fixture:updates/responses/ca_fndmcr_error_6504.json"
+        }
+    }
+}

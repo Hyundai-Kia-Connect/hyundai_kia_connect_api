@@ -1,0 +1,40 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2021 Kona EV (EV)",
+        "source": "kia_uvo #592 (status, nxtsvc, selsoc) and #459 (vrfypin, fndmcr), same owner and car",
+        "follow_up_sources": "same car",
+        "not_captured": ["POST evTripDetails (no capture with a body)"],
+        "description": "Whole update chain from one car; identifiers and coordinates replaced."
+    },
+    "implementation": {
+        "region": "Canada",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "year": 2021
+    },
+    "responses": {
+        "POST /tods/api/lstvhclsts": {
+            "body": "$fixture:updates/responses/ca_hyundai_lstvhclsts_592.json"
+        },
+        "POST /tods/api/nxtsvc": {
+            "body": "$fixture:updates/responses/ca_nxtsvc.json"
+        },
+        "POST /tods/api/vrfypin": {
+            "body": "$fixture:updates/responses/ca_vrfypin.json"
+        },
+        "POST /tods/api/fndmcr": {
+            "body": "$fixture:updates/responses/ca_fndmcr.json"
+        },
+        "POST /tods/api/evc/selsoc": {
+            "body": "$fixture:updates/responses/ca_selsoc.json"
+        },
+        "POST /tods/api/alerts/maintenance/evTripDetails": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

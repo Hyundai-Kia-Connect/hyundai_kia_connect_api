@@ -1,0 +1,28 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2022 EV6 (EV)",
+        "source": "kia_uvo #722 debug log: cmm/gvi response",
+        "follow_up_sources": "none",
+        "not_captured": ["GET evc/gts (no capture)"],
+        "description": "Real cached-state response; identifiers and coordinates replaced."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "key": "KEY-1"
+    },
+    "responses": {
+        "POST /apigw/v1/cmm/gvi": {
+            "body": "$fixture:updates/responses/usa_kia_gvi_722.json"
+        },
+        "GET /apigw/v1/evc/gts": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

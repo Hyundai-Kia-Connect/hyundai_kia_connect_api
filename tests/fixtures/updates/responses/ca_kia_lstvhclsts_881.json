@@ -1,0 +1,130 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "brand": "Kia",
+        "endpoint": "POST tods/api/lstvhclsts",
+        "source": "get_cached_vehicle_status response debug log in kia_uvo #881 (2024 Sportage PHEV)",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "status": {
+            "lastStatusDate": "20240520130744",
+            "airCtrlOn": false,
+            "engine": false,
+            "doorLock": true,
+            "doorOpen": {
+                "frontLeft": 0,
+                "frontRight": 0,
+                "backLeft": 0,
+                "backRight": 0
+            },
+            "trunkOpen": false,
+            "airTempUnit": "C",
+            "airTemp": {
+                "value": "00H",
+                "unit": 0
+            },
+            "defrost": false,
+            "lowFuelLight": false,
+            "acc": false,
+            "evStatus": {
+                "batteryCharge": false,
+                "batteryStatus": 51,
+                "batteryPlugin": 2,
+                "remainTime2": {
+                    "etc1": {
+                        "value": 0,
+                        "unit": 1
+                    },
+                    "etc2": {
+                        "value": 0,
+                        "unit": 1
+                    },
+                    "etc3": {
+                        "value": 0,
+                        "unit": 1
+                    },
+                    "atc": {
+                        "value": 0,
+                        "unit": 1
+                    }
+                },
+                "drvDistance": [
+                    {
+                        "rangeByFuel": {
+                            "gasModeRange": {
+                                "value": 421.0,
+                                "unit": 1
+                            },
+                            "evModeRange": {
+                                "value": 20.0,
+                                "unit": 1
+                            },
+                            "totalAvailableRange": {
+                                "value": 441.0,
+                                "unit": 1
+                            }
+                        },
+                        "type": 2
+                    }
+                ]
+            },
+            "hoodOpen": false,
+            "transCond": true,
+            "steerWheelHeat": 0,
+            "sideBackWindowHeat": 0,
+            "dte": {},
+            "tirePressureLamp": {
+                "tirePressureLampAll": 0
+            },
+            "battery": {
+                "batSoc": 93,
+                "sjbDeliveryMode": 1,
+                "batSignalReferenceValue": {
+                    "batWarning": 65
+                },
+                "powerAutoCutMode": 2
+            },
+            "remoteIgnition": true,
+            "seatHeaterVentInfo": {
+                "drvSeatHeatState": 2,
+                "astSeatHeatState": 2,
+                "rlSeatHeatState": 2,
+                "rrSeatHeatState": 2
+            },
+            "sleepModeCheck": false,
+            "lampWireStatus": {
+                "headLamp": {
+                    "headLampStatus": false,
+                    "leftLowLamp": false,
+                    "rightLowLamp": false,
+                    "leftHighLamp": false,
+                    "rightHighLamp": false,
+                    "leftBifuncLamp": false,
+                    "rightBifuncLamp": false
+                },
+                "stopLamp": {
+                    "leftLamp": false,
+                    "rightLamp": false
+                },
+                "turnSignalLamp": {
+                    "leftFrontLamp": false,
+                    "rightFrontLamp": false,
+                    "leftRearLamp": false,
+                    "rightRearLamp": false
+                }
+            },
+            "windowOpen": {},
+            "smartKeyBatteryWarning": false,
+            "fuelLevel": 83,
+            "washerFluidStatus": false,
+            "breakOilStatus": false,
+            "engineOilStatus": false,
+            "engineRuntime": {}
+        }
+    }
+}
