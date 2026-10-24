@@ -1,6 +1,6 @@
 """Tests for the CA location fetch gate when coordinates are unknown.
 
-KiaUvoApiCA only calls get_location (fndmcr, PIN-protected) when the odometer
+KiaUvoApiCA only calls _get_location (fndmcr, PIN-protected) when the odometer
 increased since the service reading. Coordinates live only in the in-memory
 Vehicle object, so after a Home Assistant restart/reload a parked car would
 never get a location fetch — the device_tracker and the geocoded-location
@@ -8,7 +8,7 @@ sensor stay unavailable until the car physically moves
 (Hyundai-Kia-Connect/kia_uvo#1844). The gate now also fires while no location
 is known yet; once a location exists, behaviour is unchanged (moved-gate only).
 
-get_location is mocked at the gate boundary: an fndmcr result without a
+_get_location is mocked at the gate boundary: an fndmcr result without a
 "time" field yields coordinates with location_last_set_time None (seen in the
 #1844 reporter dump) — parse_datetime(None) is None by design (kia_uvo #1771).
 """
@@ -41,7 +41,7 @@ def ca_api() -> KiaUvoApiCA:
             }
         }
     )
-    api.get_location = MagicMock(
+    api._get_location = MagicMock(
         return_value={"coord": {"lat": 43.5, "lon": -79.4}, "time": None}
     )
     return api
@@ -74,7 +74,7 @@ class TestCachedStateLocationGate:
         """
         vehicle = _vehicle(odometer=100, with_location=False)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()
         assert vehicle.location_latitude == 43.5
         assert vehicle.location_longitude == -79.4
         # fndmcr result without "time" -> timestamp stays None (HA: unknown)
@@ -84,7 +84,7 @@ class TestCachedStateLocationGate:
         """Odometer unchanged + location known -> no fetch (no API load)."""
         vehicle = _vehicle(odometer=100, with_location=True)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
-        ca_api.get_location.assert_not_called()
+        ca_api._get_location.assert_not_called()
         assert vehicle.location_latitude == 43.5
         assert vehicle.location_longitude == -79.4
 
@@ -92,43 +92,43 @@ class TestCachedStateLocationGate:
         """Odometer below the service reading -> fetch (existing behaviour)."""
         vehicle = _vehicle(odometer=99.5, with_location=True)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()
 
     def test_failed_fetch_does_not_retry_next_poll(self, ca_api):
         """A failed fndmcr attempt must not re-fire on every poll.
 
-        get_location swallows all errors and returns None, so coords stay
+        _get_location swallows all errors and returns None, so coords stay
         None and the unknown-branch gate would re-run (vrfypin + fndmcr,
         two POSTs) on every poll for the whole session — the review
         concern on Hyundai-Kia-Connect/hyundai_kia_connect_api#1294.
         Bounded: one attempt per in-memory Vehicle session.
         """
         vehicle = _vehicle(odometer=100, with_location=False)
-        ca_api.get_location.return_value = None  # server error path
+        ca_api._get_location.return_value = None  # server error path
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()
 
     def test_moved_fetch_failure_does_not_retry_when_parked(self, ca_api):
         """A failed moved-gate fetch must not hand over to the unknown
         branch for an unbounded retry once the odometer catches up."""
         vehicle = _vehicle(odometer=99.5, with_location=False)
-        ca_api.get_location.return_value = None
+        ca_api._get_location.return_value = None
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
         vehicle._odometer = 100  # service reading catches up after the fetch
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()
 
     def test_fresh_vehicle_after_restart_retries_once(self, ca_api):
         """A new Vehicle object (restart/reload) gets a fresh attempt —
         the kia_uvo #1844 recovery, not an unbounded retry."""
-        ca_api.get_location.return_value = None
+        ca_api._get_location.return_value = None
         vehicle = _vehicle(odometer=100, with_location=False)
         ca_api.update_vehicle_with_cached_state(_token(), vehicle)
         fresh = _vehicle(odometer=100, with_location=False)
         ca_api.update_vehicle_with_cached_state(_token(), fresh)
-        assert ca_api.get_location.call_count == 2
+        assert ca_api._get_location.call_count == 2
 
 
 class TestForceRefreshLocationGate:
@@ -136,14 +136,14 @@ class TestForceRefreshLocationGate:
         """Same gate on the forced-refresh path (sibling call site)."""
         vehicle = _vehicle(odometer=100, with_location=False)
         ca_api.force_refresh_vehicle_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()
         assert vehicle.location_latitude == 43.5
         assert vehicle.location_longitude == -79.4
 
     def test_failed_fetch_does_not_retry_on_force_refresh(self, ca_api):
         """Same bound on the forced-refresh path (sibling call site)."""
         vehicle = _vehicle(odometer=100, with_location=False)
-        ca_api.get_location.return_value = None
+        ca_api._get_location.return_value = None
         ca_api.force_refresh_vehicle_state(_token(), vehicle)
         ca_api.force_refresh_vehicle_state(_token(), vehicle)
-        ca_api.get_location.assert_called_once()
+        ca_api._get_location.assert_called_once()

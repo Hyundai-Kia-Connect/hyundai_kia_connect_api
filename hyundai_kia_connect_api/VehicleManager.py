@@ -89,17 +89,8 @@ class VehicleManager:
         self.vehicles: dict = {}
         self.otp_request: OTPRequest = None
 
-    @DeprecationWarning
-    def initialize(self) -> None:
-        self.token: Token = self.api.login(
-            username=self.username,
-            password=self.password,
-            pin=self.pin,
-        )
-        self.initialize_vehicles()
-
     def login(self) -> bool | OTPRequest:
-        """Returns True if login successful, or OTPOptions if OTP is required"""
+        """Return True on success, an OTPRequest if OTP is required, else False."""
         result = self.api.login(
             username=self.username,
             password=self.password,
@@ -112,6 +103,7 @@ class VehicleManager:
         if isinstance(result, OTPRequest):
             self.otp_request = result
             return result
+        return False
 
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
         self.api.send_otp(self.otp_request, notify_type)
@@ -464,7 +456,7 @@ class VehicleManager:
                     f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
                 )
         elif REGIONS[region] == REGION_INDIA:
-            return KiaUvoApiIN(brand)
+            return KiaUvoApiIN(region, brand, language)
         elif REGIONS[region] == REGION_BRAZIL:
             return HyundaiBlueLinkApiBR(region, brand, language)
         else:

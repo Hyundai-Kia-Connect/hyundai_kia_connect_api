@@ -7,11 +7,15 @@ import datetime as dt
 import json
 import logging
 import platform
+import ssl
 import time
 import uuid
 from zoneinfo import ZoneInfo
 
+import certifi
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 
 # Try to fix hyundai/cloudflare
 from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
@@ -61,9 +65,35 @@ CA_TIMEZONES = [
 ]
 
 
+class SessionTicketAdapter(HTTPAdapter):
+    """A HTTPAdapter that re-enables TLS session tickets.
+
+    Cloudflare in front of the CA endpoints fingerprints the TLS ClientHello.
+    urllib3 sets OP_NO_TICKET on its default context; with Python 3.14 /
+    OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is classified as a
+    bot and v2/login answers 403 with an HTML block page. A plain
+    ssl.create_default_context() keeps tickets enabled and is let through.
+    """
+
+    def _setup_ssl_context(self):
+        context = create_urllib3_context()
+        context.options &= ~ssl.OP_NO_TICKET
+        return context
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._setup_ssl_context()
+        kwargs["ca_certs"] = certifi.where()
+        return super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, *args, **kwargs):
+        kwargs["ssl_context"] = self._setup_ssl_context()
+        return super().proxy_manager_for(*args, **kwargs)
+
+
 class RetrySession(requests.Session):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
+        self.mount("https://", SessionTicketAdapter())
         self.max_retries = max_retries
         self.delay = delay
         self.backoff = backoff
@@ -231,7 +261,14 @@ class KiaUvoApiCA(ApiImpl):
 
         headers["Deviceid"] = device_id
         response = self.sessions.post(url, json=data, headers=headers)
-        response_json = response.json()
+        try:
+            response_json = response.json()
+        except ValueError as err:
+            raise APIError(
+                f"Login returned a non-JSON response (HTTP {response.status_code}, "
+                f"server={response.headers.get('server')}, "
+                f"cf-ray={response.headers.get('cf-ray')}): {response.text[:200]!r}"
+            ) from err
 
         # Check if OTP is required (error code 7110)
         if (
@@ -499,10 +536,10 @@ class KiaUvoApiCA(ApiImpl):
             ):
                 if vehicle.location_latitude is None:
                     vehicle._location_fetch_attempted = True
-                location = self.get_location(token, vehicle)
+                location = self._get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-            location = self.get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
         # Update service after the fact so we still have the old odometer
@@ -557,10 +594,10 @@ class KiaUvoApiCA(ApiImpl):
             ):
                 if vehicle.location_latitude is None:
                     vehicle._location_fetch_attempted = True
-                location = self.get_location(token, vehicle)
+                location = self._get_location(token, vehicle)
                 self._update_vehicle_properties_location(vehicle, location)
         else:
-            location = self.get_location(token, vehicle)
+            location = self._get_location(token, vehicle)
             self._update_vehicle_properties_location(vehicle, location)
 
         # Update service after the fact so we still have the old odometer
@@ -941,7 +978,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response["result"]["maintenanceInfo"]
         return response
 
-    def get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.API_URL + "fndmcr"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -960,7 +997,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
-    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> None:
+    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "vrfypin"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token

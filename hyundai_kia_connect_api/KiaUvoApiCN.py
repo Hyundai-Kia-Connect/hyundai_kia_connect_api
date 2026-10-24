@@ -56,9 +56,9 @@ import json
 import logging
 import math
 import re
-import typing as ty
 import uuid
 from time import sleep
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ClimateRequestOptions
@@ -71,7 +71,6 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
     ORDER_STATUS,
-    VEHICLE_LOCK_ACTION,
 )
 from .exceptions import (
     APIError,
@@ -104,7 +103,7 @@ USER_AGENT_BLUELINK_CN: str = "BlueLink/109 CFNetwork/3896.100.1.2.1 Darwin/27.0
 # no actionable signal and are ignored here.
 
 
-def _extract_uars_login_bundle(html: str) -> dict:
+def _extract_uars_login_bundle(html: str) -> dict[str, Any]:
     """Extract the UARS login token bundle embedded in the callback HTML page.
 
     The ``loginCallback.do`` response embeds a JSON document inside a JS
@@ -127,7 +126,7 @@ def _extract_uars_login_bundle(html: str) -> dict:
         except ValueError:
             continue
         if candidate.get("data", {}).get("uarsToken"):
-            return candidate
+            return cast(dict[str, Any], candidate)
     # Fallback: brace-matched scan for any JSON containing a uarsToken.
     # Walk outward from the nearest "{" so both the bare data object and the
     # full wrapper are recognised (normalised to {"data": ...} on return).
@@ -149,7 +148,7 @@ def _extract_uars_login_bundle(html: str) -> dict:
                         except ValueError:
                             break
                         if candidate.get("data", {}).get("uarsToken"):
-                            return candidate
+                            return cast(dict[str, Any], candidate)
                         if candidate.get("uarsToken"):
                             # bare data object (matched from its own "{")
                             return {"data": candidate}
@@ -180,10 +179,10 @@ class KiaUvoApiCN(ApiImplType1):
             self.CCSP_SERVICE_ID: str = "9d5df92a-06ae-435f-b459-8304f2efcc67"
             self.APP_ID: str = "5519a969-295f-4c5a-a27e-9d9fab2bd50c"
         elif brand_name == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.cn-ccapi.hyundai.com"
-            self.UARS_DOMAIN: str = "uars-h.hmgmobility.com.cn"
-            self.CCSP_SERVICE_ID: str = "72b3d019-5bc7-443d-a437-08f307cf06e2"
-            self.APP_ID: str = "b09e4d17-c30c-40f1-a1ec-8ac11d6665cf"
+            self.BASE_DOMAIN = "prd.cn-ccapi.hyundai.com"
+            self.UARS_DOMAIN = "uars-h.hmgmobility.com.cn"
+            self.CCSP_SERVICE_ID = "72b3d019-5bc7-443d-a437-08f307cf06e2"
+            self.APP_ID = "b09e4d17-c30c-40f1-a1ec-8ac11d6665cf"
         else:
             raise ValueError(f"Unsupported brand for the China region: {brand!r}")
         # DIFFERENCE vs old implementation: the old APP_IDs (eea8762c---for Kia,
@@ -200,7 +199,7 @@ class KiaUvoApiCN(ApiImplType1):
 
         # Per-username UARS state (uarsToken/tokenCode/profile).  Kept off the
         # Token dataclass because Token is shared across all regions.
-        self._uars_state: dict[str, dict] = {}
+        self._uars_state: dict[str, dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Headers
@@ -212,7 +211,7 @@ class KiaUvoApiCN(ApiImplType1):
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         # DIFFERENCE vs old implementation: no Stamp header, CN app UA, and the
         # device id header is what the servers actually require.
         headers = {
@@ -229,7 +228,7 @@ class KiaUvoApiCN(ApiImplType1):
             headers["Ccuccs2protocolsupport"] = str(ccs2_support)
         return headers
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token)
 
     def _get_control_token(self, token: Token) -> tuple[str, float]:
@@ -308,7 +307,7 @@ class KiaUvoApiCN(ApiImplType1):
         if response.get("retCode") == "F":
             raise APIError(f"Device registration failed: {response.get('resMsg')}")
         device_id = response["resMsg"]["deviceId"]
-        return device_id
+        return cast(str, device_id)
 
     @staticmethod
     def _uars_state_param(device_uuid: str, interface_id: str) -> str:
@@ -325,7 +324,7 @@ class KiaUvoApiCN(ApiImplType1):
             .rstrip("=")
         )
 
-    def _exchange_uars_callback(self, redirect_url: str) -> dict:
+    def _exchange_uars_callback(self, redirect_url: str) -> dict[str, Any]:
         """Follow the UARS loginCallback.do redirect and harvest the tokens.
 
         The UARS server performs the OAuth code exchange server-side and
@@ -346,7 +345,6 @@ class KiaUvoApiCN(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Full password login.  Five-step live-verified flow (see module
@@ -500,47 +498,13 @@ class KiaUvoApiCN(ApiImplType1):
     # ------------------------------------------------------------------
     # Vehicles / state (business surface --same schema as the old code)
     # ------------------------------------------------------------------
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        url = self.SPA_API_URL + "vehicles"
-        response = self.session.get(
-            url, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
-        _check_response_for_errors(response)
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            vehicle: Vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=entry_engine_type,
-                # DIFFERENCE vs ApiImplType1.get_vehicles: the China vehicle
-                # list does not include ccuCCS2ProtocolSupport (verified on a
-                # 2025 Custo) --default to 0 so the legacy status path is used.
-                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            )
-            result.append(vehicle)
-        return result
-
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types (ex: ICE cars) provide this
                 # information. We also don't know what the API returns if the
@@ -554,7 +518,7 @@ class KiaUvoApiCN(ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
@@ -567,7 +531,7 @@ class KiaUvoApiCN(ApiImplType1):
         # Only call for driving info on cars we know have a chance of supporting it.
         if vehicle.engine_type == ENGINE_TYPES.EV:
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 _LOGGER.exception(
                     """Failed to parse driving info. Possible reasons:
@@ -577,7 +541,7 @@ class KiaUvoApiCN(ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
         # CN-UNVERIFIED for the China region (no CCS2 vehicle in the test
@@ -608,7 +572,9 @@ class KiaUvoApiCN(ApiImplType1):
     # The property mapping below is carried over from the previous
     # implementation unchanged: the live /status/latest response (verified on
     # a 2025 Custo) uses exactly the same field layout.
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status/latest"
 
         response = self.session.get(
@@ -618,9 +584,9 @@ class KiaUvoApiCN(ApiImplType1):
         _check_response_for_errors(response)
         response = response["resMsg"]
 
-        return response
+        return cast(dict[str, Any], response)
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
@@ -631,12 +597,14 @@ class KiaUvoApiCN(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return cast(dict[str, Any], response["resMsg"])
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         # CN-UNVERIFIED: legacy "force refresh" path, presumed intact for
         # non-CCS2 vehicles (the cache endpoint /status/latest is verified).
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
@@ -654,20 +622,6 @@ class KiaUvoApiCN(ApiImplType1):
     # follows the inherited Type1 dispatch: legacy vehicles use the access
     # token, CCS2 vehicles use the PIN-derived control token)
     # ------------------------------------------------------------------
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
-
-        payload = {"action": action.value, "deviceId": token.device_id}
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
-        response = self.session.post(
-            url, json=payload, headers=self._get_authenticated_headers(token)
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
-        return response["msgId"]
-
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
@@ -680,7 +634,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -720,7 +674,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/engine"
@@ -733,7 +687,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -745,7 +699,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
@@ -757,7 +711,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -784,7 +738,7 @@ class KiaUvoApiCN(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def check_action_status(
         self,

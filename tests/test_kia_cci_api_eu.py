@@ -89,7 +89,7 @@ def test_kia_cipher_is_kia_instance():
     """Kia brand selects the kia cipher instance, not hyundai."""
     api = _make_kia_api()
     assert api.CIPHER_BRAND == "kia"
-    assert api._cipher is kia_cipher()
+    assert api._get_cipher() is kia_cipher()  # lazy: first use = load
 
 
 # ── _login_with_password() happy path (stub — zero network) ──────────

@@ -30,6 +30,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    PressureUnit,
 )
 from .svm import (
     SVMDetails,
@@ -47,6 +48,7 @@ from .utils import (
     get_float,
     normalize_battery_soc,
     parse_datetime,
+    pressure_or_none,
 )
 from .Vehicle import (
     DailyDrivingStats,
@@ -598,6 +600,39 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
             )
         )
+        vehicle.tire_pressure_front_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_front_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_unit = (
+            PressureUnit.PSI
+            if get_child_value(state, "vehicleStatus.tirePressure") is not None
+            else None
+        )
         vehicle.front_left_window_is_open = get_child_value(
             state, "vehicleStatus.windowOpen.frontLeft"
         )
@@ -1122,7 +1157,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # Without any timestamp we cannot determine freshness.
         return False
 
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         response = self._get_enrollment_details(token, force_refresh=True)
         result = []
         for entry in response["enrolledVehicleDetails"]:
@@ -1323,9 +1358,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Start charging..")
 
@@ -1344,9 +1379,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Stop charging..")
 
@@ -1367,9 +1402,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    ) -> str:
+    ) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
         url = self.API_URL + "evc/charge/targetsoc/set"

@@ -57,10 +57,7 @@ def request_with_active_session(func):
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
             new_token = self.login(
-                token.username,
-                token.password,
-                token,
-                getattr(self, "_otp_handler", None),
+                token.username, token.password, pin=token.pin, token=token
             )
             token.access_token = new_token.access_token
             token.refresh_token = new_token.refresh_token
@@ -118,10 +115,7 @@ def _retry_on_auth_error(func):
             )
             try:
                 new_token = self.login(
-                    token.username,
-                    token.password,
-                    token,
-                    getattr(self, "_otp_handler", None),
+                    token.username, token.password, pin=token.pin, token=token
                 )
             except Exception as e:
                 raise AuthenticationError(f"Re-login failed: {e}") from e
@@ -149,8 +143,6 @@ class KiaUvoApiUSA(ApiImpl):
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
         self.session = ApiImplSession()
         self.session.mount("https://", KiaSSLAdapter())
-
-        self._otp_handler = None
 
     def api_headers(self) -> dict:
         offset = time.localtime().tm_gmtoff / 60 / 60
@@ -184,7 +176,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers["deviceid"] = self.device_id
         return headers
 
-    def authed_api_headers(self, token: Token, vehicle: Vehicle):
+    def authed_api_headers(self, token: Token, vehicle: Vehicle) -> dict:
         headers = self.api_headers()
         headers["sid"] = token.access_token
         headers["vinkey"] = vehicle.key
@@ -262,11 +254,9 @@ class KiaUvoApiUSA(ApiImpl):
             raise APIError(f"No final sid returned. Response: {response.text}")
         return final_sid
 
-    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> dict:
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Public helper to send OTP to the selected destination."""
-        return self._send_otp(
-            otp_request.otp_key, notify_type.value, otp_request.request_id
-        )
+        self._send_otp(otp_request.otp_key, notify_type.value, otp_request.request_id)
 
     def verify_otp_and_complete_login(
         self,
@@ -274,7 +264,7 @@ class KiaUvoApiUSA(ApiImpl):
         password: str,
         otp_code: str,
         otp_request: OTPRequest,
-        pin: str | None,
+        pin: str | None = None,
     ) -> Token:
         """Verify OTP and complete the login producing a Token."""
         sid, rmtoken = self._verify_otp(
@@ -297,8 +287,8 @@ class KiaUvoApiUSA(ApiImpl):
         self,
         username: str,
         password: str,
-        token: Token | None = None,
         pin: str | None = None,
+        token: Token | None = None,
     ) -> Token | OTPRequest:
         """Login into cloud endpoints and return Token
 
@@ -308,13 +298,9 @@ class KiaUvoApiUSA(ApiImpl):
             User email address
         password : str
             User password
+        pin : str, optional
         token : Token, optional
             Existing token with stored rmtoken for reuse
-        otp_handler : Callable[[dict], dict], optional
-            Non-interactive OTP handler. Called twice:
-            - stage='choose_destination' -> return {'notify_type': 'EMAIL'|'SMS'}
-            - stage='input_code' -> return {'otp_code': '<code>'}
-        pin : str, optional
 
         Returns
         -------
@@ -374,7 +360,7 @@ class KiaUvoApiUSA(ApiImpl):
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh the token using the refresh token"""
-        return self.login(token.username, token.password, token)
+        return self.login(token.username, token.password, pin=token.pin, token=token)
 
     @_retry_on_auth_error
     def get_vehicles(self, token: Token) -> list[Vehicle]:
@@ -860,9 +846,6 @@ class KiaUvoApiUSA(ApiImpl):
         response_body = response.json()
         return response_body["payload"]["vehicleInfoList"][0]
 
-    def get_location(self, token: Token, vehicle_id: str) -> None:
-        pass
-
     def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
         url = self.API_URL + "rems/rvs"
         body = {
@@ -1013,12 +996,18 @@ class KiaUvoApiUSA(ApiImpl):
     ) -> ORDER_STATUS:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
-        response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle
-        )
-        response_json = response.json()
-        last_action_completed = all(v == 0 for v in response_json["payload"].values())
-        return last_action_completed
+        attempts = max(1, timeout // 2) if synchronous else 1
+        for attempt in range(attempts):
+            response = self.post_request_with_logging_and_active_session(
+                token=token, url=url, json_body=body, vehicle=vehicle
+            )
+            payload = response.json()["payload"]
+            # Every pending-command counter at 0 means the action finished.
+            if all(v == 0 for v in payload.values()):
+                return ORDER_STATUS.SUCCESS
+            if attempt < attempts - 1:
+                time.sleep(2)
+        return ORDER_STATUS.TIMEOUT if synchronous else ORDER_STATUS.PENDING
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")

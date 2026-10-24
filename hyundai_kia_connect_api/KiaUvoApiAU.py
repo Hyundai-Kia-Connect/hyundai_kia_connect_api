@@ -5,11 +5,14 @@
 import base64
 import datetime as dt
 import logging
-import typing as ty
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
-from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .ApiImplType1 import (
+    USER_AGENT_OK_HTTP,
+    ApiImplType1,
+    _check_response_for_errors,
+)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -22,6 +25,7 @@ from .const import (
     REGION_AUSTRALIA,
     REGION_NZ,
     REGIONS,
+    SEAT_LOCATION,
 )
 from .exceptions import AuthenticationError
 from .Token import Token
@@ -34,9 +38,6 @@ from .Vehicle import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
 
 
 class KiaUvoApiAU(ApiImplType1):
@@ -97,7 +98,6 @@ class KiaUvoApiAU(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
@@ -257,7 +257,7 @@ class KiaUvoApiAU(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
@@ -286,9 +286,9 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
-        return "R"
+        return SEAT_LOCATION.RIGHT
 
     def _get_cookies(self) -> dict:
         # Get Cookies #

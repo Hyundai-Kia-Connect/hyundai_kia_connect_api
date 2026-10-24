@@ -17,6 +17,7 @@ from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
 from .ApiImplType1 import (
+    USER_AGENT_OK_HTTP,
     ApiImplSession,
     ApiImplType1,
     _check_response_for_errors,
@@ -49,6 +50,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
 )
 from .Vehicle import (
@@ -57,9 +59,10 @@ from .Vehicle import (
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-ACCEPT_HEADER_ALL: str = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"
+USER_AGENT_MOZILLA: str = (
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Mobile Safari/537.36"
+)
 
 SUPPORTED_LANGUAGES_LIST = [
     "en",  # English
@@ -800,10 +803,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         vehicle.ev_battery_percentage = get_child_value(
             state, "vehicleStatus.evStatus.batteryStatus"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "vehicleStatus.evStatus.batterySoh"):
+        if battery_soh := normalize_battery_soh(
+            get_child_value(state, "vehicleStatus.evStatus.batterySoh")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
         vehicle.ev_battery_is_charging = get_child_value(
             state, "vehicleStatus.evStatus.batteryCharge"
@@ -1198,7 +1200,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
@@ -1216,7 +1218,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             gps_detail = res_msg.get("gpsDetail") or res_msg
             return gps_detail
         except Exception as e:
-            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {type(e).__name__}")
             return None
 
     def _set_location_from_gps_detail(

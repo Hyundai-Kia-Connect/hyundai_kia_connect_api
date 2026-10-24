@@ -30,6 +30,7 @@ setup(
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
         "Programming Language :: Python :: 3.14",
+        "Typing :: Typed",
     ],
     description="Python API for Hyundai, Kia, and Genesis car infotainment systems",
     install_requires=requirements,
@@ -51,6 +52,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api",
-    version="4.36.0",
+    version="4.41.1",
     zip_safe=False,
 )

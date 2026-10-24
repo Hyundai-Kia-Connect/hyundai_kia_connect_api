@@ -10,6 +10,8 @@ computation, and GSPA GET helpers live here.
 
 # pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
 
+from __future__ import annotations
+
 import base64
 import datetime as dt
 import hashlib
@@ -17,7 +19,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -32,6 +34,10 @@ from .ApiImpl import (
     WindowRequestOptions,
 )
 from .cci_auth import CciAuthMixin
+
+if TYPE_CHECKING:
+    from .gspa.cipher_keys import GspaCipher
+
 from .cci_fingerprint import (
     is_gate_rejection,
 )
@@ -78,6 +84,7 @@ from .utils import (
     get_child_value,
     int_or_none,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
     pressure_or_none,
 )
@@ -87,8 +94,8 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = (
-    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) "
-    "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Mobile Safari/537.36"
 )
 
 SUPPORTED_LANGUAGES_LIST = [
@@ -266,7 +273,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             "reservation-hvac",
             "reservation-charge-hvac",
             "reservation-engine",
-            "lock-and-start-toggle",
             # OTA commands: the app sends these with the standard
             # authenticated headers — no PIN-derived control token.
             "ota-updates",
@@ -297,16 +303,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
-        if self.CIPHER_BRAND == "hyundai":
-            from .gspa.cipher_keys import hyundai_cipher
-
-            self._cipher = hyundai_cipher()
-        elif self.CIPHER_BRAND == "kia":
-            from .gspa.cipher_keys import kia_cipher
-
-            self._cipher = kia_cipher()
-        else:
+        # The brand cipher loads lazily (see _get_cipher): parameter files
+        # are read on first stamp use, so Home Assistant does not run the
+        # disk read inside its event loop while constructing the manager.
+        if self.CIPHER_BRAND not in ("hyundai", "kia"):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
+        self._cipher: GspaCipher | None = None
 
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
@@ -809,6 +811,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     # GSPA X-Stamp computation
     # ------------------------------------------------------------------
 
+    def _get_cipher(self) -> GspaCipher:
+        """Load the brand cipher singleton on first use.
+
+        The parameter files are static and read once per process; the
+        load happens inside the first stamp computation, which callers
+        reach through worker threads, never on the Home Assistant event
+        loop that constructs this class.
+        """
+        if self._cipher is None:
+            from .gspa.cipher_keys import hyundai_cipher, kia_cipher
+
+            self._cipher = (
+                hyundai_cipher() if self.CIPHER_BRAND == "hyundai" else kia_cipher()
+            )
+        return self._cipher
+
     def _get_stamp(self, token: Token) -> tuple[str, str]:
         """Compute GSPA X-Stamp + tsid for GSPA endpoint authentication.
 
@@ -822,7 +840,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             tsid = create_tsid(device_id)
             epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
             user_id = token.user_id or ""
-            stamp = self._cipher.compute_x_stamp(
+            stamp = self._get_cipher().compute_x_stamp(
                 region=self.STAMP_REGION,
                 tsid=tsid,
                 epoch_seconds=epoch_seconds,
@@ -1585,7 +1603,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     _pu_raw,
                 )
                 vehicle.tire_pressure_unit = None
-        _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+        _scale = (
+            PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+            if vehicle.tire_pressure_unit is not None
+            else None
+        )
         _pfl = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         )
@@ -1686,10 +1708,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "Green.BatteryManagement.SoH.Ratio"):
+        if battery_soh := normalize_battery_soh(
+            get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
         vehicle.ev_battery_is_plugged_in = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
@@ -2197,8 +2218,19 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
-        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+        """Lock/unlock via the granular per-action endpoints.
+
+        POST .../door-lock {"command": "set"} and .../door-unlock: the
+        action lives in the endpoint (the "lock"/"CLOSE" body forms are
+        rejected with 400-002). Accepted live across the 2026-10 EU
+        vehicle run on every tested model (Kia CCI: EV6, EV3, eNiro
+        2021; Hyundai: IONIQ 5 2022, Tucson PHEV, IONIQ 6) with the
+        door state reflecting it in the fresh server data afterwards.
+        The shared legacy "door" + close/open shape stays accepted by
+        the backend, but the EU apps no longer send it.
+        """
+        endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
+        return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
 
     def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -2796,6 +2828,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         set_default_departure_options(options.first_departure)
         set_default_departure_options(options.second_departure)
         departures = [options.first_departure, options.second_departure]
+        departure_times = [d.time or dt.time() for d in departures]
 
         if options.off_peak_start_time is None:
             options.off_peak_start_time = dt.time()
@@ -2825,9 +2858,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     "reservInfo": {
                         "day": departures[i].days,
                         "time": {
-                            "time": departures[i].time.strftime("%I%M"),
+                            "time": departure_times[i].strftime("%I%M"),
                             "timeSection": (
-                                1 if departures[i].time >= dt.time(12, 0) else 0
+                                1 if departure_times[i] >= dt.time(12, 0) else 0
                             ),
                         },
                     },
@@ -2864,12 +2897,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             "reservFlag": 1 if options.charging_enabled else 0,
             "command": "set",
         }
-
-    def lock_and_start_toggle(
-        self, token: Token, vehicle: Vehicle, enable: bool = True
-    ) -> str:
-        body = {"lockAndStartEnable": enable}
-        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
 
     def set_ota_reservation(
         self, token: Token, vehicle: Vehicle, settings: dict[str, Any]

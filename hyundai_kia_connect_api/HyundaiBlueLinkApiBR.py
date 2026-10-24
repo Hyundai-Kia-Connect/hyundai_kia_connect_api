@@ -5,7 +5,6 @@
 import datetime as dt
 import logging
 import random
-import typing as ty
 import uuid
 from datetime import timedelta
 from time import sleep
@@ -112,8 +111,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """Build API v2 URL from path."""
         return urljoin(self.api_v2_url, path.lstrip("/"))
 
-    def _get_stamp(self) -> None:
+    def _get_stamp(self) -> str:
         """BR does not use the Stamp header; required by the shared retry helper."""
+        return ""
 
     def _get_device_id(self, stamp: str | None = None) -> str:
         """Register a push device and return the server-issued device id.
@@ -152,8 +152,14 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """Return this session's registered device id, registering one if needed."""
         return self._registered_device_id or self._get_device_id()
 
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        """Get headers with authentication."""
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict:
+        """Get headers with authentication.
+
+        ``ccs2_support`` matches the ApiImplType1 signature; BR sends no
+        CCS2 protocol header, so it is ignored.
+        """
         headers = dict(self.api_headers)
         device_id = token.device_id or self._ensure_device_id()
         headers["ccsp-device-id"] = device_id
@@ -292,7 +298,6 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login to Brazilian Hyundai API."""
@@ -371,7 +376,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         return self.login(token.username, token.password, pin=token.pin)
 
     @_retry_on_device_id_error
-    def get_vehicles(self, token: Token) -> list:
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Get list of vehicles."""
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
