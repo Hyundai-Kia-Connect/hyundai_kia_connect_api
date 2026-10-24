@@ -31,6 +31,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    ENGINE_TYPES_BY_VEHICLE_TYPE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -188,17 +189,6 @@ class ApiImplType1(ApiImpl):
         _check_response_for_errors(response)
         result = []
         for entry in response["resMsg"]["vehicles"]:
-            entry_engine_type = None
-            if entry["type"] == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif entry["type"] == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif entry["type"] == "PHEV":
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif entry["type"] == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            elif entry["type"] == "PE":
-                entry_engine_type = ENGINE_TYPES.PHEV
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickname"],
@@ -206,7 +196,7 @@ class ApiImplType1(ApiImpl):
                 registration_date=entry["regDate"],
                 VIN=entry["vin"],
                 timezone=self.data_timezone,
-                engine_type=entry_engine_type,
+                engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
                 # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
                 # those vehicles on the legacy status path.
                 ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
