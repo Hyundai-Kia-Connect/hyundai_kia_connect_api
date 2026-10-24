@@ -82,7 +82,7 @@ Tests use helpers from `tests/fixture_helpers.py`:
 - `discover_fixtures("us_kia_")` — finds all fixture files starting with `us_kia_`
 - `load_fixture(filename)` — loads and parses a JSON fixture
 
-Hand-written tests in the parent `tests/` directory may load a fixture as a base payload and modify it to cover an edge case the fixtures don't (e.g. a missing block or an unusual value).
+To cover a parsing edge case (a missing block, an unusual value), add a small scenario fixture such as `eu_kia_ev6_unset_timers.json` instead of writing a new test.
 
 ## Contributing a Fixture
 
