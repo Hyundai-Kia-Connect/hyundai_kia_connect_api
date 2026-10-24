@@ -6,18 +6,7 @@
         "brand": "Kia",
         "endpoint": "cmm/gvi (after rems/rvs force refresh)",
         "description": "Vehicle state after a force refresh cycle. The rems/rvs endpoint triggers a refresh, then cmm/gvi is called to get updated data. This response includes targetSOC under evStatus.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 72,
-            "ev_charge_limits_dc": 80,
-            "ev_charge_limits_ac": 90,
-            "odometer_value": 23460,
-            "car_battery_percentage": 90,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": true,
-            "ev_battery_is_plugged_in": 1
-        }
+        "has_target_soc": true
     },
     "vehicleConfig": {
         "vehicleDetail": {

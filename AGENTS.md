@@ -73,6 +73,11 @@ pre-commit run --all-files   # ruff, ruff-format, codespell, pyupgrade, mypy --s
 - Every fix or feature needs a test in `tests/`. Use the existing JSON fixtures
   in `tests/fixtures/` (see its README) and the snapshot tests
   (`tests/__snapshots__`, syrupy) rather than live API calls.
+- Don't write new tests for status parsing. `tests/test_vehicle_snapshots.py`
+  snapshots the full parsed `Vehicle` for every fixture. To cover new or
+  changed parsing, add or update a fixture (a small scenario fixture for an
+  edge case), run `pytest tests/test_vehicle_snapshots.py --snapshot-update`,
+  and review the snapshot diff.
 - New fixtures must be anonymised: no VINs, tokens, emails, coordinates,
   or account IDs.
 - New code must pass `mypy --strict`.

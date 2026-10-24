@@ -1,8 +1,8 @@
 """Snapshot tests for the Vehicle object across all API implementations.
 
-Uses syrupy to capture the full parsed Vehicle state for each fixture.
-If any code change alters how a fixture is parsed into a Vehicle, the
-snapshot diff will show exactly which fields changed.
+Every fixture in ``tests/fixtures`` is parsed by the parser its filename
+prefix selects, and the full parsed Vehicle is compared to a syrupy snapshot.
+A fixture with no parser mapped fails, so new fixtures can't be skipped.
 
 To update snapshots after an intentional change::
 
@@ -12,12 +12,14 @@ To update snapshots after an intentional change::
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
 from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA
 from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
@@ -34,141 +36,79 @@ _has_syrupy = importlib.util.find_spec("syrupy") is not None
 
 pytestmark = pytest.mark.skipif(not _has_syrupy, reason="syrupy not installed")
 
-# ---------------------------------------------------------------------------
-# Fixture discovery (module-level so parametrize works)
-# ---------------------------------------------------------------------------
-US_KIA_FILES = discover_fixtures("us_kia_")
-US_HYUNDAI_FILES = discover_fixtures("us_hyundai_")
-EU_FILES = [f for f in discover_fixtures("eu_kia_ev6_") if "ccs2" not in f]
-# All EU Kia CCS2 fixtures, identified by the "ccs2" suffix in the filename.
-# Covers EV9 (EV) and Sportage PHEV; future EU Kia CCS2 fixtures (any model)
-# are picked up automatically.
-CCS2_FILES = [f for f in discover_fixtures("eu_kia_") if "ccs2" in f]
-CA_FILES = discover_fixtures("ca_")
-AU_FILES = discover_fixtures("au_")
-CN_FILES = discover_fixtures("cn_")
+ALL_FIXTURES = discover_fixtures("")
 
 
-# ---------------------------------------------------------------------------
-# API factory fixtures
-# ---------------------------------------------------------------------------
-@pytest.fixture
-def usa_api() -> KiaUvoApiUSA:
-    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
-    api.data_timezone = None
-    api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
+def _api[T](cls: type[T], **attrs: Any) -> T:
+    """Build an API instance without running __init__ (no network/session)."""
+    api = cls.__new__(cls)
+    for name, value in attrs.items():
+        setattr(api, name, value)
     return api
 
 
-@pytest.fixture
-def bluelink_api() -> HyundaiBlueLinkApiUSA:
-    api = HyundaiBlueLinkApiUSA.__new__(HyundaiBlueLinkApiUSA)
-    api.data_timezone = None
-    api.temperature_range = range(62, 82)
-    return api
-
-
-@pytest.fixture
-def eu_api() -> KiaUvoApiEU:
-    api = KiaUvoApiEU.__new__(KiaUvoApiEU)
-    api.data_timezone = KiaUvoApiEU.data_timezone
-    api.temperature_range = KiaUvoApiEU.temperature_range
-    return api
-
-
-@pytest.fixture
-def ccs2_api() -> ApiImplType1:
-    api = ApiImplType1.__new__(ApiImplType1)
-    api.data_timezone = None
-    api.temperature_range = [x * 0.5 for x in range(28, 60)]
-    return api
-
-
-@pytest.fixture
-def ca_api() -> KiaUvoApiCA:
-    api = KiaUvoApiCA.__new__(KiaUvoApiCA)
-    api.data_timezone = KiaUvoApiCA.data_timezone
-    api.temperature_range_c_old = KiaUvoApiCA.temperature_range_c_old
-    api.temperature_range_c_new = KiaUvoApiCA.temperature_range_c_new
-    api.temperature_range_model_year = KiaUvoApiCA.temperature_range_model_year
-    return api
-
-
-@pytest.fixture
-def au_api() -> KiaUvoApiAU:
-    api = KiaUvoApiAU.__new__(KiaUvoApiAU)
-    api.data_timezone = KiaUvoApiAU.data_timezone
-    api.temperature_range = KiaUvoApiAU.temperature_range
-    return api
-
-
-@pytest.fixture
-def cn_api() -> KiaUvoApiCN:
-    api = KiaUvoApiCN.__new__(KiaUvoApiCN)
-    api.data_timezone = KiaUvoApiCN.data_timezone
-    api.temperature_range = KiaUvoApiCN.temperature_range
-    return api
-
-
-# ---------------------------------------------------------------------------
-# Snapshot tests — one test per region/API, parametrized over fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("fixture_file", US_KIA_FILES, ids=US_KIA_FILES)
-def test_usa_kia_vehicle_snapshot(usa_api, fixture_file, snapshot: SnapshotAssertion):
+def _parse(fixture_file: str) -> Vehicle:
     vehicle = Vehicle()
     data = load_fixture(fixture_file)
-    usa_api._update_vehicle_properties(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
+
+    if fixture_file.startswith("us_kia_"):
+        _api(
+            KiaUvoApiUSA,
+            data_timezone=None,
+            temperature_range=[62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82],
+        )._update_vehicle_properties(vehicle, data)
+    elif fixture_file.startswith("us_hyundai_"):
+        _api(
+            HyundaiBlueLinkApiUSA, data_timezone=None, temperature_range=range(62, 82)
+        )._update_vehicle_properties(vehicle, data)
+    elif fixture_file.startswith("eu_kia_gspa_"):
+        _api(KiaCciApiEU)._update_vehicle_properties_ccs2(vehicle, data)
+    elif fixture_file.startswith("eu_kia_") and "ccs2" in fixture_file:
+        _api(
+            ApiImplType1,
+            data_timezone=None,
+            temperature_range=[x * 0.5 for x in range(28, 60)],
+        )._update_vehicle_properties_ccs2(vehicle, data)
+    elif fixture_file.startswith("eu_kia_"):
+        _api(
+            KiaUvoApiEU,
+            data_timezone=KiaUvoApiEU.data_timezone,
+            temperature_range=KiaUvoApiEU.temperature_range,
+        )._update_vehicle_properties(vehicle, data)
+    elif fixture_file.startswith("br_"):
+        _api(
+            HyundaiBlueLinkApiBR, data_timezone=HyundaiBlueLinkApiBR.data_timezone
+        )._update_vehicle_properties_ccs2(vehicle, data["resMsg"]["state"]["Vehicle"])
+    elif fixture_file.startswith("ca_"):
+        vehicle.year = 2022  # selects the CA temperature range
+        _api(
+            KiaUvoApiCA,
+            data_timezone=KiaUvoApiCA.data_timezone,
+            temperature_range_c_old=KiaUvoApiCA.temperature_range_c_old,
+            temperature_range_c_new=KiaUvoApiCA.temperature_range_c_new,
+            temperature_range_model_year=KiaUvoApiCA.temperature_range_model_year,
+        )._update_vehicle_properties_base(vehicle, data)
+    elif fixture_file.startswith("au_"):
+        _api(
+            KiaUvoApiAU,
+            data_timezone=KiaUvoApiAU.data_timezone,
+            temperature_range=KiaUvoApiAU.temperature_range,
+        )._update_vehicle_properties(vehicle, data)
+    elif fixture_file.startswith("cn_"):
+        _api(
+            KiaUvoApiCN,
+            data_timezone=KiaUvoApiCN.data_timezone,
+            temperature_range=KiaUvoApiCN.temperature_range,
+        )._update_vehicle_properties(vehicle, data)
+    else:
+        pytest.fail(f"No parser mapped for fixture {fixture_file}")
+
+    return vehicle
 
 
-@pytest.mark.parametrize("fixture_file", US_HYUNDAI_FILES, ids=US_HYUNDAI_FILES)
-def test_bluelink_usa_vehicle_snapshot(
-    bluelink_api, fixture_file, snapshot: SnapshotAssertion
-):
-    vehicle = Vehicle()
-    data = load_fixture(fixture_file)
-    bluelink_api._update_vehicle_properties(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
-
-
-@pytest.mark.parametrize("fixture_file", EU_FILES, ids=EU_FILES)
-def test_eu_vehicle_snapshot(eu_api, fixture_file, snapshot: SnapshotAssertion):
-    vehicle = Vehicle()
-    data = load_fixture(fixture_file)
-    eu_api._update_vehicle_properties(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
-
-
-@pytest.mark.parametrize("fixture_file", CCS2_FILES, ids=CCS2_FILES)
-def test_ccs2_vehicle_snapshot(ccs2_api, fixture_file, snapshot: SnapshotAssertion):
-    vehicle = Vehicle()
-    data = load_fixture(fixture_file)
-    ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
-
-
-@pytest.mark.parametrize("fixture_file", CA_FILES, ids=CA_FILES)
-def test_ca_vehicle_snapshot(ca_api, fixture_file, snapshot: SnapshotAssertion):
-    vehicle = Vehicle()
-    vehicle.year = 2022  # needed for temperature_range selection
-    data = load_fixture(fixture_file)
-    ca_api._update_vehicle_properties_base(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
-
-
-@pytest.mark.parametrize("fixture_file", AU_FILES, ids=AU_FILES)
-def test_au_vehicle_snapshot(au_api, fixture_file, snapshot: SnapshotAssertion):
-    vehicle = Vehicle()
-    data = load_fixture(fixture_file)
-    au_api._update_vehicle_properties(vehicle, data)
-    assert vehicle_to_dict(vehicle) == snapshot
-
-
-@pytest.mark.parametrize("fixture_file", CN_FILES, ids=CN_FILES)
-def test_cn_vehicle_snapshot(cn_api, fixture_file, snapshot: SnapshotAssertion):
-    vehicle = Vehicle()
-    data = load_fixture(fixture_file)
-    cn_api._update_vehicle_properties(vehicle, data)
+@pytest.mark.parametrize("fixture_file", ALL_FIXTURES, ids=ALL_FIXTURES)
+def test_vehicle_snapshot(fixture_file: str, snapshot: SnapshotAssertion) -> None:
+    vehicle = _parse(fixture_file)
+    # vehicle.data is left out of the snapshot (it is the fixture itself).
+    assert vehicle.data is not None
     assert vehicle_to_dict(vehicle) == snapshot
