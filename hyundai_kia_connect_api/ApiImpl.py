@@ -4,7 +4,6 @@
 import datetime as dt
 import logging
 from dataclasses import dataclass
-from typing import TypeVar
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -140,9 +139,6 @@ class ScheduleChargingClimateRequestOptions:
         return options
 
 
-_T = TypeVar("_T")
-
-
 def _schedule_charging_scopes(
     options: ScheduleChargingClimateRequestOptions,
 ) -> tuple[bool, bool]:
@@ -212,13 +208,13 @@ def _guard_schedule_temperature(
         )
 
 
-def _fill_option_value(  # noqa: UP047  # TypeVar required for py3.10 floor
-    current: _T | None,
-    source: _T | None,
-    default: _T,
+def _fill_option_value[T](
+    current: T | None,
+    source: T | None,
+    default: T,
     label: str,
     missing: list[str],
-) -> _T:
+) -> T:
     """None = leave unchanged: explicit value, else vehicle value, else default.
 
     Falls back to ``default`` and records ``label`` in ``missing`` when the

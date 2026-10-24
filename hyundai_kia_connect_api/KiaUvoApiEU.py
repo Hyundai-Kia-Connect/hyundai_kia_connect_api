@@ -1407,7 +1407,7 @@ class KiaUvoApiEU(ApiImplType1):
             gps_detail = res_msg.get("gpsDetail") or res_msg
             return gps_detail
         except Exception as e:
-            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {e}")  # noqa: TRY401
+            _LOGGER.exception(f"{DOMAIN} - _get_location failed: {type(e).__name__}")
             return None
 
     def _set_location_from_gps_detail(
