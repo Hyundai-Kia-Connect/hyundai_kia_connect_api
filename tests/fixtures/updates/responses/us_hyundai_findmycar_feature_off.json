@@ -1,0 +1,14 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/rcs/rfc/findMyCar",
+        "source": "Get Vehicle Location debug log in kia_uvo #1455 (2025 GV70 EV)",
+        "description": "Real error response: location subscription off."
+    },
+    "errorSubCode": "GEN",
+    "systemName": "BLODS",
+    "errorSubMessage": "Feature Status is OFF",
+    "errorMessage": "We're sorry, this feature is not available according to your latest subscription status.  Please visit the owners website to view and update subscription.",
+    "errorCode": 502
+}

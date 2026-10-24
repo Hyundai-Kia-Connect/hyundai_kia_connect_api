@@ -24,6 +24,46 @@ This directory contains JSON files representing real API response shapes from th
 
 Use captured responses only, such as the `Get Vehicles Response` debug log line, which Type1 (EU/AU/CN/IN), CA, Kia USA and Hyundai USA print. BR and the EU CCI (GSPA) classes don't log this response. Several captures may be merged into one file's vehicle list. Each file has a `_fixture_meta` block with `region`, `brand`, `endpoint`, `vehicles`, `source` (where each capture came from) and `description`. Replace VINs, vehicle ids, keys and registration ids with placeholders such as `TESTVIN0000000001` and `VEHICLE-1`, and drop account, driver and address blocks. Then run `pytest tests/test_vehicle_list_snapshots.py --snapshot-update`.
 
+## Cached-state updates
+
+`updates/` holds one scenario per update, run by `tests/test_vehicle_update_snapshots.py` through `VehicleManager.update_vehicle_with_cached_state`. A fake HTTP transport answers each request by method and URL path, and the requests sent plus the full parsed Vehicle are snapshotted. A request with no scenario entry, or a scenario response that is never requested, fails the test.
+
+```json
+{
+    "_fixture_meta": {
+        "status": "...",
+        "follow_up_sources": "...",
+        "not_captured": [],
+        "description": "..."
+    },
+    "implementation": { "region": "Europe", "brand": "Kia" },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/status/latest": {
+            "body": {
+                "retCode": "S",
+                "resMsg": {
+                    "vehicleStatusInfo": "$fixture:eu_kia_ev6_2023_with_soc.json"
+                }
+            }
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": [
+            { "body": "$fixture:updates/responses/eu_drvhistory_alltime.json" },
+            { "body": "..." }
+        ]
+    }
+}
+```
+
+- A response is `{"status": 200, "body": ...}`. A list is answered in request order.
+- `"$fixture:<path under tests/fixtures>[#key]"` inlines a fixture without its `_fixture_meta`. `{"$fixture": "<ref>", "field": ...}` inlines it and overrides fields.
+- Status payloads stay in the top-level status fixtures. Follow-up reads (location, driving info, service, charge limits, trips) are real captured responses in `updates/responses/`, each with a `_fixture_meta.source`.
+- Only when no real capture exists for a read, answer it with `{"status": 503, "body": null}` and list it in `_fixture_meta.not_captured`.
+
 ## Naming Convention
 
 ```

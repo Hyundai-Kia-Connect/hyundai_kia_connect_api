@@ -1,0 +1,45 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/ca_kia_niro_ev_2022_cached.json (Kia Niro EV 2022)",
+        "follow_up_sources": "nxtsvc, selsoc: kia_uvo #592; vrfypin, fndmcr: kia_uvo #459",
+        "not_captured": ["POST evTripDetails (no capture with a body)"],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "Canada",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "year": 2022
+    },
+    "responses": {
+        "POST /tods/api/lstvhclsts": {
+            "body": {
+                "responseHeader": {
+                    "responseCode": 0,
+                    "responseDesc": "Success"
+                },
+                "result": "$fixture:ca_kia_niro_ev_2022_cached.json"
+            }
+        },
+        "POST /tods/api/nxtsvc": {
+            "body": "$fixture:updates/responses/ca_nxtsvc.json"
+        },
+        "POST /tods/api/vrfypin": {
+            "body": "$fixture:updates/responses/ca_vrfypin.json"
+        },
+        "POST /tods/api/fndmcr": {
+            "body": "$fixture:updates/responses/ca_fndmcr.json"
+        },
+        "POST /tods/api/evc/selsoc": {
+            "body": "$fixture:updates/responses/ca_selsoc.json"
+        },
+        "POST /tods/api/alerts/maintenance/evTripDetails": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

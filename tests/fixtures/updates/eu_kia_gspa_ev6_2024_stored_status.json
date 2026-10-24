@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/eu_kia_gspa_ev6_2024_stored_status.json (Kia EV6 2024)",
+        "follow_up_sources": "none",
+        "not_captured": [],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "Europe (CCI/GSPA)",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 1
+    },
+    "responses": {
+        "GET /gspa/v1/status/vehicles/VEHICLE-1/stored-status": {
+            "body": {
+                "data": {
+                    "state": {
+                        "Vehicle": "$fixture:eu_kia_gspa_ev6_2024_stored_status.json"
+                    }
+                },
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000"
+                }
+            }
+        }
+    }
+}

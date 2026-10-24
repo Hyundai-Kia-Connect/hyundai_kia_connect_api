@@ -1,0 +1,27 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/nxtsvc",
+        "source": "Get Service status data debug log in kia_uvo #592 (2021 Kona EV)",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "maintenanceInfo": {
+            "msopServiceOdometer": 48081.0,
+            "msopServiceOdometerUnit": 1,
+            "mtspServiceDate": "20220819",
+            "imatServiceOdometer": 60081.0,
+            "imatServiceOdometerUnit": 1,
+            "mtitServiceDate": "20230219",
+            "currentOdometer": 58505.7,
+            "currentOdometerUnit": 1,
+            "serviceOdometerDuration": 12000.0,
+            "serviceDaysDuration": 184,
+            "serviceMonthsThreshold": 6
+        }
+    }
+}
