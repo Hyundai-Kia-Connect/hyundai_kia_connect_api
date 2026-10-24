@@ -92,9 +92,8 @@ COMMANDS: dict[str, Callable[[ApiImpl, Token, Vehicle], Any]] = {
     "set_charge_limits": lambda api, t, v: api.set_charge_limits(t, v, 80, 90),
 }
 
-# HyundaiBlueLinkApiBR inherits these from ApiImplType1, which builds URLs
-# from SPA_API_URL, an attribute BR never sets.
-_KNOWN_FAILURES = {
+# Commands an implementation doesn't support must raise NotImplementedError.
+NOT_SUPPORTED = {
     ("br_hyundai", "start_charge"),
     ("br_hyundai", "stop_charge"),
     ("br_hyundai", "set_charge_limits"),
@@ -103,23 +102,6 @@ _KNOWN_FAILURES = {
 
 def _key(mapping: dict[int, str], value: str) -> int:
     return next(k for k, v in mapping.items() if v == value)
-
-
-def _cases() -> list[Any]:
-    cases = []
-    for impl in IMPLEMENTATIONS:
-        for command in COMMANDS:
-            marks = []
-            if (impl, command) in _KNOWN_FAILURES:
-                marks.append(
-                    pytest.mark.xfail(
-                        raises=AttributeError, strict=True, reason="BR SPA_API_URL"
-                    )
-                )
-            cases.append(
-                pytest.param(impl, command, marks=marks, id=f"{impl}-{command}")
-            )
-    return cases
 
 
 @pytest.fixture
@@ -148,7 +130,8 @@ def sent_requests() -> Any:
         yield sent
 
 
-@pytest.mark.parametrize(("impl", "command"), _cases())
+@pytest.mark.parametrize("command", COMMANDS)
+@pytest.mark.parametrize("impl", IMPLEMENTATIONS)
 def test_vehicle_command(
     impl: str,
     command: str,
@@ -175,6 +158,12 @@ def test_vehicle_command(
         engine_type=ENGINE_TYPES.EV,
         ccu_ccs2_protocol_support=ccs2,
     )
+
+    if (impl, command) in NOT_SUPPORTED:
+        with pytest.raises(NotImplementedError):
+            COMMANDS[command](api, token, vehicle)
+        assert sent_requests == []
+        return
 
     action_id = COMMANDS[command](api, token, vehicle)
 
