@@ -10,6 +10,8 @@ computation, and GSPA GET helpers live here.
 
 # pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
 
+from __future__ import annotations
+
 import base64
 import datetime as dt
 import hashlib
@@ -17,7 +19,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -31,6 +33,10 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+
+if TYPE_CHECKING:
+    from .gspa.cipher_keys import GspaCipher
+
 from .cci_fingerprint import (
     build_fp_headers,
     client_name_for_brand,
@@ -267,7 +273,6 @@ class GspaApiEU(ApiImpl):
             "reservation-hvac",
             "reservation-charge-hvac",
             "reservation-engine",
-            "lock-and-start-toggle",
             # OTA commands: the app sends these with the standard
             # authenticated headers — no PIN-derived control token.
             "ota-updates",
@@ -307,16 +312,12 @@ class GspaApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
-        if self.CIPHER_BRAND == "hyundai":
-            from .gspa.cipher_keys import hyundai_cipher
-
-            self._cipher = hyundai_cipher()
-        elif self.CIPHER_BRAND == "kia":
-            from .gspa.cipher_keys import kia_cipher
-
-            self._cipher = kia_cipher()
-        else:
+        # The brand cipher loads lazily (see _get_cipher): parameter files
+        # are read on first stamp use, so Home Assistant does not run the
+        # disk read inside its event loop while constructing the manager.
+        if self.CIPHER_BRAND not in ("hyundai", "kia"):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
+        self._cipher: GspaCipher | None = None
 
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
@@ -1015,6 +1016,22 @@ class GspaApiEU(ApiImpl):
     # GSPA X-Stamp computation
     # ------------------------------------------------------------------
 
+    def _get_cipher(self) -> GspaCipher:
+        """Load the brand cipher singleton on first use.
+
+        The parameter files are static and read once per process; the
+        load happens inside the first stamp computation, which callers
+        reach through worker threads, never on the Home Assistant event
+        loop that constructs this class.
+        """
+        if self._cipher is None:
+            from .gspa.cipher_keys import hyundai_cipher, kia_cipher
+
+            self._cipher = (
+                hyundai_cipher() if self.CIPHER_BRAND == "hyundai" else kia_cipher()
+            )
+        return self._cipher
+
     def _get_stamp(self, token: Token) -> tuple[str, str]:
         """Compute GSPA X-Stamp + tsid for GSPA endpoint authentication.
 
@@ -1028,7 +1045,7 @@ class GspaApiEU(ApiImpl):
             tsid = create_tsid(device_id)
             epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
             user_id = token.user_id or ""
-            stamp = self._cipher.compute_x_stamp(
+            stamp = self._get_cipher().compute_x_stamp(
                 region=self.STAMP_REGION,
                 tsid=tsid,
                 epoch_seconds=epoch_seconds,
@@ -2403,8 +2420,19 @@ class GspaApiEU(ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
-        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+        """Lock/unlock via the granular per-action endpoints.
+
+        POST .../door-lock {"command": "set"} and .../door-unlock: the
+        action lives in the endpoint (the "lock"/"CLOSE" body forms are
+        rejected with 400-002). Accepted live across the 2026-10 EU
+        vehicle run on every tested model (Kia CCI: EV6, EV3, eNiro
+        2021; Hyundai: IONIQ 5 2022, Tucson PHEV, IONIQ 6) with the
+        door state reflecting it in the fresh server data afterwards.
+        The shared legacy "door" + close/open shape stays accepted by
+        the backend, but the EU apps no longer send it.
+        """
+        endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
+        return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
 
     def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -3070,12 +3098,6 @@ class GspaApiEU(ApiImpl):
             "reservFlag": 1 if options.charging_enabled else 0,
             "command": "set",
         }
-
-    def lock_and_start_toggle(
-        self, token: Token, vehicle: Vehicle, enable: bool = True
-    ) -> str:
-        body = {"lockAndStartEnable": enable}
-        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
 
     def set_ota_reservation(
         self, token: Token, vehicle: Vehicle, settings: dict[str, Any]

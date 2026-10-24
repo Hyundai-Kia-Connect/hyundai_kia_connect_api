@@ -58,7 +58,10 @@ def test_path_prefix_map():
 
 def test_bearer_endpoints_cover_settings_and_reservations():
     assert "charge-target" in GspaApiEU.GSPA_BEARER_ENDPOINTS
-    assert "lock-and-start-toggle" in GspaApiEU.GSPA_BEARER_ENDPOINTS
+    # lock-and-start-toggle returned 404 on all three models in the
+    # 2026-10 vehicle run (EV6, Tucson, eNiro); the endpoint is dropped
+    # together with its bearer exemption.
+    assert "lock-and-start-toggle" not in GspaApiEU.GSPA_BEARER_ENDPOINTS
     assert "door" not in GspaApiEU.GSPA_BEARER_ENDPOINTS
 
 

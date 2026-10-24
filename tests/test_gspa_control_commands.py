@@ -25,6 +25,7 @@ from hyundai_kia_connect_api.exceptions import (
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 
@@ -56,6 +57,19 @@ def _make_vehicle(ccs2: int = 1) -> Vehicle:
     return vehicle
 
 
+def _run_command_on(api, meth, *args, **kwargs):
+    """Same as _run_command but for a caller-provided api instance."""
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = meth(token, vehicle, *args, **kwargs)
+    return action_id, post.call_args
+
+
 def _run_command(meth, *args, **kwargs):
     """Run a public control method with mocked transport+PIN; return the POST call."""
     api = _make_api()
@@ -76,14 +90,15 @@ def test_lock_action_unlock():
         HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.UNLOCK
     )
     assert action_id == "gspa:sid-1"
-    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door")
-    assert call.kwargs["json"] == {"command": "open"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-unlock")
+    assert call.kwargs["json"] == {"command": "set"}
     assert call.kwargs["headers"]["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
 
 
 def test_lock_action_lock():
     _, call = _run_command(HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.LOCK)
-    assert call.kwargs["json"] == {"command": "close"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-lock")
+    assert call.kwargs["json"] == {"command": "set"}
 
 
 def test_door_power_off():
@@ -186,10 +201,11 @@ def test_control_command_pre_ccs2_raises_unsupported():
 
 
 def test_kia_remote_control_gated_not_implemented():
-    """Kia EU CCI inherits the GSPA control layer but ships partially
-    gated: only live-proven endpoints pass (door lock + unlock, PV5
-    2026-09-19). Everything else raises NotImplementedError before any
-    request."""
+    """Kia EU CCI ships remote control through the verified-endpoint
+    gate: the 2026-10 vehicle run (EV6, EV3, eNiro 2021, Inster 2026)
+    accepted the hazard, horn, charge and both granular door shapes,
+    so they join the earlier proven set. Everything else raises
+    NotImplementedError before any request."""
     from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
     api = KiaCciApiEU(9, 2, "en")
@@ -200,10 +216,52 @@ def test_kia_remote_control_gated_not_implemented():
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
-    # Evidence-mapped: only the live-proven endpoints pass.
+    # Evidence-mapped: the endpoints accepted during the 2026-10 vehicle
+    # run, including the Kia-window acceptance (EV6).
     assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset(
-        {"door", "temperature", "lamp"}
+        {
+            "door",
+            "door-lock",
+            "door-unlock",
+            "temperature",
+            "lamp",
+            "light",
+            "hornlight",
+            "charge",
+            "windowcurtain",
+            "charge-target",
+            "charging-current",
+        }
     )
+
+
+def test_kia_verified_commands_reach_the_wire():
+    """Enabled Kia commands route through the shared implementations
+    (hazard light, horn, charge, granular doors) instead of raising."""
+    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+
+    api = KiaCciApiEU(9, 2, "en")
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        api.start_hazard_lights(token, vehicle)
+        api.start_hazard_lights_and_horn(token, vehicle)
+        api.start_charge(token, vehicle)
+        api.stop_charge(token, vehicle)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.UNLOCK)
+    urls = [c.args[0] for c in post.call_args_list]
+    bodies = [c.kwargs["json"] for c in post.call_args_list]
+    assert urls[0].endswith("/light") and bodies[0] == {"command": "on"}
+    assert urls[1].endswith("/horn-light") and bodies[1] == {"command": "on"}
+    assert urls[2].endswith("/charge") and bodies[2] == {"command": "start"}
+    assert urls[3].endswith("/charge") and bodies[3] == {"command": "stop"}
+    assert urls[4].endswith("/door-lock") and bodies[4] == {"command": "set"}
+    assert urls[5].endswith("/door-unlock") and bodies[5] == {"command": "set"}
 
 
 def test_start_climate_full_options():
@@ -503,14 +561,6 @@ def test_schedule_charging_and_climate_body_shape():
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
-def test_lock_and_start_toggle():
-    _, call = _run_command(HyundaiCciApiEU.lock_and_start_toggle, True)
-    assert call.args[0].endswith("/lock-and-start-toggle")
-    assert call.kwargs["json"] == {"lockAndStartEnable": True}
-    assert "AuthorizationCCSP" not in call.kwargs["headers"]
-    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
-
-
 def test_control_command_rc_not_0000_raises_api_error():
     api = _make_api()
     token = _make_token()
@@ -726,3 +776,29 @@ def test_set_ota_update_uses_bearer_headers():
         HyundaiCciApiEU.set_ota_update(api, token, vehicle, True)
     get_ct.assert_not_called()
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_kia_charge_limits_use_the_live_proven_plugtype_mapping():
+    """Kia GSPA charge-target: plugType 0 = DC, 1 = AC with the
+    targetSOClist / targetSOClevel fields — live-proven on a PV5
+    (2026-10-20): the library body applied (TargetSoC.Quick 100 -> 80,
+    TargetSoC.Standard 70 -> 90), while the 1=AC / 2=DC variant from
+    the issue tables was rejected with 400-002."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_limits, 90, 80)
+    body = call.kwargs["json"]
+    assert body["command"] == "set"
+    assert body["targetSOClist"] == [
+        {"plugType": 0, "targetSOClevel": 80},
+        {"plugType": 1, "targetSOClevel": 90},
+    ]
+
+
+def test_kia_charging_current_sends_the_level_field():
+    """Kia GSPA charging-current: {"chargingCurrent": level, "command":
+    "set"} — live-proven on a PV5 (2026-10-20), 202 S 202-000 with the
+    stored ElectricCurrentLevel.State following the value (1 = 100 %)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charging_current, 1)
+    body = call.kwargs["json"]
+    assert body == {"chargingCurrent": 1, "command": "set"}

@@ -1,13 +1,10 @@
 """Kia EU CCI control gate — evidence-mapped.
 
-Only live-proven endpoints pass (GSPA_VERIFIED_ENDPOINTS). Door lock and
-unlock via the shared "door" endpoint + {"command": "close"/"open"} were
-live-proven on a Kia PV5 (2026-09-19: 202 S 202-000, fresh stored-status
-7 s / 4 s after sending), and climate start/stop via the "temperature"
-endpoint on the same PV5 (202 S 202-000 both directions), and lamp
-all-off on a Kia EV6 (2026-09-23: 202 APPLIED with the stored-status
-lastUpdateTime advancing). Everything else
-stays gated until live verification (D6).
+The verified set now covers the 2026-10 vehicle run (EV6, EV3, eNiro
+2021, Inster 2026): hazard lights (light), horn + hazard (horn-light),
+charge start/stop and the granular door-lock/door-unlock endpoints
+joined door, temperature (PV5, 2026-09-19) and lamp (EV6, 2026-09-23).
+Everything else stays gated until live verification.
 """
 
 import datetime as dt
@@ -16,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
-from hyundai_kia_connect_api.const import VEHICLE_LOCK_ACTION
+from hyundai_kia_connect_api.const import CHARGE_PORT_ACTION, VEHICLE_LOCK_ACTION
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -50,14 +47,16 @@ def _make_vehicle() -> Vehicle:
     return vehicle
 
 
-def test_kia_lock_unlock_passes_gate():
-    """LOCK and UNLOCK (door + close/open) are live-proven on a PV5."""
+def test_kia_lock_unlock_granular():
+    """Lock/unlock route to the granular per-action endpoints (the EU
+    apps abandoned the shared door + close/open shape). Accepted live
+    across the 2026-10 vehicle run."""
     api = KiaCciApiEU(9, 2, "en")
     token = _make_token()
     vehicle = _make_vehicle()
-    for action, command in (
-        (VEHICLE_LOCK_ACTION.LOCK, "close"),
-        (VEHICLE_LOCK_ACTION.UNLOCK, "open"),
+    for action, endpoint in (
+        (VEHICLE_LOCK_ACTION.LOCK, "door-lock"),
+        (VEHICLE_LOCK_ACTION.UNLOCK, "door-unlock"),
     ):
         with (
             patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
@@ -67,8 +66,10 @@ def test_kia_lock_unlock_passes_gate():
             post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
             action_id = api.lock_action(token, vehicle, action)
         assert action_id == "gspa:sid-1"
-        assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/door")
-        assert post.call_args.kwargs["json"] == {"command": command}
+        assert post.call_args.args[0].endswith(
+            f"/gspa/v1/remote/vehicles/test123/{endpoint}"
+        )
+        assert post.call_args.kwargs["json"] == {"command": "set"}
 
 
 def test_kia_climate_passes_gate():
@@ -128,17 +129,16 @@ def test_kia_unverified_commands_are_gated():
     api = KiaCciApiEU(9, 2, "en")
     token = _make_token()
     vehicle = _make_vehicle()
-    for meth in (
-        api.start_charge,
-        api.stop_charge,
-        api.door_power_off,
-        api.start_hazard_lights,
+    for meth, args in (
+        (api.door_power_off, ()),
+        (api.open_frunk, ()),
+        (api.charge_port_action, (CHARGE_PORT_ACTION.OPEN,)),
     ):
         with (
             patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
             pytest.raises(NotImplementedError),
         ):
-            meth(token, vehicle)
+            meth(token, vehicle, *args)
         post.assert_not_called()
 
 
@@ -148,3 +148,31 @@ def test_kia_check_action_status_is_gated():
     api = KiaCciApiEU(9, 2, "en")
     with pytest.raises(NotImplementedError):
         api.check_action_status(_make_token(), _make_vehicle(), "gspa:sid-1")
+
+
+def test_kia_windows_accepted():
+    """Kia EU window control ships: the server accepted the scope
+    command with a polling SID on the EV6 (2026-10-18)."""
+    api = KiaCciApiEU(9, 2, "en")
+    assert api.supports_window_control is True
+    token = _make_token()
+    vehicle = _make_vehicle()
+    from hyundai_kia_connect_api.ApiImpl import WindowRequestOptions
+    from hyundai_kia_connect_api.const import WINDOW_STATE
+
+    vehicle.supports_window_control = True
+    options = WindowRequestOptions(
+        front_left=WINDOW_STATE.CLOSED,
+        front_right=WINDOW_STATE.CLOSED,
+        back_left=WINDOW_STATE.CLOSED,
+        back_right=WINDOW_STATE.CLOSED,
+    )
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = api.set_windows_state(token, vehicle, options)
+    assert action_id == "gspa:sid-1"
+    assert post.call_args.args[0].endswith("/window-curtain")
