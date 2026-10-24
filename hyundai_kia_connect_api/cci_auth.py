@@ -1,6 +1,6 @@
 """CCI auth helpers shared by the EU OneApp/CCI login flows.
 
-KiaUvoApiEU (region 1, CCAPI vehicle endpoints) and GspaApiEU (region 7,
+KiaUvoApiEU (region 1, CCAPI vehicle endpoints) and GspaApiEU (region 9,
 GSPA vehicle endpoints) log in through the same cci-api-eu host. The
 header builders and token exchanges below were duplicated in both classes;
 they live here so a fix to the gate handling lands in both regions at once.
@@ -183,7 +183,7 @@ class CciAuthMixin:
 
         The CCS token is accepted as a Bearer access_token by the legacy
         ccapi:8080 endpoints (region 1) and the GSPA REST endpoints
-        (region 7). Returns (ccs_token, valid_until).
+        (region 9). Returns (ccs_token, valid_until).
         """
         headers = self._cci_fp_headers(device_id)
         headers["authorization"] = (
