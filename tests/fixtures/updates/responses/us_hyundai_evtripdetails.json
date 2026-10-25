@@ -1,0 +1,10 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/ts/alerts/maintenance/evTripDetails",
+        "source": "get_ev_trip_details response debug log in kia_uvo #1455 (2025 GV70 EV)",
+        "description": "Real response."
+    },
+    "tripdetails": []
+}

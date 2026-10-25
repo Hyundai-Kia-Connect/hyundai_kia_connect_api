@@ -1,0 +1,27 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/br_hyundai_creta_2025_ccs2_cached.json ( )",
+        "follow_up_sources": "none",
+        "not_captured": [],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "Brazil",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "ICE",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /spa/vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "$fixture": "br_hyundai_creta_2025_ccs2_cached.json"
+            }
+        }
+    }
+}

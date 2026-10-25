@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "region": "CN",
+        "brand": "Kia",
+        "endpoint": "spa/vehicles",
+        "vehicles": "2025 库斯途 (ICE, type GN)",
+        "source": "Live China capture added with the CN rewrite (library #1295)",
+        "description": "Real vehicle list. VIN, vehicle id and plate in the nickname replaced. China omits ccuCCS2ProtocolSupport."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "vehicles": [
+            {
+                "vin": "TESTVIN0000000001",
+                "vehicleId": "VEHICLE-1",
+                "vehicleName": "库斯途",
+                "type": "GN",
+                "tmuNum": "***",
+                "nickname": "库斯途",
+                "year": "2025",
+                "master": true,
+                "carShare": 0,
+                "regDate": "2025-07-13 20:12:40.283",
+                "detailInfo": {
+                    "bleFunc": "1",
+                    "authYn": "N"
+                }
+            }
+        ]
+    },
+    "msgId": "MSG-1"
+}

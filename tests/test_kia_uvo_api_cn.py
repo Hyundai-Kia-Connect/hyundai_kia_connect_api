@@ -6,7 +6,6 @@ without hitting the real servers:
 - _uars_state_param (authorize state blob)
 - inherited _check_response_for_errors mapping (4002 -> DeviceIDError etc.)
 - brand dispatch constants
-- get_vehicles parsing (fixture from a live capture, VIN redacted)
 - the airTemp "FFH" sentinel in _update_vehicle_properties
 """
 
@@ -194,34 +193,6 @@ class TokenStub:
     device_id = "DEVICE-ID"
 
 
-# ---------------------------------------------------------------------------
-# get_vehicles parsing (fixture from live capture, VIN redacted)
-# ---------------------------------------------------------------------------
-LIVE_VEHICLES_RESPONSE = {
-    "retCode": "S",
-    "resCode": "0000",
-    "resMsg": {
-        "vehicles": [
-            {
-                "vin": "LBE***8954",
-                "vehicleId": "dceb950b-a5be-4935-9fb5-5db5a951a2d4",
-                "vehicleName": "库斯途",
-                "type": "GN",
-                "tmuNum": "***",
-                "nickname": "库斯途 (京A·12345)",
-                "year": "2025",
-                "master": True,
-                "carShare": 0,
-                "regDate": "2025-07-13 20:12:40.283",
-                "detailInfo": {"bleFunc": "1", "authYn": "N"},
-                # NOTE: no ccuCCS2ProtocolSupport in the China vehicle list
-            }
-        ]
-    },
-    "msgId": "…",
-}
-
-
 class FakeResponse:
     def __init__(self, payload):
         self._payload = payload
@@ -230,30 +201,7 @@ class FakeResponse:
         return self._payload
 
 
-class FakeSession:
-    def __init__(self, payloads):
-        self._payloads = payloads
-        self.calls = []
-
-    def get(self, url, headers=None, **kwargs):
-        self.calls.append(("GET", url))
-        return FakeResponse(self._payloads.pop(0))
-
-
-class TestGetVehicles:
-    def test_parses_live_schema_without_ccs2_flag(self, api: KiaUvoApiCN):
-        api.session = FakeSession([LIVE_VEHICLES_RESPONSE])
-        token = TokenStub()
-        vehicles = api.get_vehicles(token)
-        assert len(vehicles) == 1
-        v = vehicles[0]
-        assert v.id == "dceb950b-a5be-4935-9fb5-5db5a951a2d4"
-        assert v.name == "库斯途 (京A·12345)"
-        assert v.model == "库斯途"
-        # GN -> ICE; missing ccuCCS2ProtocolSupport defaults to 0 (legacy path)
-        assert v.ccu_ccs2_protocol_support == 0
-        assert "vehicles" in api.session.calls[0][1]
-
+class TestDeviceIdRegistration:
     def test_device_id_registration_payload(self, api: KiaUvoApiCN, monkeypatch):
         captured = {}
 
