@@ -2,21 +2,21 @@
 
 This directory contains JSON files representing real API response shapes from the Hyundai/Kia Connect API.
 
-`tests/test_vehicle_snapshots.py` parses **every** fixture here with the parser its filename prefix selects and compares the full parsed `Vehicle` to a syrupy snapshot in `tests/__snapshots__/`. A fixture with no parser mapped fails the test. Don't write per-field parsing tests for a fixture: the snapshot already covers every field.
+The top-level files are status payloads, stored without the outer response envelope. `tests/test_vehicle_update_snapshots.py` serves each one through a cached-state update scenario in `updates/` (see "Cached-state updates" below) and compares the requests sent and the full parsed `Vehicle` to a syrupy snapshot in `tests/__snapshots__/`. A status fixture that no scenario references fails the test. Don't write per-field parsing tests for a fixture: the snapshot already covers every field.
 
-## Supported Regions & Parsers
+## Status fixtures by region
 
-| Region       | API Class / parser                                     | Fixture Prefix          | Response Structure                                 |
-| ------------ | ------------------------------------------------------ | ----------------------- | -------------------------------------------------- |
-| US (Kia)     | `KiaUvoApiUSA._update_vehicle_properties`              | `us_kia_`               | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*` |
-| US (Hyundai) | `HyundaiBlueLinkApiUSA._update_vehicle_properties`     | `us_hyundai_`           | `vehicleStatus.*`                                  |
-| EU           | `KiaUvoApiEU._update_vehicle_properties`               | `eu_kia_` (no `ccs2`)   | `vehicleStatus.*`                                  |
-| EU (CCS2)    | `ApiImplType1._update_vehicle_properties_ccs2`         | `eu_kia_` (with `ccs2`) | `Green.*`, `Cabin.*`, `Body.*`                     |
-| EU (GSPA)    | `KiaCciApiEU._update_vehicle_properties_ccs2`          | `eu_kia_gspa_`          | CCS2-style stored status                           |
-| BR           | `HyundaiBlueLinkApiBR._update_vehicle_properties_ccs2` | `br_`                   | `resMsg.state.Vehicle` (CCS2)                      |
-| CA           | `KiaUvoApiCA._update_vehicle_properties_base`          | `ca_`                   | `status.*`                                         |
-| AU           | `KiaUvoApiAU._update_vehicle_properties`               | `au_`                   | `status.*`                                         |
-| CN           | `KiaUvoApiCN._update_vehicle_properties`               | `cn_`                   | `status.*`                                         |
+| Region       | Implementation (update path) | Fixture Prefix          | Response Structure                                 |
+| ------------ | ---------------------------- | ----------------------- | -------------------------------------------------- |
+| US (Kia)     | `KiaUvoApiUSA`               | `us_kia_`               | `lastVehicleInfo.vehicleStatusRpt.vehicleStatus.*` |
+| US (Hyundai) | `HyundaiBlueLinkApiUSA`      | `us_hyundai_`           | `vehicleStatus.*`                                  |
+| EU           | `KiaUvoApiEU`                | `eu_kia_` (no `ccs2`)   | `vehicleStatus.*`                                  |
+| EU (CCS2)    | `KiaUvoApiEU`                | `eu_kia_` (with `ccs2`) | `Green.*`, `Cabin.*`, `Body.*`                     |
+| EU (GSPA)    | `KiaCciApiEU`                | `eu_kia_gspa_`          | CCS2-style stored status                           |
+| BR           | `HyundaiBlueLinkApiBR`       | `br_`                   | `resMsg.state.Vehicle` (CCS2)                      |
+| CA           | `KiaUvoApiCA`                | `ca_`                   | `status.*`                                         |
+| AU           | `KiaUvoApiAU`                | `au_`                   | `status.*`                                         |
+| CN           | `KiaUvoApiCN`                | `cn_`                   | `status.*`                                         |
 
 ## Vehicle lists
 
@@ -128,15 +128,15 @@ Tests use helpers from `tests/fixture_helpers.py`:
 - `discover_fixtures("us_kia_")` — finds all fixture files starting with `us_kia_`
 - `load_fixture(filename)` — loads and parses a JSON fixture
 
-To cover a parsing edge case (a missing block, an unusual value), add a small scenario fixture such as `eu_kia_ev6_unset_timers.json` instead of writing a new test.
+To cover a parsing edge case (a missing block, an unusual value), add a small status fixture such as `eu_kia_ev6_unset_timers.json` and an update scenario for it instead of writing a new test.
 
 ## Contributing a Fixture
 
-1. Capture the API response for your vehicle (from `cmm/gvi`, `lststatus`, or equivalent endpoint).
-2. Strip any sensitive data (VIN, real GPS coordinates, account info).
-3. Name the file following the convention above — the prefix selects the parser (see the table above).
-4. Add the `_fixture_meta` block.
-5. Run `pytest tests/test_vehicle_snapshots.py --snapshot-update` to create its snapshot, then review the generated snapshot to check every parsed value is correct.
+1. Capture the real API response for your vehicle, for example from the `get_cached_vehicle_status response` debug log line. Never invent a response body.
+2. Strip any sensitive data (VINs, vehicle ids, keys, coordinates including altitude, account info).
+3. Name the file following the convention above and add the `_fixture_meta` block.
+4. Add an update scenario in `updates/` that references it, with real captures for the follow-up reads in `updates/responses/`.
+5. Run `pytest tests/test_vehicle_update_snapshots.py --snapshot-update` to create its snapshot, then review the generated snapshot to check every parsed value is correct.
 
 ### Region-Specific Notes
 

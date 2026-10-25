@@ -70,15 +70,30 @@ pytest                       # full suite; CI runs Python 3.12–3.14
 pre-commit run --all-files   # ruff, ruff-format, codespell, pyupgrade, mypy --strict, prettier
 ```
 
-- Every fix or feature needs a test in `tests/`. Use the existing JSON fixtures
-  in `tests/fixtures/` (see its README) and the snapshot tests
-  (`tests/__snapshots__`, syrupy) rather than live API calls.
-- Don't write new tests for status parsing. `tests/test_vehicle_snapshots.py`
-  snapshots the full parsed `Vehicle` for every fixture. To cover new or
-  changed parsing, add or update a fixture (a small scenario fixture for an
-  edge case), run `pytest tests/test_vehicle_snapshots.py --snapshot-update`,
-  and review the snapshot diff.
-- New fixtures must be anonymised: no VINs, tokens, emails, coordinates,
-  or account IDs.
+- Every fix or feature needs a test in `tests/`. Prefer the snapshot harnesses
+  below over new unit tests, and never call the live API. See
+  `tests/fixtures/README.md` for the fixture formats.
+    - Status parsing and cached-state updates: `tests/test_vehicle_update_snapshots.py`
+      runs `VehicleManager.update_vehicle_with_cached_state` for each scenario in
+      `tests/fixtures/updates/` and snapshots the requests sent and the full
+      `Vehicle`.
+    - Vehicle lists: `tests/test_vehicle_list_snapshots.py` with
+      `tests/fixtures/vehicle_lists/`.
+    - Commands: `tests/test_vehicle_commands.py` snapshots the outbound requests.
+- To cover new or changed parsing, add or update a scenario or fixture, run
+  `pytest <harness> --snapshot-update` and review the snapshot diff. Don't add
+  per-field asserts for values a snapshot already pins. For a parsing edge
+  case, add a small status fixture and an update scenario for it. Write a
+  separate test only for behaviour (retries, errors, gating).
+- Fixtures must be real captured API responses, never invented bodies. Check
+  first that the region's code logs the response in debug mode (for example
+  `Get Vehicles Response`, `get_cached_vehicle_status response`), then take
+  it from a debug log. If a read has no capture, answer it with
+  `{"status": 503, "body": null}` and list it in the scenario's
+  `_fixture_meta.not_captured`.
+- Anonymise fixtures: replace VINs, vehicle ids, keys, tokens and
+  coordinates (including altitudes, which can echo the longitude), and drop
+  account, driver and address blocks. Record where each capture came from in
+  `_fixture_meta.source`.
 - New code must pass `mypy --strict`.
 - Never commit credentials. `.env` is git-ignored.
