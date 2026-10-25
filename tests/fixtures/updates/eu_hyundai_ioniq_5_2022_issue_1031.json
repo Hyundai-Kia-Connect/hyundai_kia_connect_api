@@ -1,0 +1,35 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2022 IONIQ 5 (EV)",
+        "source": "kia_uvo #1031 debug log: cached status, drvhistory all-time and 30d",
+        "follow_up_sources": "location/park: library #1301 shape",
+        "not_captured": [],
+        "description": "Whole update chain from one car; identifiers and coordinates replaced."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/status/latest": {
+            "body": "$fixture:updates/responses/eu_hyundai_status_latest_1031.json"
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "body": "$fixture:updates/responses/eu_location_park.json"
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": [
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_alltime.json"
+            },
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_30d.json"
+            }
+        ]
+    }
+}

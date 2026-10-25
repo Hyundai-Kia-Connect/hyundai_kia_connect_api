@@ -1,0 +1,351 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Kia",
+        "endpoint": "POST apigw/v1/cmm/gvi",
+        "source": "got response debug log in kia_uvo #722 (2022 EV6)",
+        "description": "Real response; identifiers and coordinates replaced."
+    },
+    "status": {
+        "statusCode": 0,
+        "errorType": 0,
+        "errorCode": 0,
+        "errorMessage": "Success with response body"
+    },
+    "payload": {
+        "vehicleInfoList": [
+            {
+                "vinKey": "KEY-1",
+                "vehicleConfig": {
+                    "vehicleDetail": {
+                        "vehicle": {
+                            "vin": "TESTVIN0000000001",
+                            "trim": {
+                                "modelYear": "2022",
+                                "salesModelCode": "N5462",
+                                "optionGroupCode": "014",
+                                "modelName": "EV6",
+                                "factoryCode": "AS",
+                                "projectCode": "CV",
+                                "trimName": "GT-LINE",
+                                "driveType": "2",
+                                "transmissionType": "1",
+                                "ivrCategory": "10",
+                                "btSeriesCode": "Y"
+                            },
+                            "telematics": 1,
+                            "mileage": "16117",
+                            "mileageSyncDate": "20230921060229",
+                            "exteriorColor": "RUNWAY RED",
+                            "exteriorColorCode": "CR5",
+                            "fuelType": 4,
+                            "invDealerCode": "XXX",
+                            "testVehicle": "0",
+                            "supportedApps": [
+                                {
+                                    "appType": "0"
+                                },
+                                {
+                                    "appType": "5",
+                                    "appImage": {
+                                        "imageName": "uvo-app.png",
+                                        "imagePath": "/content/dam/kia/us/owners/image/common/app/access/",
+                                        "imageType": "2",
+                                        "imageSize": {
+                                            "length": "100",
+                                            "width": "100",
+                                            "uom": 0
+                                        }
+                                    }
+                                }
+                            ],
+                            "activationType": 2
+                        },
+                        "images": [
+                            {
+                                "imageName": "2022-ev6-gt-line-cr5.png",
+                                "imagePath": "/content/dam/kia/us/owners/image/vehicle-app/2022/ev6/gt-line/",
+                                "imageType": "1",
+                                "imageSize": {
+                                    "length": "100",
+                                    "width": "100",
+                                    "uom": 0
+                                }
+                            }
+                        ],
+                        "device": {
+                            "launchType": "0",
+                            "swVersion": "CVEV.USA.S5W_M.V010.003.230526",
+                            "telematics": {
+                                "generation": "3",
+                                "platform": "1",
+                                "tmsCenter": "1",
+                                "billing": true
+                            },
+                            "versionNum": "ECO",
+                            "headUnitType": "0",
+                            "hdRadio": "X40HAF",
+                            "ampType": "NA",
+                            "headUnitName": "avn5em",
+                            "bluetoothRef": "20",
+                            "headUnitDesc": "AVN5.0W"
+                        }
+                    },
+                    "maintenance": {
+                        "nextServiceMile": 7882.8,
+                        "maintenanceSchedule": [
+                            8000, 16000, 24000, 32000, 40000, 48000, 56000,
+                            64000, 72000, 80000, 88000, 96000
+                        ]
+                    },
+                    "billingPeriod": {
+                        "freeTrial": {
+                            "value": 12,
+                            "unit": 0
+                        },
+                        "freeTrialExtension": {
+                            "value": 12,
+                            "unit": 1
+                        },
+                        "servicePeriod": {
+                            "value": 60,
+                            "unit": 1
+                        }
+                    }
+                },
+                "lastVehicleInfo": {
+                    "vehicleNickName": "My Car",
+                    "preferredDealer": "XXX",
+                    "licensePlate": "",
+                    "psi": "",
+                    "customerType": 0,
+                    "enrollment": {
+                        "provStatus": "4",
+                        "enrollmentStatus": "1",
+                        "enrollmentType": "0",
+                        "registrationDate": "20220310",
+                        "expirationDate": "20230310",
+                        "expirationMileage": "100000",
+                        "freeServiceDate": {
+                            "startDate": "20220310",
+                            "endDate": "20230310"
+                        },
+                        "evEnrollmentCode": "XXX"
+                    },
+                    "activeDTC": {
+                        "dtcActiveCount": "0"
+                    },
+                    "vehicleStatusRpt": {
+                        "statusType": "2",
+                        "reportDate": {
+                            "utc": "20230921202841",
+                            "offset": -7
+                        },
+                        "vehicleStatus": {
+                            "climate": {
+                                "airCtrl": false,
+                                "defrost": false,
+                                "airTemp": {
+                                    "value": "72",
+                                    "unit": 1
+                                },
+                                "heatingAccessory": {
+                                    "steeringWheel": 0,
+                                    "sideMirror": 0,
+                                    "rearWindow": 0
+                                }
+                            },
+                            "engine": false,
+                            "doorLock": true,
+                            "doorStatus": {
+                                "frontLeft": 0,
+                                "frontRight": 0,
+                                "backLeft": 0,
+                                "backRight": 0,
+                                "trunk": 0,
+                                "hood": 0
+                            },
+                            "lowFuelLight": false,
+                            "evStatus": {
+                                "batteryCharge": false,
+                                "batteryStatus": 67,
+                                "batteryPlugin": 0,
+                                "batteryPrecondition": false,
+                                "remainChargeTime": [
+                                    {
+                                        "remainChargeType": 1,
+                                        "timeInterval": {
+                                            "value": 31,
+                                            "unit": 4
+                                        }
+                                    },
+                                    {
+                                        "remainChargeType": 2,
+                                        "timeInterval": {
+                                            "value": 540,
+                                            "unit": 4
+                                        }
+                                    },
+                                    {
+                                        "remainChargeType": 3,
+                                        "timeInterval": {
+                                            "value": 55,
+                                            "unit": 4
+                                        }
+                                    }
+                                ],
+                                "drvDistance": [
+                                    {
+                                        "type": 2,
+                                        "rangeByFuel": {
+                                            "evModeRange": {
+                                                "value": 199,
+                                                "unit": 3
+                                            },
+                                            "totalAvailableRange": {
+                                                "value": 199,
+                                                "unit": 3
+                                            }
+                                        }
+                                    }
+                                ],
+                                "syncDate": {
+                                    "utc": "20230921200229",
+                                    "offset": -7
+                                },
+                                "targetSOC": [
+                                    {
+                                        "plugType": 0,
+                                        "targetSOClevel": 100,
+                                        "dte": {
+                                            "type": 2,
+                                            "rangeByFuel": {
+                                                "gasModeRange": {
+                                                    "value": 0,
+                                                    "unit": 3
+                                                },
+                                                "evModeRange": {
+                                                    "value": 199,
+                                                    "unit": 3
+                                                },
+                                                "totalAvailableRange": {
+                                                    "value": 199,
+                                                    "unit": 3
+                                                }
+                                            }
+                                        }
+                                    },
+                                    {
+                                        "plugType": 1,
+                                        "targetSOClevel": 80,
+                                        "dte": {
+                                            "type": 2,
+                                            "rangeByFuel": {
+                                                "gasModeRange": {
+                                                    "value": 0,
+                                                    "unit": 3
+                                                },
+                                                "evModeRange": {
+                                                    "value": 199,
+                                                    "unit": 3
+                                                },
+                                                "totalAvailableRange": {
+                                                    "value": 199,
+                                                    "unit": 3
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            "ign3": false,
+                            "transCond": true,
+                            "tirePressure": {
+                                "all": 0
+                            },
+                            "dateTime": {
+                                "utc": "20230921202841",
+                                "offset": -7
+                            },
+                            "syncDate": {
+                                "utc": "20230921200229",
+                                "offset": -7
+                            },
+                            "batteryStatus": {
+                                "stateOfCharge": 86,
+                                "deliveryMode": 1,
+                                "warning": 65,
+                                "powerAutoCutMode": 2
+                            },
+                            "sleepMode": false,
+                            "lampWireStatus": {
+                                "headLamp": {
+                                    "headLampStatus": false,
+                                    "lampLL": false,
+                                    "lampRL": false,
+                                    "lampLH": false,
+                                    "lampRH": false,
+                                    "lampLB": false,
+                                    "lampRB": false
+                                },
+                                "stopLamp": {
+                                    "leftLamp": false,
+                                    "rightLamp": false
+                                },
+                                "turnSignalLamp": {
+                                    "lampLF": false,
+                                    "lampRF": false,
+                                    "lampLR": false,
+                                    "lampRR": false
+                                }
+                            },
+                            "windowStatus": {
+                                "windowFL": 0,
+                                "windowFR": 0,
+                                "windowRL": 0,
+                                "windowRR": 0
+                            },
+                            "smartKeyBatteryWarning": false,
+                            "washerFluidStatus": false,
+                            "brakeOilStatus": false,
+                            "engineRuntime": {},
+                            "remoteControlAvailable": 1,
+                            "valetParkingMode": 0,
+                            "rsaStatus": 0,
+                            "lightStatus": {
+                                "tailLampStatus": 0,
+                                "hazardStatus": 0
+                            }
+                        }
+                    },
+                    "location": {
+                        "coord": {
+                            "lat": 52.52,
+                            "lon": 13.405,
+                            "alt": 0,
+                            "type": 0,
+                            "altdo": 0
+                        },
+                        "head": 83,
+                        "speed": {
+                            "value": 0,
+                            "unit": 1
+                        },
+                        "accuracy": {
+                            "hdop": 6,
+                            "pdop": 12
+                        },
+                        "syncDate": {
+                            "utc": "20230921200229",
+                            "offset": -7
+                        }
+                    },
+                    "financed": true,
+                    "financeRegistered": false,
+                    "linkStatus": 0,
+                    "rsaStatus": 0
+                }
+            }
+        ]
+    }
+}

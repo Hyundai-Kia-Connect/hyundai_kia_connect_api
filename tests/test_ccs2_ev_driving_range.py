@@ -7,8 +7,9 @@ PHEV left it None. The fix reads ``Drivetrain.FuelSystem.DTE.EV`` for PHEV.
 
 Confirmed against the EU Kia Sportage PHEV 2027 CCS2 fixture:
 ``DTE: {Total: 600, Unit: 1, EV: 47, ICE: 551}`` — 47 km electric-only range,
-600 km total. HEV/ICE have no plug and no EV-only range, so ev_driving_range
-stays None.
+600 km total. The PHEV case is covered by tests/test_vehicle_update_snapshots.py;
+these tests run the same status as ICE and EV. HEV/ICE have no plug and no
+EV-only range, so ev_driving_range stays None.
 """
 
 import pytest
@@ -38,19 +39,6 @@ def _parse(api, engine_type) -> Vehicle:
 
 
 class TestEvDrivingRangePhev:
-    def test_phev_ev_driving_range_from_dte_ev(self, ccs2_api):
-        """PHEV: ev_driving_range is the electric-only DTE.EV, not DTE.Total."""
-        vehicle = _parse(ccs2_api, ENGINE_TYPES.PHEV)
-        assert vehicle.total_driving_range == 600.0
-        assert vehicle.ev_driving_range == 47.0
-        # Unit follows DTE.Unit (same as total_driving_range_unit).
-        assert vehicle.ev_driving_range_unit == vehicle.total_driving_range_unit
-
-    def test_phev_total_driving_range_still_dte_total(self, ccs2_api):
-        """total_driving_range is unchanged: always DTE.Total."""
-        vehicle = _parse(ccs2_api, ENGINE_TYPES.PHEV)
-        assert vehicle.total_driving_range == 600.0
-
     def test_ice_ev_driving_range_stays_none(self, ccs2_api):
         """ICE/HEV have no EV-only range: ev_driving_range stays None even
         when the status (here a PHEV's) happens to carry a DTE.EV field."""

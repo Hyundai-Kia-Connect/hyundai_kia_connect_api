@@ -1,0 +1,170 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/rcs/rvs/vehicleStatus",
+        "source": "get_vehicle_status response debug log in kia_uvo #1040 (2025 Santa Fe Hybrid)",
+        "description": "Real response; coordinates replaced."
+    },
+    "hataTID": "XXX",
+    "vehicleStatus": {
+        "dateTime": "2025-02-19T15:48:19Z",
+        "acc": false,
+        "fuelLevel": 60,
+        "defrostStatus": "false",
+        "transCond": true,
+        "doorLockStatus": "true",
+        "doorOpen": {
+            "frontRight": 0,
+            "frontLeft": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "washerFluidStatus": false,
+        "battery": {
+            "powerAutoCutMode": 2,
+            "batSignalReferenceValue": {
+                "batWarning": 65
+            },
+            "batSoc": 93,
+            "batState": 0,
+            "sjbDeliveryMode": 2
+        },
+        "seatHeaterVentInfo": {
+            "rlSeatHeatState": 2,
+            "drvSeatHeatState": 2,
+            "rrSeatHeatState": 2,
+            "astSeatHeatState": 2
+        },
+        "vehicleLocation": {
+            "coord": {
+                "alt": 0,
+                "lon": 13.405,
+                "type": 0.0,
+                "lat": 52.52
+            }
+        },
+        "ign3": false,
+        "ignitionStatus": "false",
+        "lowFuelLight": false,
+        "sideBackWindowHeat": 0,
+        "dte": {
+            "unit": 3,
+            "value": 312
+        },
+        "engine": false,
+        "hoodOpen": false,
+        "breakOilStatus": false,
+        "airConditionStatus": "false",
+        "windowOpen": {
+            "frontRight": 0,
+            "frOpenLevel": 0,
+            "flOpenLevel": 0,
+            "brOpenLevel": 0,
+            "blOpenLevel": 0,
+            "frontLeft": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "smartKeyBatteryWarning": false,
+        "steerWheelHeat": 0,
+        "trunkOpen": false,
+        "doorLock": true,
+        "odometer": 239,
+        "airCtrlOn": false,
+        "airTemp": {
+            "unit": 1,
+            "hvacTempType": 1,
+            "value": "OFF"
+        },
+        "evStatus": {
+            "valueDiff": 0,
+            "wirelessCharging": false,
+            "remainTime2": {
+                "etc3": {
+                    "unit": 1,
+                    "value": 0
+                },
+                "etc2": {
+                    "unit": 1,
+                    "value": 0
+                },
+                "etc1": {
+                    "unit": 1,
+                    "value": 0
+                }
+            },
+            "batteryPlugin": 0,
+            "timeDiff": 0,
+            "batteryCharge": false,
+            "batteryStatus": 50,
+            "batteryDisChargePlugin": 0,
+            "batteryDisCharge": false,
+            "drvDistance": [
+                {
+                    "rangeByFuel": {
+                        "totalAvailableRange": {
+                            "unit": 3,
+                            "value": 312
+                        },
+                        "evModeRange": {
+                            "unit": 3,
+                            "value": 312
+                        }
+                    },
+                    "type": 0
+                }
+            ],
+            "reservChargeInfos": {
+                "reservChargeInfo": {
+                    "dateTime": "2025/02/19T08:04:53Z",
+                    "reservChargeInfoDetail": {}
+                },
+                "reserveChargeInfo2": {
+                    "reservChargeInfoDetail": {
+                        "reservFatcSet": {},
+                        "reservInfo": {
+                            "time": {},
+                            "day": [9]
+                        }
+                    }
+                }
+            }
+        },
+        "sunroofOpen": false,
+        "lampWireStatus": {
+            "headLamp": {
+                "rightBifuncLamp": false,
+                "headLampStatus": false,
+                "leftLowLamp": false,
+                "rightHighLamp": false,
+                "leftBifuncLamp": false,
+                "leftHighLamp": false,
+                "rightLowLamp": false
+            },
+            "stopLamp": {
+                "rightLamp": false,
+                "stopLampStatus": false,
+                "leftLamp": false
+            },
+            "turnSignalLamp": {
+                "rightRearLamp": false,
+                "turnSignalLampStatus": false,
+                "rightFrontLamp": false,
+                "leftRearLamp": false,
+                "leftFrontLamp": false
+            }
+        },
+        "sleepModeCheck": false,
+        "defrost": false,
+        "tirePressureLamp": {
+            "tirePressureWarningLampRearLeft": 0,
+            "tirePressureWarningLampFrontLeft": 0,
+            "tirePressureWarningLampFrontRight": 0,
+            "tirePressureWarningLampAll": 0,
+            "tirePressureWarningLampRearRight": 0
+        },
+        "trunkOpenStatus": "false",
+        "engineOilStatus": false
+    }
+}

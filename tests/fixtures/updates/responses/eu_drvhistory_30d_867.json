@@ -1,0 +1,334 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "brand": "Kia",
+        "endpoint": "POST spa/vehicles/{id}/drvhistory periodTarget=0",
+        "source": "get_driving_info response30d debug log in kia_uvo #867 (e-Niro)",
+        "description": "Real response; msgId replaced."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "drivingInfo": [
+            {
+                "drivingPeriod": 0,
+                "totalPwrCsp": 236325,
+                "motorPwrCsp": 199128,
+                "climatePwrCsp": 15013,
+                "eDPwrCsp": 22150,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 78205,
+                "calculativeOdo": 1596
+            },
+            {
+                "drivingPeriod": 1,
+                "totalPwrCsp": 9089,
+                "motorPwrCsp": 7658,
+                "climatePwrCsp": 577,
+                "eDPwrCsp": 851,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3007,
+                "calculativeOdo": 61.38461538461539
+            },
+            {
+                "drivingPeriod": 2,
+                "totalPwrCsp": 26956,
+                "motorPwrCsp": 24181,
+                "climatePwrCsp": 1115,
+                "eDPwrCsp": 1660,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 5786,
+                "calculativeOdo": 173
+            }
+        ],
+        "drivingInfoDetail": [
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240420",
+                "totalPwrCsp": 520,
+                "motorPwrCsp": 331,
+                "climatePwrCsp": 89,
+                "eDPwrCsp": 100,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 222,
+                "calculativeOdo": 2
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240419",
+                "totalPwrCsp": 29789,
+                "motorPwrCsp": 25777,
+                "climatePwrCsp": 1582,
+                "eDPwrCsp": 2430,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 7347,
+                "calculativeOdo": 193
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240418",
+                "totalPwrCsp": 26413,
+                "motorPwrCsp": 24360,
+                "climatePwrCsp": 933,
+                "eDPwrCsp": 1120,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 4308,
+                "calculativeOdo": 165
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240416",
+                "totalPwrCsp": 7295,
+                "motorPwrCsp": 4486,
+                "climatePwrCsp": 1889,
+                "eDPwrCsp": 920,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 4086,
+                "calculativeOdo": 52
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240414",
+                "totalPwrCsp": 2982,
+                "motorPwrCsp": 1979,
+                "climatePwrCsp": 603,
+                "eDPwrCsp": 400,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1242,
+                "calculativeOdo": 22
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240413",
+                "totalPwrCsp": 17894,
+                "motorPwrCsp": 17230,
+                "climatePwrCsp": 254,
+                "eDPwrCsp": 410,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3380,
+                "calculativeOdo": 121
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240412",
+                "totalPwrCsp": 2255,
+                "motorPwrCsp": 1516,
+                "climatePwrCsp": 105,
+                "eDPwrCsp": 600,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1972,
+                "calculativeOdo": 16
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240411",
+                "totalPwrCsp": 1575,
+                "motorPwrCsp": 802,
+                "climatePwrCsp": 203,
+                "eDPwrCsp": 570,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1017,
+                "calculativeOdo": 8
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240410",
+                "totalPwrCsp": 21910,
+                "motorPwrCsp": 19503,
+                "climatePwrCsp": 1157,
+                "eDPwrCsp": 1250,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 5532,
+                "calculativeOdo": 155
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240409",
+                "totalPwrCsp": 4441,
+                "motorPwrCsp": 3242,
+                "climatePwrCsp": 539,
+                "eDPwrCsp": 660,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 2165,
+                "calculativeOdo": 34
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240407",
+                "totalPwrCsp": 9079,
+                "motorPwrCsp": 8203,
+                "climatePwrCsp": 156,
+                "eDPwrCsp": 720,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 4591,
+                "calculativeOdo": 67
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240406",
+                "totalPwrCsp": 5252,
+                "motorPwrCsp": 4021,
+                "climatePwrCsp": 431,
+                "eDPwrCsp": 800,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3171,
+                "calculativeOdo": 47
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240405",
+                "totalPwrCsp": 806,
+                "motorPwrCsp": 424,
+                "climatePwrCsp": 82,
+                "eDPwrCsp": 300,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 567,
+                "calculativeOdo": 4
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240404",
+                "totalPwrCsp": 2696,
+                "motorPwrCsp": 890,
+                "climatePwrCsp": 616,
+                "eDPwrCsp": 1190,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1021,
+                "calculativeOdo": 8
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240403",
+                "totalPwrCsp": 651,
+                "motorPwrCsp": 327,
+                "climatePwrCsp": 124,
+                "eDPwrCsp": 200,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 460,
+                "calculativeOdo": 3
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240402",
+                "totalPwrCsp": 6245,
+                "motorPwrCsp": 4318,
+                "climatePwrCsp": 777,
+                "eDPwrCsp": 1150,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3306,
+                "calculativeOdo": 44
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240401",
+                "totalPwrCsp": 2628,
+                "motorPwrCsp": 1806,
+                "climatePwrCsp": 322,
+                "eDPwrCsp": 500,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1785,
+                "calculativeOdo": 20
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240331",
+                "totalPwrCsp": 15709,
+                "motorPwrCsp": 14882,
+                "climatePwrCsp": 477,
+                "eDPwrCsp": 350,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3465,
+                "calculativeOdo": 109
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240329",
+                "totalPwrCsp": 9319,
+                "motorPwrCsp": 7161,
+                "climatePwrCsp": 808,
+                "eDPwrCsp": 1350,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 4370,
+                "calculativeOdo": 67
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240328",
+                "totalPwrCsp": 3743,
+                "motorPwrCsp": 2219,
+                "climatePwrCsp": 404,
+                "eDPwrCsp": 1120,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 2421,
+                "calculativeOdo": 22
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240327",
+                "totalPwrCsp": 5216,
+                "motorPwrCsp": 3092,
+                "climatePwrCsp": 264,
+                "eDPwrCsp": 1860,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3061,
+                "calculativeOdo": 32
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240326",
+                "totalPwrCsp": 4170,
+                "motorPwrCsp": 2502,
+                "climatePwrCsp": 938,
+                "eDPwrCsp": 730,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 1418,
+                "calculativeOdo": 24
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240325",
+                "totalPwrCsp": 3221,
+                "motorPwrCsp": 2521,
+                "climatePwrCsp": 0,
+                "eDPwrCsp": 700,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3645,
+                "calculativeOdo": 26
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240324",
+                "totalPwrCsp": 24640,
+                "motorPwrCsp": 23301,
+                "climatePwrCsp": 189,
+                "eDPwrCsp": 1150,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 4874,
+                "calculativeOdo": 177
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240323",
+                "totalPwrCsp": 26771,
+                "motorPwrCsp": 23602,
+                "climatePwrCsp": 1809,
+                "eDPwrCsp": 1360,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 8051,
+                "calculativeOdo": 172
+            },
+            {
+                "drivingPeriod": 0,
+                "drivingDate": "20240322",
+                "totalPwrCsp": 3097,
+                "motorPwrCsp": 2020,
+                "climatePwrCsp": 347,
+                "eDPwrCsp": 730,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 2839,
+                "calculativeOdo": 21
+            }
+        ]
+    },
+    "msgId": "MSG-1"
+}

@@ -1,0 +1,100 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "brand": "Hyundai",
+        "endpoint": "POST tods/api/lstvhclsts",
+        "source": "get_cached_vehicle_status response debug log in kia_uvo #592 (2021 Kona EV)",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "status": {
+            "lastStatusDate": "20230209105748",
+            "airCtrlOn": false,
+            "engine": false,
+            "doorLock": true,
+            "doorOpen": {
+                "frontLeft": 0,
+                "frontRight": 0,
+                "backLeft": 0,
+                "backRight": 0
+            },
+            "trunkOpen": false,
+            "airTempUnit": "C",
+            "airTemp": {
+                "value": "00H",
+                "unit": 0
+            },
+            "defrost": false,
+            "acc": false,
+            "evStatus": {
+                "batteryCharge": false,
+                "batteryStatus": 79,
+                "batteryPlugin": 0,
+                "remainTime2": {
+                    "etc1": {
+                        "value": 2,
+                        "unit": 1
+                    },
+                    "etc2": {
+                        "value": 390,
+                        "unit": 1
+                    },
+                    "etc3": {
+                        "value": 0,
+                        "unit": 1
+                    },
+                    "atc": {
+                        "value": 0,
+                        "unit": 1
+                    }
+                },
+                "drvDistance": [
+                    {
+                        "rangeByFuel": {
+                            "gasModeRange": {
+                                "value": 0.0,
+                                "unit": 1
+                            },
+                            "evModeRange": {
+                                "value": 314.0,
+                                "unit": 1
+                            },
+                            "totalAvailableRange": {
+                                "value": 314.0,
+                                "unit": 1
+                            }
+                        },
+                        "type": 2
+                    }
+                ]
+            },
+            "hoodOpen": false,
+            "transCond": true,
+            "steerWheelHeat": 0,
+            "sideBackWindowHeat": 0,
+            "dte": {},
+            "tirePressureLamp": {
+                "tirePressureLampAll": 0
+            },
+            "battery": {
+                "batSoc": 83,
+                "batState": 0,
+                "batSignalReferenceValue": {}
+            },
+            "remoteIgnition": true,
+            "seatHeaterVentInfo": {},
+            "sleepModeCheck": false,
+            "lampWireStatus": {
+                "headLamp": {},
+                "stopLamp": {},
+                "turnSignalLamp": {}
+            },
+            "windowOpen": {},
+            "engineRuntime": {}
+        }
+    }
+}
