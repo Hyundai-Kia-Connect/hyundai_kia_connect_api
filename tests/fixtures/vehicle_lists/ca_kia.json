@@ -5,7 +5,7 @@
         "endpoint": "tods/api/vhcllst",
         "vehicles": "2024 Sportage (PHEV)",
         "source": "Get Vehicles Response debug log in kia_uvo #881",
-        "description": "Real vehicle list. Vehicle id and VIN replaced."
+        "description": "Real vehicle list. Vehicle id, VIN and modelCode replaced."
     },
     "responseHeader": {
         "responseCode": 0,
@@ -16,7 +16,7 @@
             {
                 "vehicleId": "VEHICLE-1",
                 "nickName": "Sportage",
-                "modelCode": "JWWDD5G1GEV2GG576",
+                "modelCode": "XXX",
                 "modelName": "Sportage",
                 "modelYear": "2024",
                 "fuelKindCode": "P",
