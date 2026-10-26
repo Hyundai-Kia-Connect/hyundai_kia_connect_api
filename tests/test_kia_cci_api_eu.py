@@ -216,12 +216,44 @@ def test_kia_prewakeup_sends_action_body():
     assert result == {}
 
 
-def test_kia_force_refresh_not_implemented():
-    """force_refresh_vehicle_state raises NotImplementedError (inherited
-    from ApiImpl after the remote-action move to HyundaiCciApiEU)."""
+def _stored(last_update: int) -> dict:
+    return {"lastUpdateTime": last_update, "state": {"Vehicle": {}}}
+
+
+def test_kia_force_refresh_waits_for_newer_status():
+    """prewakeup, then poll stored-status until lastUpdateTime advances."""
     api = _make_kia_api()
-    with pytest.raises(NotImplementedError):
+    with (
+        patch.object(KiaCciApiEU, "prewakeup") as wake,
+        patch.object(
+            KiaCciApiEU,
+            "get_stored_status",
+            side_effect=[_stored(1), _stored(1), _stored(2)],
+        ) as status,
+        patch.object(KiaCciApiEU, "update_vehicle_with_cached_state") as update,
+        patch("hyundai_kia_connect_api.KiaCciApiEU.time.sleep") as sleep,
+    ):
         api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    wake.assert_called_once()
+    assert status.call_count == 3
+    assert sleep.call_count == 2
+    update.assert_called_once()
+
+
+def test_kia_force_refresh_gives_up_after_poll_budget():
+    """No newer status (car offline): parse the latest one after the budget."""
+    api = _make_kia_api()
+    with (
+        patch.object(KiaCciApiEU, "prewakeup", side_effect=APIError("offline")),
+        patch.object(
+            KiaCciApiEU, "get_stored_status", return_value=_stored(1)
+        ) as status,
+        patch.object(KiaCciApiEU, "update_vehicle_with_cached_state") as update,
+        patch("hyundai_kia_connect_api.KiaCciApiEU.time.sleep"),
+    ):
+        api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    assert status.call_count == 1 + KiaCciApiEU.FORCE_REFRESH_POLL_ATTEMPTS
+    update.assert_called_once()
 
 
 # ── VehicleManager wiring ────────────────────────────────
