@@ -2593,7 +2593,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
 
         body = {
             "reservFlag": 1 if options.charging_enabled else 0,
-            "offpeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            # 1 = off-peak only, 2 = preferred (live on a Kia PV5, as on EV5 flat)
+            "offpeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
             "reservStartTime": _make_time(options.off_peak_start_time or dt.time()),
             "reservEndTime": _make_time(
                 options.off_peak_end_time or options.off_peak_start_time or dt.time()

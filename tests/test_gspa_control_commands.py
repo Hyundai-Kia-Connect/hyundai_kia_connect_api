@@ -482,12 +482,20 @@ def test_schedule_reservation_charge_body():
     assert call.args[0].endswith("/reservation-charge")
     body = call.kwargs["json"]
     assert body["reservFlag"] == 1
-    assert body["offpeakPowerFlag"] == 1
+    assert body["offpeakPowerFlag"] == 2
     assert body["reservStartTime"] == {"time": "0130", "timeSection": 0}
     assert body["reservEndTime"] == {"time": "0600", "timeSection": 0}
     assert body["command"] == "set"
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_schedule_reservation_charge_off_peak_only_flag():
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = True
+    options.off_peak_charge_only_enabled = True
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_charge, options)
+    assert call.kwargs["json"]["offpeakPowerFlag"] == 1
 
 
 def test_schedule_reservation_hvac_body_shape():
