@@ -5,6 +5,7 @@
 import base64
 import datetime as dt
 import logging
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
@@ -91,7 +92,7 @@ class KiaUvoApiAU(ApiImplType1):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.PUSH_TYPE: str = "GCM"
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token)
 
     def login(
@@ -257,7 +258,7 @@ class KiaUvoApiAU(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
@@ -290,7 +291,7 @@ class KiaUvoApiAU(ApiImplType1):
         """Australia uses RHD vehicles regardless of the odometer unit."""
         return SEAT_LOCATION.RIGHT
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
         url = (
             self.USER_API_URL
