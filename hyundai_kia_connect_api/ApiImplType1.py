@@ -174,6 +174,17 @@ class ApiImplType1(ApiImpl):
     supports_valet_mode: bool = True
     # resMsg key holding the all-time entry of the drvhistory response.
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
+    # Set by each region's __init__.
+    BASE_URL: str
+    USER_API_URL: str
+    SPA_API_URL: str
+    SPA_API_URL_V2: str
+    CCSP_SERVICE_ID: str
+    APP_ID: str
+    BASIC_AUTHORIZATION: str
+    CFB: bytes
+    PUSH_TYPE: str
+    LANGUAGE: str
 
     def __init__(self) -> None:
         """Initialize."""
