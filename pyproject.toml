@@ -23,7 +23,6 @@ ignore = [
 # from this list in the PR that makes it pass; new modules must pass.
 [[tool.mypy.overrides]]
 module = [
-    "hyundai_kia_connect_api.ApiImplType1",
     "hyundai_kia_connect_api.GspaApiEU",
     "hyundai_kia_connect_api.HyundaiBlueLinkApiUSA",
     "hyundai_kia_connect_api.KiaUvoApiCA",
