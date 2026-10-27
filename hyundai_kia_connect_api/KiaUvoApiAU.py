@@ -69,18 +69,18 @@ class KiaUvoApiAU(ApiImplType1):
                 "Z31R4ngT9T1snjynGKRcSFMadGU7uBn4U7oJ4r0DyDLPvsSzf+g/m3zTq2chbyI="
             )
         elif BRANDS[brand] == BRAND_HYUNDAI:
-            self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
-            self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
-            self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
+            self.BASE_URL = "au-apigw.ccs.hyundai.com.au:8080"
+            self.CCSP_SERVICE_ID = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
+            self.APP_ID = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
             self.CFB = base64.b64decode(
                 "nGDHng3k4Cg9gWV+C+A6Yk/ecDopUNTkGmDpr2qVKAQXx9bvY2/YLoHPfObliK32mZQ="
             )
         elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
-            self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
+            self.APP_ID = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaC1OsnAhQgPgcQETEfbY8abEjR/ICXK0p+Rayw5tHCGyiUA="
             )
