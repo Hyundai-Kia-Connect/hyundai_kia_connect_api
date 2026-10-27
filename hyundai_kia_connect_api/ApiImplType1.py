@@ -57,6 +57,7 @@ from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    flag_or_none,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
@@ -104,7 +105,7 @@ def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
     return cast(F, wrapper)
 
 
-def _check_response_for_errors(response: dict) -> None:
+def _check_response_for_errors(response: dict[str, Any]) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
@@ -172,6 +173,17 @@ class ApiImplType1(ApiImpl):
 
     # resMsg key holding the all-time entry of the drvhistory response.
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
+    # Set by each region's __init__.
+    BASE_URL: str
+    USER_API_URL: str
+    SPA_API_URL: str
+    SPA_API_URL_V2: str
+    CCSP_SERVICE_ID: str
+    APP_ID: str
+    BASIC_AUTHORIZATION: str
+    CFB: bytes
+    PUSH_TYPE: str
+    LANGUAGE: str
 
     def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
         supports = super().get_vehicle_supports(vehicle)
@@ -237,7 +249,7 @@ class ApiImplType1(ApiImpl):
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -251,7 +263,7 @@ class ApiImplType1(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         control_token, _ = self._get_control_token(token)
         authenticated_headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support
@@ -261,14 +273,16 @@ class ApiImplType1(ApiImpl):
             "AuthorizationCCSP": control_token,
         }
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         """Authenticated headers for the shared per-vehicle read helpers.
 
         AU and CN override this to omit the CCS2 protocol-support value.
         """
         return self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "status.time"):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "status.time"), self.data_timezone
@@ -637,7 +651,9 @@ class ApiImplType1(ApiImpl):
             )
         vehicle.data = state
 
-    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "Date"):
             # CCS2 'Date' is always in UTC, convert to the region timezone.
             # Always use a named timezone to ensure DST adjustment.
@@ -812,10 +828,8 @@ class ApiImplType1(ApiImpl):
             "Cabin.Window.Row2.Right.Open",
             "Cabin.Window.Row2.Right.OpenLevel",
         )
-        vehicle.sunroof_is_open = (
-            bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
-            if get_child_value(state, "Body.Sunroof.Glass.Open") is not None
-            else None
+        vehicle.sunroof_is_open = flag_or_none(
+            get_child_value(state, "Body.Sunroof.Glass.Open")
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
@@ -1193,7 +1207,7 @@ class ApiImplType1(ApiImpl):
         )
 
         def _parse_departure_climate(
-            climate: dict,
+            climate: dict[str, Any],
             schedule_activation: object = None,
         ) -> tuple[bool | None, bool | None, tuple[float, str] | None]:
             activation = (
@@ -1312,7 +1326,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -1336,7 +1350,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
@@ -1358,7 +1372,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_charge_limits(
@@ -1388,7 +1402,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_vehicle_to_load_discharge_limit(
@@ -1408,7 +1422,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def lock_action(
@@ -1433,7 +1447,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def check_action_status(
@@ -1599,7 +1613,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _schedule_ev5_flat(
         self,
@@ -1832,7 +1846,7 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -1874,7 +1888,7 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
@@ -1889,7 +1903,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
@@ -1904,7 +1918,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_windows_state(
@@ -1924,7 +1938,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_navigation(
@@ -1941,7 +1955,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _refresh_access_token_headers(self) -> dict[str, str]:
         """Extra headers for the refresh_token grant. Default: none.
@@ -2084,7 +2098,7 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
-        return device_id
+        return cast(str, device_id)
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
@@ -2100,7 +2114,9 @@ class ApiImplType1(ApiImpl):
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         response = self.session.get(
             url, headers=self._get_vehicle_headers(token, vehicle)
@@ -2111,7 +2127,9 @@ class ApiImplType1(ApiImpl):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_charge_limits(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
@@ -2126,7 +2144,7 @@ class ApiImplType1(ApiImpl):
         # The car itself says the last entry per plug type is the truth when tested
         # (EU Ioniq Electric Facelift MY 2019)
         if response["resMsg"] is not None:
-            return response["resMsg"]
+            return cast(dict[str, Any] | None, response["resMsg"])
         return None
 
     @_retry_on_device_id_error
@@ -2142,7 +2160,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _get_trip_info(
         self,
@@ -2150,7 +2168,7 @@ class ApiImplType1(ApiImpl):
         vehicle: Vehicle,
         date_string: str,
         trip_period_type: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
         if trip_period_type == 0:  # month
             payload = {"tripPeriodType": 0, "setTripMonth": date_string}
@@ -2166,7 +2184,7 @@ class ApiImplType1(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
         _check_response_for_errors(response)
-        return response
+        return cast(dict[str, Any], response)
 
     def update_month_trip_info(
         self,
@@ -2213,7 +2231,7 @@ class ApiImplType1(ApiImpl):
             vehicle.month_trip_info = result
 
     def _parse_day_trip(
-        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict[str, Any]
     ) -> TripInfo | None:
         """Build a TripInfo from one entry of a day's tripList.
 
@@ -2273,7 +2291,9 @@ class ApiImplType1(ApiImpl):
             vehicle.day_trip_info = result
 
     @_retry_on_device_id_error
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_driving_info(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
 
         responseAlltime = self.session.post(
@@ -2336,7 +2356,7 @@ class ApiImplType1(ApiImpl):
                     )
                     break
 
-            return drivingInfo
+            return cast(dict[str, Any] | None, drivingInfo)
         else:
             _LOGGER.debug(
                 f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."

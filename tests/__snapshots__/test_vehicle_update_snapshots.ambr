@@ -6881,7 +6881,7 @@
       'steering_wheel_heater_is_on': False,
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
-      'sunroof_is_open': True,
+      'sunroof_is_open': None,
       'supports': dict({
         'surround_view': None,
         'valet_mode': None,

@@ -5,6 +5,7 @@
 import base64
 import datetime as dt
 import logging
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
@@ -50,10 +51,10 @@ class KiaUvoApiAU(ApiImplType1):
         super().__init__()
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_AUSTRALIA:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
-            self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "8acb778a-b918-4a8d-8624-73a0beb64289"
+            self.APP_ID = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaNfSFdtPklZ48xUuVckigYasxmeOQqVgCAC++YNrI1vVabI="
             )
@@ -69,18 +70,18 @@ class KiaUvoApiAU(ApiImplType1):
                 "Z31R4ngT9T1snjynGKRcSFMadGU7uBn4U7oJ4r0DyDLPvsSzf+g/m3zTq2chbyI="
             )
         elif BRANDS[brand] == BRAND_HYUNDAI:
-            self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
-            self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
-            self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
+            self.BASE_URL = "au-apigw.ccs.hyundai.com.au:8080"
+            self.CCSP_SERVICE_ID = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
+            self.APP_ID = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
             self.CFB = base64.b64decode(
                 "nGDHng3k4Cg9gWV+C+A6Yk/ecDopUNTkGmDpr2qVKAQXx9bvY2/YLoHPfObliK32mZQ="
             )
         elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
-            self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
+            self.APP_ID = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaC1OsnAhQgPgcQETEfbY8abEjR/ICXK0p+Rayw5tHCGyiUA="
             )
@@ -91,7 +92,7 @@ class KiaUvoApiAU(ApiImplType1):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.PUSH_TYPE: str = "GCM"
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token)
 
     def login(
@@ -257,7 +258,7 @@ class KiaUvoApiAU(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
@@ -266,7 +267,7 @@ class KiaUvoApiAU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return cast(dict[str, Any] | None, response["resMsg"])
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
@@ -284,13 +285,13 @@ class KiaUvoApiAU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
         return SEAT_LOCATION.RIGHT
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
         url = (
             self.USER_API_URL
@@ -305,9 +306,11 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = ApiImplSession()
         _ = session.get(url)
-        return session.cookies.get_dict()
+        return cast(dict[str, Any], session.cookies.get_dict())
 
-    def _get_access_token(self, authorization_code, stamp):
+    def _get_access_token(
+        self, authorization_code: str, stamp: str
+    ) -> tuple[str, str, str, Any]:
         # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
