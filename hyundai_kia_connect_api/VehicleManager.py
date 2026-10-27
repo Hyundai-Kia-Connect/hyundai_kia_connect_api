@@ -97,7 +97,7 @@ class VehicleManager:
             pin=self.pin,
         )
         if isinstance(result, Token):
-            self.token: Token = result
+            self.token = result
             self.initialize_vehicles()
             return True
         if isinstance(result, OTPRequest):
@@ -257,7 +257,7 @@ class VehicleManager:
                 else:
                     raise
             if isinstance(result, Token):
-                self.token: Token = result
+                self.token = result
                 # Temp correction to fix bad data due to a bug.
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin

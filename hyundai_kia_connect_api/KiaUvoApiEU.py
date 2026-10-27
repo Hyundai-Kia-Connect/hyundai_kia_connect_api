@@ -113,31 +113,27 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
-            self.PORT: int = 8080
-            self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.CCS_SERVICE_SECRET: str = (
-                "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
-            )
-            self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
-            self.CFB: str = base64.b64decode(
+            self.BASE_DOMAIN = "prd.eu-ccapi.hyundai.com"
+            self.PORT = 8080
+            self.CCSP_SERVICE_ID = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+            self.CCS_SERVICE_SECRET = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
+            self.APP_ID = "014d2225-8495-4735-812d-2616334fd15d"
+            self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
+            self.BASIC_AUTHORIZATION = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
-            self.PORT: int = 443
-            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.CCS_SERVICE_SECRET: str = (
-                "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
-            )
-            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
-            self.CFB: str = base64.b64decode(
+            self.BASE_DOMAIN = "prd-eu-ccapi.genesis.com"
+            self.PORT = 443
+            self.CCSP_SERVICE_ID = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.CCS_SERVICE_SECRET = "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
+            self.APP_ID = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
+            self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="
+            self.BASIC_AUTHORIZATION = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
@@ -153,9 +149,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         if BRANDS[self.brand] == BRAND_KIA:
             self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/redirect"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/token"
+            self._oauth_redirect_uri = self.USER_API_URL + "oauth2/token"
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            self._oauth_redirect_uri: str = (
+            self._oauth_redirect_uri = (
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
@@ -170,17 +166,17 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.CCI_PACKAGE_ID: str = "com.hyundai.oneapp.eu"
             self._cci_client_name: str = "hyundai"
         elif BRANDS[self.brand] == BRAND_KIA:
-            self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
-            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
-            self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
-            self.CCI_PACKAGE_ID: str = "com.kia.oneapp.eu"
-            self._cci_client_name: str = "kia"
+            self.ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
+            self.ONEAPP_REDIRECT_URI = "https://oneapp.kia.com/redirect"
+            self.CCI_API_URL = "https://cci-api-eu.kia.com"
+            self.CCI_PACKAGE_ID = "com.kia.oneapp.eu"
+            self._cci_client_name = "kia"
         else:  # BRAND_GENESIS
-            self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
-            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
-            self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
-            self.CCI_PACKAGE_ID: str = "com.genesis.oneapp.eu"
-            self._cci_client_name: str = "genesis"
+            self.ONEAPP_CLIENT_ID = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+            self.ONEAPP_REDIRECT_URI = "https://oneapp.genesis.com/redirect"
+            self.CCI_API_URL = "https://cci-api-eu.genesis.com"
+            self.CCI_PACKAGE_ID = "com.genesis.oneapp.eu"
+            self._cci_client_name = "genesis"
         self._cci_client_version: str = "1.3.3"
         self._cci_client_os_version: str = (
             "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
