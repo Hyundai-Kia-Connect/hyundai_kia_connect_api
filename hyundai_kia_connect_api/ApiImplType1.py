@@ -1310,7 +1310,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -1334,7 +1334,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
@@ -1356,7 +1356,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_charge_limits(
@@ -1386,7 +1386,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_vehicle_to_load_discharge_limit(
@@ -1406,7 +1406,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def lock_action(
@@ -1431,7 +1431,7 @@ class ApiImplType1(ApiImpl):
         response = self.session.post(url, json=payload, headers=headers).json()
         _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def check_action_status(
@@ -1597,7 +1597,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _schedule_ev5_flat(
         self,
@@ -1830,7 +1830,7 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -1872,7 +1872,7 @@ class ApiImplType1(ApiImpl):
             ).json()
         _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
@@ -1887,7 +1887,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
@@ -1902,7 +1902,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_windows_state(
@@ -1922,7 +1922,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     @_retry_on_device_id_error
     def set_navigation(
@@ -1939,7 +1939,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _refresh_access_token_headers(self) -> dict[str, str]:
         """Extra headers for the refresh_token grant. Default: none.
@@ -2082,7 +2082,7 @@ class ApiImplType1(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
 
         device_id = response["resMsg"]["deviceId"]
-        return device_id
+        return cast(str, device_id)
 
     def _get_authorization_code_with_redirect_url(
         self, username, password, cookies
@@ -2128,7 +2128,7 @@ class ApiImplType1(ApiImpl):
         # The car itself says the last entry per plug type is the truth when tested
         # (EU Ioniq Electric Facelift MY 2019)
         if response["resMsg"] is not None:
-            return response["resMsg"]
+            return cast(dict[str, Any] | None, response["resMsg"])
         return None
 
     @_retry_on_device_id_error
@@ -2144,7 +2144,7 @@ class ApiImplType1(ApiImpl):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _get_trip_info(
         self,
@@ -2168,7 +2168,7 @@ class ApiImplType1(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
         _check_response_for_errors(response)
-        return response
+        return cast(dict[str, Any], response)
 
     def update_month_trip_info(
         self,
@@ -2340,7 +2340,7 @@ class ApiImplType1(ApiImpl):
                     )
                     break
 
-            return drivingInfo
+            return cast(dict[str, Any] | None, drivingInfo)
         else:
             _LOGGER.debug(
                 f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."
