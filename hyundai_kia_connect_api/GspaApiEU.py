@@ -59,7 +59,11 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
+    AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
     ConsentRequiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
@@ -384,7 +388,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
         auth_resp = s.get(auth_url, allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
-            raise AuthenticationError(
+            raise AuthenticationBlockedError(
                 "IDPConnect authorize was blocked by the WAF ('abusing request'). "
                 "This is a server-side block, not a credentials problem. See #1273."
             )
@@ -392,14 +396,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # Step 2: RSA public key
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
                 "This may indicate an API change."
             )
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
         if not jwk.get("n") or not jwk.get("e"):
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 "API error: certs response missing RSA key material"
             )
         n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
@@ -428,7 +432,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             allow_redirects=False,
         )
         if resp.status_code != 302:
-            raise AuthenticationError(
+            raise AuthenticationSigninError(
                 f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
                 "Check username and password."
             )
@@ -439,7 +443,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 error_desc = parse_qs(urlparse(location).query).get(
                     "error_description", ["unknown"]
                 )[0]
-                raise AuthenticationError(
+                raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
                 )
@@ -449,11 +453,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     "once to accept the terms, then retry."
                 )
             if "authorize" in location:
-                raise AuthenticationError(
+                raise AuthenticationRedirectError(
                     "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
-            raise AuthenticationError(
+            raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
         code = code_list[0]

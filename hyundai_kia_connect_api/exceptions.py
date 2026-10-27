@@ -21,6 +21,34 @@ class AuthenticationError(HyundaiKiaException):
     """
 
 
+class AuthenticationBlockedError(AuthenticationError):
+    """The EU identity provider blocked the authorization request."""
+
+
+class AuthenticationCertificateError(AuthenticationError):
+    """The EU identity provider certificate could not be retrieved."""
+
+
+class AuthenticationSigninError(AuthenticationError):
+    """The EU identity provider rejected the sign-in response."""
+
+
+class AuthenticationRedirectError(AuthenticationError):
+    """The EU sign-in flow returned an unexpected redirect."""
+
+
+class AuthenticationTokenExchangeError(AuthenticationError):
+    """The EU token exchange was unsuccessful."""
+
+
+class AuthenticationCciTokenExchangeError(AuthenticationTokenExchangeError):
+    """The EU CCI token exchange was unsuccessful."""
+
+
+class AuthenticationCcsTokenExchangeError(AuthenticationTokenExchangeError):
+    """The EU CCS token exchange was unsuccessful."""
+
+
 class AuthenticationOTPRequired(AuthenticationError):
     """
     Raised when OTP is required for authentication.
