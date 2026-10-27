@@ -145,7 +145,7 @@ class KiaUvoApiUSA(ApiImpl):
         self.session = ApiImplSession()
         self.session.mount("https://", KiaSSLAdapter())
 
-    def api_headers(self) -> dict:
+    def api_headers(self) -> dict[str, Any]:
         offset = time.localtime().tm_gmtoff / 60 / 60
         # Generate clientuuid as hash of device_id (similar to iOS app)
         client_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, self.device_id))
@@ -177,7 +177,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers["deviceid"] = self.device_id
         return headers
 
-    def authed_api_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def authed_api_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         headers = self.api_headers()
         headers["sid"] = token.access_token
         headers["vinkey"] = vehicle.key
@@ -186,7 +186,7 @@ class KiaUvoApiUSA(ApiImpl):
     @request_with_active_session
     @request_with_logging
     def post_request_with_logging_and_active_session(
-        self, token: Token, url: str, json_body: dict, vehicle: Vehicle
+        self, token: Token, url: str, json_body: dict[str, Any], vehicle: Vehicle
     ) -> Response:
         headers = self.authed_api_headers(token, vehicle)
         return self.session.post(url, json=json_body, headers=headers)
@@ -199,7 +199,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers = self.authed_api_headers(token, vehicle)
         return self.session.get(url, headers=headers)
 
-    def _send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict:
+    def _send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict[str, Any]:
         """Send OTP to email or phone"""
         url = self.API_URL + "cmm/sendOTP"
         headers = self.api_headers()
@@ -468,7 +468,9 @@ class KiaUvoApiUSA(ApiImpl):
         # response after the cached update so they aren't lost.
         self._update_charge_limits_from_force_refresh(vehicle, state)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = parse_datetime(
             get_child_value(
@@ -806,7 +808,9 @@ class KiaUvoApiUSA(ApiImpl):
 
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.API_URL + "cmm/gvi"
 
         body = {
@@ -835,7 +839,9 @@ class KiaUvoApiUSA(ApiImpl):
         response_body = response.json()
         return response_body["payload"]["vehicleInfoList"][0]
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.API_URL + "rems/rvs"
         body = {
             "requestType": 0
@@ -848,7 +854,7 @@ class KiaUvoApiUSA(ApiImpl):
         return response_body
 
     def _update_charge_limits_from_force_refresh(
-        self, vehicle: Vehicle, state: dict
+        self, vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
         """Parse targetSOC from the rems/rvs (force refresh) response.
 
@@ -1013,7 +1019,7 @@ class KiaUvoApiUSA(ApiImpl):
 
         return response.headers["Xid"]
 
-    def _seat_settings(self, level) -> dict:
+    def _seat_settings(self, level) -> dict[str, Any]:
         # See const.SEAT_STATUS for the list and descriptions of levels.
         #
         # The values were determined empirically, see https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/718
