@@ -6847,7 +6847,7 @@
       'steering_wheel_heater_is_on': False,
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
-      'sunroof_is_open': True,
+      'sunroof_is_open': None,
       'supports_svm': None,
       'supports_valet_mode': None,
       'supports_window_control': None,

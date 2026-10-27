@@ -57,6 +57,7 @@ from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    flag_or_none,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
@@ -807,10 +808,8 @@ class ApiImplType1(ApiImpl):
             "Cabin.Window.Row2.Right.Open",
             "Cabin.Window.Row2.Right.OpenLevel",
         )
-        vehicle.sunroof_is_open = (
-            bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
-            if get_child_value(state, "Body.Sunroof.Glass.Open") is not None
-            else None
+        vehicle.sunroof_is_open = flag_or_none(
+            get_child_value(state, "Body.Sunroof.Glass.Open")
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")

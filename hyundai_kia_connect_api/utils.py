@@ -104,6 +104,17 @@ def bool_or_none(value: Any) -> bool | None:
     return None if value is None else bool(value)
 
 
+def flag_or_none(value: Any) -> bool | None:
+    """Map a 0/1 status flag to bool; any other value is unknown (None).
+
+    CCS2 reports features the car lacks with other codes, e.g. a PV5 without
+    a sunroof sends ``Body.Sunroof.Glass.Open = 2`` (see issue #1457).
+    """
+    if value in (0, 1):
+        return bool(value)
+    return None
+
+
 def pressure_or_none(value: float | None) -> int | float | None:
     """Return a tire pressure raw value, or None if it's the no-reading sentinel.
 
