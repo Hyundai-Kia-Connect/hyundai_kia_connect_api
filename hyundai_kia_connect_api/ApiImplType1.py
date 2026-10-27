@@ -682,6 +682,10 @@ class ApiImplType1(ApiImpl):
 
         if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[unit])
+        elif TEMPERATURE_UNITS.get(unit):
+            # With climate off the setpoint is "OFF" but the unit is still
+            # reported; keep it so consumers know the car's unit.
+            vehicle._air_temperature_unit = TEMPERATURE_UNITS[unit]
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
