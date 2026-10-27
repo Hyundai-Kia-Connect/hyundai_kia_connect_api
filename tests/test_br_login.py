@@ -337,3 +337,35 @@ class TestRefreshAccessToken:
         token = Token(username="user@example.com", password="pass", refresh_token="rt1")
 
         assert br_api.refresh_access_token(token) == "logged-in"
+
+
+class TestControlToken:
+    """The PIN control token is cached in Token.control_token_expiry, the field
+    every other region uses, so it survives Token.to_dict/from_dict."""
+
+    def _token(self) -> Token:
+        return Token(access_token="at1", device_id="srv-1", pin="1234")
+
+    def test_fetches_once_and_reuses_after_round_trip(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.put.return_value = _resp(
+            200, {"controlToken": "ct1", "expiresTime": 600}
+        )
+        token = self._token()
+
+        assert br_api._ensure_control_token(token) == "Bearer ct1"
+        restored = Token.from_dict(token.to_dict())
+        assert br_api._ensure_control_token(restored) == "Bearer ct1"
+        br_api.session.put.assert_called_once()
+
+    def test_expired_token_is_refetched(self, br_api):
+        br_api.session = MagicMock()
+        br_api.session.put.return_value = _resp(
+            200, {"controlToken": "ct2", "expiresTime": 600}
+        )
+        token = self._token()
+        token.control_token = "Bearer old"
+        token.control_token_expiry = 1.0
+
+        assert br_api._ensure_control_token(token) == "Bearer ct2"
+        br_api.session.put.assert_called_once()

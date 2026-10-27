@@ -458,14 +458,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
     def _ensure_control_token(self, token: Token) -> str:
         """Ensure we have a valid control token for remote commands."""
-        control_token = getattr(token, "control_token", None)
-        expires_at = getattr(token, "control_token_expires_at", None)
-        if (
-            control_token
-            and expires_at
-            and expires_at - dt.timedelta(seconds=5) > dt.datetime.now(dt.UTC)
-        ):
-            return control_token
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if token.control_token and token.control_token_expiry - 5 > now:
+            return token.control_token
 
         if not token.pin:
             raise APIError("PIN is required for remote commands.")
@@ -486,10 +481,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         control_token = f"Bearer {data['controlToken']}"
         expires_in = data.get("expiresTime", 0)
-        expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in or 600)
 
         token.control_token = control_token
-        token.control_token_expires_at = expires_at
+        token.control_token_expiry = now + (expires_in or 600)
         return control_token
 
     def lock_action(
