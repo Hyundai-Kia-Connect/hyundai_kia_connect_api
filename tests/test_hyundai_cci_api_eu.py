@@ -101,6 +101,22 @@ def test_login_with_password_certs_endpoint_fails():
             api._login_with_password("user@test.com", "password", "device-1")
 
 
+def test_login_with_password_certs_missing_key_material():
+    """A certificate response without RSA key fields raises a typed error."""
+    api = _make_hyundai_api()
+    certs_resp = MagicMock(status_code=200)
+    certs_resp.json.return_value = {"retValue": {}}
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.ApiImplSession",
+            return_value=_cci_session(certs_resp, MagicMock()),
+        ),
+        pytest.raises(AuthenticationCertificateError, match="missing RSA key material"),
+    ):
+        api._login_with_password("user@test.com", "password", "device-1")
+
+
 def test_login_with_password_signin_returns_non_302():
     """Signin returns 200 instead of 302 -> AuthenticationError."""
     api = _make_hyundai_api()
