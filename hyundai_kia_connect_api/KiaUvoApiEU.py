@@ -17,9 +17,9 @@ import requests
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
+from .ApiImpl import ApiImplSession
 from .ApiImplType1 import (
     USER_AGENT_OK_HTTP,
-    ApiImplSession,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -609,7 +609,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             or vehicle.engine_type == ENGINE_TYPES.PHEV
         ):
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types provide this information.
                 # we also don't know what the API returns if the info is unavailable.
@@ -622,7 +622,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
         """Force-refresh CCS2 state: wake the vehicle, wait, read the cached snapshot.
@@ -679,8 +679,11 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
         if get_child_value(state, "vehicleStatus.airTemp.value"):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "vehicleStatus.airTemp.value")
+            tempIndex = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(state, "vehicleStatus.airTemp.value")
+                ),
             )
 
             vehicle.air_temperature = (
@@ -1022,11 +1025,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             state,
             "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
         ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )
+            temp_index = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
+                    )
+                ),
             )
 
             vehicle.ev_first_departure_climate_temperature = (
@@ -1043,11 +1049,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             state,
             "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
         ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )
+            temp_index = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
+                    )
+                ),
             )
 
             vehicle.ev_second_departure_climate_temperature = (
@@ -1288,7 +1297,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _ = session.get(url)
         return cast(dict[str, Any], session.cookies.get_dict())
 
-    def _get_access_token(self, stamp, authorization_code):
+    def _get_access_token(
+        self, stamp: str, authorization_code: str
+    ) -> tuple[str, str, str, Any]:
         if BRANDS[self.brand] == BRAND_GENESIS:
             url = self.USER_API_URL + "oauth2/token"
             headers = {
@@ -1316,14 +1327,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
         # Default for Kia and Hyundai
         url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
-        data = {
+        payload = {
             "grant_type": "refresh_token",
             "refresh_token": authorization_code,
             "client_id": self.CCSP_SERVICE_ID,
             "client_secret": self.CCS_SERVICE_SECRET,
         }
 
-        response = self.session.post(url, data=data, allow_redirects=False)
+        response = self.session.post(url, data=payload, allow_redirects=False)
 
         response_json = response.json()
         _check_response_for_errors(response_json)
