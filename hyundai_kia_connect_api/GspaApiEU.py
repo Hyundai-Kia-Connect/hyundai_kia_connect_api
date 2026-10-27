@@ -1038,10 +1038,25 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             response = requests.post(
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
             )
+        if response.status_code == 401:
+            # Live-probed 2026-10-25: an expired access token returns HTTP 401
+            # {"code": 9030, "message": "error.msg.common.jwt-expired"}. The
+            # PIN is not checked, so this must not be reported as a wrong PIN.
+            raise AuthenticationError(
+                "CCI PIN endpoint rejected the access token "
+                f"(HTTP 401: {response.text[:200]}) - token refresh required"
+            )
         try:
             resp: dict[str, Any] = response.json()
         except ValueError as e:
             raise APIError("CCI PIN endpoint returned a non-JSON body") from e
+        if "isMatched" not in resp:
+            # No PIN result in the body: the request failed before the PIN
+            # was checked.
+            raise APIError(
+                f"CCI PIN endpoint error: HTTP {response.status_code} - "
+                f"{response.text[:200]}"
+            )
         if resp.get("isMatched") is not True:
             # 2xx business error (live-probed 2026-09-04: HTTP 200 with
             # isMatched false and controlTokenInfo null). After 5 failed
