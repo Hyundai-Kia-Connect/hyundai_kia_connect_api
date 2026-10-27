@@ -10,7 +10,7 @@ import platform
 import ssl
 import time
 import uuid
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import certifi
@@ -985,7 +985,7 @@ class KiaUvoApiCA(ApiImpl):
         self._check_response_for_errors(response)
 
         response = response["result"]["maintenanceInfo"]
-        return response
+        return cast(dict[str, Any], response)
 
     def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.API_URL + "fndmcr"
@@ -1001,7 +1001,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
             if response["responseHeader"]["responseCode"] != 0:
                 raise APIError("No Location Located")
-            return response["result"]
+            return cast(dict[str, Any] | None, response["result"])
         except Exception:
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
@@ -1014,7 +1014,7 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
-        return result["pAuth"]
+        return cast(str, result["pAuth"])
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
@@ -1036,7 +1036,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -1172,7 +1172,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -1191,7 +1191,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def check_action_status(
         self,
@@ -1265,7 +1265,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
@@ -1281,7 +1281,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def _update_vehicle_properties_charge(
         self, vehicle: Vehicle, state: list[dict[str, Any]]
@@ -1313,7 +1313,7 @@ class KiaUvoApiCA(ApiImpl):
         # Check for errors (including 7602 - access token deleted)
         self._check_response_for_errors(response)
 
-        return response["result"]
+        return cast(list[dict[str, Any]], response["result"])
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -1349,7 +1349,7 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def _mask_sensitive_data(self, data: dict[str, Any] | str) -> dict[str, Any] | str:
         """Create a copy of data with sensitive fields masked for logging."""

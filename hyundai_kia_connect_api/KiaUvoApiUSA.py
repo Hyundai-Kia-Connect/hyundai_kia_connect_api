@@ -209,7 +209,7 @@ class KiaUvoApiUSA(ApiImpl):
         headers["xid"] = xid
         response = self.session.post(url, json={}, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def _verify_otp(self, otp_key: str, otp_code: str, xid: str) -> tuple[str, str]:
         """Verify OTP code and return sid and rmtoken"""
@@ -253,7 +253,7 @@ class KiaUvoApiUSA(ApiImpl):
         final_sid = response.headers.get("sid")
         if not final_sid:
             raise APIError(f"No final sid returned. Response: {response.text}")
-        return final_sid
+        return cast(str, final_sid)
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Public helper to send OTP to the selected destination."""
@@ -837,7 +837,7 @@ class KiaUvoApiUSA(ApiImpl):
         )
 
         response_body = response.json()
-        return response_body["payload"]["vehicleInfoList"][0]
+        return cast(dict[str, Any], response_body["payload"]["vehicleInfoList"][0])
 
     def _get_forced_vehicle_state(
         self, token: Token, vehicle: Vehicle
@@ -851,7 +851,7 @@ class KiaUvoApiUSA(ApiImpl):
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_body = response.json()
-        return response_body
+        return cast(dict[str, Any], response_body)
 
     def _update_charge_limits_from_force_refresh(
         self, vehicle: Vehicle, state: dict[str, Any]
@@ -1017,7 +1017,7 @@ class KiaUvoApiUSA(ApiImpl):
             token=token, url=url, vehicle=vehicle
         )
 
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
 
     def _seat_settings(self, level) -> dict[str, Any]:
         # See const.SEAT_STATUS for the list and descriptions of levels.
@@ -1133,14 +1133,14 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rems/stop"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/charge"
@@ -1148,14 +1148,14 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/cancel"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -1176,4 +1176,4 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return response.headers["Xid"]
+        return cast(str, response.headers["Xid"])
