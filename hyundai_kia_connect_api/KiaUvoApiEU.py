@@ -105,7 +105,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB: str = base64.b64decode(
+            self.CFB = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
             )
             self.BASIC_AUTHORIZATION: str = (
