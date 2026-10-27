@@ -9,6 +9,7 @@ import logging
 import re
 import uuid
 from time import sleep
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -261,7 +262,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
     def _login_with_password(
         self, username: str, password: str, device_id: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Headless login using username + plaintext password (OneApp/CCI flow).
 
         All EU brands (Hyundai/Kia/Genesis) use the OneApp/CCI flow, which
@@ -276,7 +277,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
     def _login_with_password_cci(
         self, username: str, password: str, device_id: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """OneApp/CCI password login (EU Hyundai/Kia) — bypasses the IDPConnect WAF.
 
         Uses the OneApp client_id (4f4953b5 / 01b36c86) whose authorize is not
@@ -655,7 +656,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         self._update_vehicle_properties_ccs2(vehicle, state)
         self._set_cached_location_park(token, vehicle)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "vehicleStatus.time"):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "vehicleStatus.time"), self.data_timezone
@@ -1157,7 +1160,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         if vehicle.ccu_ccs2_protocol_support == 0:
             url = url + "/status/latest"
@@ -1200,7 +1205,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
@@ -1222,7 +1227,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             return None
 
     def _set_location_from_gps_detail(
-        self, vehicle: Vehicle, gps_detail: dict | None
+        self, vehicle: Vehicle, gps_detail: dict[str, Any] | None
     ) -> None:
         """Apply the gpsDetail of GET /location, whose time is UTC.
 
@@ -1270,7 +1275,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _check_response_for_errors(response)
         return response["msgId"]
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
         url = (
             self.USER_API_URL

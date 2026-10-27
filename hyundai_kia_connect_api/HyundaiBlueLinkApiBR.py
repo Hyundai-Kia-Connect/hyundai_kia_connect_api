@@ -8,6 +8,7 @@ import random
 import uuid
 from datetime import timedelta
 from time import sleep
+from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from requests import Response
@@ -160,7 +161,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Get headers with authentication.
 
         ``ccs2_support`` matches the ApiImplType1 signature; BR sends no
@@ -211,7 +212,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             f"(keys={sorted(data.keys())})"
         )
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         """Request cookies from the API for authentication."""
         params = {
             "response_type": "code",
@@ -228,7 +229,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         return self.session.cookies.get_dict()
 
     def _get_authorization_code(
-        self, cookies: dict, username: str, password: str
+        self, cookies: dict[str, Any], username: str, password: str
     ) -> str:
         """Get authorization code from redirect URL."""
         url = self._build_api_url("/user/signin")
@@ -281,7 +282,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             )
         return code_list[0]
 
-    def _get_auth_response(self, authorization_code: str) -> dict:
+    def _get_auth_response(self, authorization_code: str) -> dict[str, Any]:
         """Request access token from the API."""
         url = self._build_api_url("/user/oauth2/token")
         body = {
@@ -397,7 +398,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             for entry in response["resMsg"]["vehicles"]
         ]
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         """Return the server-cached CCS2 vehicle status (does not wake the car).
 
         BR vehicles report ``ccuCCS2ProtocolSupport: 0`` but the cached status
@@ -634,7 +637,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         return data.get("msgId")
 
-    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list:
+    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list[Any]:
         """Get notification history (for debugging and tracking command results)."""
         url = self._build_api_url(f"/spa/notifications/{vehicle.id}/history")
         headers = self._get_authenticated_headers(token)

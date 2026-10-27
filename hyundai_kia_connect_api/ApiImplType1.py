@@ -104,7 +104,7 @@ def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
     return cast(F, wrapper)
 
 
-def _check_response_for_errors(response: dict) -> None:
+def _check_response_for_errors(response: dict[str, Any]) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
@@ -233,7 +233,7 @@ class ApiImplType1(ApiImpl):
 
     def _get_authenticated_headers(
         self, token: Token, ccs2_support: int | None = None
-    ) -> dict:
+    ) -> dict[str, Any]:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -247,7 +247,7 @@ class ApiImplType1(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         control_token, _ = self._get_control_token(token)
         authenticated_headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support
@@ -257,14 +257,16 @@ class ApiImplType1(ApiImpl):
             "AuthorizationCCSP": control_token,
         }
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         """Authenticated headers for the shared per-vehicle read helpers.
 
         AU and CN override this to omit the CCS2 protocol-support value.
         """
         return self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "status.time"):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "status.time"), self.data_timezone
@@ -633,7 +635,9 @@ class ApiImplType1(ApiImpl):
             )
         vehicle.data = state
 
-    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "Date"):
             # CCS2 'Date' is always in UTC, convert to the region timezone.
             # Always use a named timezone to ensure DST adjustment.
@@ -1187,7 +1191,7 @@ class ApiImplType1(ApiImpl):
         )
 
         def _parse_departure_climate(
-            climate: dict,
+            climate: dict[str, Any],
             schedule_activation: object = None,
         ) -> tuple[bool | None, bool | None, tuple[float, str] | None]:
             activation = (
@@ -2094,7 +2098,9 @@ class ApiImplType1(ApiImpl):
         authorization_code = "".join(parse_qs(parsed_url.query)["code"])
         return authorization_code
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
         response = self.session.get(
             url, headers=self._get_vehicle_headers(token, vehicle)
@@ -2105,7 +2111,9 @@ class ApiImplType1(ApiImpl):
         mapped_response["vehicleStatus"] = response["resMsg"]
         return mapped_response
 
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_charge_limits(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         # Not currently used as value is in the general get.
         # Most likely this forces the car the update it.
         url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
@@ -2144,7 +2152,7 @@ class ApiImplType1(ApiImpl):
         vehicle: Vehicle,
         date_string: str,
         trip_period_type: int,
-    ) -> dict:
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
         if trip_period_type == 0:  # month
             payload = {"tripPeriodType": 0, "setTripMonth": date_string}
@@ -2207,7 +2215,7 @@ class ApiImplType1(ApiImpl):
             vehicle.month_trip_info = result
 
     def _parse_day_trip(
-        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict[str, Any]
     ) -> TripInfo | None:
         """Build a TripInfo from one entry of a day's tripList.
 
@@ -2267,7 +2275,9 @@ class ApiImplType1(ApiImpl):
             vehicle.day_trip_info = result
 
     @_retry_on_device_id_error
-    def _get_driving_info(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_driving_info(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
 
         responseAlltime = self.session.post(
