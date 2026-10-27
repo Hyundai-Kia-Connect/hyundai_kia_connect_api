@@ -2,4 +2,4 @@ beautifulsoup4>=4.15.0
 requests
 certifi>=2026.10.19
 tzdata>=2026.5
-pycryptodome>=3.24.0,<4
+pycryptodome>=3.24.1,<4
