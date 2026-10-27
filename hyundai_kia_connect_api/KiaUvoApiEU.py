@@ -9,7 +9,7 @@ import logging
 import re
 import uuid
 from time import sleep
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -1176,7 +1176,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             response = response["resMsg"]["vehicleStatusInfo"]
         else:
             response = response["resMsg"]["state"]["Vehicle"]
-        return response
+        return cast(dict[str, Any], response)
 
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
@@ -1217,7 +1217,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             # Some accounts return the location fields flat under resMsg
             # (GET /location/park already parses the same flat shape, #1301).
             gps_detail = res_msg.get("gpsDetail") or res_msg
-            return gps_detail
+            return cast(dict[str, Any] | None, gps_detail)
         except Exception as e:
             _LOGGER.exception(f"{DOMAIN} - _get_location failed: {type(e).__name__}")
             return None
@@ -1269,7 +1269,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
@@ -1286,7 +1286,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = ApiImplSession()
         _ = session.get(url)
-        return session.cookies.get_dict()
+        return cast(dict[str, Any], session.cookies.get_dict())
 
     def _get_access_token(self, stamp, authorization_code):
         if BRANDS[self.brand] == BRAND_GENESIS:

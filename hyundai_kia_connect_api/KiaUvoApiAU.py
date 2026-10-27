@@ -5,7 +5,7 @@
 import base64
 import datetime as dt
 import logging
-from typing import Any
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession
@@ -267,7 +267,7 @@ class KiaUvoApiAU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return cast(dict[str, Any] | None, response["resMsg"])
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
@@ -285,7 +285,7 @@ class KiaUvoApiAU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
@@ -306,7 +306,7 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = ApiImplSession()
         _ = session.get(url)
-        return session.cookies.get_dict()
+        return cast(dict[str, Any], session.cookies.get_dict())
 
     def _get_access_token(self, authorization_code, stamp):
         # Get Access Token #

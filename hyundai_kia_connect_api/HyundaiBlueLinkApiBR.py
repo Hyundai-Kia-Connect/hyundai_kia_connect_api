@@ -8,7 +8,7 @@ import random
 import uuid
 from datetime import timedelta
 from time import sleep
-from typing import Any
+from typing import Any, cast
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from requests import Response
@@ -153,7 +153,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         device_id = response_json["resMsg"]["deviceId"]
         self._registered_device_id = device_id
-        return device_id
+        return cast(str, device_id)
 
     def _ensure_device_id(self) -> str:
         """Return this session's registered device id, registering one if needed."""
@@ -226,7 +226,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self._raise_auth_error(response, "cookie request")
         # The session cookie ('account') is set during the 302 redirect, so it
         # lives in the session cookie jar rather than on the final response.
-        return self.session.cookies.get_dict()
+        return cast(dict[str, Any], self.session.cookies.get_dict())
 
     def _get_authorization_code(
         self, cookies: dict[str, Any], username: str, password: str
@@ -280,7 +280,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             raise AuthenticationError(
                 "Brazilian Hyundai login failed: no authorization code in redirect URL."
             )
-        return code_list[0]
+        return cast(str, code_list[0])
 
     def _get_auth_response(self, authorization_code: str) -> dict[str, Any]:
         """Request access token from the API."""
@@ -299,7 +299,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         response = self.session.post(url, data=body, headers=headers)
         self._raise_auth_error(response, "token request")
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def login(
         self,
@@ -412,7 +412,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers).json()
         _check_response_for_errors(response)
-        return response["resMsg"]["state"]["Vehicle"]
+        return cast(dict[str, Any], response["resMsg"]["state"]["Vehicle"])
 
     @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -520,7 +520,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Lock action failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def check_action_status(
         self,
@@ -610,7 +610,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Window action failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         """Turn on hazard lights (lights only, no horn)."""
@@ -635,7 +635,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Hazard lights failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def get_notification_history(self, token: Token, vehicle: Vehicle) -> list[Any]:
         """Get notification history (for debugging and tracking command results)."""
@@ -647,7 +647,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         data = response.json()
         _LOGGER.debug(f"{DOMAIN} - Notification history response")
 
-        return data.get("resMsg", [])
+        return cast(list[Any], data.get("resMsg", []))
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -713,7 +713,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Start climate failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         """Stop climate control."""
@@ -741,7 +741,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Stop climate failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     # Commands below are inherited from ApiImplType1 but have no BR endpoint
     # (the inherited versions build URLs from SPA_API_URL, which BR never
