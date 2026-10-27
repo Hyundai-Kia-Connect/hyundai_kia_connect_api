@@ -51,10 +51,10 @@ class KiaUvoApiAU(ApiImplType1):
         super().__init__()
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_AUSTRALIA:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
-            self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "8acb778a-b918-4a8d-8624-73a0beb64289"
+            self.APP_ID = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaNfSFdtPklZ48xUuVckigYasxmeOQqVgCAC++YNrI1vVabI="
             )
@@ -308,7 +308,9 @@ class KiaUvoApiAU(ApiImplType1):
         _ = session.get(url)
         return cast(dict[str, Any], session.cookies.get_dict())
 
-    def _get_access_token(self, authorization_code, stamp):
+    def _get_access_token(
+        self, authorization_code: str, stamp: str
+    ) -> tuple[str, str, str, Any]:
         # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {
