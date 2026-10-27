@@ -6,7 +6,7 @@ import base64
 import datetime as dt
 import logging
 import time
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import certifi
 from requests.adapters import HTTPAdapter
@@ -396,7 +396,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if "enrolledVehicleDetails" not in response_json:
             raise AuthenticationError("Missing enrolledVehicleDetails in response")
         self._enrollment_details_cache = response_json
-        return response_json
+        return cast(dict[str, Any], response_json)
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         response = self._get_enrollment_details(token)
@@ -446,7 +446,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
 
-        return response
+        return cast(dict[str, Any], response)
 
     def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
         """
@@ -1189,7 +1189,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def _get_transaction_id(self, response) -> str | None:
         for key in ("tmsTid", "transactionId", "Xid"):
             if key in response.headers:
-                return response.headers[key]
+                return cast(str | None, response.headers[key])
         _LOGGER.warning(
             f"{DOMAIN} - No transaction ID found in response headers: "
             f"{dict(response.headers)}"
