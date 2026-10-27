@@ -79,6 +79,7 @@ from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    flag_or_none,
     float_or_none,
     get_child_value,
     int_or_none,
@@ -1569,10 +1570,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle.back_right_window_is_open = bool(_open) if _open is not None else None
         if _level and _level > 0 and not _open:
             vehicle.back_right_window_is_open = True  # vented
-        vehicle.sunroof_is_open = (
-            bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
-            if get_child_value(state, "Body.Sunroof.Glass.Open") is not None
-            else None
+        vehicle.sunroof_is_open = flag_or_none(
+            get_child_value(state, "Body.Sunroof.Glass.Open")
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
