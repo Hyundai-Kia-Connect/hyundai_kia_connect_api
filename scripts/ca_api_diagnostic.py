@@ -29,6 +29,20 @@ import uuid
 
 import requests
 
+# Match the TLS fingerprint of the integration (library >= 4.41.2): Cloudflare
+# in front of the CA endpoints classifies urllib3's ticket-less ClientHello as
+# a bot and serves a 403 HTML block page the integration never sees. Without
+# the adapter the script reports blocks the integration does not experience.
+try:
+    from hyundai_kia_connect_api.KiaUvoApiCA import SessionTicketAdapter
+
+    SESSION = requests.Session()
+    SESSION.mount("https://", SessionTicketAdapter())
+    USING_TICKET_ADAPTER = True
+except ImportError:
+    SESSION = requests.Session()
+    USING_TICKET_ADAPTER = False
+
 # ── Brand config ────────────────────────────────────────────────────────────
 
 BRAND_CONFIG = {
@@ -137,7 +151,7 @@ def test_v2_login(
     url = f"https://{base_url}/tods/api/v2/login"
     data = {"loginId": username, "password": password}
     try:
-        resp = requests.post(url, json=data, headers=headers, timeout=30)
+        resp = SESSION.post(url, json=data, headers=headers, timeout=30)
         print_result("v2/login", resp)
         data = safe_json(resp)
         if data and data.get("responseHeader", {}).get("responseCode") == 0:
@@ -162,7 +176,7 @@ def test_lgn_login(
     url = f"https://{base_url}/tods/api/lgn"
     data = {"loginId": username, "password": password}
     try:
-        resp = requests.post(url, json=data, headers=headers, timeout=30)
+        resp = SESSION.post(url, json=data, headers=headers, timeout=30)
         print_result("lgn", resp)
         data = safe_json(resp)
         if data and data.get("responseHeader", {}).get("responseCode") == 0:
@@ -186,7 +200,7 @@ def test_v2_login_with_refresh_token(
     # 3a: refreshToken in request body
     data = {"loginId": username, "password": password, "refreshToken": refresh_token}
     try:
-        resp = requests.post(url, json=data, headers=headers, timeout=30)
+        resp = SESSION.post(url, json=data, headers=headers, timeout=30)
         print_result("v2/login+body.refreshToken", resp)
     except Exception as e:
         print(f"  [3a] ERROR: {e}")
@@ -196,7 +210,7 @@ def test_v2_login_with_refresh_token(
     headers_rt["refreshToken"] = refresh_token
     data = {"loginId": username, "password": password}
     try:
-        resp = requests.post(url, json=data, headers=headers_rt, timeout=30)
+        resp = SESSION.post(url, json=data, headers=headers_rt, timeout=30)
         print_result("v2/login+header.refreshToken", resp)
     except Exception as e:
         print(f"  [3b] ERROR: {e}")
@@ -222,7 +236,7 @@ def test_potential_refresh_endpoints(
             {"grant_type": "refresh_token", "refresh_token": refresh_token},
         ]:
             try:
-                resp = requests.post(url, json=body_fmt, headers=headers, timeout=15)
+                resp = SESSION.post(url, json=body_fmt, headers=headers, timeout=15)
                 code = resp.status_code
                 data = safe_json(resp)
                 if data:
@@ -251,7 +265,7 @@ def test_verify_endpoints(base_url: str, headers: dict, access_token: str) -> No
     # 5a: vrfytnc — "verify token"
     url = f"https://{base_url}/tods/api/vrfytnc"
     try:
-        resp = requests.post(url, json={}, headers=headers, timeout=15)
+        resp = SESSION.post(url, json={}, headers=headers, timeout=15)
         print_result("vrfytnc", resp)
     except Exception as e:
         print(f"  [vrfytnc] ERROR: {e}")
@@ -259,7 +273,7 @@ def test_verify_endpoints(base_url: str, headers: dict, access_token: str) -> No
     # 5b: vrfyacctkn — "verify account token"
     url = f"https://{base_url}/tods/api/vrfyacctkn"
     try:
-        resp = requests.post(url, json={}, headers=headers, timeout=15)
+        resp = SESSION.post(url, json={}, headers=headers, timeout=15)
         print_result("vrfyacctkn", resp)
     except Exception as e:
         print(f"  [vrfyacctkn] ERROR: {e}")
@@ -267,7 +281,7 @@ def test_verify_endpoints(base_url: str, headers: dict, access_token: str) -> No
     # 5c: vhcllst — current test_token approach (may keep session alive)
     url = f"https://{base_url}/tods/api/vhcllst"
     try:
-        resp = requests.post(url, json={}, headers=headers, timeout=15)
+        resp = SESSION.post(url, json={}, headers=headers, timeout=15)
         print_result("vhcllst", resp)
     except Exception as e:
         print(f"  [vhcllst] ERROR: {e}")
@@ -286,7 +300,7 @@ def test_device_id_stability(
     url = f"https://{base_url}/tods/api/v2/login"
     data = {"loginId": username, "password": password}
     try:
-        resp1 = requests.post(url, json=data, headers=headers1, timeout=30)
+        resp1 = SESSION.post(url, json=data, headers=headers1, timeout=30)
         data1 = safe_json(resp1)
         if data1:
             rc = data1.get("responseHeader", {}).get("responseCode", "?")
@@ -310,7 +324,7 @@ def test_device_id_stability(
     # Second login with same device_id
     headers2 = make_headers(brand_config, device_id)
     try:
-        resp2 = requests.post(url, json=data, headers=headers2, timeout=30)
+        resp2 = SESSION.post(url, json=data, headers=headers2, timeout=30)
         data2 = safe_json(resp2)
         if data2:
             rc = data2.get("responseHeader", {}).get("responseCode", "?")
@@ -342,7 +356,7 @@ def test_different_device_id(
     url = f"https://{base_url}/tods/api/v2/login"
     data = {"loginId": username, "password": password}
     try:
-        resp = requests.post(url, json=data, headers=headers, timeout=30)
+        resp = SESSION.post(url, json=data, headers=headers, timeout=30)
         data = safe_json(resp)
         if data:
             rc = data.get("responseHeader", {}).get("responseCode", "?")
@@ -386,6 +400,16 @@ def main():
         help="Skip probing unknown endpoints (avoids many 404s)",
     )
     args = parser.parse_args()
+
+    if USING_TICKET_ADAPTER:
+        print("TLS: session-ticket adapter active (matches the integration)")
+    else:
+        print(
+            "TLS: WARNING — hyundai_kia_connect_api >= 4.41.2 not importable,"
+            " requests go out with urllib3's default context and Cloudflare may"
+            " block them with a 403 HTML page the integration does not see."
+            " Run with the pip-installed library on PYTHONPATH to mirror it."
+        )
 
     brand_config = BRAND_CONFIG[args.brand]
     base_url = brand_config["base_url"]
