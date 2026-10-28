@@ -62,6 +62,7 @@ from .exceptions import (
     AuthenticationBlockedError,
     AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
     AuthenticationRedirectError,
     AuthenticationSigninError,
     ConsentRequiredError,
@@ -432,17 +433,21 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             allow_redirects=False,
         )
         if resp.status_code != 302:
+            if error_desc.strip().casefold() == "invalid credentials":
+                raise AuthenticationInvalidCredentialsError(
+                    "Authentication rejected: invalid credentials."
+                )
             raise AuthenticationSigninError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
+                f"Authentication rejected: {error_desc}. "
                 "Check username and password."
             )
         location = resp.headers.get("location", "")
         code_list = parse_qs(urlparse(location).query).get("code")
         if not code_list:
-            if "error" in location.lower():
-                error_desc = parse_qs(urlparse(location).query).get(
-                    "error_description", ["unknown"]
-                )[0]
+            query = parse_qs(urlparse(location).query)
+            
+            if query.get("error"):
+                error_desc = query.get("error_description", ["unknown"])[0]
                 raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
