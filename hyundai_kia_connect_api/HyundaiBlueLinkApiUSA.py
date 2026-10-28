@@ -6,7 +6,7 @@ import base64
 import datetime as dt
 import logging
 import time
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 
 import certifi
 from requests.adapters import HTTPAdapter
@@ -64,7 +64,7 @@ CIPHERS = "DEFAULT@SECLEVEL=1"
 _LOGGER = logging.getLogger(__name__)
 
 
-def _check_response_for_errors(response: dict) -> None:
+def _check_response_for_errors(response: dict[str, Any]) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
@@ -125,7 +125,7 @@ def _safe_parse_json(response, action_name: str):
     return response.json()
 
 
-def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
+def parse_svm_response(response: dict[str, Any], timezone: dt.timezone) -> SVMDetails:
     """Parse a getSVMDetails response into SVMDetails.
 
     Args:
@@ -223,7 +223,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # generation and model rarely change, so the response is cached for
     # the instance lifetime. get_vehicles force-refreshes (vehicle list
     # can change); _get_vehicle_details uses the cache.
-    _enrollment_details_cache: dict | None = None
+    _enrollment_details_cache: dict[str, Any] | None = None
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
@@ -268,14 +268,14 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
-    def _get_authenticated_headers(self, token: Token) -> dict:
+    def _get_authenticated_headers(self, token: Token) -> dict[str, Any]:
         headers = dict(self.API_HEADERS)
         headers["username"] = token.username
         headers["accessToken"] = token.access_token
         headers["blueLinkServicePin"] = token.pin
         return headers
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         headers = self._get_authenticated_headers(token)
         headers["registrationId"] = vehicle.id
         headers["gen"] = str(vehicle.generation)
@@ -377,7 +377,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def _get_enrollment_details(
         self, token: Token, force_refresh: bool = False
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Return enrollment details for the account, cached on the instance.
 
         Capabilities, seat configs, generation and model change rarely, so
@@ -396,7 +396,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if "enrolledVehicleDetails" not in response_json:
             raise AuthenticationError("Missing enrolledVehicleDetails in response")
         self._enrollment_details_cache = response_json
-        return response_json
+        return cast(dict[str, Any], response_json)
 
     def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
         response = self._get_enrollment_details(token)
@@ -407,7 +407,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def _get_vehicle_status(
         self, token: Token, vehicle: Vehicle, refresh: bool
-    ) -> dict:
+    ) -> dict[str, Any]:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self._get_vehicle_headers(token, vehicle)
@@ -431,7 +431,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return status
 
-    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         if vehicle.engine_type != ENGINE_TYPES.EV:
             return {}
 
@@ -446,7 +446,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
 
-        return response
+        return cast(dict[str, Any], response)
 
     def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
         """
@@ -488,7 +488,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location result is None")
         return None
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         vehicle.last_updated_at = parse_datetime(
             get_child_value(state, "vehicleStatus.dateTime"), self.data_timezone
         )
@@ -1187,7 +1189,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     def _get_transaction_id(self, response) -> str | None:
         for key in ("tmsTid", "transactionId", "Xid"):
             if key in response.headers:
-                return response.headers[key]
+                return cast(str | None, response.headers[key])
         _LOGGER.warning(
             f"{DOMAIN} - No transaction ID found in response headers: "
             f"{dict(response.headers)}"

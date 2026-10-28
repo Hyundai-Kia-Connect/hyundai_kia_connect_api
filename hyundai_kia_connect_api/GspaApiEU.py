@@ -1454,14 +1454,18 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         air_temp = get_child_value(state, "Cabin.HVAC.Row1.Driver.Temperature.Value")
+        air_temp_unit = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
+        )
         if air_temp is not None and air_temp != "OFF":
-            air_temp_unit = get_child_value(
-                state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
-            )
             vehicle.air_temperature = (
                 air_temp,
                 TEMPERATURE_UNITS.get(air_temp_unit, TEMPERATURE_UNITS[0]),
             )
+        elif TEMPERATURE_UNITS.get(air_temp_unit):
+            # With climate off the setpoint is "OFF" but the unit is still
+            # reported; keep it so consumers know the car's unit.
+            vehicle._air_temperature_unit = TEMPERATURE_UNITS[air_temp_unit]
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")

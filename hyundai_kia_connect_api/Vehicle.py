@@ -104,7 +104,7 @@ class Vehicle:
 
     _last_updated_at: datetime.datetime | None = None
     _last_scanned_at: datetime.datetime | None = None
-    timezone: datetime.timezone = datetime.UTC  # default UTC
+    timezone: datetime.tzinfo = datetime.UTC  # default UTC
 
     dtc_count: int | None = None
     dtc_descriptions: dict[str, Any] | None = None

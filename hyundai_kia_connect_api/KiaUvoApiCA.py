@@ -10,6 +10,7 @@ import platform
 import ssl
 import time
 import uuid
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import certifi
@@ -141,9 +142,9 @@ class KiaUvoApiCA(ApiImpl):
         if BRANDS[brand] == BRAND_KIA:
             self.BASE_URL: str = "kiaconnect.ca"
         elif BRANDS[brand] == BRAND_HYUNDAI:
-            self.BASE_URL: str = "mybluelink.ca"
+            self.BASE_URL = "mybluelink.ca"
         elif BRANDS[brand] == BRAND_GENESIS:
-            self.BASE_URL: str = "genesisconnect.ca"
+            self.BASE_URL = "genesisconnect.ca"
 
         self.old_vehicle_status = {}
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
@@ -198,7 +199,7 @@ class KiaUvoApiCA(ApiImpl):
             self._sessions = RetrySession(max_retries=4, delay=2, backoff=2)
         return self._sessions
 
-    def _check_response_for_errors(self, response: dict) -> None:
+    def _check_response_for_errors(self, response: dict[str, Any]) -> None:
         """Checks for errors in the API response.
 
         If an error is found, an exception is raised.
@@ -609,7 +610,9 @@ class KiaUvoApiCA(ApiImpl):
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
 
-    def _update_vehicle_properties_base(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_base(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         _LOGGER.debug(f"{DOMAIN} - Old Vehicle Last Updated: {vehicle.last_updated_at}")
         vehicle.last_updated_at = parse_datetime(
             get_child_value(state, "status.lastStatusDate"), self.data_timezone
@@ -850,7 +853,9 @@ class KiaUvoApiCA(ApiImpl):
             vehicle.data = {}
         vehicle.data["status"] = state["status"]
 
-    def _update_vehicle_properties_service(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_service(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         vehicle.odometer = (
             get_child_value(state, "currentOdometer"),
             DISTANCE_UNITS[get_child_value(state, "currentOdometerUnit")],
@@ -867,7 +872,7 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.data["service"] = state
 
     def _update_vehicle_properties_location(
-        self, vehicle: Vehicle, state: dict
+        self, vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
@@ -922,7 +927,9 @@ class KiaUvoApiCA(ApiImpl):
                 f"{DOMAIN} - Error with _update_vehicle_properties_trip_details response: {response.text}"
             )
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         # Vehicle Status Call
         url = self.API_URL + "lstvhclsts"
         headers = self.API_HEADERS.copy()
@@ -943,7 +950,9 @@ class KiaUvoApiCA(ApiImpl):
 
         return status
 
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.API_URL + "rltmvhclsts"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -963,7 +972,7 @@ class KiaUvoApiCA(ApiImpl):
 
         return status
 
-    def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_next_service(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
@@ -976,9 +985,9 @@ class KiaUvoApiCA(ApiImpl):
         self._check_response_for_errors(response)
 
         response = response["result"]["maintenanceInfo"]
-        return response
+        return cast(dict[str, Any], response)
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.API_URL + "fndmcr"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -992,7 +1001,7 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
             if response["responseHeader"]["responseCode"] != 0:
                 raise APIError("No Location Located")
-            return response["result"]
+            return cast(dict[str, Any] | None, response["result"])
         except Exception:
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
@@ -1005,7 +1014,7 @@ class KiaUvoApiCA(ApiImpl):
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
         result = response.json()["result"]
-        return result["pAuth"]
+        return cast(str, result["pAuth"])
 
     def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
@@ -1027,7 +1036,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -1163,7 +1172,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -1182,7 +1191,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def check_action_status(
         self,
@@ -1256,7 +1265,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
@@ -1272,9 +1281,11 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
-    def _update_vehicle_properties_charge(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_charge(
+        self, vehicle: Vehicle, state: list[dict[str, Any]]
+    ) -> None:
         try:
             if [x["level"] for x in state if x["plugType"] == 1][-1] <= 100:
                 vehicle.ev_charge_limits_ac = [
@@ -1287,7 +1298,9 @@ class KiaUvoApiCA(ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
 
-    def _get_charge_limits(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_charge_limits(
+        self, token: Token, vehicle: Vehicle
+    ) -> list[dict[str, Any]]:
         url = self.API_URL + "evc/selsoc"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -1300,7 +1313,7 @@ class KiaUvoApiCA(ApiImpl):
         # Check for errors (including 7602 - access token deleted)
         self._check_response_for_errors(response)
 
-        return response["result"]
+        return cast(list[dict[str, Any]], response["result"])
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -1336,9 +1349,9 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
-        return response_headers["transactionId"]
+        return cast(str, response_headers["transactionId"])
 
-    def _mask_sensitive_data(self, data: dict | str) -> dict | str:
+    def _mask_sensitive_data(self, data: dict[str, Any] | str) -> dict[str, Any] | str:
         """Create a copy of data with sensitive fields masked for logging."""
         if isinstance(data, str):
             return data

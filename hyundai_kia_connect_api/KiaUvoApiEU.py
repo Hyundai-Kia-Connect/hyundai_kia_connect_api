@@ -9,6 +9,7 @@ import logging
 import re
 import uuid
 from time import sleep
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
@@ -16,9 +17,9 @@ import requests
 from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
+from .ApiImpl import ApiImplSession
 from .ApiImplType1 import (
     USER_AGENT_OK_HTTP,
-    ApiImplSession,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -104,7 +105,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
             self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB: str = base64.b64decode(
+            self.CFB = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
             )
             self.BASIC_AUTHORIZATION: str = (
@@ -113,31 +114,27 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
             self.PUSH_TYPE = "APNS"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.hyundai.com"
-            self.PORT: int = 8080
-            self.CCSP_SERVICE_ID: str = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.CCS_SERVICE_SECRET: str = (
-                "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
-            )
-            self.APP_ID: str = "014d2225-8495-4735-812d-2616334fd15d"
-            self.CFB: str = base64.b64decode(
+            self.BASE_DOMAIN = "prd.eu-ccapi.hyundai.com"
+            self.PORT = 8080
+            self.CCSP_SERVICE_ID = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
+            self.CCS_SERVICE_SECRET = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
+            self.APP_ID = "014d2225-8495-4735-812d-2616334fd15d"
+            self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
+            self.BASIC_AUTHORIZATION = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN: str = "prd-eu-ccapi.genesis.com"
-            self.PORT: int = 443
-            self.CCSP_SERVICE_ID: str = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.CCS_SERVICE_SECRET: str = (
-                "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
-            )
-            self.APP_ID: str = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
-            self.CFB: str = base64.b64decode(
+            self.BASE_DOMAIN = "prd-eu-ccapi.genesis.com"
+            self.PORT = 443
+            self.CCSP_SERVICE_ID = "3020afa2-30ff-412a-aa51-d28fbe901e10"
+            self.CCS_SERVICE_SECRET = "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
+            self.APP_ID = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
+            self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION: str = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="
+            self.BASIC_AUTHORIZATION = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
@@ -153,9 +150,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         if BRANDS[self.brand] == BRAND_KIA:
             self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/redirect"
         elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self._oauth_redirect_uri: str = self.USER_API_URL + "oauth2/token"
+            self._oauth_redirect_uri = self.USER_API_URL + "oauth2/token"
         elif BRANDS[self.brand] == BRAND_GENESIS:
-            self._oauth_redirect_uri: str = (
+            self._oauth_redirect_uri = (
                 "https://accounts-eu.genesis.com/realms/eugenesisidm/ga-api/redirect2"
             )
 
@@ -170,17 +167,17 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.CCI_PACKAGE_ID: str = "com.hyundai.oneapp.eu"
             self._cci_client_name: str = "hyundai"
         elif BRANDS[self.brand] == BRAND_KIA:
-            self.ONEAPP_CLIENT_ID: str = "01b36c86-79e8-486c-8009-15f2ad88d670"
-            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.kia.com/redirect"
-            self.CCI_API_URL: str = "https://cci-api-eu.kia.com"
-            self.CCI_PACKAGE_ID: str = "com.kia.oneapp.eu"
-            self._cci_client_name: str = "kia"
+            self.ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
+            self.ONEAPP_REDIRECT_URI = "https://oneapp.kia.com/redirect"
+            self.CCI_API_URL = "https://cci-api-eu.kia.com"
+            self.CCI_PACKAGE_ID = "com.kia.oneapp.eu"
+            self._cci_client_name = "kia"
         else:  # BRAND_GENESIS
-            self.ONEAPP_CLIENT_ID: str = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
-            self.ONEAPP_REDIRECT_URI: str = "https://oneapp.genesis.com/redirect"
-            self.CCI_API_URL: str = "https://cci-api-eu.genesis.com"
-            self.CCI_PACKAGE_ID: str = "com.genesis.oneapp.eu"
-            self._cci_client_name: str = "genesis"
+            self.ONEAPP_CLIENT_ID = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+            self.ONEAPP_REDIRECT_URI = "https://oneapp.genesis.com/redirect"
+            self.CCI_API_URL = "https://cci-api-eu.genesis.com"
+            self.CCI_PACKAGE_ID = "com.genesis.oneapp.eu"
+            self._cci_client_name = "genesis"
         self._cci_client_version: str = "1.3.3"
         self._cci_client_os_version: str = (
             "27" if BRANDS[self.brand] == BRAND_KIA else "18.7"
@@ -261,7 +258,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
     def _login_with_password(
         self, username: str, password: str, device_id: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Headless login using username + plaintext password (OneApp/CCI flow).
 
         All EU brands (Hyundai/Kia/Genesis) use the OneApp/CCI flow, which
@@ -276,7 +273,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
     def _login_with_password_cci(
         self, username: str, password: str, device_id: str
-    ) -> dict:
+    ) -> dict[str, Any]:
         """OneApp/CCI password login (EU Hyundai/Kia) — bypasses the IDPConnect WAF.
 
         Uses the OneApp client_id (4f4953b5 / 01b36c86) whose authorize is not
@@ -612,7 +609,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             or vehicle.engine_type == ENGINE_TYPES.PHEV
         ):
             try:
-                state = self._get_driving_info(token, vehicle)
+                drive_info = self._get_driving_info(token, vehicle)
             except Exception as e:
                 # we don't know if all car types provide this information.
                 # we also don't know what the API returns if the info is unavailable.
@@ -625,7 +622,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     exc_info=e,
                 )
             else:
-                self._update_vehicle_drive_info(vehicle, state)
+                self._update_vehicle_drive_info(vehicle, drive_info)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
         """Force-refresh CCS2 state: wake the vehicle, wait, read the cached snapshot.
@@ -655,7 +652,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         self._update_vehicle_properties_ccs2(vehicle, state)
         self._set_cached_location_park(token, vehicle)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         if get_child_value(state, "vehicleStatus.time"):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "vehicleStatus.time"), self.data_timezone
@@ -680,8 +679,11 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
         if get_child_value(state, "vehicleStatus.airTemp.value"):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "vehicleStatus.airTemp.value")
+            tempIndex = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(state, "vehicleStatus.airTemp.value")
+                ),
             )
 
             vehicle.air_temperature = (
@@ -1023,11 +1025,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             state,
             "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
         ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )
+            temp_index = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservFatcSet.airTemp.value",
+                    )
+                ),
             )
 
             vehicle.ev_first_departure_climate_temperature = (
@@ -1044,11 +1049,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             state,
             "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
         ):
-            temp_index = get_hex_temp_into_index(
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
-                )
+            temp_index = cast(
+                int,
+                get_hex_temp_into_index(
+                    get_child_value(
+                        state,
+                        "vehicleStatus.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservFatcSet.airTemp.value",
+                    )
+                ),
             )
 
             vehicle.ev_second_departure_climate_temperature = (
@@ -1157,7 +1165,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id
         if vehicle.ccu_ccs2_protocol_support == 0:
             url = url + "/status/latest"
@@ -1175,7 +1185,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             response = response["resMsg"]["vehicleStatusInfo"]
         else:
             response = response["resMsg"]["state"]["Vehicle"]
-        return response
+        return cast(dict[str, Any], response)
 
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
@@ -1200,7 +1210,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict | None:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location"
 
         try:
@@ -1216,13 +1226,13 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             # Some accounts return the location fields flat under resMsg
             # (GET /location/park already parses the same flat shape, #1301).
             gps_detail = res_msg.get("gpsDetail") or res_msg
-            return gps_detail
+            return cast(dict[str, Any] | None, gps_detail)
         except Exception as e:
             _LOGGER.exception(f"{DOMAIN} - _get_location failed: {type(e).__name__}")
             return None
 
     def _set_location_from_gps_detail(
-        self, vehicle: Vehicle, gps_detail: dict | None
+        self, vehicle: Vehicle, gps_detail: dict[str, Any] | None
     ) -> None:
         """Apply the gpsDetail of GET /location, whose time is UTC.
 
@@ -1268,9 +1278,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
         url = (
             self.USER_API_URL
@@ -1285,9 +1295,11 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = ApiImplSession()
         _ = session.get(url)
-        return session.cookies.get_dict()
+        return cast(dict[str, Any], session.cookies.get_dict())
 
-    def _get_access_token(self, stamp, authorization_code):
+    def _get_access_token(
+        self, stamp: str, authorization_code: str
+    ) -> tuple[str, str, str, Any]:
         if BRANDS[self.brand] == BRAND_GENESIS:
             url = self.USER_API_URL + "oauth2/token"
             headers = {
@@ -1315,14 +1327,14 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
         # Default for Kia and Hyundai
         url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
-        data = {
+        payload = {
             "grant_type": "refresh_token",
             "refresh_token": authorization_code,
             "client_id": self.CCSP_SERVICE_ID,
             "client_secret": self.CCS_SERVICE_SECRET,
         }
 
-        response = self.session.post(url, data=data, allow_redirects=False)
+        response = self.session.post(url, data=payload, allow_redirects=False)
 
         response_json = response.json()
         _check_response_for_errors(response_json)
