@@ -107,7 +107,8 @@ class KiaCciApiEU(GspaApiEU):
         Unlike the Hyundai implementation, driving info and history are
         not fetched: on Kia these endpoints currently fail server-side
         (confirmed live on a real EV6), so a cached-state update stays
-        limited to stored-status.
+        limited to stored-status plus the GSPA location stored-status
+        fallback for vehicles with no Location node.
         """
         if not (token.access_token or token.exchangeable_token):
             raise APIError("No CCS token — cannot fetch GSPA stored-status")
@@ -118,6 +119,7 @@ class KiaCciApiEU(GspaApiEU):
         if isinstance(state, dict) and "Vehicle" in state:
             state = state["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
+        self._update_vehicle_gspa_location(token, vehicle)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints)

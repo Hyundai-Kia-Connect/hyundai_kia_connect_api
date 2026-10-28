@@ -372,6 +372,7 @@ class HyundaiCciApiEU(GspaApiEU):
         if isinstance(state, dict) and "Vehicle" in state:
             state = state["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
+        self._update_vehicle_gspa_location(token, vehicle)
 
         if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
             try:

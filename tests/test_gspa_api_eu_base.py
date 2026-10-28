@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.GspaApiEU import _parse_gspa_svm_timestamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -282,3 +283,87 @@ def test_manager_init_does_not_read_cipher_files(monkeypatch):
     assert sorted(reads) == ["hyundai_cipher_params.json"]
     api._get_cipher()  # singleton: no second read
     assert sorted(reads) == ["hyundai_cipher_params.json"]
+
+
+def test_parse_gspa_svm_timestamp_millis_variant():
+    """Location stored-status appends .mmm milliseconds (live PV5,
+    2026-10-27); the 14-digit and unparsable shapes behave as before."""
+    assert _parse_gspa_svm_timestamp("20261027220812.291") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("20261027220812") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("2026102722.291") is None
+    # right shape, invalid date — the strptime error arm stays covered
+    assert _parse_gspa_svm_timestamp("20261999009999.291") is None
+
+
+LOCATION_STATUS_PAYLOAD = {
+    "coord": {"lat": 0.0, "lon": 0.0, "type": 0, "alt": 0.0},
+    "head": 0,
+    "speed": {"value": 0, "unit": 0},
+    "time": "20261027220812.291",
+}
+
+
+def test_update_vehicle_gspa_location_sets_location():
+    """No Location node in the status tree (PV5): the fallback read sets
+    vehicle.location from the server-cached position with its UTC time."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(
+        api, "get_location_stored_status", return_value=LOCATION_STATUS_PAYLOAD
+    ) as mock_read:
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    mock_read.assert_called_once()
+    assert vehicle.location_latitude == 0.0
+    assert vehicle.location_longitude == 0.0
+    assert vehicle.location_last_updated_at == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+
+
+def test_update_vehicle_gspa_location_skips_vehicle_with_location_node():
+    """Vehicles whose status tree carries a Location node take no extra
+    request."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    vehicle.location = (52.0, 20.0, dt.datetime.now(dt.UTC))
+
+    with patch.object(api, "get_location_stored_status") as mock_read:
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    mock_read.assert_not_called()
+    assert vehicle.location_latitude == 52.0  # existing location untouched
+
+
+def test_update_vehicle_gspa_location_unusable_payload_stays_unknown():
+    """Missing coord or unparsable time leaves the location unset (HA
+    convention: unknown, not masked)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    for payload in (None, {}, {"coord": {"lat": 1.0}}, {"time": "2026102722.291"}):
+        with patch.object(api, "get_location_stored_status", return_value=payload):
+            api._update_vehicle_gspa_location(token, vehicle)
+        assert vehicle.location_latitude is None
+        assert vehicle.location_last_updated_at is None
+
+
+def test_update_vehicle_gspa_location_read_failure_stays_unknown():
+    """A failing location read leaves the location unset, never stale."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(api, "get_location_stored_status", side_effect=APIError("boom")):
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    assert vehicle.location_latitude is None
+    assert vehicle.location_last_updated_at is None

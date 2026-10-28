@@ -121,8 +121,10 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     """Parse a GSPA SVM timestamp (media-set ``date`` or ``gpsDetail.time``).
 
     Shapes seen in the EU response: 14-digit ``yyyyMMddHHmmss`` strings
-    (assumed UTC) and epoch-millisecond numbers. ISO 8601 strings are
-    accepted as a fallback. Returns None for anything unparsable.
+    (assumed UTC) and epoch-millisecond numbers. The location endpoints
+    append ``.mmm`` milliseconds — ``yyyyMMddHHmmss.mmm``. ISO 8601
+    strings are accepted as a fallback. Returns None for anything
+    unparsable.
     """
     if value is None:
         return None
@@ -141,6 +143,18 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
         if len(value) == 14 and value.isdigit():
             try:
                 return dt.datetime.strptime(value, "%Y%m%d%H%M%S").replace(
+                    tzinfo=dt.UTC
+                )
+            except ValueError:
+                return None
+        if (
+            len(value) == 18
+            and value[:14].isdigit()
+            and value[14] == "."
+            and value[15:].isdigit()
+        ):
+            try:
+                return dt.datetime.strptime(value, "%Y%m%d%H%M%S.%f").replace(
                     tzinfo=dt.UTC
                 )
             except ValueError:
@@ -3082,6 +3096,39 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
             return None
+
+    def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate vehicle.location from the GSPA location stored-status.
+
+        The GSPA stored-status tree carries no Location node on some
+        vehicles (confirmed on a PV5, 2026-10-27), leaving vehicle.location
+        unset. This endpoint serves the server-cached position with a UTC
+        ``time`` (wire shape identical to the SVM ``gpsDetail`` block):
+        {"data": {"coord": {lat, lon, type, alt}, "head", "speed",
+        "time"}}. Read-only — unlike location ``update-status``, which
+        long-polls the car (wake) and reports the car's clock time, so it
+        stays off the cached path.
+        """
+        if vehicle.location_latitude is not None:
+            return
+        try:
+            data = self.get_location_stored_status(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location fallback read failed")
+            return
+        # _gspa_get already lifts the {"data": ..., "metaInfo": ...} envelope.
+        if not isinstance(data, dict):
+            return
+        coord = data.get("coord")
+        if not isinstance(coord, dict):
+            return
+        latitude = float_or_none(coord.get("lat"))
+        longitude = float_or_none(coord.get("lon"))
+        location_time = _parse_gspa_svm_timestamp(data.get("time"))
+        if latitude is None or longitude is None or location_time is None:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status: no usable position")
+            return
+        vehicle.location = (latitude, longitude, location_time)
 
     def get_location_routes(
         self, token: Token, vehicle: Vehicle

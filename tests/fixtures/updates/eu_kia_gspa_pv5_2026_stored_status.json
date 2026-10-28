@@ -3,7 +3,7 @@
         "status": "tests/fixtures/eu_kia_gspa_pv5_2026_stored_status.json (Kia PV5 Passenger 2026)",
         "follow_up_sources": "none",
         "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. The PV5 status tree carries no Location node, so the cached update also reads location/stored-status — response from the reporter capture (lib PR #1331), coordinates redacted before sharing."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -23,6 +23,15 @@
                         "Vehicle": "$fixture:eu_kia_gspa_pv5_2026_stored_status.json"
                     }
                 },
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000"
+                }
+            }
+        },
+        "GET /gspa/v1/location/vehicles/VEHICLE-1/stored-status": {
+            "body": {
+                "data": "$fixture:eu_kia_gspa_pv5_location_stored_status.json",
                 "metaInfo": {
                     "retCode": "S",
                     "resCode": "200-000"

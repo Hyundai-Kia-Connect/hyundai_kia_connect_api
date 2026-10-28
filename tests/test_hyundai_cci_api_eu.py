@@ -692,6 +692,52 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
     assert vehicle.ev_battery_percentage == 78
 
 
+def test_update_vehicle_with_cached_state_location_fallback():
+    """A status tree without a Location node pulls vehicle.location from
+    the GSPA location stored-status fallback (PV5-style wire shape,
+    live-confirmed by the lib PR #1331 reporter)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    vehicle.engine_type = ENGINE_TYPES.EV
+
+    ccs2_state = {
+        "Drivetrain": {"Odometer": 12345},
+        "Electronics": {"Battery": {"Level": 85}},
+    }
+    location_status = {
+        "coord": {"lat": 0.0, "lon": 0.0, "type": 0, "alt": 0.0},
+        "head": 0,
+        "speed": {"value": 0, "unit": 0},
+        "time": "20261027220812.291",
+    }
+
+    with (
+        patch.object(
+            api,
+            "get_stored_status",
+            return_value={"state": {"Vehicle": ccs2_state}},
+        ),
+        patch.object(api, "_get_driving_info", return_value=None),
+        patch.object(api, "_get_driving_history", return_value=None),
+        patch.object(
+            api, "get_location_stored_status", return_value=location_status
+        ) as get_loc,
+        # keep the query reads out of the network — not this test's scope
+        patch.object(api, "_update_vehicle_extended_data", MagicMock()),
+        patch.object(api, "_update_vehicle_gspa_data", MagicMock()),
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    get_loc.assert_called_once()
+    assert vehicle.location_latitude == 0.0
+    assert vehicle.location_longitude == 0.0
+    assert vehicle.location_last_updated_at == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+
+
 # ── smart_key_battery_warning_is_on (FOB.LowBattery) ───────────
 
 
