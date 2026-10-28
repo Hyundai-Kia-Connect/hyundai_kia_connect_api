@@ -32,6 +32,7 @@ class AuthenticationCertificateError(AuthenticationError):
 class AuthenticationSigninError(AuthenticationError):
     """The identity provider rejected the sign-in response."""
 
+
 class AuthenticationTokenExpiredError(AuthenticationError):
     """The authentication token has expired."""
 
