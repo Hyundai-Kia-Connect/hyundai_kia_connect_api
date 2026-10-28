@@ -18,11 +18,12 @@ vehicle confirm their payload shapes.
 
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
+from .mqtt_service_hub_eu import MqttServiceHubMixin
 from .Token import Token
 from .Vehicle import Vehicle
 
 
-class KiaCciApiEU(GspaApiEU):
+class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     """Kia EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
@@ -87,6 +88,14 @@ class KiaCciApiEU(GspaApiEU):
     # check_action_status stays gated in this region: outcomes reach the
     # integration through vehicle-status pushes or the cached state read.
     # Observed per command on EV6, EV3, eNiro, I5, Tucson and IONIQ 6.
+
+    supports_mqtt_push: bool = True
+
+    # Push (Service Hub) REST base, live-probed on production.
+    SERVICE_HUB_BASE = "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010"
+
+    CCSP_CLIENT_SERVICE_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
+    PUSH_PROVIDER_ID = "3863bdda-b753-4edb-9fbf-38288a353fe1"
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
