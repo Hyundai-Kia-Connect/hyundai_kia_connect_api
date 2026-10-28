@@ -65,6 +65,7 @@ from .exceptions import (
     AuthenticationInvalidCredentialsError,
     AuthenticationRedirectError,
     AuthenticationSigninError,
+    AuthenticationTokenExpiredError,
     ConsentRequiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
@@ -913,7 +914,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if valid_until.tzinfo is None:
             valid_until = valid_until.replace(tzinfo=dt.UTC)
         if valid_until - dt.timedelta(seconds=60) <= dt.datetime.now(dt.UTC):
-            raise AuthenticationError("CCS token expired — refresh required")
+            raise AuthenticationTokenExpiredError(
+                "CCS token expired — refresh required"
+            )
 
     def _raise_gspa_error(self, status_code: int, data: dict[str, Any]) -> None:
         """Raise a typed exception from a GSPA failure response.
