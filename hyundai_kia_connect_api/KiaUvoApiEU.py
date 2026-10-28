@@ -349,13 +349,13 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         code_list = parse_qs(urlparse(location).query).get("code")
         if not code_list:
             query = parse_qs(urlparse(location).query)
-            
+
             if query.get("error"):
                 error_desc = query.get("error_description", ["unknown"])[0]
                 if error_desc.strip().casefold() == "invalid credentials":
                     raise AuthenticationInvalidCredentialsError(
                         "Authentication rejected: invalid credentials."
-                    )                
+                    )
                 raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
