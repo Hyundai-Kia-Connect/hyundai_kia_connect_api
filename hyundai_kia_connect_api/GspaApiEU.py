@@ -437,42 +437,42 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
                 "Check username and password."
             )
-        
+
         location = resp.headers.get("location", "")
         code_list = parse_qs(urlparse(location).query).get("code")
-        
+
         if not code_list:
             query = parse_qs(urlparse(location).query)
-        
+
             if query.get("error"):
                 error_desc = query.get("error_description", ["unknown"])[0]
-        
+
                 if error_desc.strip().casefold() == "invalid credentials":
                     raise AuthenticationInvalidCredentialsError(
                         "Authentication rejected: invalid credentials."
                     )
-        
+
                 raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
                 )
-        
+
             if "/web/v1/user/authorization" in location:
                 raise ConsentRequiredError(
                     "Account consent is required. Please log in via a browser "
                     "once to accept the terms, then retry."
                 )
-        
+
             if "authorize" in location:
                 raise AuthenticationRedirectError(
                     "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
-        
+
             raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
-        
+
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens
