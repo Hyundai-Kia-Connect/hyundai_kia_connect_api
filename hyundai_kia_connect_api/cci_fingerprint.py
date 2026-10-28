@@ -4,9 +4,9 @@ The EU OneApp app signs POSTs to cci-api-eu.../auth/* with X-Fingerprint:
 HMAC-SHA256 over the client identity plus app-embedded secret constant
 pairs. The X-Timestamp is in the message only. The key/message shapes and
 the constants below were recovered from the app's Android 1.4.0 build and
-verified live on 2026-10-14 for both Hyundai and Kia EU (exchange and
-token-refresh answer 200; a wrong signature answers 9036, a missing
-X-Fingerprint answers 9035).
+verified live on 2026-10-14 for both Hyundai and Kia EU and on 2026-10-28
+for Genesis EU (exchange and token-refresh answer 200; a wrong signature
+answers 9036, a missing X-Fingerprint answers 9035).
 """
 
 from __future__ import annotations
@@ -24,11 +24,9 @@ from .const import BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS
 _FINGERPRINT_KEYS: dict[str, tuple[str, str, str]] = {
     BRAND_HYUNDAI: ("OsZDfDuCyVX", "yfqjCoA2JbX", "2MrLpGwNBC"),
     BRAND_KIA: ("yb4Z1n2nlKe", "ukNilE7QEdb", "KB34nStPVa"),
-    # Genesis EU 1.4.0 constants; verified live 2026-10-28: signed exchange
-    # and signed token refresh answer 200 on cci-api-eu.genesis.com.
-    # (The helper carries one extra key piece, the x-timestamp header value,
-    # which is empty at signing time because the header is added later, so
-    # the effective shape matches the other brands.)
+    # Genesis EU constants (app 1.4.0). The app adds one extra key piece,
+    # the x-timestamp header value, which is empty at signing time (header
+    # is set later), so the shape here matches the other brands.
     BRAND_GENESIS: ("SGcyufLERcZ", "g8d7THY41KO", "8l1fHRfZZb"),
 }
 
