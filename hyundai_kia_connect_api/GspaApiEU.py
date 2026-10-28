@@ -434,7 +434,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
         if resp.status_code != 302:
             raise AuthenticationSigninError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
+                f"Signin failed: HTTP {resp.status_code}. "
                 "Check username and password."
             )
 
@@ -446,12 +446,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
 
             if query.get("error"):
                 error_desc = query.get("error_description", ["unknown"])[0]
-
+            
                 if error_desc.strip().casefold() == "invalid credentials":
                     raise AuthenticationInvalidCredentialsError(
                         "Authentication rejected: invalid credentials."
                     )
-
+            
                 raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
