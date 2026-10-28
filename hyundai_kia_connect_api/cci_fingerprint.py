@@ -24,14 +24,13 @@ from .const import BRAND_GENESIS, BRAND_HYUNDAI, BRAND_KIA, BRANDS
 _FINGERPRINT_KEYS: dict[str, tuple[str, str, str]] = {
     BRAND_HYUNDAI: ("OsZDfDuCyVX", "yfqjCoA2JbX", "2MrLpGwNBC"),
     BRAND_KIA: ("yb4Z1n2nlKe", "ukNilE7QEdb", "KB34nStPVa"),
+    # Genesis EU 1.4.0 constants; verified live 2026-10-28: signed exchange
+    # and signed token refresh answer 200 on cci-api-eu.genesis.com.
+    # (The helper carries one extra key piece, the x-timestamp header value,
+    # which is empty at signing time because the header is added later, so
+    # the effective shape matches the other brands.)
+    BRAND_GENESIS: ("SGcyufLERcZ", "g8d7THY41KO", "8l1fHRfZZb"),
 }
-# Genesis EU placeholder: the gate is live on cci-api-eu.genesis.com
-# (signed exchange with the Hyundai triple answers 9036 and its legacy
-# exchange answers 9035 on 2026-10-14), and the Genesis signing constants
-# have not been extracted yet. The mapping keeps brand 3 from raising a
-# KeyError on the signed path; the gate rejection then routes to the
-# legacy fallback and the typed error instead.
-_FINGERPRINT_KEYS[BRAND_GENESIS] = _FINGERPRINT_KEYS[BRAND_HYUNDAI]
 
 # Android OneApp build identity the gate validates the fingerprint against.
 CLIENT_VERSION = "1.4.0"
