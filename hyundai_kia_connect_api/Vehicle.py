@@ -206,6 +206,18 @@ class Vehicle:
     _ota_checked: bool = False
     _valet_failed: bool = False
 
+    # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
+    # distinct from Token.mqtt_client_id (the device-level registration id).
+    # Capability flags: True = supported, False = not supported, None =
+    # not reported by the metadata read; conditional topics require True.
+    mqtt_vehicle_id: str | None = None
+    hu_client_id: str | None = None
+    supports_hvac_close_remote: bool | None = None
+    supports_media_close_remote: bool | None = None
+    supports_speed_event: bool | None = None
+    supports_ota_progress: bool | None = None
+    supports_schedule_update: bool | None = None
+
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool | None = None
     tire_pressure_rear_left_warning_is_on: bool | None = None
