@@ -35,6 +35,17 @@ signatures, `Vehicle` attributes) can break kia_uvo.
 - **Don't bump versions or edit `HISTORY.rst`.** The release workflow does
   both.
 - Contributors outside the org may have at most 4 open PRs at a time.
+- **Check for overlap first.** Before reporting "a new bug plus a fix", search
+  your own open PRs and issues for the same endpoint or symptom. Supporting an
+  existing PR beats writing a parallel one.
+- **Back root-cause claims with a log.** Don't write "same bug as #X" or
+  "caused by Y" in a comment unless a capture proves it. If you don't have
+  one, say so and get it first.
+- **Read the full issue thread before planning a fix.** A closed issue is
+  often closed because the reporter confirmed a fix in the comments, and the
+  data dump you're about to request may already be there.
+- **Cross-repo references use the full form** `Hyundai-Kia-Connect/kia_uvo#N`.
+  A bare `#N` resolves to the current repo only.
 
 ## Architecture
 
@@ -61,6 +72,23 @@ signatures, `Vehicle` attributes) can break kia_uvo.
   HTTP (`BLE001` is ignored). Don't narrow these handlers as a drive-by change.
 - Datetimes are naive for now (`DTZ*` ignored). A timezone-aware migration is
   planned as its own PR, so don't partially convert.
+- Parse defensively. When a block is missing, leave the field `None`; when an
+  enum is built from an API value, fall back to `None` with a logged warning.
+  The API can add values at any time. Don't trade graceful degradation for
+  type safety.
+- A field name tells you nothing about semantics. `expiresTime: 86400` is a
+  24-hour TTL, not an epoch. Check the value's magnitude before doing time
+  arithmetic on it.
+- When you fix one "absent block coerced to a default" pattern
+  (`int(x or 0)`, `dt.time(x or 0)`), grep the rest of the function and the
+  sibling region parsers for the same idiom and guard each one with its own
+  test.
+- When scoping a fix to one region, document the boundary and note regions
+  that share the mechanism. A "region-specific" login fix can turn out to
+  cover a sibling brand on the same endpoint.
+- Capability flags are named `supports_*` (not `is_support_*`).
+- A method, property or parameter with no caller is removed, not kept "for
+  later".
 
 ## Development
 
@@ -96,4 +124,8 @@ pre-commit run --all-files   # ruff, ruff-format, codespell, pyupgrade, mypy --s
   account, driver and address blocks. Record where each capture came from in
   `_fixture_meta.source`.
 - New code must pass `mypy --strict`.
+- Adding a `Vehicle` field changes every snapshot that serializes the full
+  dataclass. Run the full suite, regenerate with the harness's
+  `--snapshot-update`, and include the `.ambr` diff in the same commit. Never
+  hand-edit snapshot files.
 - Never commit credentials. `.env` is git-ignored.
