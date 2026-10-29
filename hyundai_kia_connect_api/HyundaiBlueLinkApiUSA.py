@@ -246,7 +246,6 @@ class cipherAdapter(HTTPAdapter):
         if proxy in self.proxy_manager:
             return self.proxy_manager[proxy]
         if proxy.lower().startswith("socks"):
-            # SOCKS handling is requests' own.
             return super().proxy_manager_for(proxy, **kwargs)
         manager = self.proxy_manager[proxy] = _CipherProxyManager(
             proxy,
