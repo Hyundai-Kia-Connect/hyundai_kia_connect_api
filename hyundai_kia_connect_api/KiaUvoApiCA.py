@@ -143,8 +143,6 @@ class SessionTicketAdapter(HTTPAdapter):
         if proxy in self.proxy_manager:
             return self.proxy_manager[proxy]
         if proxy.lower().startswith("socks"):
-            # SOCKS handling is requests' own; the CA endpoints don't
-            # fingerprint its ClientHello differently.
             return super().proxy_manager_for(proxy, **kwargs)
         manager = self.proxy_manager[proxy] = _SessionTicketProxyManager(
             proxy,
