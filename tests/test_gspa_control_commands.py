@@ -530,22 +530,65 @@ def test_schedule_reservation_charge_off_peak_only_flag():
 
 
 def test_schedule_reservation_hvac_body_shape():
+    """reservInfo = the app DTO (day list + time object only), per the
+    PV5 live round (2026-10-22): the previous nested reservInfo failed
+    with 500-000 twice; the app form returned 202 and applied across
+    four runs. The 12-hour clock and afternoon timeSection match the
+    reservation-charge capture (19:05 -> "0705" / timeSection 1)."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True
     options.first_departure.days = [1]
     options.first_departure.time = dt.time(7, 5)
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.second_departure.enabled = True
+    options.second_departure.days = [4]
+    options.second_departure.time = dt.time(19, 5)
     _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
     assert call.args[0].endswith("/reservation-hvac")
     body = call.kwargs["json"]
     assert body["command"] == "set"
     assert body["reservedHVACInfo1"]["reservHVACflag"] == 1
-    assert body["reservedHVACInfo2"]["reservHVACflag"] == 0
+    assert body["reservedHVACInfo1"]["reservInfo"] == {
+        "day": [1],
+        "time": {"time": "0705", "timeSection": 0},
+    }
+    assert body["reservedHVACInfo2"]["reservHVACflag"] == 1
+    assert body["reservedHVACInfo2"]["reservInfo"] == {
+        "day": [4],
+        "time": {"time": "0705", "timeSection": 1},
+    }
+    # the climate options travel in reservHVACSet, not reservInfo
+    for info in (
+        body["reservedHVACInfo1"]["reservInfo"],
+        body["reservedHVACInfo2"]["reservInfo"],
+    ):
+        assert "scheduleEnable" not in info
+        assert "hvacTemp" not in info
+        assert "drvSeatLoc" not in info
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
-def test_schedule_reservation_engine_body_shape():
+def test_schedule_reservation_hvac_days_default_to_sunday():
+    """day defaults to [0] = Sunday (PV5 live round: day 0 maps to
+    Schedule1.Sun)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
+    info1 = call.kwargs["json"]["reservedHVACInfo1"]["reservInfo"]
+    info2 = call.kwargs["json"]["reservedHVACInfo2"]["reservInfo"]
+    assert info1["day"] == [0] and info2["day"] == [0]
+    # departure times default to dt.time() = 00:00 -> morning section
+    assert info1["time"] == {"time": "1200", "timeSection": 0}
+
+
+def test_schedule_reservation_engine_body_shape_unchanged():
+    """reservation-engine keeps the nested reservInfo for now: no live
+    capture of that endpoint exists (no ICE car in the #1909/#1145
+    loop), so the app-form change stays scoped to reservation-hvac."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True
