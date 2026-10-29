@@ -877,6 +877,54 @@ def test_parse_gspa_widget_lamp_data_flat_and_nested():
     assert vehicle.headlamp_left_low is None  # not in payload — untouched
 
 
+def test_parse_gspa_widget_lamp_data_defensive_branches():
+    """Non-dict lamp blocks (unexpected wire shape) skip their section,
+    the remaining Bifunc / rear / PowerSupply leaves still parse; keys
+    absent from the payload leave the fields untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    api._parse_gspa_widget_lamp_data(
+        vehicle,
+        {
+            "Body": {
+                "Lights": {
+                    "Front": {
+                        "Left": "unexpected",
+                        "Right": {
+                            "Low": {"Warning": 1.0},
+                            "Bifunc": {"Warning": 1.0},
+                            "TurnSignal": {"Warning": 0.0},
+                        },
+                        "HeadLamp": {"SystemWarning": 3},
+                    },
+                    "Rear": {
+                        "Left": "unexpected",
+                        "Right": {
+                            "StopLamp": {"Warning": 1.0},
+                            "TurnSignal": {"Warning": 0.0},
+                        },
+                    },
+                }
+            },
+            "Electronics": {"PowerSupply": {"Ignition3": 1.0}},
+            "remoteIgnition": 1,
+            "RemoteControl": {"SleepMode": 0.0},
+            "Drivetrain": {"Transmission": {"ParkingPosition": 1.0}},
+        },
+    )
+    assert vehicle.headlamp_left_low is None  # skipped block — untouched
+    assert vehicle.headlamp_right_low is True
+    assert vehicle.headlamp_right_bifunc is True
+    assert vehicle.turn_signal_right_front is False
+    assert vehicle.headlamp_status == 3
+    assert vehicle.stop_lamp_right is True
+    assert vehicle.turn_signal_right_rear is False
+    assert vehicle.ign3 is True
+    assert vehicle.remote_ignition is True
+    assert vehicle.sleep_mode_check is False
+    assert vehicle.transmission_condition == 1.0
+
+
 def test_refresh_failure_warning_includes_response_reason(caplog):
     """A generic (non-4111) refresh failure logs the server's reason —
     without it, a ~4h token wall has no visible cause in HA logs (#1338)."""

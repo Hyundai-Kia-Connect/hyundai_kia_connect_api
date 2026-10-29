@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 from hyundai_kia_connect_api.GspaApiEU import _parse_gspa_svm_timestamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
@@ -367,3 +367,100 @@ def test_update_vehicle_gspa_location_read_failure_stays_unknown():
 
     assert vehicle.location_latitude is None
     assert vehicle.location_last_updated_at is None
+
+
+# ── GSPA read getters — error-path arms (codecov patch target) ──
+
+extended_read_methods = sorted(list(EXTENDED_READS) + ["get_location_stored_status"])
+
+
+@pytest.mark.parametrize("method", extended_read_methods)
+def test_extended_read_swallows_transport_error(method):
+    """A non-auth failure on a GSPA read returns None (fields stay unknown,
+    no crash in the cached-update path)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert getattr(api, method)(token, vehicle) is None
+
+
+@pytest.mark.parametrize("method", extended_read_methods)
+def test_extended_read_reraises_auth_error(method):
+    """An expired token propagates (the caller refreshes and retries)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.get",
+            side_effect=AuthenticationError("expired"),
+        ),
+        pytest.raises(AuthenticationError),
+    ):
+        getattr(api, method)(token, vehicle)
+
+
+def test_get_gspa_vehicles_401_reraises_auth_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=401)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp),
+        pytest.raises(AuthenticationError),
+    ):
+        api.get_gspa_vehicles(token)
+
+
+def test_get_gspa_vehicles_connection_error_returns_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api.get_gspa_vehicles(token) is None
+
+
+def test_get_weather_business_error_returns_none():
+    """HTTP 200 with retCode "F" is a business error: None, no raise."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "F", "resCode": "700-001", "message": "no weather"},
+        "data": None,
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
+        assert api.get_weather(token, 50.0614, 19.9373) is None
+
+
+def test_get_weather_401_reraises_auth_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=401)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp),
+        pytest.raises(AuthenticationError),
+    ):
+        api.get_weather(token, 50.0614, 19.9373)
+
+
+def test_get_weather_connection_error_returns_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api.get_weather(token, 50.0614, 19.9373) is None

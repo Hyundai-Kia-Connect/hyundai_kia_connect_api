@@ -22,6 +22,7 @@ from hyundai_kia_connect_api.const import (
 from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationError,
+    InvalidAPIResponseError,
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
@@ -801,3 +802,56 @@ def test_kia_charging_current_sends_the_level_field():
     _action_id, call = _run_command_on(api, api.set_charging_current, 1)
     body = call.kwargs["json"]
     assert body == {"chargingCurrent": 1, "command": "set"}
+
+
+def test_control_command_4xx_non_json_body():
+    """A 4xx with a non-JSON body classifies through the empty-data arm."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    resp = MagicMock(status_code=400)
+    resp.json.side_effect = ValueError("bad json")
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = resp
+        with pytest.raises(APIError):
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+    assert post.call_count == 1
+
+
+def test_control_command_2xx_non_json_body():
+    """A 2xx with a non-JSON body raises InvalidAPIResponseError."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    resp = MagicMock(status_code=202)
+    resp.json.side_effect = ValueError("bad json")
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = resp
+        with pytest.raises(InvalidAPIResponseError, match="non-JSON body"):
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+
+
+def test_control_command_2xx_non_object_json():
+    """A 2xx whose body is valid JSON but not an object (e.g. a list)
+    raises InvalidAPIResponseError."""
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    resp = MagicMock(status_code=202)
+    resp.json.return_value = ["not", "an", "object"]
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = resp
+        with pytest.raises(InvalidAPIResponseError, match="non-object JSON"):
+            HyundaiCciApiEU.lock_action(api, token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
