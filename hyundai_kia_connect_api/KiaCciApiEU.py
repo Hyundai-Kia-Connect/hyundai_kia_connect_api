@@ -17,10 +17,8 @@ vehicle confirm their payload shapes.
 # pylint:disable=missing-class-docstring,invalid-name
 
 import logging
-import time
 
-from .const import DOMAIN
-from .exceptions import APIError, AuthenticationError
+from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
 from .Vehicle import Vehicle
@@ -120,36 +118,7 @@ class KiaCciApiEU(GspaApiEU):
         data = self.get_stored_status(token, vehicle)
         if not data:
             raise APIError("GSPA stored-status returned no data")
-        state = data.get("state", {})
-        if isinstance(state, dict) and "Vehicle" in state:
-            state = state["Vehicle"]
-        self._update_vehicle_properties_ccs2(vehicle, state)
-
-    # A Kia PV5 reports a fresh stored-status 5-20 s after prewakeup (also
-    # from sleep); re-reading right away still returns the previous state.
-    FORCE_REFRESH_POLL_INTERVAL = 5
-    FORCE_REFRESH_POLL_ATTEMPTS = 8
-
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Wake the vehicle, wait for a newer stored-status, then parse it.
-
-        Falls back to the latest stored-status when the car does not
-        report within the poll budget (offline or deep sleep).
-        """
-        before = self.get_stored_status(token, vehicle) or {}
-        last_update = before.get("lastUpdateTime")
-        try:
-            self.prewakeup(token, vehicle)
-        except AuthenticationError:
-            raise
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - prewakeup failed (car may be offline)")
-        for _ in range(self.FORCE_REFRESH_POLL_ATTEMPTS):
-            time.sleep(self.FORCE_REFRESH_POLL_INTERVAL)
-            data = self.get_stored_status(token, vehicle) or {}
-            if data.get("lastUpdateTime") not in (None, last_update):
-                break
-        self.update_vehicle_with_cached_state(token, vehicle)
+        self._apply_stored_status(vehicle, data)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints)

@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import uuid
+from time import sleep, time
 from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
@@ -1424,6 +1425,65 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
+
+    def _apply_stored_status(self, vehicle: Vehicle, data: dict[str, Any]) -> None:
+        state = data.get("state", {})
+        if isinstance(state, dict) and "Vehicle" in state:
+            state = state["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
+
+    # ------------------------------------------------------------------
+    # Force refresh
+    # ------------------------------------------------------------------
+
+    # 140 s matches the app's read timeout for a wake (#1184).
+    FORCE_REFRESH_TIMEOUT = 140
+    FORCE_REFRESH_INITIAL_DELAY = 5
+    FORCE_REFRESH_POLL_INTERVAL = 5
+    # lastUpdateTime is server time; tolerate a local clock running ahead.
+    FORCE_REFRESH_CLOCK_TOLERANCE_MS = 5000
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wake the vehicle and apply the first stored-status reported after it.
+
+        Raises APIError if the wake fails or no newer status arrives within
+        FORCE_REFRESH_TIMEOUT; the vehicle is left untouched in that case,
+        since its state is unknown.
+        """
+        self._validate_ccs_token(token)
+        requested_at = int(time() * 1000)
+        if self.prewakeup(token, vehicle) is None:
+            raise APIError("GSPA prewakeup failed")
+        attempts = 1 + int(
+            (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
+            // self.FORCE_REFRESH_POLL_INTERVAL
+        )
+        oldest = requested_at - self.FORCE_REFRESH_CLOCK_TOLERANCE_MS
+        sleep(self.FORCE_REFRESH_INITIAL_DELAY)
+        for attempt in range(attempts):
+            if attempt:
+                sleep(self.FORCE_REFRESH_POLL_INTERVAL)
+            data = self.get_stored_status(token, vehicle) or {}
+            # The wire sends epoch ms as a string ("1789000000000").
+            updated = int_or_none(data.get("lastUpdateTime"))
+            if updated is not None and updated >= oldest:
+                break
+        else:
+            last = (
+                dt.datetime.fromtimestamp(updated / 1000, dt.UTC).isoformat()
+                if updated is not None
+                else "unknown"
+            )
+            raise APIError(
+                f"Vehicle did not report a new status within "
+                f"{self.FORCE_REFRESH_TIMEOUT} s after prewakeup; "
+                f"last status from {last}"
+            )
+        _LOGGER.debug(
+            f"{DOMAIN} - new stored-status "
+            f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
+        )
+        self._apply_stored_status(vehicle, data)
 
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)

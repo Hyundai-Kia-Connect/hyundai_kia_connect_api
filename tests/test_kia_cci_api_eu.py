@@ -217,43 +217,90 @@ def test_kia_prewakeup_sends_action_body():
 
 
 def _stored(last_update: int) -> dict:
-    return {"lastUpdateTime": last_update, "state": {"Vehicle": {}}}
+    # String like the wire and the stored-status fixtures.
+    return {"lastUpdateTime": str(last_update), "state": {"Vehicle": {}}}
 
 
-def test_kia_force_refresh_waits_for_newer_status():
-    """prewakeup, then poll stored-status until lastUpdateTime advances."""
-    api = _make_kia_api()
+# Local clock at the wake request: 100 s → 100_000 ms.
+_REQUESTED_AT = 100_000
+
+
+def _force_refresh(api, statuses):
+    """Run force_refresh_vehicle_state with the clock and sleep patched."""
     with (
-        patch.object(KiaCciApiEU, "prewakeup") as wake,
-        patch.object(
-            KiaCciApiEU,
-            "get_stored_status",
-            side_effect=[_stored(1), _stored(1), _stored(2)],
-        ) as status,
-        patch.object(KiaCciApiEU, "update_vehicle_with_cached_state") as update,
-        patch("hyundai_kia_connect_api.KiaCciApiEU.time.sleep") as sleep,
+        patch.object(KiaCciApiEU, "prewakeup", return_value={}),
+        patch.object(KiaCciApiEU, "get_stored_status", side_effect=statuses) as status,
+        patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
+        patch("hyundai_kia_connect_api.GspaApiEU.time", return_value=100.0),
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep") as sleep,
     ):
         api.force_refresh_vehicle_state(MagicMock(), MagicMock())
-    wake.assert_called_once()
-    assert status.call_count == 3
-    assert sleep.call_count == 2
-    update.assert_called_once()
+    return status, parse, sleep
 
 
-def test_kia_force_refresh_gives_up_after_poll_budget():
-    """No newer status (car offline): parse the latest one after the budget."""
+def test_kia_force_refresh_applies_first_newer_status():
+    """Poll until lastUpdateTime is after the wake, then apply that status."""
+    api = _make_kia_api()
+    status, parse, sleep = _force_refresh(
+        api, [_stored(_REQUESTED_AT - 60_000), _stored(_REQUESTED_AT + 7_000)]
+    )
+    assert status.call_count == 2
+    assert [c.args[0] for c in sleep.call_args_list] == [
+        KiaCciApiEU.FORCE_REFRESH_INITIAL_DELAY,
+        KiaCciApiEU.FORCE_REFRESH_POLL_INTERVAL,
+    ]
+    parse.assert_called_once()
+
+
+def test_kia_force_refresh_accepts_status_within_clock_tolerance():
+    api = _make_kia_api()
+    status, parse, _ = _force_refresh(api, [_stored(_REQUESTED_AT - 4_000)])
+    assert status.call_count == 1
+    parse.assert_called_once()
+
+
+def test_kia_force_refresh_keeps_polling_after_failed_read():
+    api = _make_kia_api()
+    status, parse, _ = _force_refresh(api, [None, _stored(_REQUESTED_AT + 1_000)])
+    assert status.call_count == 2
+    parse.assert_called_once()
+
+
+def test_kia_force_refresh_raises_when_prewakeup_fails():
+    """prewakeup returns None on failure: raise, read nothing, apply nothing."""
     api = _make_kia_api()
     with (
-        patch.object(KiaCciApiEU, "prewakeup", side_effect=APIError("offline")),
-        patch.object(
-            KiaCciApiEU, "get_stored_status", return_value=_stored(1)
-        ) as status,
-        patch.object(KiaCciApiEU, "update_vehicle_with_cached_state") as update,
-        patch("hyundai_kia_connect_api.KiaCciApiEU.time.sleep"),
+        patch.object(KiaCciApiEU, "prewakeup", return_value=None),
+        patch.object(KiaCciApiEU, "get_stored_status") as status,
+        patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep"),
+        pytest.raises(APIError),
     ):
         api.force_refresh_vehicle_state(MagicMock(), MagicMock())
-    assert status.call_count == 1 + KiaCciApiEU.FORCE_REFRESH_POLL_ATTEMPTS
-    update.assert_called_once()
+    status.assert_not_called()
+    parse.assert_not_called()
+
+
+def test_kia_force_refresh_raises_after_timeout_without_applying():
+    """No newer status within the budget: the state is unknown, so raise."""
+    api = _make_kia_api()
+    attempts = 1 + (
+        (KiaCciApiEU.FORCE_REFRESH_TIMEOUT - KiaCciApiEU.FORCE_REFRESH_INITIAL_DELAY)
+        // KiaCciApiEU.FORCE_REFRESH_POLL_INTERVAL
+    )
+    stale = _stored(_REQUESTED_AT - 6_000)
+    with (
+        patch.object(KiaCciApiEU, "prewakeup", return_value={}),
+        patch.object(KiaCciApiEU, "get_stored_status", return_value=stale) as status,
+        patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
+        patch("hyundai_kia_connect_api.GspaApiEU.time", return_value=100.0),
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep") as sleep,
+        pytest.raises(APIError, match="last status from 1970-01-01T00:01:34"),
+    ):
+        api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    assert status.call_count == attempts
+    assert sleep.call_count == attempts
+    parse.assert_not_called()
 
 
 # ── VehicleManager wiring ────────────────────────────────

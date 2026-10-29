@@ -204,21 +204,11 @@ class HyundaiCciApiEU(GspaApiEU):
     # ------------------------------------------------------------------
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Wake the vehicle and re-read GSPA stored-status.
-
-        Prewakeup is best-effort (car may be offline). The status read
-        returns the last cached state regardless.
-        """
-        self._validate_ccs_token(token)
-        try:
-            self.prewakeup(token, vehicle)
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - prewakeup failed (car may be offline)")
-        # Reset cached-failure flags so the next cached update retries the
-        # OTA + valet reads instead of skipping them.
+        super().force_refresh_vehicle_state(token, vehicle)
+        # Reset cached-failure flags so the OTA + valet reads are retried.
         vehicle._ota_checked = False
         vehicle._valet_failed = False
-        self.update_vehicle_with_cached_state(token, vehicle)
+        self._update_vehicle_extras(token, vehicle)
 
     # ------------------------------------------------------------------
     # Update vehicle with cached state
@@ -239,11 +229,11 @@ class HyundaiCciApiEU(GspaApiEU):
         data = self.get_stored_status(token, vehicle)
         if not data:
             raise APIError("GSPA stored-status returned no data")
-        state = data.get("state", {})
-        if isinstance(state, dict) and "Vehicle" in state:
-            state = state["Vehicle"]
-        self._update_vehicle_properties_ccs2(vehicle, state)
+        self._apply_stored_status(vehicle, data)
+        self._update_vehicle_extras(token, vehicle)
 
+    def _update_vehicle_extras(self, token: Token, vehicle: Vehicle) -> None:
+        """Driving info, history and GSPA reads that follow a stored-status update."""
         if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
             try:
                 state = self._get_driving_info(token, vehicle)
