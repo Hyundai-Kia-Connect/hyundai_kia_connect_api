@@ -3,6 +3,7 @@
 CA API diagnostic script for Hyundai/Kia Canada token refresh investigation.
 
 Issue: https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/1715
+        (Hyundai CA errorCode 7549: https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/2025)
 Purpose: Test various CA API endpoints and approaches to find a working
          token refresh mechanism that doesn't require OTP every few days.
 
@@ -117,6 +118,18 @@ def safe_json(response: requests.Response) -> dict | None:
         return None
 
 
+def dump_body_on_error(response: requests.Response, data: dict | None) -> None:
+    """Print the full response body so the issue thread carries it verbatim.
+
+    Only used for non-success responses: success bodies contain access and
+    refresh tokens, which must not be shared.
+    """
+    resp_code = (data.get("responseHeader", {}) or {}).get("responseCode")
+    if resp_code == 0 and response.status_code == 200:
+        return
+    print(f"  [RAW] Status {response.status_code}: {response.text}")
+
+
 def print_result(label: str, response: requests.Response):
     """Print a structured test result."""
     data = safe_json(response)
@@ -136,6 +149,7 @@ def print_result(label: str, response: requests.Response):
         print(
             f"  [{label}] HTTP={code} respCode={resp_code} errCode={err_code} errDesc={err_desc[:60]} result_keys={result_keys}"
         )
+        dump_body_on_error(response, data)
     else:
         print(f"  [{label}] HTTP={code} (non-JSON or empty)")
 
@@ -307,6 +321,7 @@ def test_device_id_stability(
             err = data1.get("error", {})
             err_code = err.get("errorCode", "") if isinstance(err, dict) else ""
             print(f"  Login 1: respCode={rc} errCode={err_code}")
+            dump_body_on_error(resp1, data1)
             if err_code == "7110":
                 print(
                     "  >>> First login requires OTP — this is expected for a new device_id"
@@ -331,6 +346,7 @@ def test_device_id_stability(
             err = data2.get("error", {})
             err_code = err.get("errorCode", "") if isinstance(err, dict) else ""
             print(f"  Login 2: respCode={rc} errCode={err_code}")
+            dump_body_on_error(resp2, data2)
             if rc == 0:
                 print(
                     "  >>> Second login succeeded WITHOUT OTP — device is remembered!"
@@ -348,8 +364,8 @@ def test_device_id_stability(
 def test_different_device_id(
     base_url: str, brand_config: dict, username: str, password: str
 ) -> None:
-    """Test 7: Login with random device_id — should always trigger OTP."""
-    print("\n=== Test 7: Login with random device_id (should trigger OTP) ===")
+    """Test 7: Login with random device_id — how the server treats a new device."""
+    print("\n=== Test 7: Login with random device_id ===")
     random_id = get_random_device_id()
     print(f"  Random Device ID: {random_id}")
     headers = make_headers(brand_config, random_id)
@@ -363,6 +379,7 @@ def test_different_device_id(
             err = data.get("error", {})
             err_code = err.get("errorCode", "") if isinstance(err, dict) else ""
             print(f"  respCode={rc} errCode={err_code}")
+            dump_body_on_error(resp, data)
             if err_code == "7110":
                 print("  >>> Random device_id triggers OTP as expected")
             elif rc == 0:
@@ -415,7 +432,7 @@ def main():
     base_url = brand_config["base_url"]
     device_id = get_device_id()
 
-    print("CA API Diagnostic — Issue #1715")
+    print("CA API Diagnostic")
     print(f"Brand: {args.brand}")
     print(f"Base URL: https://{base_url}")
     print(f"Device ID: {device_id}")
@@ -428,9 +445,9 @@ def main():
     token_data = test_v2_login(base_url, headers, args.username, args.password)
 
     if not token_data:
-        # If v2/login with deterministic device_id fails (OTP required),
+        # If v2/login with deterministic device_id fails,
         # try the old /lgn endpoint which bluelinky uses
-        print("\nv2/login failed or requires OTP. Trying old /lgn endpoint...")
+        print("\nv2/login did not return tokens. Trying old /lgn endpoint...")
         lgn_result = test_lgn_login(base_url, headers, args.username, args.password)
         if lgn_result:
             token_data = lgn_result
@@ -463,10 +480,9 @@ def main():
 
     else:
         print("\n!!! No tokens obtained — cannot test refresh approaches.")
-        print("!!! If OTP was required, you can:")
-        print("!!! 1. Complete the OTP flow in the kia_uvo integration")
-        print("!!! 2. Wait for device to be remembered (up to 90 days)")
-        print("!!! 3. Re-run this script — it should work without OTP then")
+        print("!!! Check the [RAW] response bodies above for the server's full")
+        print("!!! error. If the error was 7110 (OTP required), completing the")
+        print("!!! OTP flow in the kia_uvo integration and re-running may clear it.")
 
     # ── Phase 3: Device ID stability ────────────────────────────────────
 
@@ -479,8 +495,8 @@ def main():
     test_different_device_id(base_url, brand_config, args.username, args.password)
 
     print("\n" + "=" * 60)
-    print("Diagnostic complete. Please share the output in the GitHub issue:")
-    print("https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/1715")
+    print("Diagnostic complete. Share the full output in the GitHub issue you")
+    print("were pointed to — the [RAW] blocks matter most for diagnosis.")
     print("\nNOTE: Review output for any tokens/credentials before sharing!")
     print("      Redact accessToken, refreshToken, and any personal info.")
 
