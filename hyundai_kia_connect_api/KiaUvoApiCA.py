@@ -15,7 +15,10 @@ from zoneinfo import ZoneInfo
 
 import certifi
 import requests
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 # Try to fix hyundai/cloudflare
@@ -66,29 +69,90 @@ CA_TIMEZONES = [
 ]
 
 
-class SessionTicketAdapter(HTTPAdapter):
-    """A HTTPAdapter that re-enables TLS session tickets.
+def create_session_ticket_context() -> ssl.SSLContext:
+    """An SSL context with TLS session tickets enabled.
 
     Cloudflare in front of the CA endpoints fingerprints the TLS ClientHello.
-    urllib3 sets OP_NO_TICKET on its default context; with Python 3.14 /
-    OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is classified as a
-    bot and v2/login answers 403 with an HTML block page. A plain
-    ssl.create_default_context() keeps tickets enabled and is let through.
+    urllib3 sets OP_NO_TICKET on the contexts it builds by default; with
+    Python 3.14 / OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is
+    classified as a bot and v2/login answers 403 with an HTML block page.
+    This context keeps tickets enabled and is let through.
+    """
+    context = create_urllib3_context()
+    context.options &= ~ssl.OP_NO_TICKET
+    return context
+
+
+class _SessionTicketConnection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards. A fresh context per connection
+    sidesteps that in both injected and plain setups.
     """
 
-    def _setup_ssl_context(self):
-        context = create_urllib3_context()
-        context.options &= ~ssl.OP_NO_TICKET
-        return context
+    def connect(self) -> None:
+        self.ssl_context = create_session_ticket_context()
+        super().connect()
 
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
+
+class _SessionTicketConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _SessionTicketConnection
+
+
+class _SessionTicketPoolManager(PoolManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _SessionTicketConnectionPool,
+        }
+
+
+class _SessionTicketProxyManager(ProxyManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _SessionTicketConnectionPool,
+        }
+
+
+class SessionTicketAdapter(HTTPAdapter):
+    """An HTTPAdapter mounting pools whose connections enable TLS session
+    tickets (see _SessionTicketConnection for why)."""
+
+    def init_poolmanager(
+        self,
+        connections=DEFAULT_POOLSIZE,
+        maxsize=DEFAULT_POOLSIZE,
+        block=DEFAULT_POOLBLOCK,
+        **kwargs,
+    ):
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _SessionTicketPoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
 
-    def proxy_manager_for(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-        return super().proxy_manager_for(*args, **kwargs)
+    def proxy_manager_for(self, proxy, **kwargs):
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _SessionTicketProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=self._pool_connections,
+            maxsize=self._pool_maxsize,
+            block=self._pool_block,
+            **kwargs,
+        )
+        return manager
 
 
 class RetrySession(requests.Session):
