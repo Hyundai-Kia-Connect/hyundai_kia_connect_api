@@ -2230,6 +2230,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         door state reflecting it in the fresh server data afterwards.
         The shared legacy "door" + close/open shape stays accepted by
         the backend, but the EU apps no longer send it.
+
+        When the vehicle reports SafeMode the apps dispatch lock/unlock
+        to the sibling .../door-lock-safety and .../door-unlock-safety
+        endpoints instead (door lock/unlock only; same
+        {"command": "set"} body, and unrecognized safe states fall back
+        to door-lock-safety). The endpoints are accepted by the backend
+        (202 on a PV5) but the behavioral difference is unverified, so
+        the library keeps the plain door-lock/door-unlock surface.
         """
         endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
         return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
