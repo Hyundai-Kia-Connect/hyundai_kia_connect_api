@@ -2338,7 +2338,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if options.defrost is not None:
             body["windshieldFrontDefogState"] = options.defrost
         if options.heating is not None:
-            body["heating1"] = options.heating
+            # heating1 is acked but has no effect on GSPA (PV5, #1398); one
+            # sideRearMirrorHeating flag covers the rear window and the
+            # mirrors, engaged by heating 1/2/4 — same mapping as the CCS2
+            # path. An explicit side_rear_mirror_heating option overrides.
+            body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
         if options.temp_unit is not None:
             # tempUnit is a string on the wire ("C"/"F"); the 0/1 int form is
             # rejected with 400-002 (live-proven on a PV5, 2026-09-19).
@@ -2389,7 +2393,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             if options.climate is not None:
                 body["hvacCtrl"] = 1 if options.climate else 0
             if options.heating is not None:
-                body["heating1"] = options.heating
+                # Same mapping as start_climate (see there for rationale).
+                body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
             if options.temp_unit is not None:
                 # tempUnit is a string on the wire ("C"/"F"); the 0/1 int
                 # form is rejected with 400-002 (live-proven on a PV5,

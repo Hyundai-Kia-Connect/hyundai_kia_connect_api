@@ -609,10 +609,10 @@
       dict({
         'body': dict({
           'command': 'start',
-          'heating1': 0,
           'hvacTemp': '21',
           'hvacTempType': 1,
           'ignitionDuration': 10,
+          'sideRearMirrorHeating': 0,
           'tempUnit': 'C',
           'windshieldFrontDefogState': False,
         }),
@@ -765,10 +765,10 @@
       dict({
         'body': dict({
           'command': 'start',
-          'heating1': 0,
           'hvacTemp': '21',
           'hvacTempType': 1,
           'ignitionDuration': 10,
+          'sideRearMirrorHeating': 0,
           'tempUnit': 'C',
           'windshieldFrontDefogState': False,
         }),
