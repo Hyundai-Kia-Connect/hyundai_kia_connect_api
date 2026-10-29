@@ -284,12 +284,14 @@ def test_start_climate_full_options():
     assert body["command"] == "start"
     assert body["hvacTemp"] == "21.5"
     assert body["windshieldFrontDefogState"] is True
-    assert body["heating1"] == 1
+    assert "heating1" not in body
     assert body["tempUnit"] == "C"
     assert body["hvacTempType"] == 1
     assert body["drvSeatLoc"] == "L"
     assert body["ignitionDuration"] == 10
     assert body["strgWhlHeating"] is True
+    # The explicit side_rear_mirror_heating option wins over the heating
+    # mapping (see test_start_climate_heating_maps_to_side_rear_mirror).
     assert body["sideRearMirrorHeating"] is True
     assert body["seatClimateInfo"] == {
         "drvSeatClimateState": 1,
@@ -323,6 +325,28 @@ def test_stop_climate():
     _, call = _run_command(HyundaiCciApiEU.stop_climate)
     assert call.args[0].endswith("/temperature")
     assert call.kwargs["json"] == {"command": "stop"}
+
+
+def test_start_climate_heating_maps_to_side_rear_mirror():
+    """The user-facing heating option maps to sideRearMirrorHeating — the
+    single GSPA flag that covers the rear window and the mirrors (live
+    flip verified on a PV5: flag 1 flips Body.Windshield.Rear.Defog.State
+    0→1 at the car). heating1 is acked by the backend but ignored there."""
+    for heating, flag in ((1, 1), (2, 1), (4, 1), (0, 0), (3, 0)):
+        options = ClimateRequestOptions(heating=heating)
+        _, call = _run_command(HyundaiCciApiEU.start_climate, options)
+        body = call.kwargs["json"]
+        assert "heating1" not in body
+        assert body["sideRearMirrorHeating"] == flag
+
+
+def test_start_engine_heating_maps_to_side_rear_mirror():
+    options = ClimateRequestOptions(heating=2)
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
+    assert call.args[0].endswith("/engine")
+    body = call.kwargs["json"]
+    assert "heating1" not in body
+    assert body["sideRearMirrorHeating"] == 1
 
 
 def test_start_engine_maps_climate_field():
@@ -379,7 +403,14 @@ def test_windows_front_open_scope():
         front_right=WINDOW_STATE.OPEN,
     )
     _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
-    assert call.kwargs["json"]["command"] == "front-open"
+    body: dict[str, Any] = call.kwargs["json"]
+    assert body["command"] == "front-open"
+    # Front-scope commands send the rear pairs as explicit nulls — 0 is
+    # WINDOW_STATE.CLOSED on this endpoint and would close the rear windows.
+    assert body["drvSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["psgSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["rlSeatWindow"] is None
+    assert body["rrSeatWindow"] is None
 
 
 def test_windows_mixed_state_raises():
