@@ -293,27 +293,37 @@ def test_login_with_password_success():
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
 
 
-def test_login_refresh_token_flow():
-    """When password matches 48-char refresh_token, use _get_access_token()."""
+def test_login_48char_string_is_treated_as_password():
+    """Even a legacy-token-shaped password runs the normal password flow.
+
+    The 48-char refresh-token login is gone and CCI password login is the
+    only EU entry point, so a password that merely resembles the legacy token
+    still goes through _login_with_password like any other password.
+    """
     api = _make_eu_api(brand=1)  # Kia
-    refresh_token = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"
+    password = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"  # 48 chars
 
     with (
         patch.object(api, "_get_stamp", return_value="stamp"),
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
+        patch.object(api, "_get_access_token") as get_access_token,
         patch.object(
             api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer access-token", "auth-code", 86400),
-        ),
+            "_login_with_password",
+            return_value={
+                "access_token": "Bearer access-token",
+                "refresh_token": "REFRESHTOKEN123456789012345678901234567890",
+                "expires_in": 3600,
+            },
+        ) as login_with_password,
     ):
-        token = api.login("user@test.com", refresh_token, pin="1234")
+        token = api.login("user@test.com", password, pin="1234")
 
+    login_with_password.assert_called_once_with("user@test.com", password, "device-123")
+    get_access_token.assert_not_called()
     assert token.access_token == "Bearer access-token"
-    assert token.refresh_token == refresh_token
-    assert token.device_id == "device-123"
     assert token.pin == "1234"
 
 
