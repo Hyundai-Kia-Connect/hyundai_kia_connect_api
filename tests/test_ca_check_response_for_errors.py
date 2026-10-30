@@ -43,6 +43,33 @@ class TestCheckResponseForErrors:
                 }
             )
 
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "7401",
+            "7402",
+            "7403",
+            "7404",
+            "7435",
+            "7530",
+            "7531",
+            "7532",
+            "7549",
+            "7602",
+            "7603",
+        ],
+    )
+    def test_ca_auth_error_codes_raise_authentication_error(self, api, code):
+        """Every code the CA server uses for credential/account problems must
+        map to AuthenticationError so the coordinator re-authenticates."""
+        with pytest.raises(AuthenticationError, match=code):
+            api._check_response_for_errors(
+                {
+                    "responseHeader": {"responseCode": 1},
+                    "error": {"errorCode": code, "errorDesc": f"desc {code}"},
+                }
+            )
+
     def test_7110_otp_required_passes_through(self, api):
         """7110 is OTP-required, handled in login — must not raise here."""
         api._check_response_for_errors(
