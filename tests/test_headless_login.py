@@ -235,8 +235,18 @@ def test_login_with_password_cci_token_exchange_fails():
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
-def test_login_with_password_success():
-    """Full CCI login flow returns access_token, refresh_token and CCI fields."""
+@pytest.mark.parametrize(
+    "expires_time",
+    [86400, 3600],
+    ids=["ttl-24h-older-captures", "ttl-1h-live-2026-10-30"],
+)
+def test_login_with_password_success(expires_time):
+    """Full CCI login flow returns access_token, refresh_token and CCI fields.
+
+    The CCS exchange answers expiresTime as a TTL in seconds. Both observed
+    server values are covered: 86400 (24h) from older captures and 3600 (1h)
+    from live runs on 2026-10-30.
+    """
     api = _make_eu_api(brand=2)  # Hyundai
     cci_token_resp = MagicMock(status_code=200)
     cci_token_resp.json.return_value = {
@@ -252,7 +262,7 @@ def test_login_with_password_success():
     exchange_resp = MagicMock(status_code=200)
     exchange_resp.json.return_value = {
         "accessToken": "ccs-token",
-        "expiresTime": 86400,
+        "expiresTime": expires_time,
     }
     with ExitStack() as stack:
         stack.enter_context(
@@ -283,11 +293,13 @@ def test_login_with_password_success():
     assert info["exchangeable_token"] == "exch-at"
     assert info["non_ccs_token"] == "nonccs"
     assert info["id_token"] == "id-tok"
-    # expiresTime is a TTL in seconds (86400 = 24h), so valid_until is ~24h
-    # from now — not an epoch in 1970.
+    # expiresTime is a TTL in seconds, so valid_until is ~TTL from now —
+    # not an epoch in 1970.
     now = dt.datetime.now(dt.UTC)
     assert info["valid_until"] > now
-    assert (info["valid_until"] - now).total_seconds() == pytest.approx(86400, abs=5)
+    assert (info["valid_until"] - now).total_seconds() == pytest.approx(
+        expires_time, abs=5
+    )
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────

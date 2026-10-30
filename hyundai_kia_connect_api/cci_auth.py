@@ -229,8 +229,10 @@ class CciAuthMixin:
             raise AuthenticationError(
                 f"CCS token exchange returned no accessToken: {resp.text[:200]}"
             )
-        # expiresTime is the CCS token TTL in seconds (e.g. 86400 = 24h), not an
-        # epoch. Treat it as a relative duration from now; fall back to +1h.
+        # expiresTime is the CCS token TTL in seconds, not an epoch. Treat it
+        # as a relative duration from now; fall back to +1h. Observed values:
+        # 86400 (24h) in older captures, 3600 (1h) live 2026-10-30 on both EU
+        # regions (Hyundai/Kia).
         expires_in = data.get("expiresTime")
         if expires_in:
             ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
