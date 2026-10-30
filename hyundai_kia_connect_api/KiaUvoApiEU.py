@@ -210,28 +210,6 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         cookies = self._get_cookies()
         self._set_session_language(cookies)
 
-        # Determine if password is a legacy 48-char refresh_token or plaintext.
-        # (CCI 87-char refresh tokens are not usable as a standalone password —
-        # the CCI token refresh needs the full token set, handled by
-        # refresh_access_token with the persisted Token.)
-        is_refresh_token = bool(re.match(r"^[A-Z0-9]{48}$", password))
-
-        if is_refresh_token:
-            refresh_token = password
-            _, access_token, _, expires_in = self._get_access_token(
-                stamp, refresh_token
-            )
-            valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
-            return Token(
-                username=username,
-                password=password,
-                access_token=access_token,
-                refresh_token=refresh_token,
-                device_id=device_id,
-                valid_until=valid_until,
-                pin=pin,
-            )
-
         # Plaintext password login — CCI flow (Hyundai/Kia) or legacy (Genesis).
         info = self._login_with_password(username, password, device_id)
         # CCI flow returns the CCS token expiry as valid_until; legacy falls back
