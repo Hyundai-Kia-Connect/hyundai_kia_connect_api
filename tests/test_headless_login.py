@@ -8,7 +8,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequiredError
+from hyundai_kia_connect_api.exceptions import (
+    AuthenticationBlockedError,
+    AuthenticationCciTokenExchangeError,
+    AuthenticationCertificateError,
+    AuthenticationError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
+    ConsentRequiredError,
+)
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Token import Token
 
@@ -81,7 +89,9 @@ def test_login_with_password_certs_endpoint_fails():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="failed to fetch RSA certs"):
+        with pytest.raises(
+            AuthenticationCertificateError, match="failed to fetch RSA certs"
+        ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -98,7 +108,7 @@ def test_login_with_password_signin_returns_non_302():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Signin failed"):
+        with pytest.raises(AuthenticationSigninError, match="Signin failed"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -118,7 +128,7 @@ def test_login_with_password_signin_no_code_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(
-            AuthenticationError, match="unexpected redirect after signin"
+            AuthenticationRedirectError, match="unexpected redirect after signin"
         ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
@@ -141,7 +151,7 @@ def test_login_with_password_signin_error_in_redirect():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Authentication rejected"):
+        with pytest.raises(AuthenticationSigninError, match="Authentication rejected"):
             api._login_with_password_cci("user@test.com", "wrong-password", "device-1")
 
 
@@ -162,7 +172,7 @@ def test_login_with_password_signin_redirect_to_login_page():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="returned to login page"):
+        with pytest.raises(AuthenticationRedirectError, match="returned to login page"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -205,7 +215,7 @@ def test_login_with_password_waf_block_detected():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="abusing request"):
+        with pytest.raises(AuthenticationBlockedError, match="abusing request"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -231,7 +241,9 @@ def test_login_with_password_cci_token_exchange_fails():
                 return_value=token_resp,
             )
         )
-        with pytest.raises(AuthenticationError, match="CCI token exchange failed"):
+        with pytest.raises(
+            AuthenticationCciTokenExchangeError, match="CCI token exchange failed"
+        ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 

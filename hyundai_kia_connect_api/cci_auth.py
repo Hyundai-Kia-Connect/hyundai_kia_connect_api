@@ -22,7 +22,10 @@ from .cci_fingerprint import (
     is_gate_rejection,
 )
 from .const import BRANDS, DOMAIN
-from .exceptions import AuthenticationError
+from .exceptions import (
+    AuthenticationCciTokenExchangeError,
+    AuthenticationCcsTokenExchangeError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -136,7 +139,7 @@ class CciAuthMixin:
             )
             resp = self._legacy_exchange_auth_code(device_id, auth_code)
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCciTokenExchangeError(
                 f"CCI token exchange failed: HTTP {resp.status_code} — "
                 f"{resp.text[:200]}. This may indicate an API change."
             )
@@ -219,14 +222,14 @@ class CciAuthMixin:
                 timeout=(5, 30),
             )
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCcsTokenExchangeError(
                 f"CCS token exchange failed: HTTP {resp.status_code} — "
                 f"{resp.text[:200]}. This may indicate an API change."
             )
         data = resp.json()
         ccs_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
         if not ccs_token:
-            raise AuthenticationError(
+            raise AuthenticationCcsTokenExchangeError(
                 f"CCS token exchange returned no accessToken: {resp.text[:200]}"
             )
         # expiresTime is the CCS token TTL in seconds, not an epoch. Treat it

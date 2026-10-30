@@ -41,7 +41,12 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
+    AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
     ConsentRequiredError,
     DeviceIDError,
 )
@@ -261,7 +266,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         )
         auth_resp = s.get(auth_url, allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
-            raise AuthenticationError(
+            raise AuthenticationBlockedError(
                 "IDPConnect authorize was blocked by the WAF ('abusing request'). "
                 "This is a server-side block, not a credentials problem. See #1273."
             )
@@ -269,7 +274,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         # Step 2: RSA public key
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
                 "This may indicate a Hyundai API change."
             )
@@ -301,18 +306,22 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             allow_redirects=False,
         )
         if resp.status_code != 302:
-            raise AuthenticationError(
+            raise AuthenticationSigninError(
                 f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
                 "Check username and password."
             )
         location = resp.headers.get("location", "")
         code_list = parse_qs(urlparse(location).query).get("code")
         if not code_list:
-            if "error" in location.lower():
-                error_desc = parse_qs(urlparse(location).query).get(
-                    "error_description", ["unknown"]
-                )[0]
-                raise AuthenticationError(
+            query = parse_qs(urlparse(location).query)
+
+            if query.get("error"):
+                error_desc = query.get("error_description", ["unknown"])[0]
+                if error_desc.strip().casefold() == "invalid credentials":
+                    raise AuthenticationInvalidCredentialsError(
+                        "Authentication rejected: invalid credentials."
+                    )
+                raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
                 )
@@ -322,11 +331,11 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     "once to accept the terms, then retry."
                 )
             if "authorize" in location:
-                raise AuthenticationError(
+                raise AuthenticationRedirectError(
                     "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
-            raise AuthenticationError(
+            raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
         code = code_list[0]
