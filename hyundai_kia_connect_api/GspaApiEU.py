@@ -2625,7 +2625,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape).
+
+        reservInfo carries the app DTO: day list + time object only;
+        the schedule on/off is reservHVACflag and climate options live
+        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22)."""
         if options.first_departure is None:
             options.first_departure = (
                 ScheduleChargingClimateRequestOptions.DepartureOptions()
@@ -2651,17 +2655,20 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         def _make_reserv_info(
             dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
         ) -> dict[str, Any]:
+            # App-confirmed reservInfo DTO (Kia EU 1.4.0
+            # ReservationInfoApiRequest): day list plus the time object
+            # only. The previous nested shape (scheduleEnable, hvacTemp,
+            # drvSeatLoc, ...) failed server-side with 500-000 on a PV5
+            # twice; with this app form the call returned 202 and
+            # applied, four runs. On/off travels in reservHVACflag, the
+            # climate options in reservHVACSet; 12:00 and later is
+            # afternoon (timeSection 1), matching reservation-charge.
             return {
-                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
                 "day": dep.days or [0],
-                "time": dep.time.strftime("%I%M") if dep.time else "1200",
-                "windshieldFrontDefogState": options.defrost or False,
-                "ignitionDuration": 10,
-                "hvacCtrl": 1 if options.climate_enabled else 0,
-                "hvacTempType": 1,
-                "hvacTemp": f"{temperature:.1f}",
-                "tempUnit": options.temperature_unit,
-                "drvSeatLoc": "L",
+                "time": {
+                    "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                    "timeSection": 1 if dep.time and dep.time >= dt.time(12, 0) else 0,
+                },
             }
 
         def _make_hvac_set() -> dict[str, Any]:
