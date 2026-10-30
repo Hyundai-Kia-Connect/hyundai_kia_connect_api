@@ -109,6 +109,13 @@ class Vehicle:
     dtc_count: int | None = None
     dtc_descriptions: dict[str, Any] | None = None
 
+    # Maintenance report (CA gtmvrlst / gtmvrrpt): the newest month's report
+    maintenance_report_last_id: int | None = None
+    maintenance_report_date: str | None = None
+    maintenance_report_odometer: float | None = None
+    maintenance_report_odometer_unit: str | None = None
+    maintenance_report_systems: dict[str, Any] | None = None
+
     smart_key_battery_warning_is_on: bool | None = None
     washer_fluid_warning_is_on: bool | None = None
     brake_fluid_warning_is_on: bool | None = None
