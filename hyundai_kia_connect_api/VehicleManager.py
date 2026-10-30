@@ -38,6 +38,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
 )
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .GenesisCciApiEU import GenesisCciApiEU
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
@@ -436,7 +437,7 @@ class VehicleManager:
             if BRANDS[brand] == BRAND_KIA:
                 return KiaCciApiEU(region, brand, language)
             if BRANDS[brand] == BRAND_GENESIS:
-                raise APIError("Genesis EU CCI/GSPA is not supported yet")
+                return GenesisCciApiEU(region, brand, language)
             return HyundaiCciApiEU(region, brand, language)
         elif REGIONS[region] == REGION_USA and (
             BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS

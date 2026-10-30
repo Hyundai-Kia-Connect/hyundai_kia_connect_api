@@ -306,7 +306,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # The brand cipher loads lazily (see _get_cipher): parameter files
         # are read on first stamp use, so Home Assistant does not run the
         # disk read inside its event loop while constructing the manager.
-        if self.CIPHER_BRAND not in ("hyundai", "kia"):
+        if self.CIPHER_BRAND not in ("hyundai", "kia", "genesis"):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
         self._cipher: GspaCipher | None = None
 
@@ -820,10 +820,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         loop that constructs this class.
         """
         if self._cipher is None:
-            from .gspa.cipher_keys import hyundai_cipher, kia_cipher
+            from .gspa.cipher_keys import genesis_cipher, hyundai_cipher, kia_cipher
 
             self._cipher = (
-                hyundai_cipher() if self.CIPHER_BRAND == "hyundai" else kia_cipher()
+                hyundai_cipher()
+                if self.CIPHER_BRAND == "hyundai"
+                else genesis_cipher()
+                if self.CIPHER_BRAND == "genesis"
+                else kia_cipher()
             )
         return self._cipher
 
