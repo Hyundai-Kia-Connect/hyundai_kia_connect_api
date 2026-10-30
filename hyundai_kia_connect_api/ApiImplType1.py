@@ -1988,8 +1988,8 @@ class ApiImplType1(ApiImpl):
 
         Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
         Shared by AU, IN and CN (all use the same endpoint format).
-        KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
-        body instead of form-urlencoded.
+        KiaUvoApiEU overrides this with the CCI token-refresh flow
+        (v2/auth/token-refresh + CCS re-exchange).
 
         No Stamp header is sent by default. Regions whose server requires
         it (AU, confirmed live in kia_uvo #1778; IN, whose login flow has

@@ -308,7 +308,6 @@ def test_login_48char_string_is_treated_as_password():
         patch.object(api, "_get_device_id", return_value="device-123"),
         patch.object(api, "_get_cookies", return_value={}),
         patch.object(api, "_set_session_language"),
-        patch.object(api, "_get_access_token") as get_access_token,
         patch.object(
             api,
             "_login_with_password",
@@ -316,13 +315,13 @@ def test_login_48char_string_is_treated_as_password():
                 "access_token": "Bearer access-token",
                 "refresh_token": "REFRESHTOKEN123456789012345678901234567890",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ) as login_with_password,
     ):
         token = api.login("user@test.com", password, pin="1234")
 
     login_with_password.assert_called_once_with("user@test.com", password, "device-123")
-    get_access_token.assert_not_called()
     assert token.access_token == "Bearer access-token"
     assert token.pin == "1234"
 
@@ -343,6 +342,7 @@ def test_login_plaintext_password_calls_login_with_password():
                 "access_token": "Bearer headless-access-token",
                 "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ),
     ):
@@ -373,6 +373,7 @@ def test_login_survives_legacy_register_failure(caplog):
                 "access_token": "Bearer headless-access-token",
                 "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ) as login_with_password,
         caplog.at_level(logging.DEBUG),
@@ -409,6 +410,7 @@ def test_login_plaintext_password_genesis_calls_login_with_password():
                 "access_token": "Bearer genesis-access-token",
                 "refresh_token": "GENESISREFRESHTOKEN12345678901234567",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ),
     ):
@@ -494,70 +496,22 @@ def _make_token(**overrides) -> Token:
     return Token(**defaults)
 
 
-def test_refresh_access_token_uses_stored_refresh_token():
-    """refresh_access_token calls _get_access_token with stored refresh_token."""
-    api = _make_eu_api(brand=1)  # Kia
+def test_refresh_access_token_without_cci_fields_falls_back_to_login():
+    """A stored token without CCI fields goes straight to full login.
 
-    mock_get_token = MagicMock(
-        return_value=("Bearer", "Bearer new-access-token", "new-rt", 86400)
-    )
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(api, "_get_access_token", mock_get_token),
-    ):
-        token = _make_token()
-        result = api.refresh_access_token(token)
-
-    assert result.access_token == "Bearer new-access-token"
-    assert result.refresh_token == "new-rt"
-    assert result.device_id == "device-123"
-    assert result.username == "user@test.com"
-    assert result.pin == "1234"
-    mock_get_token.assert_called_once_with("stamp", token.refresh_token)
-
-
-def test_refresh_access_token_preserves_device_id():
-    """refresh_access_token preserves device_id from original token."""
+    Tokens from pre-CCI installs carry only the old refresh_token grant
+    data. The legacy grant is gone, so the refresh self-migrates the
+    account to the CCI flow, same as the GspaApiEU lineage.
+    """
     api = _make_eu_api(brand=1)
 
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access-token", "rotated-rt", 3600),
-        ),
-    ):
-        token = _make_token(device_id="original-device-id")
-        result = api.refresh_access_token(token)
+    with patch.object(
+        api, "login", return_value=_make_token(access_token="Bearer from-login")
+    ) as mock_login:
+        result = api.refresh_access_token(_make_token())
 
-    assert result.device_id == "original-device-id"
-
-
-def test_refresh_access_token_genesis_keeps_old_refresh_token():
-    """When _get_access_token returns None for refresh_token, keep the original.
-
-    Some brands (Genesis, Hyundai EU) don't rotate refresh tokens,
-    so the API doesn't return a new one. The `or` fallback preserves
-    the original refresh_token.
-    """
-    api = _make_eu_api(brand=3)  # Genesis
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer gen-access", None, 3600),
-        ),
-    ):
-        token = _make_token(refresh_token="GENESISRT1234567890123456789012345")
-        result = api.refresh_access_token(token)
-
-    assert result.access_token == "Bearer gen-access"
-    # None from API → fallback to original refresh_token
-    assert result.refresh_token == "GENESISRT1234567890123456789012345"
-    assert result.device_id == "device-123"
+    mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
+    assert result.access_token == "Bearer from-login"
 
 
 def test_refresh_access_token_falls_back_on_missing_refresh_token():
@@ -587,28 +541,6 @@ def test_refresh_access_token_falls_back_on_none_refresh_token():
     mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
 
 
-def test_refresh_access_token_falls_back_on_exchange_failure():
-    """When _get_access_token raises, fall back to full login."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            side_effect=Exception("Network error"),
-        ),
-        patch.object(
-            api, "login", return_value=_make_token(access_token="Bearer from-login")
-        ) as mock_login,
-    ):
-        token = _make_token()
-        result = api.refresh_access_token(token)
-
-    mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
-    assert result.access_token == "Bearer from-login"
-
-
 def test_refresh_cci_failure_warning_includes_response_reason(caplog):
     """A CCI refresh failure logs the server's reason — without it, a
     ~4h token wall has no visible cause in HA logs (#1338)."""
@@ -633,41 +565,3 @@ def test_refresh_cci_failure_warning_includes_response_reason(caplog):
     assert len(refresh_warnings) == 1
     assert "HTTP 400" in refresh_warnings[0].message
     assert "4121" in refresh_warnings[0].message
-
-
-def test_refresh_access_token_does_not_call_get_device_id():
-    """refresh_access_token should NOT call _get_device_id (no full re-login)."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access", "new-rt", 3600),
-        ),
-        patch.object(api, "_get_device_id") as mock_device_id,
-    ):
-        token = _make_token()
-        api.refresh_access_token(token)
-
-    mock_device_id.assert_not_called()
-
-
-def test_refresh_access_token_does_not_call_get_cookies():
-    """refresh_access_token should NOT call _get_cookies (no full re-login)."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access", "new-rt", 3600),
-        ),
-        patch.object(api, "_get_cookies") as mock_cookies,
-    ):
-        token = _make_token()
-        api.refresh_access_token(token)
-
-    mock_cookies.assert_not_called()

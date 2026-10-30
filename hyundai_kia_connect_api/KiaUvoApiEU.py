@@ -19,7 +19,6 @@ from Crypto.PublicKey import RSA
 
 from .ApiImpl import ApiImplSession
 from .ApiImplType1 import (
-    USER_AGENT_OK_HTTP,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -103,13 +102,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
             self.PORT: int = 8080
             self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.CCS_SERVICE_SECRET: str = "secret"
             self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
             self.CFB = base64.b64decode(
                 "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-            self.BASIC_AUTHORIZATION: str = (
-                "Basic ZmRjODVjMDAtMGEyZi00YzY0LWJjYjQtMmNmYjE1MDA3MzBhOnNlY3JldA=="
             )
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
             self.PUSH_TYPE = "APNS"
@@ -117,24 +112,20 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             self.BASE_DOMAIN = "prd.eu-ccapi.hyundai.com"
             self.PORT = 8080
             self.CCSP_SERVICE_ID = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.CCS_SERVICE_SECRET = "KUy49XxPzLpLuoK0xhBC77W6VXhmtQR9iQhmIFjjoY4IpxsV"
             self.APP_ID = "014d2225-8495-4735-812d-2616334fd15d"
             self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
             )
-            self.BASIC_AUTHORIZATION = "Basic NmQ0NzdjMzgtM2NhNC00Y2YzLTk1NTctMmExOTI5YTk0NjU0OktVeTQ5WHhQekxwTHVvSzB4aEJDNzdXNlZYaG10UVI5aVFobUlGampvWTRJcHhzVg=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
             self.PUSH_TYPE = "GCM"
         elif BRANDS[self.brand] == BRAND_GENESIS:
             self.BASE_DOMAIN = "prd-eu-ccapi.genesis.com"
             self.PORT = 443
             self.CCSP_SERVICE_ID = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.CCS_SERVICE_SECRET = "FKDdlef2ffdleFEweELFKERiLER2FED21sDdwdgQz6hFESE3"
             self.APP_ID = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
             self.CFB = base64.b64decode(
                 "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
             )
-            self.BASIC_AUTHORIZATION = "Basic MzAyMGFmYTItMzBmZi00MTJhLWFhNTEtZDI4ZmJlOTAxZTEwOkZLRGRsZWYyZmZkbGVGRXdlRUxGS0VSaUxFUjJGRUQyMXNEZHdkZ1F6NmhGRVNFMw=="
             self.LOGIN_FORM_HOST = "https://idpconnect-eu.genesis.com"
             self.PUSH_TYPE = "GCM"
 
@@ -210,13 +201,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         cookies = self._get_cookies()
         self._set_session_language(cookies)
 
-        # Plaintext password login — CCI flow (Hyundai/Kia) or legacy (Genesis).
         info = self._login_with_password(username, password, device_id)
-        # CCI flow returns the CCS token expiry as valid_until; legacy falls back
-        # to expires_in from the token response.
-        valid_until = info.get("valid_until") or (
-            dt.datetime.now(dt.UTC) + dt.timedelta(seconds=info["expires_in"])
-        )
+        # _login_with_password is the CCI flow; it always returns valid_until.
+        valid_until = info["valid_until"]
 
         return Token(
             username=username,
@@ -374,12 +361,10 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         }
 
     def refresh_access_token(self, token: Token) -> Token:
-        """Refresh access token using the stored refresh token.
+        """Refresh access token using the stored CCI token set.
 
-        EU Hyundai/Kia (CCI flow): refresh the CCI token set via
-        cci-api-eu/domain/api/v2/auth/token-refresh, then re-exchange the CCS
-        token. Legacy/Genesis: use the OAuth2 refresh_token grant. Falls back
-        to full login if the refresh token is missing or the exchange fails.
+        POST /auth/v2/token-refresh with the full token set, then re-exchange
+        the CCS token. Falls back to full login if the refresh fails.
         """
         if getattr(token, "cci_access_token", None) or getattr(
             token, "non_ccs_token", None
@@ -389,28 +374,6 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             except Exception as ex:
                 _LOGGER.warning(
                     f"CCI token refresh failed ({ex}), falling back to full login"
-                )
-                return self.login(token.username, token.password, token.pin)
-
-        if token.refresh_token:
-            try:
-                stamp = self._get_stamp()
-                _, access_token, new_refresh_token, expires_in = self._get_access_token(
-                    stamp, token.refresh_token
-                )
-                valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
-                return Token(
-                    username=token.username,
-                    password=token.password,
-                    access_token=access_token,
-                    refresh_token=new_refresh_token or token.refresh_token,
-                    device_id=token.device_id,
-                    valid_until=valid_until,
-                    pin=token.pin,
-                )
-            except Exception:
-                _LOGGER.warning(
-                    "Refresh token exchange failed, falling back to full login"
                 )
         return self.login(token.username, token.password, token.pin)
 
@@ -1274,51 +1237,3 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         session = ApiImplSession()
         _ = session.get(url)
         return cast(dict[str, Any], session.cookies.get_dict())
-
-    def _get_access_token(
-        self, stamp: str, authorization_code: str
-    ) -> tuple[str, str, str, Any]:
-        if BRANDS[self.brand] == BRAND_GENESIS:
-            url = self.USER_API_URL + "oauth2/token"
-            headers = {
-                "Authorization": self.BASIC_AUTHORIZATION,
-                "Stamp": stamp,
-                "Content-type": "application/x-www-form-urlencoded",
-                "Host": self.BASE_URL,
-                "Connection": "close",
-                "Accept-Encoding": "gzip, deflate",
-                "User-Agent": USER_AGENT_OK_HTTP,
-            }
-            data = (
-                "grant_type=refresh_token&redirect_uri=https%3A%2F%2Fwww.getpostman.com%2Foauth2%2Fcallback&refresh_token="
-                + authorization_code
-            )
-            response = self.session.post(url, data=data, headers=headers)
-            response_json = response.json()
-            _check_response_for_errors(response_json)
-
-            token_type = response_json["token_type"]
-            access_token = token_type + " " + response_json["access_token"]
-            # Genesis doesn't issue a new refresh_token in this response, so we keep the old one
-            expires_in = response_json["expires_in"]
-            return token_type, access_token, authorization_code, expires_in
-
-        # Default for Kia and Hyundai
-        url = self.LOGIN_FORM_HOST + "/auth/api/v2/user/oauth2/token"
-        payload = {
-            "grant_type": "refresh_token",
-            "refresh_token": authorization_code,
-            "client_id": self.CCSP_SERVICE_ID,
-            "client_secret": self.CCS_SERVICE_SECRET,
-        }
-
-        response = self.session.post(url, data=payload, allow_redirects=False)
-
-        response_json = response.json()
-        _check_response_for_errors(response_json)
-
-        token_type = response_json["token_type"]
-        access_token = token_type + " " + response_json["access_token"]
-        authorization_code = response_json.get("refresh_token", authorization_code)
-        expires_in = response_json["expires_in"]
-        return token_type, access_token, authorization_code, expires_in
