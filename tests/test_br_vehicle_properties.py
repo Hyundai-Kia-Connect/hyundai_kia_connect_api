@@ -66,7 +66,7 @@ class TestBRInheritance:
 
     def test_valet_mode_disabled(self, br_api):
         # ApiImplType1 defaults valet mode on; BR must keep it off.
-        assert br_api.supports_valet_mode is False
+        assert br_api.get_vehicle_supports(Vehicle()).valet_mode is False
 
 
 class TestBRCachedEndpoint:

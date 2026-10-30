@@ -75,6 +75,7 @@ from .Vehicle import (
     MonthTripInfo,
     TripInfo,
     Vehicle,
+    VehicleSupports,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -177,8 +178,6 @@ def _filled[T](value: T | None) -> T:
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
-    supports_window_control: bool = True
-    supports_valet_mode: bool = True
     # resMsg key holding the all-time entry of the drvhistory response.
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
     # Set by each region's __init__.
@@ -193,6 +192,12 @@ class ApiImplType1(ApiImpl):
     temperature_range: Sequence[float]
     PUSH_TYPE: str
     LANGUAGE: str
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        supports.window_control = True
+        supports.valet_mode = True
+        return supports
 
     def __init__(self) -> None:
         """Initialize."""

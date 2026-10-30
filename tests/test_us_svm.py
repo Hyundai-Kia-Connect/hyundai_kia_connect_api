@@ -16,9 +16,9 @@ from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
-def test_vehicle_has_supports_svm_field_default_none():
+def test_vehicle_supports_svm_default_none():
     vehicle = _make_vehicle()
-    assert vehicle.supports_svm is None
+    assert vehicle.supports.surround_view is None
 
 
 def test_svm_details_can_be_imported():
@@ -169,17 +169,14 @@ def test_api_impl_svm_stubs_raise_not_implemented():
         api.request_svm_capture(token, vehicle, acknowledged_warning=True)
 
 
-def test_api_impl_supports_svm_default_false():
+def test_api_impl_surround_view_default_false():
     from hyundai_kia_connect_api.ApiImpl import ApiImpl
 
-    # Capability is a per-region class attribute (like supports_window_control),
-    # not a probe method.
-    assert ApiImpl.supports_svm is False
+    assert ApiImpl().get_vehicle_supports(_make_vehicle()).surround_view is False
 
 
-def test_usa_supports_svm_class_attr_true():
-    # Hyundai BlueLink USA declares SVM support at the region level.
-    assert HyundaiBlueLinkApiUSA.supports_svm is True
+def test_usa_supports_surround_view():
+    assert _make_api().get_vehicle_supports(_make_vehicle()).surround_view is True
 
 
 def test_vehicle_manager_stamps_supports_svm_from_api():
@@ -199,9 +196,7 @@ def test_vehicle_manager_stamps_supports_svm_from_api():
     vehicle = _make_vehicle()
     with patch.object(manager.api, "get_vehicles", return_value=[vehicle]):
         manager.initialize_vehicles()
-    assert manager.api.supports_svm is True
-    assert vehicle.supports_svm is True
-    assert vehicle.supports_svm is manager.api.supports_svm
+    assert vehicle.supports.surround_view is True
 
 
 def _make_api():

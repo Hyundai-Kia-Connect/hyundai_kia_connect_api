@@ -27,7 +27,7 @@ from hyundai_kia_connect_api.exceptions import (
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 
 ENVELOPE = {"rc": "0000", "rs": {"SID": "sid-1"}, "msg": "success"}
 
@@ -53,6 +53,7 @@ def _make_vehicle(ccs2: int = 1) -> Vehicle:
     vehicle = Vehicle()
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
+    vehicle.supports = VehicleSupports(window_control=True)
     return vehicle
 
 
@@ -474,6 +475,14 @@ def test_windows_front_open_scope():
     assert body["psgSeatWindow"] == WINDOW_STATE.OPEN.value
     assert body["rlSeatWindow"] is None
     assert body["rrSeatWindow"] is None
+
+
+def test_windows_raise_when_vehicle_lacks_window_control():
+    options = WindowRequestOptions(front_left=WINDOW_STATE.OPEN)
+    vehicle = _make_vehicle()
+    vehicle.supports.window_control = False
+    with pytest.raises(APIError, match="Window control not supported"):
+        _make_api().set_windows_state(_make_token(), vehicle, options)
 
 
 def test_windows_mixed_state_raises():

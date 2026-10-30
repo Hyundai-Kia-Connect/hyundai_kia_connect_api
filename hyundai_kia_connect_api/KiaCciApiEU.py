@@ -19,7 +19,7 @@ vehicle confirm their payload shapes.
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 
 
 class KiaCciApiEU(GspaApiEU):
@@ -88,7 +88,11 @@ class KiaCciApiEU(GspaApiEU):
             "reservation-charge",
         }
     )
-    supports_window_control = True
+
+    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
+        supports = super().get_vehicle_supports(vehicle)
+        supports.window_control = True
+        return supports
 
     # Action-status polling on the EU CCI backend returned PENDING for
     # every poll across the 2026-10 vehicle run (brand-independent), so

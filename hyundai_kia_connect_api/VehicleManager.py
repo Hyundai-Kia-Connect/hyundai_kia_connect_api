@@ -126,9 +126,7 @@ class VehicleManager:
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            vehicle.supports_window_control = self.api.supports_window_control
-            vehicle.supports_valet_mode = self.api.supports_valet_mode
-            vehicle.supports_svm = self.api.supports_svm
+            vehicle.supports = self.api.get_vehicle_supports(vehicle)
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
