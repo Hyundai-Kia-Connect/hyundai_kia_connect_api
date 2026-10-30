@@ -229,6 +229,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
+    # Push (Service Hub) REST base — subclasses that declare
+    # supports_mqtt_push MUST override it.
+    SERVICE_HUB_BASE: str = ""
+
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
@@ -320,6 +324,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
         # regions.
+
+        # Push (Service Hub) session state — used by MqttServiceHubMixin:
+        # per-request tid from the device/host response headers, and one
+        # requests.Session keeping cookies across the Service Hub calls.
+        self._service_hub_tid: str | None = None
+        self._service_hub_session: requests.Session | None = None
 
         self.session = ApiImplSession()
 
