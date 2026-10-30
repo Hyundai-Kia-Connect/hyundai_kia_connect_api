@@ -230,8 +230,71 @@ def test_kia_remote_control_gated_not_implemented():
             "windowcurtain",
             "charge-target",
             "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
         }
     )
+
+
+def test_kia_discharge_limit_sends_the_live_proven_body():
+    """Kia GSPA discharge-limit: {"dischargingLimit": n, "command": "set"}
+    — live-proven on a PV5 (2026-10-22): 202 with the stored
+    VehicleToLoad.DischargeLimitation.SoC following (20 -> 30)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_vehicle_to_load_discharge_limit, 30)
+    assert call.args[0].endswith("/discharge-limit")
+    assert call.kwargs["json"] == {"dischargingLimit": 30, "command": "set"}
+
+
+def test_kia_charge_alarm_sends_both_all_flag_bodies():
+    """Kia GSPA charge-alarm: all-on / all-off flag bodies — live-proven
+    on a PV5 (2026-10-22): 202 (the one 202 that answers with a SID),
+    stored Setting.CompleteAlarm flags following both directions.
+    Per-combination bodies also reach the wire, but the library exposes
+    the boolean pair only."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, True)
+    assert call.args[0].endswith("/charge-alarm")
+    assert call.kwargs["json"] == {
+        "alarmOff": 0,
+        "alarmBefore10": 1,
+        "alarmBefore20": 1,
+        "alarmBefore30": 1,
+        "command": "set",
+    }
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, False)
+    assert call.kwargs["json"] == {
+        "alarmOff": 1,
+        "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
+def test_kia_reservation_charge_uses_the_flat_offpeak_body():
+    """Kia GSPA reservation-charge: reservFlag + offpeakPowerFlag plus
+    the reservStartTime / reservEndTime {time, timeSection} objects — live-proven on a
+    PV5 (2026-10-22): 202 with Reservation.OffPeakTime following. The
+    12-hour clock encoding matches the capture verbatim: 12:00-13:00 =
+    "1200"/1 and "0100"/1 (timeSection 1 marks the afternoon half)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = False
+    options.off_peak_charge_only_enabled = True
+    options.off_peak_start_time = dt.time(12, 0)
+    options.off_peak_end_time = dt.time(13, 0)
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.schedule_reservation_charge, options)
+    assert call.args[0].endswith("/reservation-charge")
+    body = call.kwargs["json"]
+    assert body == {
+        "reservFlag": 0,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {"time": "1200", "timeSection": 1},
+        "reservEndTime": {"time": "0100", "timeSection": 1},
+        "command": "set",
+    }
 
 
 def test_kia_verified_commands_reach_the_wire():
