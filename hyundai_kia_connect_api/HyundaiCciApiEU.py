@@ -199,66 +199,37 @@ class HyundaiCciApiEU(GspaApiEU):
 
     # ------------------------------------------------------------------
     # CCS2 vehicle property mapping
-    # ------------------------------------------------------------------
-    # Force refresh
-    # ------------------------------------------------------------------
+    def _update_vehicle_extended_data(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate Vehicle fields from GSPA query endpoints (read-only).
 
-    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Wake the vehicle and re-read GSPA stored-status.
-
-        Prewakeup is best-effort (car may be offline). The status read
-        returns the last cached state regardless.
+        These are GET reads of server-side cached data — they do not wake
+        the telematics unit or drain the 12V battery. Failures leave the
+        fields unknown (None), never stale values (HA convention).
         """
-        self._validate_ccs_token(token)
         try:
-            self.prewakeup(token, vehicle)
+            valet = self.get_valet_status(token, vehicle)
+            if valet and isinstance(valet, dict):
+                mode = valet.get("valetMode", "").lower()
+                vehicle.valet_mode_active = mode == "active"
         except Exception:
-            _LOGGER.debug(f"{DOMAIN} - prewakeup failed (car may be offline)")
-        # Reset cached-failure flags so the next cached update retries the
-        # OTA + valet reads instead of skipping them.
-        vehicle._ota_checked = False
-        vehicle._valet_failed = False
-        self.update_vehicle_with_cached_state(token, vehicle)
+            vehicle.valet_mode_active = None
+            _LOGGER.debug(f"{DOMAIN} - GSPA valet_status update failed")
 
-    # ------------------------------------------------------------------
-    # Update vehicle with cached state
-    # ------------------------------------------------------------------
+        # Stored-status widget provides lamp, signal, ignition, sleep data
+        try:
+            widget = self.get_stored_status_widget(token, vehicle)
+            if widget and isinstance(widget, dict):
+                self._parse_gspa_widget_lamp_data(vehicle, widget)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA stored-status-widget failed")
 
-    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        """Fetch GSPA stored-status and update vehicle properties.
-
-        GSPA stored-status is the primary status for all vehicles. The
-        response shape is:
-          {serviceNo, lastUpdateTime, state:{Vehicle:{Body,Cabin,Chassis,
-          Drivetrain,Green,Electronics,Location,...}}}
-        state.Vehicle is the ccs2 vehicleStatus — fed to
-        _update_vehicle_properties_ccs2.
-        """
-        if not (token.access_token or token.exchangeable_token):
-            raise APIError("No CCS token — cannot fetch GSPA stored-status")
-        data = self.get_stored_status(token, vehicle)
-        if not data:
-            raise APIError("GSPA stored-status returned no data")
-        state = data.get("state", {})
-        if isinstance(state, dict) and "Vehicle" in state:
-            state = state["Vehicle"]
-        self._update_vehicle_properties_ccs2(vehicle, state)
-
-        if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
-            try:
-                state = self._get_driving_info(token, vehicle)
-                if state:
-                    self._update_vehicle_drive_info(vehicle, state)
-            except Exception:
-                _LOGGER.debug(f"{DOMAIN} - Driving info fetch failed")
-            try:
-                history = self._get_driving_history(token, vehicle)
-                if history and isinstance(history, dict):
-                    self._update_vehicle_driving_history(vehicle, history)
-            except Exception:
-                _LOGGER.debug(f"{DOMAIN} - Driving history fetch failed")
-
-        self._update_vehicle_gspa_data(token, vehicle)
+        # DTC breakdowns
+        try:
+            bd = self.get_breakdowns(token, vehicle)
+            if bd and isinstance(bd, dict):
+                self._parse_breakdowns(vehicle, bd)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA breakdowns update failed")
 
     def _update_vehicle_gspa_data(self, token: Token, vehicle: Vehicle) -> None:
         """Populate Vehicle GSPA query fields from server-side cached data.
@@ -285,3 +256,136 @@ class HyundaiCciApiEU(GspaApiEU):
         except Exception:
             vehicle.ota_update_available = None  # HA convention: unavailable = unknown
             _LOGGER.debug(f"{DOMAIN} - GSPA ota_updates update failed")
+
+    @staticmethod
+    def _parse_gspa_widget_lamp_data(vehicle: Vehicle, widget: dict[str, Any]) -> None:
+        """Parse lamp/signal/ignition/sleep data from GSPA stored-status-widget.
+
+        Live-probed structure (2026-06-15, Santa Fe HEV):
+          state.Vehicle.Body.Lights.Front.Left.Low.Warning  (0.0/1.0)
+          state.Vehicle.Body.Lights.Front.Left.High.Warning
+          state.Vehicle.Body.Lights.Front.Left.TurnSignal.Warning
+          state.Vehicle.Body.Lights.Rear.Left.StopLamp.Warning
+          state.Vehicle.Electronics.PowerSupply.Ignition3  (0.0/1.0)
+          state.Vehicle.RemoteControl.SleepMode  (0.0/1.0)
+          state.Vehicle.Drivetrain.Transmission.ParkingPosition  (0.0/1.0)
+
+        Values are 0.0/1.0 floats. All parsing is defensive.
+        """
+        # The widget data may be nested under "state.Vehicle" or flat
+        state = widget.get("state", widget)
+        vehicle_data = state.get("Vehicle", state)
+
+        lights = vehicle_data.get("Body", {}).get("Lights", {})
+        front = lights.get("Front", {})
+        for side, obj in (
+            ("left", front.get("Left", {})),
+            ("right", front.get("Right", {})),
+        ):
+            if not isinstance(obj, dict):
+                continue
+            low = obj.get("Low", {})
+            if isinstance(low, dict) and "Warning" in low:
+                setattr(vehicle, f"headlamp_{side}_low", bool(low["Warning"]))
+            high = obj.get("High", {})
+            if isinstance(high, dict) and "Warning" in high:
+                setattr(vehicle, f"headlamp_{side}_high", bool(high["Warning"]))
+            bifunc = obj.get("Bifunc", {})
+            if isinstance(bifunc, dict) and "Warning" in bifunc:
+                setattr(vehicle, f"headlamp_{side}_bifunc", bool(bifunc["Warning"]))
+            ts = obj.get("TurnSignal", {})
+            if isinstance(ts, dict) and "Warning" in ts:
+                setattr(vehicle, f"turn_signal_{side}_front", bool(ts["Warning"]))
+
+        head_lamp = front.get("HeadLamp", {})
+        if isinstance(head_lamp, dict) and "SystemWarning" in head_lamp:
+            vehicle.headlamp_status = head_lamp.get("SystemWarning")
+
+        rear = lights.get("Rear", {})
+        for side, obj in (
+            ("left", rear.get("Left", {})),
+            ("right", rear.get("Right", {})),
+        ):
+            if not isinstance(obj, dict):
+                continue
+            sl = obj.get("StopLamp", {})
+            if isinstance(sl, dict) and "Warning" in sl:
+                setattr(vehicle, f"stop_lamp_{side}", bool(sl["Warning"]))
+            ts = obj.get("TurnSignal", {})
+            if isinstance(ts, dict) and "Warning" in ts:
+                setattr(vehicle, f"turn_signal_{side}_rear", bool(ts["Warning"]))
+
+        power_supply = vehicle_data.get("Electronics", {}).get("PowerSupply", {})
+        if isinstance(power_supply, dict) and "Ignition3" in power_supply:
+            vehicle.ign3 = bool(power_supply["Ignition3"])
+
+        remote_ign = vehicle_data.get("remoteIgnition")
+        if remote_ign is not None:
+            vehicle.remote_ignition = bool(remote_ign)
+
+        remote_control = vehicle_data.get("RemoteControl", {})
+        if isinstance(remote_control, dict) and "SleepMode" in remote_control:
+            vehicle.sleep_mode_check = bool(remote_control["SleepMode"])
+
+        drivetrain = vehicle_data.get("Drivetrain", {})
+        transmission = drivetrain.get("Transmission", {})
+        if isinstance(transmission, dict) and "ParkingPosition" in transmission:
+            vehicle.transmission_condition = transmission["ParkingPosition"]
+
+    # ------------------------------------------------------------------
+    # Force refresh
+    # ------------------------------------------------------------------
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wake the vehicle and re-read GSPA stored-status.
+
+        Prewakeup is best-effort (car may be offline). The status read
+        returns the last cached state regardless.
+        """
+        self._validate_ccs_token(token)
+        try:
+            self.prewakeup(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - prewakeup failed (car may be offline)")
+        self.update_vehicle_with_cached_state(token, vehicle)
+
+    # ------------------------------------------------------------------
+    # Update vehicle with cached state
+    # ------------------------------------------------------------------
+
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Fetch GSPA stored-status and update vehicle properties.
+
+        GSPA stored-status is the primary status for all vehicles. The
+        response shape is:
+          {serviceNo, lastUpdateTime, state:{Vehicle:{Body,Cabin,Chassis,
+          Drivetrain,Green,Electronics,Location,...}}}
+        state.Vehicle is the ccs2 vehicleStatus — fed to
+        _update_vehicle_properties_ccs2.
+        """
+        if not (token.access_token or token.exchangeable_token):
+            raise APIError("No CCS token — cannot fetch GSPA stored-status")
+        data = self.get_stored_status(token, vehicle)
+        if not data:
+            raise APIError("GSPA stored-status returned no data")
+        state = data.get("state", {})
+        if isinstance(state, dict) and "Vehicle" in state:
+            state = state["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
+        self._update_vehicle_gspa_location(token, vehicle)
+
+        if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
+            try:
+                state = self._get_driving_info(token, vehicle)
+                if state:
+                    self._update_vehicle_drive_info(vehicle, state)
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - Driving info fetch failed")
+            try:
+                history = self._get_driving_history(token, vehicle)
+                if history and isinstance(history, dict):
+                    self._update_vehicle_driving_history(vehicle, history)
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - Driving history fetch failed")
+        self._update_vehicle_extended_data(token, vehicle)
+        self._update_vehicle_gspa_data(token, vehicle)

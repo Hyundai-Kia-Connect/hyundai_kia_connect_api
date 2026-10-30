@@ -702,10 +702,6 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
         ),
         patch.object(api, "_get_driving_info", return_value=None),
         patch.object(api, "_get_driving_history", return_value=None),
-        # the cached-update path also runs the GSPA query reads
-        # (software-version / OTA / valet) — keep them out of this
-        # stored-status test so no live HTTP is attempted
-        patch.object(api, "_update_vehicle_gspa_data", MagicMock()),
     ):
         api.update_vehicle_with_cached_state(token, vehicle)
 
@@ -719,6 +715,52 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
     assert vehicle.odometer_unit == DISTANCE_UNITS[1]
     assert vehicle.car_battery_percentage == 85
     assert vehicle.ev_battery_percentage == 78
+
+
+def test_update_vehicle_with_cached_state_location_fallback():
+    """A status tree without a Location node pulls vehicle.location from
+    the GSPA location stored-status fallback (PV5-style wire shape,
+    live-confirmed by the lib PR #1331 reporter)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    vehicle.engine_type = ENGINE_TYPES.EV
+
+    ccs2_state = {
+        "Drivetrain": {"Odometer": 12345},
+        "Electronics": {"Battery": {"Level": 85}},
+    }
+    location_status = {
+        "coord": {"lat": 0.0, "lon": 0.0, "type": 0, "alt": 0.0},
+        "head": 0,
+        "speed": {"value": 0, "unit": 0},
+        "time": "20261027220812.291",
+    }
+
+    with (
+        patch.object(
+            api,
+            "get_stored_status",
+            return_value={"state": {"Vehicle": ccs2_state}},
+        ),
+        patch.object(api, "_get_driving_info", return_value=None),
+        patch.object(api, "_get_driving_history", return_value=None),
+        patch.object(
+            api, "get_location_stored_status", return_value=location_status
+        ) as get_loc,
+        # keep the query reads out of the network — not this test's scope
+        patch.object(api, "_update_vehicle_extended_data", MagicMock()),
+        patch.object(api, "_update_vehicle_gspa_data", MagicMock()),
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    get_loc.assert_called_once()
+    assert vehicle.location_latitude == 0.0
+    assert vehicle.location_longitude == 0.0
+    assert vehicle.location_last_updated_at == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
 
 
 # ── smart_key_battery_warning_is_on (FOB.LowBattery) ───────────
@@ -786,34 +828,126 @@ def test_prewakeup_failure_returns_none():
         assert api.prewakeup(token, Vehicle()) is None
 
 
-def test_refresh_4111_logs_info_not_warning(caplog):
-    """CCI 4111 (credentials expired) is an expected lifecycle event:
-    log INFO, skip the WARNING, fall back to full login."""
+def test_update_vehicle_extended_data_populates_valet_widget():
+    """The extended-read wiring populates valet mode, widget lamp data
+    and DTC breakdowns on the cached-update path."""
     api = _make_hyundai_api()
-    token = _make_token()
+    token = Token(access_token="ccs-token")
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    widget = {
+        "state": {
+            "Vehicle": {
+                "Body": {
+                    "Lights": {
+                        "Front": {
+                            "Left": {
+                                "Low": {"Warning": 1.0},
+                                "TurnSignal": {"Warning": 0.0},
+                            }
+                        },
+                        "Rear": {"Right": {"StopLamp": {"Warning": 1.0}}},
+                    }
+                },
+                "Electronics": {"PowerSupply": {"Ignition3": 0.0}},
+                "RemoteControl": {"SleepMode": 1.0},
+            }
+        }
+    }
     with (
-        patch.object(
-            api,
-            "_refresh_cci_token",
-            side_effect=AuthenticationError(
-                'CCI token refresh failed: HTTP 401 — {"code":"4111"}'
-            ),
-        ),
-        patch.object(api, "login", return_value=token) as login,
-        caplog.at_level(logging.DEBUG),
+        patch.object(api, "get_valet_status", return_value={"valetMode": "Active"}),
+        patch.object(api, "get_stored_status_widget", return_value=widget),
+        patch.object(api, "get_breakdowns", return_value={"breakdown": []}),
     ):
-        result = api.refresh_access_token(token)
-    assert result is token  # login() mocked return value
-    assert login.called
-    refresh_warnings = [
-        r
-        for r in caplog.records
-        if r.levelno == logging.WARNING and "refresh" in r.message.lower()
-    ]
-    assert refresh_warnings == []
-    assert any(
-        r.levelno == logging.INFO and "4111" in r.message for r in caplog.records
+        api._update_vehicle_extended_data(token, vehicle)
+
+    assert vehicle.valet_mode_active is True
+    assert vehicle.headlamp_left_low is True
+    assert vehicle.turn_signal_left_front is False
+    assert vehicle.stop_lamp_right is True
+    assert vehicle.ign3 is False
+    assert vehicle.sleep_mode_check is True
+
+
+def test_update_vehicle_extended_data_failure_sets_unknown():
+    """HA convention: a failed read leaves the field unknown (None),
+    never stale."""
+    api = _make_hyundai_api()
+    token = Token(access_token="ccs-token")
+    vehicle = Vehicle()
+    vehicle.id = "car-123"
+    vehicle.valet_mode_active = True  # stale from a previous poll
+    with (
+        patch.object(api, "get_valet_status", side_effect=APIError("boom")),
+        patch.object(api, "get_stored_status_widget", side_effect=APIError("boom")),
+        patch.object(api, "get_breakdowns", side_effect=APIError("boom")),
+    ):
+        api._update_vehicle_extended_data(token, vehicle)
+
+    assert vehicle.valet_mode_active is None
+
+
+def test_parse_gspa_widget_lamp_data_flat_and_nested():
+    """Widget payloads nested under state.Vehicle and flat shapes both
+    parse; keys absent from the payload leave the fields untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    api._parse_gspa_widget_lamp_data(
+        vehicle,
+        {
+            "Body": {"Lights": {"Front": {"Left": {"High": {"Warning": 1.0}}}}},
+        },
     )
+    assert vehicle.headlamp_left_high is True
+    assert vehicle.headlamp_left_low is None  # not in payload — untouched
+
+
+def test_parse_gspa_widget_lamp_data_defensive_branches():
+    """Non-dict lamp blocks (unexpected wire shape) skip their section,
+    the remaining Bifunc / rear / PowerSupply leaves still parse; keys
+    absent from the payload leave the fields untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    api._parse_gspa_widget_lamp_data(
+        vehicle,
+        {
+            "Body": {
+                "Lights": {
+                    "Front": {
+                        "Left": "unexpected",
+                        "Right": {
+                            "Low": {"Warning": 1.0},
+                            "Bifunc": {"Warning": 1.0},
+                            "TurnSignal": {"Warning": 0.0},
+                        },
+                        "HeadLamp": {"SystemWarning": 3},
+                    },
+                    "Rear": {
+                        "Left": "unexpected",
+                        "Right": {
+                            "StopLamp": {"Warning": 1.0},
+                            "TurnSignal": {"Warning": 0.0},
+                        },
+                    },
+                }
+            },
+            "Electronics": {"PowerSupply": {"Ignition3": 1.0}},
+            "remoteIgnition": 1,
+            "RemoteControl": {"SleepMode": 0.0},
+            "Drivetrain": {"Transmission": {"ParkingPosition": 1.0}},
+        },
+    )
+    assert vehicle.headlamp_left_low is None  # skipped block — untouched
+    assert vehicle.headlamp_right_low is True
+    assert vehicle.headlamp_right_bifunc is True
+    assert vehicle.turn_signal_right_front is False
+    assert vehicle.headlamp_status == 3
+    assert vehicle.stop_lamp_right is True
+    assert vehicle.turn_signal_right_rear is False
+    assert vehicle.ign3 is True
+    assert vehicle.remote_ignition is True
+    assert vehicle.sleep_mode_check is False
+    assert vehicle.transmission_condition == 1.0
 
 
 def test_refresh_failure_warning_includes_response_reason(caplog):
@@ -838,6 +972,7 @@ def test_refresh_failure_warning_includes_response_reason(caplog):
     assert len(refresh_warnings) == 1
     assert "HTTP 400" in refresh_warnings[0].message
     assert "4121" in refresh_warnings[0].message
+    del result
 
 
 # ── _update_vehicle_gspa_data() — sw/ota reads on cached path ──

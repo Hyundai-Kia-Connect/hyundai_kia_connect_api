@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
+from hyundai_kia_connect_api.GspaApiEU import _parse_gspa_svm_timestamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -147,52 +148,74 @@ def test_base_gspa_get_500_json_meta_raises_api_error():
         api._gspa_get(token, vehicle, "status/vehicles/{carId}/stored-status")
 
 
-def test_get_ota_updates_returns_data():
-    """get_ota_updates GETs the mru ota-updates path and returns the
-    data payload."""
+EXTENDED_READS = {
+    "get_location_update_status": "location/vehicles/test123/update-status",
+    "get_location_routes": "location/vehicles/test123/routes",
+    "get_valet_status": "valet/vehicles/test123/status",
+    "get_valet_history": "valet/vehicles/test123/history",
+    "get_safety_data": "safety/vehicles/test123/alert-setting",
+    "get_stored_status_widget": "status/vehicles/test123/stored-status-widget",
+}
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    sorted(EXTENDED_READS.items()),
+    ids=[name for name, _ in sorted(EXTENDED_READS.items())],
+)
+def test_extended_read_url_construction(method, path):
+    """Each extended read requests CCSP_API_URL + /gspa/v1/{path}."""
     api = HyundaiCciApiEU(9, 2, "en")
     token = _make_base_token()
     vehicle = _make_base_vehicle()
 
-    rs_data = {"otaUpdateList": [{"updateVer": "CCU26.1.0"}]}
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        getattr(api, method)(token, vehicle)
+
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + f"/gspa/v1/{path}"
+
+
+def test_get_gspa_vehicles_url_and_payload():
+    """get_gspa_vehicles GETs /gspa/v1/vehicles (no carId) and returns the
+    data list."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    vehicles = [{"vin": "VIN1"}, {"vin": "VIN2"}]
     resp = MagicMock(status_code=200)
     resp.json.return_value = {
         "metaInfo": {"retCode": "S", "resCode": "200-000"},
-        "data": rs_data,
+        "data": vehicles,
     }
     with patch(
         "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
     ) as mock_get:
-        result = api.get_ota_updates(token, vehicle)
+        result = api.get_gspa_vehicles(token)
 
-    assert result == rs_data
-    assert mock_get.call_args[0][0].endswith(
-        "/gspa/v1/mru/vehicles/test123/ota-updates"
-    )
+    assert result == vehicles
+    assert mock_get.call_args[0][0] == api.CCSP_API_URL + "/gspa/v1/vehicles"
 
 
-def test_get_ota_updates_returns_none_on_error():
-    """get_ota_updates swallows non-auth failures and returns None."""
+def test_get_gspa_vehicles_returns_none_on_business_error():
     api = HyundaiCciApiEU(9, 2, "en")
     token = _make_base_token()
-    vehicle = _make_base_vehicle()
-
     resp = MagicMock(status_code=200)
     resp.json.return_value = {
-        "metaInfo": {"retCode": "F", "resCode": "404-007", "message": "no update info"},
+        "metaInfo": {"retCode": "F", "resCode": "404-001", "message": "none"},
         "data": None,
     }
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
-        assert api.get_ota_updates(token, vehicle) is None
+        assert api.get_gspa_vehicles(token) is None
 
 
-def test_get_software_version_returns_data():
-    """get_software_version GETs the device-info software-version path."""
+def test_get_weather_url_and_payload():
     api = HyundaiCciApiEU(9, 2, "en")
     token = _make_base_token()
-    vehicle = _make_base_vehicle()
-
-    rs_data = {"swVer": "CCU25.SF.HEV.SOP1.001"}
+    rs_data = {"temperature": 21}
     resp = MagicMock(status_code=200)
     resp.json.return_value = {
         "metaInfo": {"retCode": "S", "resCode": "200-000"},
@@ -201,11 +224,36 @@ def test_get_software_version_returns_data():
     with patch(
         "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
     ) as mock_get:
-        result = api.get_software_version(token, vehicle)
+        result = api.get_weather(token, 50.0614, 19.9373)
 
     assert result == rs_data
-    assert mock_get.call_args[0][0].endswith(
-        "/gspa/v1/device-info/vehicles/test123/software-version"
+    assert mock_get.call_args[0][0].endswith("/gspa/v1/contents/wts/weathers")
+    # On-device-confirmed query shape: currentCoordinate=%f,%f + attributes
+    assert mock_get.call_args[1]["params"] == {
+        "currentCoordinate": "50.061400,19.937300",
+        "attributes": "currentWeather",
+    }
+
+
+def _trip_token() -> Token:
+    return _make_base_token()
+
+
+def test_get_location_stored_status_path():
+    """Location stored-status read — D7 companion endpoint."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {"metaInfo": {"retCode": "S"}, "data": {}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp
+    ) as mock_get:
+        api.get_location_stored_status(token, vehicle)
+
+    assert mock_get.call_args[0][0] == (
+        api.CCSP_API_URL + "/gspa/v1/location/vehicles/test123/stored-status"
     )
 
 
@@ -235,3 +283,184 @@ def test_manager_init_does_not_read_cipher_files(monkeypatch):
     assert sorted(reads) == ["hyundai_cipher_params.json"]
     api._get_cipher()  # singleton: no second read
     assert sorted(reads) == ["hyundai_cipher_params.json"]
+
+
+def test_parse_gspa_svm_timestamp_millis_variant():
+    """Location stored-status appends .mmm milliseconds (live PV5,
+    2026-10-27); the 14-digit and unparsable shapes behave as before."""
+    assert _parse_gspa_svm_timestamp("20261027220812.291") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("20261027220812") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("2026102722.291") is None
+    # right shape, invalid date — the strptime error arm stays covered
+    assert _parse_gspa_svm_timestamp("20261999009999.291") is None
+
+
+LOCATION_STATUS_PAYLOAD = {
+    "coord": {"lat": 0.0, "lon": 0.0, "type": 0, "alt": 0.0},
+    "head": 0,
+    "speed": {"value": 0, "unit": 0},
+    "time": "20261027220812.291",
+}
+
+
+def test_update_vehicle_gspa_location_sets_location():
+    """No Location node in the status tree (PV5): the fallback read sets
+    vehicle.location from the server-cached position with its UTC time."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(
+        api, "get_location_stored_status", return_value=LOCATION_STATUS_PAYLOAD
+    ) as mock_read:
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    mock_read.assert_called_once()
+    assert vehicle.location_latitude == 0.0
+    assert vehicle.location_longitude == 0.0
+    assert vehicle.location_last_updated_at == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+
+
+def test_update_vehicle_gspa_location_skips_vehicle_with_location_node():
+    """Vehicles whose status tree carries a Location node take no extra
+    request."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    vehicle.location = (52.0, 20.0, dt.datetime.now(dt.UTC))
+
+    with patch.object(api, "get_location_stored_status") as mock_read:
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    mock_read.assert_not_called()
+    assert vehicle.location_latitude == 52.0  # existing location untouched
+
+
+def test_update_vehicle_gspa_location_unusable_payload_stays_unknown():
+    """Missing coord or unparsable time leaves the location unset (HA
+    convention: unknown, not masked)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    for payload in (None, {}, {"coord": {"lat": 1.0}}, {"time": "2026102722.291"}):
+        with patch.object(api, "get_location_stored_status", return_value=payload):
+            api._update_vehicle_gspa_location(token, vehicle)
+        assert vehicle.location_latitude is None
+        assert vehicle.location_last_updated_at is None
+
+
+def test_update_vehicle_gspa_location_read_failure_stays_unknown():
+    """A failing location read leaves the location unset, never stale."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(api, "get_location_stored_status", side_effect=APIError("boom")):
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    assert vehicle.location_latitude is None
+    assert vehicle.location_last_updated_at is None
+
+
+# ── GSPA read getters — error-path arms (codecov patch target) ──
+
+extended_read_methods = sorted(list(EXTENDED_READS) + ["get_location_stored_status"])
+
+
+@pytest.mark.parametrize("method", extended_read_methods)
+def test_extended_read_swallows_transport_error(method):
+    """A non-auth failure on a GSPA read returns None (fields stay unknown,
+    no crash in the cached-update path)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert getattr(api, method)(token, vehicle) is None
+
+
+@pytest.mark.parametrize("method", extended_read_methods)
+def test_extended_read_reraises_auth_error(method):
+    """An expired token propagates (the caller refreshes and retries)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.get",
+            side_effect=AuthenticationError("expired"),
+        ),
+        pytest.raises(AuthenticationError),
+    ):
+        getattr(api, method)(token, vehicle)
+
+
+def test_get_gspa_vehicles_401_reraises_auth_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=401)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp),
+        pytest.raises(AuthenticationError),
+    ):
+        api.get_gspa_vehicles(token)
+
+
+def test_get_gspa_vehicles_connection_error_returns_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api.get_gspa_vehicles(token) is None
+
+
+def test_get_weather_business_error_returns_none():
+    """HTTP 200 with retCode "F" is a business error: None, no raise."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=200)
+    resp.json.return_value = {
+        "metaInfo": {"retCode": "F", "resCode": "700-001", "message": "no weather"},
+        "data": None,
+    }
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
+        assert api.get_weather(token, 50.0614, 19.9373) is None
+
+
+def test_get_weather_401_reraises_auth_error():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    resp = MagicMock(status_code=401)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp),
+        pytest.raises(AuthenticationError),
+    ):
+        api.get_weather(token, 50.0614, 19.9373)
+
+
+def test_get_weather_connection_error_returns_none():
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api.get_weather(token, 50.0614, 19.9373) is None
