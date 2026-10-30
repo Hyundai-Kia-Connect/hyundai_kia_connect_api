@@ -1,4 +1,4 @@
-"""Tests for KiaUvoApiCA IP-bound token handling (kia_uvo#1715).
+"""Tests for KiaUvoApiCA IP-bound token handling (Hyundai-Kia-Connect/kia_uvo#1715).
 
 CA rejects an access token with errorCode 7606 ("Access Token IP Validation
 failed") when the caller's IP no longer matches the IP the token was issued
@@ -40,6 +40,16 @@ def _ip_validation_error_payload():
         "error": {
             "errorCode": "7606",
             "errorDesc": "Access Token IP Validation failed.",
+        },
+        "responseHeader": {"responseCode": 1},
+    }
+
+
+def _refresh_rejected_payload():
+    return {
+        "error": {
+            "errorCode": "7470",
+            "errorDesc": "Refresh token rejected.",
         },
         "responseHeader": {"responseCode": 1},
     }
@@ -109,7 +119,7 @@ def test_test_token_still_returns_true_when_no_error():
 
 
 def test_check_and_refresh_token_reauthenticates_on_ip_validation_error():
-    """Regression test for kia_uvo#1715: a fresh VehicleManager (persisted,
+    """Regression test for Hyundai-Kia-Connect/kia_uvo#1715: a fresh VehicleManager (persisted,
     unexpired token; empty in-memory vehicle cache -- the state right after
     an HA restart) must recover from a 7606 response by re-logging in and
     populating vehicles, instead of crashing with an unhandled APIError."""
@@ -133,7 +143,8 @@ def test_check_and_refresh_token_reauthenticates_on_ip_validation_error():
     vm.api._sessions = MagicMock()
     vm.api._sessions.post.side_effect = [
         _FakeResponse(_ip_validation_error_payload()),  # test_token()
-        _FakeResponse(_login_ok_payload()),  # refresh_access_token() -> login()
+        _FakeResponse(_refresh_rejected_payload()),  # refresh_access_token()
+        _FakeResponse(_login_ok_payload()),  # fallback re-login
         _FakeResponse(
             _vehicles_ok_payload()
         ),  # initialize_vehicles() -> get_vehicles()

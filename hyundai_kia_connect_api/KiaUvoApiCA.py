@@ -245,7 +245,7 @@ class KiaUvoApiCA(ApiImpl):
         refresh_access_token, or computed on first login). Otherwise derive it
         deterministically from MAC+hostname (uuid5) and cache it. Caching means
         a Docker restart with a changed MAC/hostname no longer produces a new
-        device_id the server does not recognize (kia_uvo#1715).
+        device_id the server does not recognize (Hyundai-Kia-Connect/kia_uvo#1715).
         """
         if self._device_id is None:
             device_uuid = uuid.uuid5(
@@ -401,15 +401,48 @@ class KiaUvoApiCA(ApiImpl):
         )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
-        """Refresh the token. CA has no refresh endpoint, so this re-logs-in.
+        """Refresh the token via the gtothbyrftkn endpoint.
 
-        Carry forward the persisted device_id so the server still recognizes
-        the device and does not trigger OTP (kia_uvo#1715). When the Token has
-        no device_id (first run after upgrade from a pre-fix install), fall back
-        to the deterministic uuid5(MAC+hostname) computed inside login().
+        The CA mobile apps refresh with POST gtothbyrftkn: the refresh token
+        in the JSON body, the common request headers without accessToken, and
+        the from: SPA header value (CWP is the web-portal path and carries the
+        7549 captcha challenge, Hyundai-Kia-Connect/kia_uvo#2025). Any failure falls back to
+        re-login, which carries forward the persisted device_id so the server
+        still recognizes the device (Hyundai-Kia-Connect/kia_uvo#1715).
         """
         if token.device_id:
             self._device_id = token.device_id
+        if token.refresh_token:
+            url = self.API_URL + "gtothbyrftkn"
+            data = {"refTokenData": token.refresh_token}
+            headers = self.API_HEADERS.copy()
+            headers.pop("accessToken", None)
+            headers["from"] = "SPA"
+            headers["Deviceid"] = self._get_device_id()
+            try:
+                response = self.sessions.post(url, json=data, headers=headers)
+                response_json = response.json()
+                if response_json["responseHeader"]["responseCode"] == 0:
+                    response_data = response_json["result"]
+                    token_expire_in = int(response_data["expireIn"]) - 60
+                    valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+                        seconds=token_expire_in
+                    )
+                    return Token(
+                        username=token.username,
+                        password=token.password,
+                        access_token=response_data["accessToken"],
+                        refresh_token=response_data["refreshToken"],
+                        device_id=self._device_id,
+                        valid_until=valid_until,
+                        pin=token.pin,
+                    )
+                _LOGGER.debug(f"{DOMAIN} - Refresh rejected: {response_json}")
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Refresh request failed; falling back to login"
+                )
+
         return self.login(
             username=token.username, password=token.password, pin=token.pin
         )
@@ -539,7 +572,7 @@ class KiaUvoApiCA(ApiImpl):
         # since changed (e.g. an ISP lease renewal around a nightly HA restart)
         # rather than expiring it normally. Treating 7606 as valid left
         # check_and_refresh_token() reusing the stale token, which then failed
-        # again in get_vehicles() as an unhandled APIError (kia_uvo#1715).
+        # again in get_vehicles() as an unhandled APIError (Hyundai-Kia-Connect/kia_uvo#1715).
         token_errors = ["7403", "7602", "7606"]
         return not (
             response["responseHeader"]["responseCode"] == 1
