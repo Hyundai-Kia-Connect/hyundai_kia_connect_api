@@ -29,7 +29,6 @@ class FakePushApi:
         self.broker: dict | None = {
             "mqtt_host": "broker.example",
             "mqtt_port": 8883,
-            "use_ssl": True,
         }
         self.reg: dict | None = {
             "client_id": "dev-client",

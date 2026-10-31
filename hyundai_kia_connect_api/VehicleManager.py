@@ -91,12 +91,10 @@ class VehicleManager:
         self.token: Token = token
         self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
-        # Push transport; connection-scoped state (vehicle identity lives
-        # on Vehicle — mqtt_vehicle_id, hu_client_id).
+        # Connection-scoped state; vehicle push identity lives on Vehicle.
         self._push_session: MqttPushSession | None = None
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
-        # Vehicles with push started; rebuilt-subscription source on reconnect.
 
     def login(self) -> bool | OTPRequest:
         """Return True on success, an OTPRequest if OTP is required, else False."""
