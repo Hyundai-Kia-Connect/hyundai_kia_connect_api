@@ -83,7 +83,6 @@ class VehicleSupports:
 
     window_control: bool | None = None
     valet_mode: bool | None = None
-    # SVM / Find My Car
     surround_view: bool | None = None
 
 
