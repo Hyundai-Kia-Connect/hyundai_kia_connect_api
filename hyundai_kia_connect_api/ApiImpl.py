@@ -737,6 +737,25 @@ class ApiImpl:
             "start_hazard_lights_and_horn is not implemented for this region"
         )
 
+    def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("door_power_off is not implemented for this region")
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("open_frunk is not implemented for this region")
+
+    def turn_off_lamp(
+        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+    ) -> str:
+        raise NotImplementedError("turn_off_lamp is not implemented for this region")
+
+    def stop_rear_seat_alarm(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "stop_rear_seat_alarm is not implemented for this region"
+        )
+
+    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+        raise NotImplementedError("set_charge_alarm is not implemented for this region")
+
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:

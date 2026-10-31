@@ -529,6 +529,27 @@
     ]),
   })
 # ---
+# name: test_vehicle_command[eu_cci_hyundai-door_power_off]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-power-off',
+      }),
+    ]),
+  })
+# ---
 # name: test_vehicle_command[eu_cci_hyundai-lock]
   dict({
     'action_id': 'gspa:SID-1',
@@ -546,6 +567,45 @@
         }),
         'method': 'POST',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-lock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-open_frunk]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'open',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/frunk',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-set_charge_alarm]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'alarmBefore10': 1,
+          'alarmBefore20': 1,
+          'alarmBefore30': 1,
+          'alarmOff': 0,
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge-alarm',
       }),
     ]),
   })
@@ -664,6 +724,48 @@
     ]),
   })
 # ---
+# name: test_vehicle_command[eu_cci_hyundai-stop_rear_seat_alarm]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/safety/vehicles/VEHICLE-ID/rearseat-alarm',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-turn_off_lamp]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'all-off',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/lamp',
+      }),
+    ]),
+  })
+# ---
 # name: test_vehicle_command[eu_cci_hyundai-unlock]
   dict({
     'action_id': 'gspa:SID-1',
@@ -702,6 +804,24 @@
         }),
         'method': 'POST',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-lock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-set_charge_alarm]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'alarmBefore10': 1,
+          'alarmBefore20': 1,
+          'alarmBefore30': 1,
+          'alarmOff': 0,
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge-alarm',
       }),
     ]),
   })
@@ -816,6 +936,27 @@
         }),
         'method': 'POST',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-turn_off_lamp]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'all-off',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/lamp',
       }),
     ]),
   })

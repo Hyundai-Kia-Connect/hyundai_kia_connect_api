@@ -302,6 +302,23 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id)
         )
 
+    def door_power_off(self, vehicle_id: str) -> str:
+        return self.api.door_power_off(self.token, self.get_vehicle(vehicle_id))
+
+    def open_frunk(self, vehicle_id: str) -> str:
+        return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
+
+    def turn_off_lamp(self, vehicle_id: str, mode: str = "all-off") -> str:
+        return self.api.turn_off_lamp(self.token, self.get_vehicle(vehicle_id), mode)
+
+    def stop_rear_seat_alarm(self, vehicle_id: str) -> str:
+        return self.api.stop_rear_seat_alarm(self.token, self.get_vehicle(vehicle_id))
+
+    def set_charge_alarm(self, vehicle_id: str, enabled: bool) -> str:
+        return self.api.set_charge_alarm(
+            self.token, self.get_vehicle(vehicle_id), enabled
+        )
+
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
         return self.api.set_charge_limits(
             self.token, self.get_vehicle(vehicle_id), ac, dc
