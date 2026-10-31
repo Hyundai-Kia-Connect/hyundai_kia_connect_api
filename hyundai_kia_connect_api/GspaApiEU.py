@@ -282,11 +282,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     # Path constant used for action status polling (?path=...).
     GSPA_REMOTE_VEHICLES_PATH = "gspa/v1/remote/vehicles"
 
-    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
-        supports = super().get_vehicle_supports(vehicle)
-        supports.valet_mode = True
-        return supports
-
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
 
@@ -568,6 +563,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     timezone=self.data_timezone,
                     engine_type=entry_engine_type,
                     ccu_ccs2_protocol_support=ccs2_support,
+                    supports=VehicleSupports(
+                        window_control=True, valet_mode=True, surround_view=False
+                    ),
                 )
             )
 

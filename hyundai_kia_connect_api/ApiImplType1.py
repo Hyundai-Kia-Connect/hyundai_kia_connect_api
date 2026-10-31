@@ -185,12 +185,6 @@ class ApiImplType1(ApiImpl):
     PUSH_TYPE: str
     LANGUAGE: str
 
-    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
-        supports = super().get_vehicle_supports(vehicle)
-        supports.window_control = True
-        supports.valet_mode = True
-        return supports
-
     def __init__(self) -> None:
         """Initialize."""
         self.session = ApiImplSession()
@@ -221,6 +215,9 @@ class ApiImplType1(ApiImpl):
             # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
             # those vehicles on the legacy status path.
             ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
+            supports=VehicleSupports(
+                window_control=True, valet_mode=True, surround_view=False
+            ),
         )
 
     def _get_time_from_string(self, value, timesection) -> dt.time | None:

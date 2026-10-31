@@ -1,12 +1,6 @@
 """Tests for valet mode capability flag and status attribute."""
 
-from unittest.mock import MagicMock
-
-from hyundai_kia_connect_api.ApiImpl import ApiImpl
-from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
-from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
-from hyundai_kia_connect_api.VehicleManager import VehicleManager
+from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
 def test_vehicle_has_valet_mode_active_attribute():
@@ -18,30 +12,3 @@ def test_vehicle_has_valet_mode_active_attribute():
 def test_vehicle_supports_valet_mode_default_none():
     vehicle = Vehicle()
     assert vehicle.supports.valet_mode is None
-
-
-def test_base_api_impl_does_not_support_valet_mode():
-    assert ApiImpl().get_vehicle_supports(Vehicle()).valet_mode is False
-
-
-def test_type1_api_impl_supports_valet_mode():
-    api = ApiImplType1.__new__(ApiImplType1)
-    assert api.get_vehicle_supports(Vehicle()).valet_mode is True
-
-
-def test_vehicle_manager_resolves_supports_valet_mode():
-    vehicle = Vehicle()
-    vehicle.id = "test-vehicle"
-
-    fake_api = MagicMock()
-    fake_api.get_vehicle_supports.return_value = VehicleSupports(valet_mode=True)
-    fake_api.get_vehicles.return_value = [vehicle]
-
-    manager = VehicleManager.__new__(VehicleManager)
-    manager.api = fake_api
-    manager.token = Token(access_token="x", refresh_token="y", device_id="z")
-    manager.vehicles = {}
-
-    manager.initialize_vehicles()
-
-    assert manager.vehicles["test-vehicle"].supports.valet_mode is True

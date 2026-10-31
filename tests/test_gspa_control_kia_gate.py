@@ -156,7 +156,6 @@ def test_kia_windows_accepted():
     api = KiaCciApiEU(9, 2, "en")
     token = _make_token()
     vehicle = _make_vehicle()
-    assert api.get_vehicle_supports(vehicle).window_control is True
     from hyundai_kia_connect_api.ApiImpl import WindowRequestOptions
     from hyundai_kia_connect_api.const import WINDOW_STATE
 

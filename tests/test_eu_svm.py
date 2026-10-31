@@ -18,7 +18,6 @@ from hyundai_kia_connect_api.GspaApiEU import (
     parse_svm_detail,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
-from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.svm import SVMDetails, redact_svm_metadata
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -249,15 +248,6 @@ def test_get_svm_details_missing_scs_detail(monkeypatch):
 # ---------------------------------------------------------------------------
 # Capability flag + shared helpers
 # ---------------------------------------------------------------------------
-
-
-def test_supports_surround_view_per_brand():
-    def resolve(api_cls):
-        return api_cls.__new__(api_cls).get_vehicle_supports(Vehicle())
-
-    assert resolve(HyundaiCciApiEU).surround_view is True
-    # Kia EU SVM awaits live verification — stays False there.
-    assert resolve(KiaCciApiEU).surround_view is False
 
 
 def test_log_redaction_redacts_image_and_gps():

@@ -221,13 +221,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # can change); _get_vehicle_details uses the cache.
     _enrollment_details_cache: dict[str, Any] | None = None
 
-    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
-        supports = super().get_vehicle_supports(vehicle)
-        # SVM / Find My Car; the image is fetched on demand via
-        # get_svm_details / request_svm_capture.
-        supports.surround_view = True
-        return supports
-
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
@@ -1184,6 +1177,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 timezone=self.data_timezone,
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=int(entry.get("vehicleGeneration", "2")),
+                # SVM / Find My Car; the image is fetched on demand via
+                # get_svm_details / request_svm_capture.
+                supports=VehicleSupports(
+                    window_control=False, valet_mode=False, surround_view=True
+                ),
             )
             result.append(vehicle)
 

@@ -1,7 +1,7 @@
 """Tests for the vehicle.supports.<item> capability model."""
 
 import dataclasses
-from unittest.mock import patch
+from typing import Any
 
 import pytest
 
@@ -11,13 +11,29 @@ from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
-from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from hyundai_kia_connect_api.VehicleManager import VehicleManager
+
+_SPA_ENTRY = {
+    "vehicleId": "vehicle-id",
+    "nickname": "nickname",
+    "vehicleName": "model",
+    "regDate": "2024-01-01",
+    "vin": "VIN",
+    "type": "EV",
+}
+_CCI_ENTRY = {"ccspCarId": "vehicle-id", "vin": "VIN", "isEv": True}
 
 
-def _resolve(api_cls) -> VehicleSupports:
-    return api_cls.get_vehicle_supports(api_cls.__new__(api_cls), Vehicle())
+def _spa_vehicle(api_cls: Any) -> Vehicle:
+    vehicle: Vehicle = api_cls.__new__(api_cls)._vehicle_from_spa_entry(_SPA_ENTRY)
+    return vehicle
+
+
+def _cci_vehicle(api_cls: Any) -> Vehicle:
+    vehicles: list[Vehicle] = api_cls.__new__(api_cls)._parse_vehicles_from_cci(
+        [_CCI_ENTRY]
+    )
+    return vehicles[0]
 
 
 def test_vehicle_supports_defaults_to_undetermined():
@@ -36,38 +52,33 @@ def test_vehicle_supports_not_shared_between_vehicles():
 
 
 @pytest.mark.parametrize(
-    ("api_cls", "expected"),
+    ("build", "expected"),
     [
         (
-            ApiImpl,
-            VehicleSupports(
-                window_control=False, valet_mode=False, surround_view=False
-            ),
-        ),
-        (
-            ApiImplType1,
+            lambda: _spa_vehicle(ApiImplType1),
             VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
         ),
         (
-            HyundaiBlueLinkApiBR,
+            lambda: _spa_vehicle(HyundaiBlueLinkApiBR),
             VehicleSupports(window_control=True, valet_mode=False, surround_view=False),
         ),
         (
-            HyundaiCciApiEU,
+            lambda: _cci_vehicle(HyundaiCciApiEU),
             VehicleSupports(window_control=True, valet_mode=True, surround_view=True),
         ),
         (
-            KiaCciApiEU,
+            lambda: _cci_vehicle(KiaCciApiEU),
             VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
         ),
     ],
+    ids=["type1", "br", "eu_cci_hyundai", "eu_cci_kia"],
 )
-def test_get_vehicle_supports_per_region(api_cls, expected):
-    assert _resolve(api_cls) == expected
+def test_region_sets_supports_on_parsed_vehicle(build, expected):
+    assert build().supports == expected
 
 
-def test_api_holds_no_flat_supports_attributes():
-    """Support is resolved by get_vehicle_supports, not stored on the API."""
+def test_api_holds_no_supports_attributes():
+    """Support lives on vehicle.supports, not on the API."""
     for api_cls in (
         ApiImpl,
         ApiImplType1,
@@ -75,29 +86,8 @@ def test_api_holds_no_flat_supports_attributes():
         HyundaiCciApiEU,
         KiaCciApiEU,
     ):
-        flat = [name for name in dir(api_cls) if name.startswith("supports_")]
+        flat = [name for name in dir(api_cls) if "supports" in name]
         assert flat == [], api_cls.__name__
-
-
-def test_vehicle_manager_uses_per_vehicle_override():
-    class PerVehicleApi(ApiImpl):
-        def get_vehicle_supports(self, vehicle):
-            supports = super().get_vehicle_supports(vehicle)
-            supports.surround_view = vehicle.id == "with-svm"
-            return supports
-
-    with_svm, without_svm = Vehicle(id="with-svm"), Vehicle(id="without-svm")
-    api = PerVehicleApi()
-    manager = VehicleManager.__new__(VehicleManager)
-    manager.api = api
-    manager.token = Token(access_token="x", refresh_token="y", device_id="z")
-    manager.vehicles = {}
-
-    with patch.object(api, "get_vehicles", return_value=[with_svm, without_svm]):
-        manager.initialize_vehicles()
-
-    assert manager.vehicles["with-svm"].supports.surround_view is True
-    assert manager.vehicles["without-svm"].supports.surround_view is False
 
 
 @pytest.mark.parametrize(

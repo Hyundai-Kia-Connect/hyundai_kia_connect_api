@@ -64,10 +64,6 @@ class TestBRInheritance:
         assert hasattr(br_api, "_update_vehicle_properties_ccs2")
         assert type(br_api).__mro__[1].__name__ == "ApiImplType1"
 
-    def test_valet_mode_disabled(self, br_api):
-        # ApiImplType1 defaults valet mode on; BR must keep it off.
-        assert br_api.get_vehicle_supports(Vehicle()).valet_mode is False
-
 
 class TestBRCachedEndpoint:
     """The cached read must use /ccs2/carstatus/latest (never /status*)."""

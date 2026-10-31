@@ -33,7 +33,7 @@ from .const import (
 from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
-from .Vehicle import Vehicle, VehicleSupports
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -469,19 +469,6 @@ class ApiImpl:
 
     def __init__(self) -> None:
         """Initialize."""
-
-    def get_vehicle_supports(self, vehicle: Vehicle) -> VehicleSupports:
-        """Resolve what ``vehicle`` supports.
-
-        The base marks every item unsupported. Regions override this, call
-        ``super()`` and set what they support, from fixed region facts or
-        per-vehicle data.
-        """
-        return VehicleSupports(
-            window_control=False,
-            valet_mode=False,
-            surround_view=False,
-        )
 
     def login(
         self,

@@ -125,7 +125,6 @@ class VehicleManager:
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            vehicle.supports = self.api.get_vehicle_supports(vehicle)
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:

@@ -75,9 +75,9 @@ class DailyDrivingStats:
 class VehicleSupports:
     """What a vehicle supports, read as ``vehicle.supports.<item>``.
 
-    Resolved once per vehicle by ``ApiImpl.get_vehicle_supports`` when the
-    VehicleManager initializes vehicles. Consumers (e.g. Home Assistant) use
-    these to decide which entities and services to expose.
+    Set by each region when it builds the vehicle in ``get_vehicles``.
+    Consumers (e.g. Home Assistant) use these to decide which entities and
+    services to expose.
 
     Each item is tri-state: ``True`` supported, ``False`` not supported,
     ``None`` not yet determined. Treat ``None`` as unsupported when gating.
@@ -86,8 +86,8 @@ class VehicleSupports:
     as SVM) and is named after it, never after a region's raw API flag.
 
     Add an item only together with a region that decides it: add a field
-    here and set it in that region's ``ApiImpl.get_vehicle_supports``. The API decides support; the vehicle
-    holds the answer, so library code also checks ``vehicle.supports``.
+    here and set it where that region builds its vehicles. Library code also
+    checks ``vehicle.supports``.
     """
 
     window_control: bool | None = None  # set_windows_state
