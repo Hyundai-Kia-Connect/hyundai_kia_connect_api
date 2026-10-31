@@ -1474,7 +1474,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         FORCE_REFRESH_TIMEOUT; the vehicle is left untouched in that case,
         since its state is unknown.
         """
-        self._validate_ccs_token(token)
         requested_at = int(time() * 1000)
         if self.prewakeup(token, vehicle) is None:
             raise APIError("GSPA prewakeup failed")

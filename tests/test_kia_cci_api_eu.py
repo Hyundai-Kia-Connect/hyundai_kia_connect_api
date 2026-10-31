@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 from hyundai_kia_connect_api.gspa.cipher_keys import kia_cipher
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
@@ -301,6 +301,25 @@ def test_kia_force_refresh_raises_after_timeout_without_applying():
     assert status.call_count == attempts
     assert sleep.call_count == attempts
     parse.assert_not_called()
+
+
+def test_kia_force_refresh_expired_token_raises_before_wake():
+    """The token check in prewakeup covers force refresh: an expired token
+    raises before any request, wait or status read."""
+    api = _make_kia_api()
+    token = MagicMock()
+    token.access_token = "Bearer ccs-token"
+    token.valid_until = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "get_stored_status") as status,
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep") as sleep,
+        pytest.raises(AuthenticationError),
+    ):
+        api.force_refresh_vehicle_state(token, MagicMock())
+    post.assert_not_called()
+    status.assert_not_called()
+    sleep.assert_not_called()
 
 
 # ── VehicleManager wiring ────────────────────────────────
