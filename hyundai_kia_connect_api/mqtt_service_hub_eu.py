@@ -524,9 +524,7 @@ _CAPS_PROTOCOL_KEYS: dict[str, tuple[str, ...]] = {
     "schedule_update": ("vehicle.ota.scheduleupdate",),
 }
 
-# The phone-side location topic has no confirmed 1:1 protocol in the
-# metadata, so there is no entry for it: location push stays unsubscribed
-# until a per-car run confirms the mapping.
+# The location topic has no confirmed metadata protocol (re-add on evidence).
 
 
 def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
@@ -645,7 +643,6 @@ def build_car_status_topics(vehicle_id: str) -> list[str]:
     The res topic is excluded — the broker rejects phone-client
     subscriptions to it with rc=128.
     """
-    # The location topic stays out (see the protocol-map note above).
     return [
         TOPIC_PREFIX_VSS + vehicle_id,
         TOPIC_PREFIX_CONNECTION + vehicle_id,

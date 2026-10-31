@@ -495,9 +495,7 @@ class VehicleManager:
         broker info, rejected registration); ``APIError`` propagates.
         """
         vehicle = self.vehicles.get(vehicle_id)
-        # is False = the metadata says this car has no phone protocols;
-        # None = unknown, attempt: the flow's own metadata read refines it
-        # and the next poll skips it without the attempt.
+        # False skips outright; None attempts (the flow's metadata refines it).
         if vehicle is None or vehicle.supports.mqtt_push is False:
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
             return False
