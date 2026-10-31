@@ -3,7 +3,7 @@
         "status": "tests/fixtures/eu_kia_gspa_ev6_2024_stored_status.json (Kia EV6 2024)",
         "follow_up_sources": "none",
         "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. Location.GeoCoord is overridden with synthetic coordinates to reflect the real EV6 payload — the base fixture redacts it wholesale, and without a location the cached update would take the location stored-status fallback read."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -20,7 +20,23 @@
             "body": {
                 "data": {
                     "state": {
-                        "Vehicle": "$fixture:eu_kia_gspa_ev6_2024_stored_status.json"
+                        "Vehicle": {
+                            "$fixture": "eu_kia_gspa_ev6_2024_stored_status.json",
+                            "Location": {
+                                "GeoCoord": {
+                                    "Latitude": 52.0,
+                                    "Longitude": 19.0
+                                },
+                                "TimeStamp": {
+                                    "Year": 2026,
+                                    "Mon": 1,
+                                    "Day": 1,
+                                    "Hour": 9,
+                                    "Min": 0,
+                                    "Sec": 0
+                                }
+                            }
+                        }
                     }
                 },
                 "metaInfo": {

@@ -229,7 +229,7 @@ class HyundaiCciApiEU(GspaApiEU):
         data = self.get_stored_status(token, vehicle)
         if not data:
             raise APIError("GSPA stored-status returned no data")
-        self._apply_stored_status(vehicle, data)
+        self._apply_stored_status(token, vehicle, data)
         self._update_vehicle_extras(token, vehicle)
 
     def _update_vehicle_extras(self, token: Token, vehicle: Vehicle) -> None:
