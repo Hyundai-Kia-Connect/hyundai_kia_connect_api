@@ -12,7 +12,10 @@ from typing import Any, cast
 
 import certifi
 from requests import RequestException, Response
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
@@ -34,17 +37,87 @@ from .Vehicle import Vehicle
 _LOGGER = logging.getLogger(__name__)
 
 
-# This is the key part of our patch. We get the standard SSLContext that requests would
-# normally use, and add ciphers that Kia USA may need for compatibility.
+def create_kia_tls12_context() -> ssl.SSLContext:
+    """An SSL context pinned exactly to TLS 1.2 with the legacy ciphers
+    Kia USA requires (see CIPHERS in HyundaiBlueLinkApiUSA)."""
+    context = create_urllib3_context(
+        ciphers="DEFAULT:@SECLEVEL=1",
+        ssl_minimum_version=ssl.TLSVersion.TLSv1_2,
+        ssl_maximum_version=ssl.TLSVersion.TLSv1_2,
+    )
+    context.options |= 0x4
+    return context
+
+
+class _KiaTls12Connection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards.
+    """
+
+    def connect(self) -> None:
+        self.ssl_context = create_kia_tls12_context()
+        super().connect()
+
+
+class _KiaTls12ConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _KiaTls12Connection
+
+
+class _KiaTls12PoolManager(PoolManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
+class _KiaTls12ProxyManager(ProxyManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
 class KiaSSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args: Any, **kwargs: Any) -> Any:
-        context = create_urllib3_context(
-            ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
-        )
-        context.options |= 0x4
-        kwargs["ssl_context"] = context
+    """An HTTPAdapter mounting pools whose connections pin Kia USA's TLS
+    1.2 legacy-cipher setup (see _KiaTls12Connection for why)."""
+
+    def init_poolmanager(
+        self,
+        connections: int = DEFAULT_POOLSIZE,
+        maxsize: int = DEFAULT_POOLSIZE,
+        block: bool = DEFAULT_POOLBLOCK,
+        **kwargs: Any,
+    ) -> None:
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _KiaTls12PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
+
+    def proxy_manager_for(self, proxy: str, **kwargs: Any) -> Any:
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _KiaTls12ProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=DEFAULT_POOLSIZE,
+            maxsize=DEFAULT_POOLSIZE,
+            block=DEFAULT_POOLBLOCK,
+            **kwargs,
+        )
+        return manager
 
 
 def request_with_active_session[F: Callable[..., Any]](func: F) -> F:

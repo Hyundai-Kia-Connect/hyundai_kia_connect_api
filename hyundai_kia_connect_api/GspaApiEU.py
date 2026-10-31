@@ -44,6 +44,7 @@ from .cci_fingerprint import (
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
+    CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
@@ -59,7 +60,13 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
+    AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
+    AuthenticationTokenExpiredError,
     ConsentRequiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
@@ -306,7 +313,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # The brand cipher loads lazily (see _get_cipher): parameter files
         # are read on first stamp use, so Home Assistant does not run the
         # disk read inside its event loop while constructing the manager.
-        if self.CIPHER_BRAND not in ("hyundai", "kia"):
+        if self.CIPHER_BRAND not in ("hyundai", "kia", "genesis"):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
         self._cipher: GspaCipher | None = None
 
@@ -384,7 +391,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
         auth_resp = s.get(auth_url, allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
-            raise AuthenticationError(
+            raise AuthenticationBlockedError(
                 "IDPConnect authorize was blocked by the WAF ('abusing request'). "
                 "This is a server-side block, not a credentials problem. See #1273."
             )
@@ -392,14 +399,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # Step 2: RSA public key
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
                 "This may indicate an API change."
             )
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
         if not jwk.get("n") or not jwk.get("e"):
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 "API error: certs response missing RSA key material"
             )
         n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
@@ -428,34 +435,45 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             allow_redirects=False,
         )
         if resp.status_code != 302:
-            raise AuthenticationError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
-                "Check username and password."
+            raise AuthenticationSigninError(
+                f"Signin failed: HTTP {resp.status_code}. Check username and password."
             )
+
         location = resp.headers.get("location", "")
         code_list = parse_qs(urlparse(location).query).get("code")
+
         if not code_list:
-            if "error" in location.lower():
-                error_desc = parse_qs(urlparse(location).query).get(
-                    "error_description", ["unknown"]
-                )[0]
-                raise AuthenticationError(
+            query = parse_qs(urlparse(location).query)
+
+            if query.get("error"):
+                error_desc = query.get("error_description", ["unknown"])[0]
+
+                if error_desc.strip().casefold() == "invalid credentials":
+                    raise AuthenticationInvalidCredentialsError(
+                        "Authentication rejected: invalid credentials."
+                    )
+
+                raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
                 )
+
             if "/web/v1/user/authorization" in location:
                 raise ConsentRequiredError(
                     "Account consent is required. Please log in via a browser "
                     "once to accept the terms, then retry."
                 )
+
             if "authorize" in location:
-                raise AuthenticationError(
+                raise AuthenticationRedirectError(
                     "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
-            raise AuthenticationError(
+
+            raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
+
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens
@@ -820,10 +838,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         loop that constructs this class.
         """
         if self._cipher is None:
-            from .gspa.cipher_keys import hyundai_cipher, kia_cipher
+            from .gspa.cipher_keys import genesis_cipher, hyundai_cipher, kia_cipher
 
             self._cipher = (
-                hyundai_cipher() if self.CIPHER_BRAND == "hyundai" else kia_cipher()
+                hyundai_cipher()
+                if self.CIPHER_BRAND == "hyundai"
+                else genesis_cipher()
+                if self.CIPHER_BRAND == "genesis"
+                else kia_cipher()
             )
         return self._cipher
 
@@ -897,7 +919,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if valid_until.tzinfo is None:
             valid_until = valid_until.replace(tzinfo=dt.UTC)
         if valid_until - dt.timedelta(seconds=60) <= dt.datetime.now(dt.UTC):
-            raise AuthenticationError("CCS token expired — refresh required")
+            raise AuthenticationTokenExpiredError(
+                "CCS token expired — refresh required"
+            )
 
     def _raise_gspa_error(self, status_code: int, data: dict[str, Any]) -> None:
         """Raise a typed exception from a GSPA failure response.
@@ -1729,9 +1753,28 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        vehicle.ev_battery_is_plugged_in = get_child_value(
+        # ConnectorFastening.State follows the connector LOCK, not the
+        # cable: plugged-but-idle reads 0, a released lock after a charge
+        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
+        # kia_uvo#1837). Plug sensor stays unknown; enum carries the state.
+        vehicle.ev_battery_is_plugged_in = None
+        fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
+        vehicle.ev_connector_fastening_state = None
+        if fastening_raw is not None:
+            try:
+                vehicle.ev_connector_fastening_state = CONNECTOR_FASTENING_STATE(
+                    int(fastening_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ConnectorFastening.State %r not in "
+                    "{0: disconnected, 1: connected}",
+                    DOMAIN,
+                    fastening_raw,
+                )
+                vehicle.ev_connector_fastening_state = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -2245,6 +2288,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         door state reflecting it in the fresh server data afterwards.
         The shared legacy "door" + close/open shape stays accepted by
         the backend, but the EU apps no longer send it.
+
+        When the vehicle reports SafeMode the apps dispatch lock/unlock
+        to the sibling .../door-lock-safety and .../door-unlock-safety
+        endpoints instead (door lock/unlock only; same
+        {"command": "set"} body, and unrecognized safe states fall back
+        to door-lock-safety). The endpoints are accepted by the backend
+        (202 on a PV5) but the behavioral difference is unverified, so
+        the library keeps the plain door-lock/door-unlock surface.
         """
         endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
         return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
@@ -2353,7 +2404,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if options.defrost is not None:
             body["windshieldFrontDefogState"] = options.defrost
         if options.heating is not None:
-            body["heating1"] = options.heating
+            # heating1 is acked but has no effect on GSPA (PV5, #1398); one
+            # sideRearMirrorHeating flag covers the rear window and the
+            # mirrors, engaged by heating 1/2/4 — same mapping as the CCS2
+            # path. An explicit side_rear_mirror_heating option overrides.
+            body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
         if options.temp_unit is not None:
             # tempUnit is a string on the wire ("C"/"F"); the 0/1 int form is
             # rejected with 400-002 (live-proven on a PV5, 2026-09-19).
@@ -2404,7 +2459,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             if options.climate is not None:
                 body["hvacCtrl"] = 1 if options.climate else 0
             if options.heating is not None:
-                body["heating1"] = options.heating
+                # Same mapping as start_climate (see there for rationale).
+                body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
             if options.temp_unit is not None:
                 # tempUnit is a string on the wire ("C"/"F"); the 0/1 int
                 # form is rejected with 400-002 (live-proven on a PV5,
@@ -2627,7 +2683,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape).
+
+        reservInfo carries the app DTO: day list + time object only;
+        the schedule on/off is reservHVACflag and climate options live
+        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22)."""
         if options.first_departure is None:
             options.first_departure = (
                 ScheduleChargingClimateRequestOptions.DepartureOptions()
@@ -2653,17 +2713,20 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         def _make_reserv_info(
             dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
         ) -> dict[str, Any]:
+            # App-confirmed reservInfo DTO (Kia EU 1.4.0
+            # ReservationInfoApiRequest): day list plus the time object
+            # only. The previous nested shape (scheduleEnable, hvacTemp,
+            # drvSeatLoc, ...) failed server-side with 500-000 on a PV5
+            # twice; with this app form the call returned 202 and
+            # applied, four runs. On/off travels in reservHVACflag, the
+            # climate options in reservHVACSet; 12:00 and later is
+            # afternoon (timeSection 1), matching reservation-charge.
             return {
-                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
                 "day": dep.days or [0],
-                "time": dep.time.strftime("%I%M") if dep.time else "1200",
-                "windshieldFrontDefogState": options.defrost or False,
-                "ignitionDuration": 10,
-                "hvacCtrl": 1 if options.climate_enabled else 0,
-                "hvacTempType": 1,
-                "hvacTemp": f"{temperature:.1f}",
-                "tempUnit": options.temperature_unit,
-                "drvSeatLoc": "L",
+                "time": {
+                    "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                    "timeSection": 1 if dep.time and dep.time >= dt.time(12, 0) else 0,
+                },
             }
 
         def _make_hvac_set() -> dict[str, Any]:

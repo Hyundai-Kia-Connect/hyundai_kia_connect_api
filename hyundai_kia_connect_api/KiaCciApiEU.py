@@ -65,6 +65,11 @@ class KiaCciApiEU(GspaApiEU):
     # status (TargetSoC.Quick/Standard follow the plugType 0=DC/1=AC
     # mapping; ElectricCurrentLevel.State 2 -> 1 for 100 %). Both use the
     # bearer auth mode and need no cable connected.
+    # V2L discharge limit, charge alarm and the flat reservation-charge
+    # body live-proven on the same PV5 (2026-10-22): 202 with the stored
+    # fields following (VehicleToLoad.DischargeLimitation.SoC 20 -> 30,
+    # Setting.CompleteAlarm flags, Reservation.OffPeakTime 12:00-12:30 ->
+    # 12:00-13:00). Bearer-only as well.
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -78,6 +83,9 @@ class KiaCciApiEU(GspaApiEU):
             "windowcurtain",
             "charge-target",
             "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
         }
     )
     supports_window_control = True

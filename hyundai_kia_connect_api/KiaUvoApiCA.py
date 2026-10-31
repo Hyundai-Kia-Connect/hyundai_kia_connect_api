@@ -15,7 +15,10 @@ from zoneinfo import ZoneInfo
 
 import certifi
 import requests
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 # Try to fix hyundai/cloudflare
@@ -36,7 +39,10 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationTokenExpiredError,
     InvalidAPIResponseError,
 )
 from .Token import Token
@@ -66,29 +72,90 @@ CA_TIMEZONES = [
 ]
 
 
-class SessionTicketAdapter(HTTPAdapter):
-    """A HTTPAdapter that re-enables TLS session tickets.
+def create_session_ticket_context() -> ssl.SSLContext:
+    """An SSL context with TLS session tickets enabled.
 
     Cloudflare in front of the CA endpoints fingerprints the TLS ClientHello.
-    urllib3 sets OP_NO_TICKET on its default context; with Python 3.14 /
-    OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is classified as a
-    bot and v2/login answers 403 with an HTML block page. A plain
-    ssl.create_default_context() keeps tickets enabled and is let through.
+    urllib3 sets OP_NO_TICKET on the contexts it builds by default; with
+    Python 3.14 / OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is
+    classified as a bot and v2/login answers 403 with an HTML block page.
+    This context keeps tickets enabled and is let through.
+    """
+    context = create_urllib3_context()
+    context.options &= ~ssl.OP_NO_TICKET
+    return context
+
+
+class _SessionTicketConnection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards. A fresh context per connection
+    sidesteps that in both injected and plain setups.
     """
 
-    def _setup_ssl_context(self):
-        context = create_urllib3_context()
-        context.options &= ~ssl.OP_NO_TICKET
-        return context
+    def connect(self) -> None:
+        self.ssl_context = create_session_ticket_context()
+        super().connect()
 
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
+
+class _SessionTicketConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _SessionTicketConnection
+
+
+class _SessionTicketPoolManager(PoolManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _SessionTicketConnectionPool,
+        }
+
+
+class _SessionTicketProxyManager(ProxyManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _SessionTicketConnectionPool,
+        }
+
+
+class SessionTicketAdapter(HTTPAdapter):
+    """An HTTPAdapter mounting pools whose connections enable TLS session
+    tickets (see _SessionTicketConnection for why)."""
+
+    def init_poolmanager(
+        self,
+        connections=DEFAULT_POOLSIZE,
+        maxsize=DEFAULT_POOLSIZE,
+        block=DEFAULT_POOLBLOCK,
+        **kwargs,
+    ):
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _SessionTicketPoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
 
-    def proxy_manager_for(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-        return super().proxy_manager_for(*args, **kwargs)
+    def proxy_manager_for(self, proxy, **kwargs):
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _SessionTicketProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=self._pool_connections,
+            maxsize=self._pool_maxsize,
+            block=self._pool_block,
+            **kwargs,
+        )
+        return manager
 
 
 class RetrySession(requests.Session):
@@ -181,7 +248,7 @@ class KiaUvoApiCA(ApiImpl):
         refresh_access_token, or computed on first login). Otherwise derive it
         deterministically from MAC+hostname (uuid5) and cache it. Caching means
         a Docker restart with a changed MAC/hostname no longer produces a new
-        device_id the server does not recognize (kia_uvo#1715).
+        device_id the server does not recognize (Hyundai-Kia-Connect/kia_uvo#1715).
         """
         if self._device_id is None:
             device_uuid = uuid.uuid5(
@@ -209,23 +276,32 @@ class KiaUvoApiCA(ApiImpl):
         resCode / resMsg known values:
         - 0000: no error
         - 7110: OTP Required (MFA verification needed)
-        - 7402: Account Locked Out
+        - 7401: Wrong credential
+        - 7402 / 7530 / 7531 / 7532: Account Locked Out
         - 7403: Authentication expired
-        - 7404: Wrong username/password
+        - 7404 / 7435: Wrong username/password / account does not exist
         - 7445: Request could not be processed
-        - 7549: OTP verification failed (Genesis CA)
+        - 7549: Portal login captcha challenge required (
+          Hyundai-Kia-Connect/kia_uvo#2025)
         - 7602: Access token deleted
+        - 7603: Incorrect password
         - 7710: Device ID is not valid
 
         :param response: the API's JSON response
         """
 
         error_code_mapping = {
-            "7404": AuthenticationError,
-            "7402": AuthenticationError,
-            "7403": AuthenticationError,  # Auth expired - triggers re-login
-            "7549": AuthenticationError,  # OTP verification failed (Genesis CA)
-            "7602": AuthenticationError,  # Access token deleted - triggers re-login
+            "7401": AuthenticationInvalidCredentialsError,  # Wrong credential
+            "7404": AuthenticationInvalidCredentialsError,
+            "7435": AuthenticationInvalidCredentialsError,  # Account does not exist
+            "7603": AuthenticationInvalidCredentialsError,  # Incorrect password
+            "7402": AuthenticationBlockedError,  # Account locked out (7530-7532)
+            "7530": AuthenticationBlockedError,
+            "7531": AuthenticationBlockedError,
+            "7532": AuthenticationBlockedError,
+            "7403": AuthenticationTokenExpiredError,  # Expired - triggers re-login
+            "7602": AuthenticationTokenExpiredError,  # Access token deleted
+            "7549": AuthenticationError,  # Portal login captcha challenge
         }
         response_code = response.get("responseHeader", {}).get("responseCode")
         if response_code is None:
@@ -337,15 +413,48 @@ class KiaUvoApiCA(ApiImpl):
         )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
-        """Refresh the token. CA has no refresh endpoint, so this re-logs-in.
+        """Refresh the token via the gtothbyrftkn endpoint.
 
-        Carry forward the persisted device_id so the server still recognizes
-        the device and does not trigger OTP (kia_uvo#1715). When the Token has
-        no device_id (first run after upgrade from a pre-fix install), fall back
-        to the deterministic uuid5(MAC+hostname) computed inside login().
+        The CA mobile apps refresh with POST gtothbyrftkn: the refresh token
+        in the JSON body, the common request headers without accessToken, and
+        the from: SPA header value (CWP is the web-portal path and carries the
+        7549 captcha challenge, Hyundai-Kia-Connect/kia_uvo#2025). Any failure falls back to
+        re-login, which carries forward the persisted device_id so the server
+        still recognizes the device (Hyundai-Kia-Connect/kia_uvo#1715).
         """
         if token.device_id:
             self._device_id = token.device_id
+        if token.refresh_token:
+            url = self.API_URL + "gtothbyrftkn"
+            data = {"refTokenData": token.refresh_token}
+            headers = self.API_HEADERS.copy()
+            headers.pop("accessToken", None)
+            headers["from"] = "SPA"
+            headers["Deviceid"] = self._get_device_id()
+            try:
+                response = self.sessions.post(url, json=data, headers=headers)
+                response_json = response.json()
+                if response_json["responseHeader"]["responseCode"] == 0:
+                    response_data = response_json["result"]
+                    token_expire_in = int(response_data["expireIn"]) - 60
+                    valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+                        seconds=token_expire_in
+                    )
+                    return Token(
+                        username=token.username,
+                        password=token.password,
+                        access_token=response_data["accessToken"],
+                        refresh_token=response_data["refreshToken"],
+                        device_id=self._device_id,
+                        valid_until=valid_until,
+                        pin=token.pin,
+                    )
+                _LOGGER.debug(f"{DOMAIN} - Refresh rejected: {response_json}")
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Refresh request failed; falling back to login"
+                )
+
         return self.login(
             username=token.username, password=token.password, pin=token.pin
         )
@@ -475,7 +584,7 @@ class KiaUvoApiCA(ApiImpl):
         # since changed (e.g. an ISP lease renewal around a nightly HA restart)
         # rather than expiring it normally. Treating 7606 as valid left
         # check_and_refresh_token() reusing the stale token, which then failed
-        # again in get_vehicles() as an unhandled APIError (kia_uvo#1715).
+        # again in get_vehicles() as an unhandled APIError (Hyundai-Kia-Connect/kia_uvo#1715).
         token_errors = ["7403", "7602", "7606"]
         return not (
             response["responseHeader"]["responseCode"] == 1

@@ -159,6 +159,14 @@ class WINDOW_STATE(IntEnum):
     VENTILATION = 2
 
 
+class CONNECTOR_FASTENING_STATE(IntEnum):
+    DISCONNECTED = 0
+    CONNECTED = 1
+    # The app SDK maps 0/1/2 (2 = Connected); state 2 has never shown up in
+    # a capture, so it stays outside the enum until named from one. An
+    # unreported or out-of-range value holds as None.
+
+
 class SEAT_LOCATION(str, Enum):
     """Driver seat location (GSPA drvSeatLoc wire values)."""
 

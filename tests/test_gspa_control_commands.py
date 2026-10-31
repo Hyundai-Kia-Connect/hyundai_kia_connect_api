@@ -230,8 +230,71 @@ def test_kia_remote_control_gated_not_implemented():
             "windowcurtain",
             "charge-target",
             "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
         }
     )
+
+
+def test_kia_discharge_limit_sends_the_live_proven_body():
+    """Kia GSPA discharge-limit: {"dischargingLimit": n, "command": "set"}
+    — live-proven on a PV5 (2026-10-22): 202 with the stored
+    VehicleToLoad.DischargeLimitation.SoC following (20 -> 30)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_vehicle_to_load_discharge_limit, 30)
+    assert call.args[0].endswith("/discharge-limit")
+    assert call.kwargs["json"] == {"dischargingLimit": 30, "command": "set"}
+
+
+def test_kia_charge_alarm_sends_both_all_flag_bodies():
+    """Kia GSPA charge-alarm: all-on / all-off flag bodies — live-proven
+    on a PV5 (2026-10-22): 202 (the one 202 that answers with a SID),
+    stored Setting.CompleteAlarm flags following both directions.
+    Per-combination bodies also reach the wire, but the library exposes
+    the boolean pair only."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, True)
+    assert call.args[0].endswith("/charge-alarm")
+    assert call.kwargs["json"] == {
+        "alarmOff": 0,
+        "alarmBefore10": 1,
+        "alarmBefore20": 1,
+        "alarmBefore30": 1,
+        "command": "set",
+    }
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, False)
+    assert call.kwargs["json"] == {
+        "alarmOff": 1,
+        "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
+def test_kia_reservation_charge_uses_the_flat_offpeak_body():
+    """Kia GSPA reservation-charge: reservFlag + offpeakPowerFlag plus
+    the reservStartTime / reservEndTime {time, timeSection} objects — live-proven on a
+    PV5 (2026-10-22): 202 with Reservation.OffPeakTime following. The
+    12-hour clock encoding matches the capture verbatim: 12:00-13:00 =
+    "1200"/1 and "0100"/1 (timeSection 1 marks the afternoon half)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = False
+    options.off_peak_charge_only_enabled = True
+    options.off_peak_start_time = dt.time(12, 0)
+    options.off_peak_end_time = dt.time(13, 0)
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.schedule_reservation_charge, options)
+    assert call.args[0].endswith("/reservation-charge")
+    body = call.kwargs["json"]
+    assert body == {
+        "reservFlag": 0,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {"time": "1200", "timeSection": 1},
+        "reservEndTime": {"time": "0100", "timeSection": 1},
+        "command": "set",
+    }
 
 
 def test_kia_verified_commands_reach_the_wire():
@@ -284,12 +347,14 @@ def test_start_climate_full_options():
     assert body["command"] == "start"
     assert body["hvacTemp"] == "21.5"
     assert body["windshieldFrontDefogState"] is True
-    assert body["heating1"] == 1
+    assert "heating1" not in body
     assert body["tempUnit"] == "C"
     assert body["hvacTempType"] == 1
     assert body["drvSeatLoc"] == "L"
     assert body["ignitionDuration"] == 10
     assert body["strgWhlHeating"] is True
+    # The explicit side_rear_mirror_heating option wins over the heating
+    # mapping (see test_start_climate_heating_maps_to_side_rear_mirror).
     assert body["sideRearMirrorHeating"] is True
     assert body["seatClimateInfo"] == {
         "drvSeatClimateState": 1,
@@ -323,6 +388,28 @@ def test_stop_climate():
     _, call = _run_command(HyundaiCciApiEU.stop_climate)
     assert call.args[0].endswith("/temperature")
     assert call.kwargs["json"] == {"command": "stop"}
+
+
+def test_start_climate_heating_maps_to_side_rear_mirror():
+    """The user-facing heating option maps to sideRearMirrorHeating — the
+    single GSPA flag that covers the rear window and the mirrors (live
+    flip verified on a PV5: flag 1 flips Body.Windshield.Rear.Defog.State
+    0→1 at the car). heating1 is acked by the backend but ignored there."""
+    for heating, flag in ((1, 1), (2, 1), (4, 1), (0, 0), (3, 0)):
+        options = ClimateRequestOptions(heating=heating)
+        _, call = _run_command(HyundaiCciApiEU.start_climate, options)
+        body = call.kwargs["json"]
+        assert "heating1" not in body
+        assert body["sideRearMirrorHeating"] == flag
+
+
+def test_start_engine_heating_maps_to_side_rear_mirror():
+    options = ClimateRequestOptions(heating=2)
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
+    assert call.args[0].endswith("/engine")
+    body = call.kwargs["json"]
+    assert "heating1" not in body
+    assert body["sideRearMirrorHeating"] == 1
 
 
 def test_start_engine_maps_climate_field():
@@ -379,7 +466,14 @@ def test_windows_front_open_scope():
         front_right=WINDOW_STATE.OPEN,
     )
     _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
-    assert call.kwargs["json"]["command"] == "front-open"
+    body: dict[str, Any] = call.kwargs["json"]
+    assert body["command"] == "front-open"
+    # Front-scope commands send the rear pairs as explicit nulls — 0 is
+    # WINDOW_STATE.CLOSED on this endpoint and would close the rear windows.
+    assert body["drvSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["psgSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["rlSeatWindow"] is None
+    assert body["rrSeatWindow"] is None
 
 
 def test_windows_mixed_state_raises():
@@ -499,22 +593,65 @@ def test_schedule_reservation_charge_off_peak_only_flag():
 
 
 def test_schedule_reservation_hvac_body_shape():
+    """reservInfo = the app DTO (day list + time object only), per the
+    PV5 live round (2026-10-22): the previous nested reservInfo failed
+    with 500-000 twice; the app form returned 202 and applied across
+    four runs. The 12-hour clock and afternoon timeSection match the
+    reservation-charge capture (19:05 -> "0705" / timeSection 1)."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True
     options.first_departure.days = [1]
     options.first_departure.time = dt.time(7, 5)
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.second_departure.enabled = True
+    options.second_departure.days = [4]
+    options.second_departure.time = dt.time(19, 5)
     _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
     assert call.args[0].endswith("/reservation-hvac")
     body = call.kwargs["json"]
     assert body["command"] == "set"
     assert body["reservedHVACInfo1"]["reservHVACflag"] == 1
-    assert body["reservedHVACInfo2"]["reservHVACflag"] == 0
+    assert body["reservedHVACInfo1"]["reservInfo"] == {
+        "day": [1],
+        "time": {"time": "0705", "timeSection": 0},
+    }
+    assert body["reservedHVACInfo2"]["reservHVACflag"] == 1
+    assert body["reservedHVACInfo2"]["reservInfo"] == {
+        "day": [4],
+        "time": {"time": "0705", "timeSection": 1},
+    }
+    # the climate options travel in reservHVACSet, not reservInfo
+    for info in (
+        body["reservedHVACInfo1"]["reservInfo"],
+        body["reservedHVACInfo2"]["reservInfo"],
+    ):
+        assert "scheduleEnable" not in info
+        assert "hvacTemp" not in info
+        assert "drvSeatLoc" not in info
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
-def test_schedule_reservation_engine_body_shape():
+def test_schedule_reservation_hvac_days_default_to_sunday():
+    """day defaults to [0] = Sunday (PV5 live round: day 0 maps to
+    Schedule1.Sun)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
+    info1 = call.kwargs["json"]["reservedHVACInfo1"]["reservInfo"]
+    info2 = call.kwargs["json"]["reservedHVACInfo2"]["reservInfo"]
+    assert info1["day"] == [0] and info2["day"] == [0]
+    # departure times default to dt.time() = 00:00 -> morning section
+    assert info1["time"] == {"time": "1200", "timeSection": 0}
+
+
+def test_schedule_reservation_engine_body_shape_unchanged():
+    """reservation-engine keeps the nested reservInfo for now: no live
+    capture of that endpoint exists (no ICE car in the #1909/#1145
+    loop), so the app-form change stays scoped to reservation-hvac."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True

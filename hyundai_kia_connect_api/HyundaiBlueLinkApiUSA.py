@@ -5,11 +5,15 @@
 import base64
 import datetime as dt
 import logging
+import ssl
 import time
 from typing import Any, ClassVar, cast
 
 import certifi
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import (
@@ -176,26 +180,82 @@ def parse_svm_response(response: dict[str, Any], timezone: dt.timezone) -> SVMDe
     )
 
 
+def create_cipher_context() -> ssl.SSLContext:
+    """An SSL context with the poor ciphers Hyundai USA requires."""
+    context = create_urllib3_context(ciphers=CIPHERS)
+    context.options |= 0x4
+    return context
+
+
+class _CipherConnection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards.
+    """
+
+    def connect(self) -> None:
+        self.ssl_context = create_cipher_context()
+        super().connect()
+
+
+class _CipherConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _CipherConnection
+
+
+class _CipherPoolManager(PoolManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _CipherConnectionPool,
+        }
+
+
+class _CipherProxyManager(ProxyManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _CipherConnectionPool,
+        }
+
+
 class cipherAdapter(HTTPAdapter):
-    """
-    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
-    """
+    """An HTTPAdapter mounting pools whose connections use Hyundai USA's
+    legacy ciphers (see _CipherConnection for why)."""
 
-    def _setup_ssl_context(self):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        context.options |= 0x4
-
-        return context
-
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
+    def init_poolmanager(
+        self,
+        connections=DEFAULT_POOLSIZE,
+        maxsize=DEFAULT_POOLSIZE,
+        block=DEFAULT_POOLBLOCK,
+        **kwargs,
+    ):
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _CipherPoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
 
-    def proxy_manager_for(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-
-        return super().proxy_manager_for(*args, **kwargs)
+    def proxy_manager_for(self, proxy, **kwargs):
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _CipherProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=self._pool_connections,
+            maxsize=self._pool_maxsize,
+            block=self._pool_block,
+            **kwargs,
+        )
+        return manager
 
 
 class HyundaiBlueLinkApiUSA(ApiImpl):
