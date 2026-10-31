@@ -429,6 +429,29 @@ def test_get_control_token_pin_locked_reports_window():
             api._get_control_token(_make_token())
 
 
+def test_get_control_token_expired_access_token_is_auth_error():
+    """Live: an expired access token returns HTTP 401 with code 9030 and
+    no PIN result; this is an auth error, not a wrong PIN."""
+    token = _make_token()
+    body = {"code": 9030, "message": "error.msg.common.jwt-expired"}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(401, body)
+        with pytest.raises(AuthenticationError, match="refresh required"):
+            _make_api()._get_control_token(token)
+    assert token.control_token is None
+
+
+def test_get_control_token_error_without_pin_result_is_not_pin_failure():
+    """A body without isMatched carries no PIN result, so the error must
+    not claim the PIN was wrong."""
+    body = {"code": 9999, "message": "error.msg.common.unknown"}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(500, body)
+        with pytest.raises(APIError, match="HTTP 500") as excinfo:
+            _make_api()._get_control_token(_make_token())
+    assert "PIN verification failed" not in str(excinfo.value)
+
+
 def _status_response(polling_state: str) -> dict:
     return {
         "metaInfo": {"retCode": "S", "resCode": "200-000"},
