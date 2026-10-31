@@ -87,7 +87,7 @@ class VehicleManager:
         )
 
         self.token: Token = token
-        self.vehicles: dict = {}
+        self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
 
     def login(self) -> bool | OTPRequest:
