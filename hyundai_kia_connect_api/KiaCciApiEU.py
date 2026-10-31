@@ -14,9 +14,8 @@ not present on Kia; they are added once live fixtures from a real Kia
 vehicle confirm their payload shapes.
 """
 
-from typing import Any
-
 import logging
+from typing import Any
 
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
