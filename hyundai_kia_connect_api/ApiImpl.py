@@ -10,11 +10,6 @@ from typing import Any
 import requests
 from requests.exceptions import JSONDecodeError
 
-try:
-    from geopy.geocoders import GoogleV3
-except ImportError:
-    GoogleV3 = None
-
 from .const import (
     CHARGE_PORT_ACTION,
     DISTANCE_UNITS,
@@ -35,6 +30,11 @@ from .svm import SVMDetails
 from .Token import Token
 from .utils import get_child_value, to_int_enum
 from .Vehicle import Vehicle
+
+try:
+    from geopy.geocoders import GoogleV3
+except ImportError:
+    GoogleV3 = None
 
 _LOGGER = logging.getLogger(__name__)
 
