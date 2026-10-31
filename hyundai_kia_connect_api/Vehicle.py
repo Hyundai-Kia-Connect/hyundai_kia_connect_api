@@ -7,7 +7,13 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
-from .const import DISTANCE_UNITS, ENGINE_TYPES, PRESSURE_UNITS, PressureUnit
+from .const import (
+    CONNECTOR_FASTENING_STATE,
+    DISTANCE_UNITS,
+    ENGINE_TYPES,
+    PRESSURE_UNITS,
+    PressureUnit,
+)
 from .utils import float_or_none, get_float, get_safe_local_datetime
 
 _LOGGER = logging.getLogger(__name__)
@@ -147,7 +153,7 @@ class Vehicle:
 
     _last_updated_at: datetime.datetime | None = None
     _last_scanned_at: datetime.datetime | None = None
-    timezone: datetime.timezone = datetime.UTC  # default UTC
+    timezone: datetime.tzinfo = datetime.UTC  # default UTC
 
     dtc_count: int | None = None
     dtc_descriptions: dict[str, Any] | None = None
@@ -416,6 +422,9 @@ class Vehicle:
     ev_battery_capacity: int | None = None
     ev_battery_is_charging: bool | None = None
     ev_battery_is_plugged_in: bool | None = None
+    # Raw connector-fastening state from the stored status (0 = disconnected,
+    # 1 = connected; unknown or unreported = None).
+    ev_connector_fastening_state: CONNECTOR_FASTENING_STATE | None = None
 
     _ev_driving_range: float | None = None
     _ev_driving_range_value: float | None = None

@@ -8,6 +8,7 @@ import pytest
 from hyundai_kia_connect_api import VehicleSupports
 from hyundai_kia_connect_api.ApiImpl import ApiImpl
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.GenesisCciApiEU import GenesisCciApiEU
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
@@ -70,8 +71,12 @@ def test_vehicle_supports_not_shared_between_vehicles():
             lambda: _cci_vehicle(KiaCciApiEU),
             VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
         ),
+        (
+            lambda: _cci_vehicle(GenesisCciApiEU),
+            VehicleSupports(window_control=False, valet_mode=True, surround_view=False),
+        ),
     ],
-    ids=["type1", "br", "eu_cci_hyundai", "eu_cci_kia"],
+    ids=["type1", "br", "eu_cci_hyundai", "eu_cci_kia", "eu_cci_genesis"],
 )
 def test_region_sets_supports_on_parsed_vehicle(build, expected):
     assert build().supports == expected
@@ -85,6 +90,7 @@ def test_api_holds_no_supports_attributes():
         HyundaiBlueLinkApiBR,
         HyundaiCciApiEU,
         KiaCciApiEU,
+        GenesisCciApiEU,
     ):
         flat = [name for name in dir(api_cls) if "supports" in name]
         assert flat == [], api_cls.__name__

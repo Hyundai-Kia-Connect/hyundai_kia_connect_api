@@ -19,7 +19,7 @@ API Usage
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
-Europe Hyundai and Kia login logic is based on the `bluelink-refresh-token <https://github.com/TMA84/bluelink-refresh-token>`_ project.  Username/password login is supported directly for Kia, Hyundai, and Genesis (EU) — no browser or manual token extraction needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
+Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
 China (Hyundai Bluelink / Kia UVO CN)
 -------------------------------------

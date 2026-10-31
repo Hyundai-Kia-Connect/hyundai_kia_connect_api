@@ -87,6 +87,26 @@ def test_compute_x_fingerprint_matches_live_hyundai_vector():
     assert compute_x_fingerprint(_fp_headers(), 2) == HYUNDAI_GOLDEN_FP
 
 
+# Genesis 1.4.0 constants; live-verified on 2026-10-28 (signed exchange and
+# signed token refresh answer 200). Pinned as the regression contract.
+GENESIS_KEYS = ("SGcyufLERcZ", "g8d7THY41KO", "8l1fHRfZZb")
+
+
+def test_genesis_keys_recovered_constants():
+    from hyundai_kia_connect_api import cci_fingerprint
+    from hyundai_kia_connect_api.const import BRAND_GENESIS
+
+    assert cci_fingerprint._FINGERPRINT_KEYS[BRAND_GENESIS] == GENESIS_KEYS
+    headers = dict(_KIA_IDENTITY)
+    headers["client-id"] = "com.genesis.oneapp.eu"
+    headers["client-name"] = "GenesisEU"
+    headers["X-Timestamp"] = KIA_GOLDEN_TS
+    assert (
+        compute_x_fingerprint(headers, 3)
+        == "4fdf3bc26ed4a9d7f8d4c8c01b14b70631b3e681c9284ff064fcbc30df087f5a"
+    )
+
+
 def test_compute_x_fingerprint_strips_java_ascii_whitespace():
     headers = dict(_KIA_IDENTITY)
     headers["X-Timestamp"] = KIA_GOLDEN_TS

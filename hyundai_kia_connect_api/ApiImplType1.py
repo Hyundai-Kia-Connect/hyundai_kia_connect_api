@@ -9,7 +9,7 @@ import random
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from time import sleep
 from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
@@ -28,6 +28,7 @@ from .ApiImpl import (
     _vehicle_temperature_unit,
 )
 from .const import (
+    CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
@@ -92,7 +93,7 @@ def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
     _device_id_lock = threading.Lock()
 
     @functools.wraps(func)
-    def wrapper(self, token, *args, **kwargs):
+    def wrapper(self: Any, token: Token, *args: Any, **kwargs: Any) -> Any:
         try:
             return func(self, token, *args, **kwargs)
         except DeviceIDError:
@@ -168,6 +169,12 @@ def _check_response_for_errors(response: dict[str, Any]) -> None:
             raise AuthenticationError(retMSG)
 
 
+def _filled[T](value: T | None) -> T:
+    """Narrow a schedule option set by _fill_schedule_options_from_vehicle."""
+    assert value is not None
+    return value
+
+
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
@@ -182,6 +189,7 @@ class ApiImplType1(ApiImpl):
     APP_ID: str
     BASIC_AUTHORIZATION: str
     CFB: bytes
+    temperature_range: Sequence[float]
     PUSH_TYPE: str
     LANGUAGE: str
 
@@ -220,7 +228,7 @@ class ApiImplType1(ApiImpl):
             ),
         )
 
-    def _get_time_from_string(self, value, timesection) -> dt.time | None:
+    def _get_time_from_string(self, value: Any, timesection: Any) -> dt.time | None:
         if value is None:
             return None
         try:
@@ -310,7 +318,7 @@ class ApiImplType1(ApiImpl):
         air_temp_value = get_child_value(state, "status.airTemp.value")
         if air_temp_value and air_temp_value != "FFH":
             try:
-                tempIndex = get_hex_temp_into_index(air_temp_value)
+                tempIndex = cast(int, get_hex_temp_into_index(air_temp_value))
                 vehicle.air_temperature = (
                     self.temperature_range[tempIndex],
                     TEMPERATURE_UNITS[
@@ -656,9 +664,10 @@ class ApiImplType1(ApiImpl):
             # Always use a named timezone to ensure DST adjustment.
             # In EU, CCS2 'Offset' is always 1 (CET), but CEST is UTC+0100.
             # In AU, CCS2 'Offset' is 10 (AEST), but AEDT is UTC+1100.
-            vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), dt.UTC
-            ).astimezone(self.data_timezone)
+            date = parse_datetime(get_child_value(state, "Date"), dt.UTC)
+            vehicle.last_updated_at = (
+                date.astimezone(self.data_timezone) if date else None
+            )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
@@ -684,6 +693,10 @@ class ApiImplType1(ApiImpl):
 
         if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[unit])
+        elif air_temp_unit := TEMPERATURE_UNITS.get(unit):
+            # With climate off the setpoint is "OFF" but the unit is still
+            # reported; keep it so consumers know the car's unit.
+            vehicle._air_temperature_unit = air_temp_unit
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
@@ -868,7 +881,11 @@ class ApiImplType1(ApiImpl):
                     _pu_raw,
                 )
                 vehicle.tire_pressure_unit = None
-        _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+        _scale = (
+            PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+            if vehicle.tire_pressure_unit is not None
+            else None
+        )
         # 255 (0xFF) is the TPMS "no reading" sentinel (car off / before
         # driving) -> pressure_or_none returns None so the entity shows
         # unavailable instead of an impossible value. See kia_uvo #1783, #1232.
@@ -997,12 +1014,30 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
+        # ConnectorFastening.State follows the connector LOCK, not the
+        # cable: plugged-but-idle reads 0, a released lock after a charge
+        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
+        # kia_uvo#1837 "unplugged when charging stopped"). The plug sensor
+        # therefore stays unknown on this path; the enum field carries
+        # the reported state.
+        vehicle.ev_battery_is_plugged_in = None
+        fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
+        vehicle.ev_connector_fastening_state = None
+        if fastening_raw is not None:
+            try:
+                vehicle.ev_connector_fastening_state = CONNECTOR_FASTENING_STATE(
+                    int(fastening_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ConnectorFastening.State %r not in "
+                    "{0: disconnected, 1: connected}",
+                    DOMAIN,
+                    fastening_raw,
+                )
+                vehicle.ev_connector_fastening_state = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -1206,7 +1241,7 @@ class ApiImplType1(ApiImpl):
         def _parse_departure_climate(
             climate: dict[str, Any],
             schedule_activation: object = None,
-        ) -> tuple[bool | None, bool | None, tuple[float, str] | None]:
+        ) -> tuple[bool | None, bool | None, tuple[float, str | None] | None]:
             activation = (
                 schedule_activation
                 if schedule_activation is not None
@@ -1215,7 +1250,7 @@ class ApiImplType1(ApiImpl):
             enabled = bool(activation) if activation is not None else None
             defrost_val = climate.get("Defrost")
             defrost = bool(defrost_val) if defrost_val is not None else None
-            temp: tuple[float, str] | None = None
+            temp: tuple[float, str | None] | None = None
             temp_val = climate.get("Temperature")
             if temp_val is not None:
                 try:
@@ -1540,7 +1575,13 @@ class ApiImplType1(ApiImpl):
         _fill_schedule_options_from_vehicle(
             options, vehicle, scopes=("charge", "climate")
         )
-        departures = [options.first_departure, options.second_departure]
+        departures = [
+            _filled(options.first_departure),
+            _filled(options.second_departure),
+        ]
+        departure_times = [_filled(dep.time) for dep in departures]
+        off_peak_start = _filled(options.off_peak_start_time)
+        off_peak_end = _filled(options.off_peak_end_time)
 
         temperature_unit = _vehicle_temperature_unit(vehicle) or 0
 
@@ -1565,14 +1606,14 @@ class ApiImplType1(ApiImpl):
                 "defrost": dep.defrost if dep.defrost is not None else False,
             }
 
-        payload = {
+        payload: dict[str, Any] = {
             "reservChargeInfo" + str(i + 1): {
                 "reservChargeSet": departures[i].enabled,
                 "reservInfo": {
                     "day": departures[i].days,
                     "time": {
-                        "time": departures[i].time.strftime("%I%M"),
-                        "timeSection": 1 if departures[i].time >= dt.time(12, 0) else 0,
+                        "time": departure_times[i].strftime("%I%M"),
+                        "timeSection": 1 if departure_times[i] >= dt.time(12, 0) else 0,
                     },
                 },
                 "reservFatcSet": _build_combined_fatc_set(departures[i]),
@@ -1584,16 +1625,12 @@ class ApiImplType1(ApiImpl):
             "offPeakPowerInfo": {
                 "offPeakPowerTime1": {
                     "endtime": {
-                        "timeSection": (
-                            1 if options.off_peak_end_time >= dt.time(12, 0) else 0
-                        ),
-                        "time": options.off_peak_end_time.strftime("%I%M"),
+                        "timeSection": 1 if off_peak_end >= dt.time(12, 0) else 0,
+                        "time": off_peak_end.strftime("%I%M"),
                     },
                     "starttime": {
-                        "timeSection": (
-                            1 if options.off_peak_start_time >= dt.time(12, 0) else 0
-                        ),
-                        "time": options.off_peak_start_time.strftime("%I%M"),
+                        "timeSection": 1 if off_peak_start >= dt.time(12, 0) else 0,
+                        "time": off_peak_start.strftime("%I%M"),
                     },
                 },
                 # Flag semantics match the apps' vehicle data model:
@@ -1637,6 +1674,8 @@ class ApiImplType1(ApiImpl):
 
         if charge_active:
             _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
+            off_peak_start = _filled(options.off_peak_start_time)
+            off_peak_end = _filled(options.off_peak_end_time)
             charge_payload = {
                 "reservFlag": 1 if options.charging_enabled else 0,
                 # EV5 flat-path enum is the OPPOSITE of the combined path:
@@ -1644,23 +1683,23 @@ class ApiImplType1(ApiImpl):
                 # Kia PV5). Do not "align" it with the combined path.
                 "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
                 "reservStartTime": {
-                    "time": options.off_peak_start_time.strftime("%I%M"),
-                    "timeSection": (
-                        1 if options.off_peak_start_time >= dt.time(12, 0) else 0
-                    ),
+                    "time": off_peak_start.strftime("%I%M"),
+                    "timeSection": 1 if off_peak_start >= dt.time(12, 0) else 0,
                 },
                 "reservEndTime": {
-                    "time": options.off_peak_end_time.strftime("%I%M"),
-                    "timeSection": (
-                        1 if options.off_peak_end_time >= dt.time(12, 0) else 0
-                    ),
+                    "time": off_peak_end.strftime("%I%M"),
+                    "timeSection": 1 if off_peak_end >= dt.time(12, 0) else 0,
                 },
             }
 
         if climate_active:
             _guard_schedule_temperature(options, vehicle)
             _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
-            departures = [options.first_departure, options.second_departure]
+            departures = [
+                _filled(options.first_departure),
+                _filled(options.second_departure),
+            ]
+            departure_times = [_filled(dep.time) for dep in departures]
             temperature_unit = _vehicle_temperature_unit(vehicle) or 0
 
             def _build_flat_hvac_set(
@@ -1689,9 +1728,9 @@ class ApiImplType1(ApiImpl):
                     "reservInfo": {
                         "day": departures[i].days,
                         "time": {
-                            "time": departures[i].time.strftime("%I%M"),
+                            "time": departure_times[i].strftime("%I%M"),
                             "timeSection": (
-                                1 if departures[i].time >= dt.time(12, 0) else 0
+                                1 if departure_times[i] >= dt.time(12, 0) else 0
                             ),
                         },
                     },
@@ -1970,8 +2009,8 @@ class ApiImplType1(ApiImpl):
 
         Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
         Shared by AU, IN and CN (all use the same endpoint format).
-        KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
-        body instead of form-urlencoded.
+        KiaUvoApiEU overrides this with the CCI token-refresh flow
+        (v2/auth/token-refresh + CCS re-exchange).
 
         No Stamp header is sent by default. Regions whose server requires
         it (AU, confirmed live in kia_uvo #1778; IN, whose login flow has
@@ -2055,7 +2094,7 @@ class ApiImplType1(ApiImpl):
         token.control_token_expiry = control_token_expire_at
         return control_token, control_token_expire_at
 
-    def _set_session_language(self, cookies) -> None:
+    def _set_session_language(self, cookies: dict[str, Any]) -> None:
         # Set Language for Session #
         url = self.USER_API_URL + "language"
         headers = {"Content-type": "application/json"}
@@ -2098,7 +2137,7 @@ class ApiImplType1(ApiImpl):
         return cast(str, device_id)
 
     def _get_authorization_code_with_redirect_url(
-        self, username, password, cookies
+        self, username: str, password: str, cookies: dict[str, Any]
     ) -> str:
         url = self.USER_API_URL + "signin"
         headers = {"Content-type": "application/json"}
@@ -2185,9 +2224,9 @@ class ApiImplType1(ApiImpl):
 
     def update_month_trip_info(
         self,
-        token,
-        vehicle,
-        yyyymm_string,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymm_string: str,
     ) -> None:
         """
         feature only available for some regions.
@@ -2246,9 +2285,9 @@ class ApiImplType1(ApiImpl):
 
     def update_day_trip_info(
         self,
-        token,
-        vehicle,
-        yyyymmdd_string,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymmdd_string: str,
     ) -> None:
         """
         feature only available for some regions.
@@ -2283,7 +2322,8 @@ class ApiImplType1(ApiImpl):
                 processed_trip = self._parse_day_trip(
                     token, vehicle, yyyymmdd_string, trip
                 )
-                result.trip_list.append(processed_trip)
+                if processed_trip is not None:
+                    result.trip_list.append(processed_trip)
 
             vehicle.day_trip_info = result
 

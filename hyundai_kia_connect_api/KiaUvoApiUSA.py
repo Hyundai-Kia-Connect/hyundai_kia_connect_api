@@ -6,12 +6,16 @@ import logging
 import ssl
 import time
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any, cast
 
 import certifi
 from requests import RequestException, Response
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
@@ -33,21 +37,91 @@ from .Vehicle import Vehicle
 _LOGGER = logging.getLogger(__name__)
 
 
-# This is the key part of our patch. We get the standard SSLContext that requests would
-# normally use, and add ciphers that Kia USA may need for compatibility.
+def create_kia_tls12_context() -> ssl.SSLContext:
+    """An SSL context pinned exactly to TLS 1.2 with the legacy ciphers
+    Kia USA requires (see CIPHERS in HyundaiBlueLinkApiUSA)."""
+    context = create_urllib3_context(
+        ciphers="DEFAULT:@SECLEVEL=1",
+        ssl_minimum_version=ssl.TLSVersion.TLSv1_2,
+        ssl_maximum_version=ssl.TLSVersion.TLSv1_2,
+    )
+    context.options |= 0x4
+    return context
+
+
+class _KiaTls12Connection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards.
+    """
+
+    def connect(self) -> None:
+        self.ssl_context = create_kia_tls12_context()
+        super().connect()
+
+
+class _KiaTls12ConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _KiaTls12Connection
+
+
+class _KiaTls12PoolManager(PoolManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
+class _KiaTls12ProxyManager(ProxyManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
 class KiaSSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(
-            ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
-        )
-        context.options |= 0x4
-        kwargs["ssl_context"] = context
+    """An HTTPAdapter mounting pools whose connections pin Kia USA's TLS
+    1.2 legacy-cipher setup (see _KiaTls12Connection for why)."""
+
+    def init_poolmanager(
+        self,
+        connections: int = DEFAULT_POOLSIZE,
+        maxsize: int = DEFAULT_POOLSIZE,
+        block: bool = DEFAULT_POOLBLOCK,
+        **kwargs: Any,
+    ) -> None:
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _KiaTls12PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
+
+    def proxy_manager_for(self, proxy: str, **kwargs: Any) -> Any:
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _KiaTls12ProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=DEFAULT_POOLSIZE,
+            maxsize=DEFAULT_POOLSIZE,
+            block=DEFAULT_POOLBLOCK,
+            **kwargs,
+        )
+        return manager
 
 
-def request_with_active_session(func):
-    def request_with_active_session_wrapper(*args, **kwargs):
+def request_with_active_session[F: Callable[..., Any]](func: F) -> F:
+    def request_with_active_session_wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
         except AuthenticationError:
@@ -70,11 +144,11 @@ def request_with_active_session(func):
             response = func(*args, **kwargs)
             return response
 
-    return request_with_active_session_wrapper
+    return cast(F, request_with_active_session_wrapper)
 
 
-def request_with_logging(func):
-    def request_with_logging_wrapper(*args, **kwargs):
+def request_with_logging[F: Callable[..., Any]](func: F) -> F:
+    def request_with_logging_wrapper(*args: Any, **kwargs: Any) -> Any:
         url = kwargs["url"]
         json_body = kwargs.get("json_body")
         if json_body is not None:
@@ -96,10 +170,10 @@ def request_with_logging(func):
         _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
-    return request_with_logging_wrapper
+    return cast(F, request_with_logging_wrapper)
 
 
-def _retry_on_auth_error(func):
+def _retry_on_auth_error[F: Callable[..., Any]](func: F) -> F:
     """Token-only retry decorator: re-login and retry once on AuthenticationError.
 
     Symmetric with request_with_active_session but for methods that only take
@@ -107,7 +181,9 @@ def _retry_on_auth_error(func):
     request_with_active_session's concurrency behavior.
     """
 
-    def _retry_on_auth_error_wrapper(self, token, *args, **kwargs):
+    def _retry_on_auth_error_wrapper(
+        self: Any, token: Token, *args: Any, **kwargs: Any
+    ) -> Any:
         try:
             return func(self, token, *args, **kwargs)
         except AuthenticationError:
@@ -127,15 +203,17 @@ def _retry_on_auth_error(func):
             token.valid_until = new_token.valid_until
             return func(self, token, *args, **kwargs)
 
-    return _retry_on_auth_error_wrapper
+    return cast(F, _retry_on_auth_error_wrapper)
 
 
 class KiaUvoApiUSA(ApiImpl):
     """KiaUvoApiUSA"""
 
-    def __init__(self, region: int, brand: int, language) -> None:
+    data_timezone = dt.UTC
+    temperature_range = range(62, 83)
+
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.LANGUAGE: str = language
-        self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
         self.device_id = str(uuid.uuid4()).upper()
@@ -199,7 +277,9 @@ class KiaUvoApiUSA(ApiImpl):
         headers = self.authed_api_headers(token, vehicle)
         return self.session.get(url, headers=headers)
 
-    def _send_otp(self, otp_key: str, notify_type: str, xid: str) -> dict[str, Any]:
+    def _send_otp(
+        self, otp_key: str | None, notify_type: str, xid: str | None
+    ) -> dict[str, Any]:
         """Send OTP to email or phone"""
         url = self.API_URL + "cmm/sendOTP"
         headers = self.api_headers()
@@ -211,7 +291,9 @@ class KiaUvoApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
         return cast(dict[str, Any], response.json())
 
-    def _verify_otp(self, otp_key: str, otp_code: str, xid: str) -> tuple[str, str]:
+    def _verify_otp(
+        self, otp_key: str | None, otp_code: str, xid: str | None
+    ) -> tuple[str, str]:
         """Verify OTP code and return sid and rmtoken"""
         url = self.API_URL + "cmm/verifyOTP"
         headers = self.api_headers()
@@ -253,7 +335,7 @@ class KiaUvoApiUSA(ApiImpl):
         final_sid = response.headers.get("sid")
         if not final_sid:
             raise APIError(f"No final sid returned. Response: {response.text}")
-        return cast(str, final_sid)
+        return final_sid
 
     def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
         """Public helper to send OTP to the selected destination."""
@@ -329,16 +411,17 @@ class KiaUvoApiUSA(ApiImpl):
         if session_id:
             _LOGGER.debug(f"Got session id {session_id}")
             valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
-            existing_rmtoken = token.refresh_token if token else None
-            return Token(
+            new_token = Token(
                 username=username,
                 password=password,
                 access_token=session_id,
-                refresh_token=existing_rmtoken,
                 valid_until=valid_until,
                 device_id=self.device_id,
                 pin=pin,
             )
+            if token:
+                new_token.refresh_token = token.refresh_token
+            return new_token
         if "payload" in response_json and "otpKey" in response_json["payload"]:
             payload = response_json["payload"]
             if payload.get("rmTokenExpired"):
@@ -399,7 +482,7 @@ class KiaUvoApiUSA(ApiImpl):
         return result
 
     @staticmethod
-    def _engine_type_from_fuel_type(fuel_type) -> ENGINE_TYPES | None:
+    def _engine_type_from_fuel_type(fuel_type: Any) -> ENGINE_TYPES | None:
         # Only fuelType=4 (EV) is confirmed against a live Kia USA account
         # (2020 Niro EV). Mappings for ICE/PHEV/HEV are unknown, so leave
         # engine_type as None for those and let _update_vehicle_properties
@@ -438,12 +521,12 @@ class KiaUvoApiUSA(ApiImpl):
                     vehicles[vid] = vehicle
         else:
             # For readability work with vehicle without s
-            vehicle = vehicles
+            single = cast(Vehicle, vehicles)
             for entry in summary:
-                if vehicle.id == entry["vehicleIdentifier"]:
-                    vehicle.name = entry["nickName"]
-                    vehicle.model = entry["modelName"]
-                    vehicle.key = entry["vehicleKey"]
+                if single.id == entry["vehicleIdentifier"]:
+                    single.name = entry["nickName"]
+                    single.model = entry["modelName"]
+                    single.key = entry["vehicleKey"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
@@ -539,22 +622,6 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state,
             "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",
-        )
-        vehicle.front_left_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",
-        )
-        vehicle.front_right_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",
-        )
-        vehicle.rear_left_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",
-        )
-        vehicle.rear_right_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",
         )
         vehicle.is_locked = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorLock"
@@ -1004,7 +1071,9 @@ class KiaUvoApiUSA(ApiImpl):
                 time.sleep(2)
         return ORDER_STATUS.TIMEOUT if synchronous else ORDER_STATUS.PENDING
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rems/door/lock"
@@ -1017,9 +1086,9 @@ class KiaUvoApiUSA(ApiImpl):
             token=token, url=url, vehicle=vehicle
         )
 
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]
 
-    def _seat_settings(self, level) -> dict[str, Any]:
+    def _seat_settings(self, level: int | None) -> dict[str, Any]:
         # See const.SEAT_STATUS for the list and descriptions of levels.
         #
         # The values were determined empirically, see https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/718
@@ -1078,10 +1147,11 @@ class KiaUvoApiUSA(ApiImpl):
         url = self.API_URL + "rems/start"
         if options.set_temp is None:
             options.set_temp = 70
+        set_temp: float | str = options.set_temp
         if options.set_temp < 62:
-            options.set_temp = "LOW"
+            set_temp = "LOW"
         elif options.set_temp > 82:
-            options.set_temp = "HIGH"
+            set_temp = "HIGH"
         if options.climate is None:
             options.climate = True
         if options.heating is None:
@@ -1097,7 +1167,7 @@ class KiaUvoApiUSA(ApiImpl):
             "remoteClimate": {
                 "airTemp": {
                     "unit": 1,
-                    "value": str(options.set_temp),
+                    "value": str(set_temp),
                 },
                 "airCtrl": options.climate,
                 "defrost": options.defrost,
@@ -1133,14 +1203,14 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "rems/stop"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url, vehicle=vehicle
         )
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]
 
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/charge"
@@ -1148,14 +1218,14 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/cancel"
         response = self.get_request_with_logging_and_active_session(
             token=token, url=url, vehicle=vehicle
         )
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
@@ -1176,4 +1246,4 @@ class KiaUvoApiUSA(ApiImpl):
         response = self.post_request_with_logging_and_active_session(
             token=token, url=url, json_body=body, vehicle=vehicle
         )
-        return cast(str, response.headers["Xid"])
+        return response.headers["Xid"]

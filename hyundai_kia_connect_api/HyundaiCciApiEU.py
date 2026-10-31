@@ -56,9 +56,10 @@ class HyundaiCciApiEU(GspaApiEU):
 
     def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
         vehicles = super()._parse_vehicles_from_cci(data)
-        # SVM reads confirmed live on the EU GSPA endpoints (na-images);
+        # SVM reads confirmed live on the EU GSPA endpoints;
         # KiaCciApiEU keeps the inherited False until verified there too.
         for vehicle in vehicles:
+            vehicle.supports.window_control = True
             vehicle.supports.surround_view = True
         return vehicles
 
