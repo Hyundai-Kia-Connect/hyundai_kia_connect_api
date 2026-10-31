@@ -1063,10 +1063,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
             )
         if response.status_code == 401:
-            # Live-probed 2026-10-25: an expired access token returns HTTP 401
-            # {"code": 9030, "message": "error.msg.common.jwt-expired"}. The
-            # PIN is not checked, so this must not be reported as a wrong PIN.
-            raise AuthenticationError(
+            raise AuthenticationTokenExpiredError(
                 "CCI PIN endpoint rejected the access token "
                 f"(HTTP 401: {response.text[:200]}) - token refresh required"
             )

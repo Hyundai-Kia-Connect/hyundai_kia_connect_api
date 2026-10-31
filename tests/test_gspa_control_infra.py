@@ -10,6 +10,7 @@ from hyundai_kia_connect_api.const import ORDER_STATUS
 from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationError,
+    AuthenticationTokenExpiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
     ServiceTemporaryUnavailable,
@@ -429,14 +430,13 @@ def test_get_control_token_pin_locked_reports_window():
             api._get_control_token(_make_token())
 
 
-def test_get_control_token_expired_access_token_is_auth_error():
-    """Live: an expired access token returns HTTP 401 with code 9030 and
-    no PIN result; this is an auth error, not a wrong PIN."""
+def test_get_control_token_expired_access_token_is_token_expired_error():
+    """The PIN endpoint answers an expired token with HTTP 401."""
     token = _make_token()
     body = {"code": 9030, "message": "error.msg.common.jwt-expired"}
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
         post.return_value = _post_mock(401, body)
-        with pytest.raises(AuthenticationError, match="refresh required"):
+        with pytest.raises(AuthenticationTokenExpiredError, match="refresh required"):
             _make_api()._get_control_token(token)
     assert token.control_token is None
 
