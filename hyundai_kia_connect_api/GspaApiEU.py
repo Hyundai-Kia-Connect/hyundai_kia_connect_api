@@ -128,8 +128,9 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     """Parse a GSPA SVM timestamp (media-set ``date`` or ``gpsDetail.time``).
 
     Shapes seen in the EU response: 14-digit ``yyyyMMddHHmmss`` strings
-    (assumed UTC) and epoch-millisecond numbers. ISO 8601 strings are
-    accepted as a fallback. Returns None for anything unparsable.
+    (assumed UTC) and epoch-millisecond numbers. The location endpoints
+    append ``.mmm`` milliseconds — ``yyyyMMddHHmmss.mmm``. ISO 8601 strings
+    are accepted as a fallback. Returns None for anything unparsable.
     """
     if value is None:
         return None
@@ -148,6 +149,18 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
         if len(value) == 14 and value.isdigit():
             try:
                 return dt.datetime.strptime(value, "%Y%m%d%H%M%S").replace(
+                    tzinfo=dt.UTC
+                )
+            except ValueError:
+                return None
+        if (
+            len(value) == 18
+            and value[:14].isdigit()
+            and value[14] == "."
+            and value[15:].isdigit()
+        ):
+            try:
+                return dt.datetime.strptime(value, "%Y%m%d%H%M%S.%f").replace(
                     tzinfo=dt.UTC
                 )
             except ValueError:
