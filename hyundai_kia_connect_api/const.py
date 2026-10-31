@@ -1,7 +1,5 @@
 """const.py"""
 
-# pylint:disable=invalid-name,missing-class-docstring
-
 import datetime
 from enum import Enum, IntEnum
 
@@ -137,6 +135,10 @@ class VEHICLE_LOCK_ACTION(Enum):
 class CHARGE_PORT_ACTION(Enum):
     CLOSE = "close"
     OPEN = "open"
+
+
+class LAMP_MODE(Enum):
+    ALL_OFF = "all-off"
 
 
 class ORDER_STATUS(Enum):

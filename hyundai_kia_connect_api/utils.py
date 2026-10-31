@@ -1,4 +1,3 @@
-# pylint:disable=bare-except,missing-function-docstring,invalid-name,broad-exception-caught
 """utils.py"""
 
 import datetime

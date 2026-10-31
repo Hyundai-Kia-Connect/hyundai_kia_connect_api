@@ -14,7 +14,7 @@ not present on Kia; they are added once live fixtures from a real Kia
 vehicle confirm their payload shapes.
 """
 
-# pylint:disable=missing-class-docstring,invalid-name
+from typing import Any
 
 import logging
 
@@ -92,7 +92,12 @@ class KiaCciApiEU(GspaApiEU):
             "reservation-charge",
         }
     )
-    supports_window_control = True
+
+    def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
+        vehicles = super()._parse_vehicles_from_cci(data)
+        for vehicle in vehicles:
+            vehicle.supports.window_control = True
+        return vehicles
 
     # Action-status polling on the EU CCI backend returned PENDING for
     # every poll across the 2026-10 vehicle run (brand-independent), so

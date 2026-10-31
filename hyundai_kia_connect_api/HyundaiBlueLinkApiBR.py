@@ -1,7 +1,5 @@
 """HyundaiBlueLinkApiBR.py"""
 
-# pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
-
 import datetime as dt
 import logging
 import random
@@ -69,10 +67,13 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     endpoint selection and force-refresh flow.
     """
 
-    supports_window_control: bool = True
-    # BR does not implement valet mode; keep it off (ApiImplType1 defaults True).
-    supports_valet_mode: bool = False
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        vehicle = super()._vehicle_from_spa_entry(entry)
+        # BR does not implement valet mode (ApiImplType1 enables it).
+        vehicle.supports.valet_mode = False
+        return vehicle
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
         if BRANDS[brand] != BRAND_HYUNDAI:
