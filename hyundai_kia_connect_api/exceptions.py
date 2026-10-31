@@ -1,7 +1,5 @@
 """exceptions.py"""
 
-# pylint:disable=unnecessary-pass
-
 
 class HyundaiKiaException(Exception):
     """

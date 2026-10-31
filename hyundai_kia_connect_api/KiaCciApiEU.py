@@ -14,8 +14,6 @@ not present on Kia; they are added once live fixtures from a real Kia
 vehicle confirm their payload shapes.
 """
 
-# pylint:disable=missing-class-docstring,invalid-name
-
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token

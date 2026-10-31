@@ -1,7 +1,5 @@
 """KiaUvoApiEU.py"""
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,super-init-not-called,unused-argument,line-too-long,too-many-lines
-
 import base64
 import datetime as dt
 import json

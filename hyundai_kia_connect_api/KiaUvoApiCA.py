@@ -1,7 +1,5 @@
 """KiaUvoApiCA.py"""
 
-# pylint:disable=unused-argument,missing-timeout,logging-fstring-interpolation,bare-except,invalid-name,missing-function-docstring
-
 import base64
 import datetime as dt
 import json
