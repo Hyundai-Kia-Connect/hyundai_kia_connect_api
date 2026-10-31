@@ -3,8 +3,8 @@
 Kia-specific EU implementation inheriting the OneApp (CCI) login flow,
 vehicle listing, and the GSPA secure-request layer from ``GspaApiEU``.
 This module keeps Kia brand constants. Remote actions are gated: only
-live-verified endpoints pass (GSPA_VERIFIED_ENDPOINTS) and force refresh
-raises NotImplementedError (inherited from ApiImpl) — Kia EU CCI remote
+live-verified endpoints pass (GSPA_VERIFIED_ENDPOINTS); force refresh
+wakes the car and waits for a newer stored-status. Kia EU CCI remote
 control beyond the verified set awaits live verification (D6). Cached-state parsing
 uses the shared CCS2 property parser (moved to ``GspaApiEU``): the Kia
 stored-status envelope and vehicle state tree match the Hyundai shape
@@ -16,10 +16,14 @@ vehicle confirm their payload shapes.
 
 # pylint:disable=missing-class-docstring,invalid-name
 
+import logging
+
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .Token import Token
 from .Vehicle import Vehicle
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class KiaCciApiEU(GspaApiEU):
@@ -122,10 +126,7 @@ class KiaCciApiEU(GspaApiEU):
         data = self.get_stored_status(token, vehicle)
         if not data:
             raise APIError("GSPA stored-status returned no data")
-        state = data.get("state", {})
-        if isinstance(state, dict) and "Vehicle" in state:
-            state = state["Vehicle"]
-        self._update_vehicle_properties_ccs2(vehicle, state)
+        self._apply_stored_status(vehicle, data)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints)
