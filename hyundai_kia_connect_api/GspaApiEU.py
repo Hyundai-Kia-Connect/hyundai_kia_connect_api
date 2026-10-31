@@ -173,6 +173,22 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     return None
 
 
+def _parse_valet_mode(value: Any) -> bool | None:
+    """Map the app's ValetMode enum to the active flag.
+
+    myHyundai 1.4.0 (CCS SDK lib-domain) defines ACTIVE(0), IGN_OFF(1),
+    INACTIVE(2), INVALID(-1); live on a Santa Fe HEV the idle car reads
+    INACTIVE(2). Anything else stays unknown.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value in (0, 1):
+        return True
+    if value == 2:
+        return False
+    return None
+
+
 def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     """Parse a GSPA SVM ``scsDetail`` object into SVMDetails.
 
@@ -1596,6 +1612,42 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
         )
         self._apply_stored_status(token, vehicle, data)
+
+    def _update_vehicle_gspa_data(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate Vehicle GSPA query fields from server-side cached data.
+
+        These are GET endpoints that read cached data from the GSPA server.
+        They do NOT wake the telematics unit or drain the 12V battery.
+        """
+        try:
+            sw = self.get_software_version(token, vehicle)
+            if sw and isinstance(sw, dict):
+                vehicle.software_version = sw.get("softwareVersion")
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA software_version update failed")
+
+        try:
+            if not vehicle._ota_checked:
+                vehicle._ota_checked = True  # set before call — concurrent workers skip
+                ota = self.get_ota_updates(token, vehicle)
+                if ota and isinstance(ota, dict):
+                    updates = ota.get("otaUpdateList", [])
+                    vehicle.ota_update_available = (
+                        len(updates) > 0 if updates else False
+                    )
+        except Exception:
+            vehicle.ota_update_available = None  # HA convention: unavailable = unknown
+            _LOGGER.debug(f"{DOMAIN} - GSPA ota_updates update failed")
+
+        # Vehicle._valet_failed marks a failed valet read; force refresh resets.
+        if not vehicle._valet_failed:
+            try:
+                valet = self._get_valet_status(token, vehicle)
+                if valet and isinstance(valet, dict) and "valetMode" in valet:
+                    vehicle.valet_mode_active = _parse_valet_mode(valet["valetMode"])
+            except Exception:
+                vehicle._valet_failed = True
+                _LOGGER.debug(f"{DOMAIN} - GSPA valet_status update failed")
 
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)
@@ -3330,4 +3382,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             raise
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA software-version GET failed")
+            return None
+
+    def _get_valet_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get valet mode status from GSPA; None on failure.
+
+        Wire shape: {"valetMode": <int>} when idle (live, Santa Fe HEV
+        2026-11-01); the app's ValetStatus model adds startDate/endDateTime/
+        runTime/currentLocation blocks while valet is engaged.
+        """
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "valet/vehicles/{carId}/status")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA valet status failed")
             return None
