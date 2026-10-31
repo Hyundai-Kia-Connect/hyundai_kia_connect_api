@@ -22,7 +22,7 @@ from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 # Try to fix hyundai/cloudflare
-from .ApiImpl import ApiImpl, ClimateRequestOptions, OTPRequest
+from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -158,7 +158,7 @@ class SessionTicketAdapter(HTTPAdapter):
         return manager
 
 
-class RetrySession(requests.Session):
+class RetrySession(ApiImplSession):
     def __init__(self, max_retries=3, delay=2, backoff=2):
         super().__init__()
         self.mount("https://", SessionTicketAdapter())
