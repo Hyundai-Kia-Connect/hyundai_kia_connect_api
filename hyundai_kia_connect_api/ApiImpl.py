@@ -574,6 +574,12 @@ class ApiImpl:
             "parse_push_message is not implemented for this region"
         )
 
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        """Broker credentials for the MQTT connect; None = connect unauthenticated."""
+        raise NotImplementedError(
+            "get_push_credentials is not implemented for this region"
+        )
+
     def check_action_status(
         self,
         token: Token,

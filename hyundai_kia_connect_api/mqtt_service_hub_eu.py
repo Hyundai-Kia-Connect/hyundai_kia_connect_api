@@ -373,6 +373,18 @@ class MqttServiceHubMixin:
         ]
         return f"{full_url}?{'&'.join(parts)}"
 
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        """Broker credentials for the MQTT connect.
+
+        App-confirmed (CCS-SDK MQTTRepositoryImpl) and live-verified on
+        the Hyundai/Kia EU brokers: username = the registered client id,
+        password = the access token without "Bearer ". Return None to
+        connect unauthenticated — the Genesis broker rejects the
+        credential form and serves the delivery ACL at subscribe time.
+        """
+        stripped = (token.access_token or "").removeprefix("Bearer ").strip()
+        return (token.mqtt_client_id or "", stripped)
+
     def _get_service_hub_headers(self, token: Token) -> dict[str, str]:
         """Headers for the Service Hub endpoints (app-confirmed header set).
 
@@ -822,6 +834,7 @@ class MqttPushSession:
         if not reg:
             _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
             return False
+        creds = self._api.get_push_credentials(token)
 
         if not self._register_new_vehicle(vehicle, token):
             return False
@@ -836,10 +849,8 @@ class MqttPushSession:
             broker_host=broker["mqtt_host"],
             broker_port=broker.get("mqtt_port", 8883),
             client_id=reg.get("client_id"),
-            # Broker auth (app-confirmed, live-verified): username = MQTT
-            # client id, password = the auth access token without "Bearer ".
-            broker_username=reg.get("client_id"),
-            broker_password=(token.access_token or "").replace("Bearer ", "").strip(),
+            broker_username=creds[0] if creds else None,
+            broker_password=creds[1] if creds else None,
         )
         if self._connection_change_callback:
             client.set_on_connection_change(self._connection_change_callback)

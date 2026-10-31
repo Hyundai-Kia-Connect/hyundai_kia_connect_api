@@ -42,6 +42,10 @@ class FakePushApi:
         ]
         self.calls: list[str] = []
 
+    def get_push_credentials(self, token) -> tuple[str, str] | None:
+        """The default broker auth: client id + stripped access token."""
+        return (token.mqtt_client_id or "dev-client", "stripped-token")
+
     def get_push_broker_info(self, _token):
         self.calls.append("broker")
         return self.broker
@@ -152,6 +156,18 @@ def test_start_push_true_and_configures_transport(monkeypatch):
     assert vm.vehicles["careu1"].supports.mqtt_push is True
     assert vm._push_session._client.configured["broker_host"] == "broker.example"
     assert vm._push_session._client.configured["client_id"] == "dev-client"
+
+
+def test_start_push_connects_unauthenticated_when_credentials_none(monkeypatch):
+    # Genesis mode: the g broker refuses the credential form (live rc=135)
+    # and serves the delivery ACL at subscribe time.
+    vm = _make_vm()
+    vm.api.get_push_credentials = lambda token: None  # type: ignore[method-assign]
+    _connected_transport_factory(monkeypatch)
+    assert vm.start_push("careu1") is True
+    configured = vm._push_session._client.configured
+    assert configured["broker_username"] is None
+    assert configured["broker_password"] is None
 
 
 def test_start_push_false_when_vehicle_unknown():
