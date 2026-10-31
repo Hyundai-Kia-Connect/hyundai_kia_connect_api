@@ -2,6 +2,7 @@
 
 import dataclasses
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,6 +13,7 @@ from hyundai_kia_connect_api.GenesisCciApiEU import GenesisCciApiEU
 from hyundai_kia_connect_api.HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+from hyundai_kia_connect_api.KiaUvoApiUSA import KiaUvoApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 _SPA_ENTRY = {
@@ -80,6 +82,17 @@ def test_vehicle_supports_not_shared_between_vehicles():
 )
 def test_region_sets_supports_on_parsed_vehicle(build, expected):
     assert build().supports == expected
+
+
+def test_kia_usa_refresh_sets_supports_on_new_vehicle():
+    api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
+    summary = [{"vehicleIdentifier": "vehicle-id", "nickName": "n", "modelName": "m"}]
+    vehicles: dict[str, Vehicle] = {}
+    with patch.object(KiaUvoApiUSA, "_get_vehicle_summary", return_value=summary):
+        api.refresh_vehicles(MagicMock(), vehicles)
+    assert vehicles["vehicle-id"].supports == VehicleSupports(
+        window_control=False, valet_mode=False, svm=False
+    )
 
 
 def test_api_holds_no_supports_attributes():

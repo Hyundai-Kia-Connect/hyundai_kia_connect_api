@@ -81,8 +81,11 @@ class DailyDrivingStats:
 class VehicleSupports:
     """Set by each region in ``get_vehicles``. ``None`` means unknown; treat it as unsupported."""
 
+    # VehicleManager.set_windows_state
     window_control: bool | None = None
+    # VehicleManager.start_valet_mode / stop_valet_mode
     valet_mode: bool | None = None
+    # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
 
 

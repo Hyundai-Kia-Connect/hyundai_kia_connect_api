@@ -17,6 +17,11 @@
         'id': 'VEHICLE-1',
         'model': 'KONA EV',
         'name': 'Kona VÉ',
+        'supports': dict({
+          'svm': False,
+          'valet_mode': False,
+          'window_control': False,
+        }),
         'year': 2021,
       }),
       'VEHICLE-2': dict({
@@ -25,6 +30,11 @@
         'engine_type': 'ENGINE_TYPES.EV',
         'id': 'VEHICLE-2',
         'name': 'KONA EV',
+        'supports': dict({
+          'svm': False,
+          'valet_mode': False,
+          'window_control': False,
+        }),
         'year': 1900,
       }),
       'VEHICLE-3': dict({
@@ -34,6 +44,11 @@
         'id': 'VEHICLE-3',
         'model': 'KONA EV',
         'name': 'KONA EV',
+        'supports': dict({
+          'svm': False,
+          'valet_mode': False,
+          'window_control': False,
+        }),
         'year': 2024,
       }),
     }),
@@ -57,6 +72,11 @@
         'id': 'VEHICLE-1',
         'model': 'Sportage',
         'name': 'Sportage',
+        'supports': dict({
+          'svm': False,
+          'valet_mode': False,
+          'window_control': False,
+        }),
         'year': 2024,
       }),
     }),
@@ -228,6 +248,11 @@
         'key': 'KEY-1',
         'model': 'EV6',
         'name': 'My EV6',
+        'supports': dict({
+          'svm': False,
+          'valet_mode': False,
+          'window_control': False,
+        }),
       }),
     }),
   })
