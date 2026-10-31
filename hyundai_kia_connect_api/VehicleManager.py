@@ -1,7 +1,5 @@
 """VehicleManager.py"""
 
-# pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
-
 import datetime as dt
 import logging
 import re

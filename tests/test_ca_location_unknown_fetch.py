@@ -34,6 +34,7 @@ def ca_api() -> KiaUvoApiCA:
         return_value={"currentOdometer": 100, "currentOdometerUnit": 1}
     )
     api._update_vehicle_properties_service = MagicMock()
+    api._update_maintenance_report = MagicMock()
     api._get_forced_vehicle_state = MagicMock(
         return_value={
             "status": {
