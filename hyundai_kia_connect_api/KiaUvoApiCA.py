@@ -39,7 +39,10 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationTokenExpiredError,
     InvalidAPIResponseError,
 )
 from .Token import Token
@@ -273,23 +276,32 @@ class KiaUvoApiCA(ApiImpl):
         resCode / resMsg known values:
         - 0000: no error
         - 7110: OTP Required (MFA verification needed)
-        - 7402: Account Locked Out
+        - 7401: Wrong credential
+        - 7402 / 7530 / 7531 / 7532: Account Locked Out
         - 7403: Authentication expired
-        - 7404: Wrong username/password
+        - 7404 / 7435: Wrong username/password / account does not exist
         - 7445: Request could not be processed
-        - 7549: OTP verification failed (Genesis CA)
+        - 7549: Portal login captcha challenge required (
+          Hyundai-Kia-Connect/kia_uvo#2025)
         - 7602: Access token deleted
+        - 7603: Incorrect password
         - 7710: Device ID is not valid
 
         :param response: the API's JSON response
         """
 
         error_code_mapping = {
-            "7404": AuthenticationError,
-            "7402": AuthenticationError,
-            "7403": AuthenticationError,  # Auth expired - triggers re-login
-            "7549": AuthenticationError,  # OTP verification failed (Genesis CA)
-            "7602": AuthenticationError,  # Access token deleted - triggers re-login
+            "7401": AuthenticationInvalidCredentialsError,  # Wrong credential
+            "7404": AuthenticationInvalidCredentialsError,
+            "7435": AuthenticationInvalidCredentialsError,  # Account does not exist
+            "7603": AuthenticationInvalidCredentialsError,  # Incorrect password
+            "7402": AuthenticationBlockedError,  # Account locked out (7530-7532)
+            "7530": AuthenticationBlockedError,
+            "7531": AuthenticationBlockedError,
+            "7532": AuthenticationBlockedError,
+            "7403": AuthenticationTokenExpiredError,  # Expired - triggers re-login
+            "7602": AuthenticationTokenExpiredError,  # Access token deleted
+            "7549": AuthenticationError,  # Portal login captcha challenge
         }
         response_code = response.get("responseHeader", {}).get("responseCode")
         if response_code is None:
