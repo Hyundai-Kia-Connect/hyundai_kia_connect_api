@@ -15,7 +15,10 @@ import pytest
 from hyundai_kia_connect_api.const import ORDER_STATUS
 from hyundai_kia_connect_api.exceptions import (
     APIError,
+    AuthenticationBlockedError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationTokenExpiredError,
     InvalidAPIResponseError,
 )
 from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA
@@ -44,25 +47,28 @@ class TestCheckResponseForErrors:
             )
 
     @pytest.mark.parametrize(
-        "code",
+        "code, expected_class",
         [
-            "7401",
-            "7402",
-            "7403",
-            "7404",
-            "7435",
-            "7530",
-            "7531",
-            "7532",
-            "7549",
-            "7602",
-            "7603",
+            ("7401", AuthenticationInvalidCredentialsError),
+            ("7404", AuthenticationInvalidCredentialsError),
+            ("7435", AuthenticationInvalidCredentialsError),
+            ("7603", AuthenticationInvalidCredentialsError),
+            ("7402", AuthenticationBlockedError),
+            ("7530", AuthenticationBlockedError),
+            ("7531", AuthenticationBlockedError),
+            ("7532", AuthenticationBlockedError),
+            ("7403", AuthenticationTokenExpiredError),
+            ("7602", AuthenticationTokenExpiredError),
+            ("7549", AuthenticationError),
         ],
     )
-    def test_ca_auth_error_codes_raise_authentication_error(self, api, code):
-        """Every code the CA server uses for credential/account problems must
-        map to AuthenticationError so the coordinator re-authenticates."""
-        with pytest.raises(AuthenticationError, match=code):
+    def test_ca_auth_error_codes_raise_typed_authentication_error(
+        self, api, code, expected_class
+    ):
+        """Credential problems raise the typed subclass the Home Assistant
+        side pins the re-auth prompt to; the generic AuthenticationError
+        catch keeps working for the rest of the library."""
+        with pytest.raises(expected_class, match=code):
             api._check_response_for_errors(
                 {
                     "responseHeader": {"responseCode": 1},

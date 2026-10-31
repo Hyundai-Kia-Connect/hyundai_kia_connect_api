@@ -39,7 +39,10 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationTokenExpiredError,
     InvalidAPIResponseError,
 )
 from .Token import Token
@@ -288,17 +291,17 @@ class KiaUvoApiCA(ApiImpl):
         """
 
         error_code_mapping = {
-            "7401": AuthenticationError,  # Wrong credential
-            "7404": AuthenticationError,
-            "7435": AuthenticationError,  # Account does not exist
-            "7402": AuthenticationError,
-            "7530": AuthenticationError,  # Account locked out (7530-7532)
-            "7531": AuthenticationError,
-            "7532": AuthenticationError,
-            "7403": AuthenticationError,  # Auth expired - triggers re-login
+            "7401": AuthenticationInvalidCredentialsError,  # Wrong credential
+            "7404": AuthenticationInvalidCredentialsError,
+            "7435": AuthenticationInvalidCredentialsError,  # Account does not exist
+            "7603": AuthenticationInvalidCredentialsError,  # Incorrect password
+            "7402": AuthenticationBlockedError,  # Account locked out (7530-7532)
+            "7530": AuthenticationBlockedError,
+            "7531": AuthenticationBlockedError,
+            "7532": AuthenticationBlockedError,
+            "7403": AuthenticationTokenExpiredError,  # Expired - triggers re-login
+            "7602": AuthenticationTokenExpiredError,  # Access token deleted
             "7549": AuthenticationError,  # Portal login captcha challenge
-            "7602": AuthenticationError,  # Access token deleted - triggers re-login
-            "7603": AuthenticationError,  # Incorrect password
         }
         response_code = response.get("responseHeader", {}).get("responseCode")
         if response_code is None:
