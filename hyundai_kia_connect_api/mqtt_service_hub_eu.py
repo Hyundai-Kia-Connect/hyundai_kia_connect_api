@@ -836,8 +836,10 @@ class MqttPushSession:
             broker_host=broker["mqtt_host"],
             broker_port=broker.get("mqtt_port", 8883),
             client_id=reg.get("client_id"),
-            broker_username=reg.get("username"),
-            broker_password=reg.get("password"),
+            # Broker auth (app-confirmed, live-verified): username = MQTT
+            # client id, password = the auth access token without "Bearer ".
+            broker_username=reg.get("client_id"),
+            broker_password=(token.access_token or "").replace("Bearer ", "").strip(),
         )
         if self._connection_change_callback:
             client.set_on_connection_change(self._connection_change_callback)
