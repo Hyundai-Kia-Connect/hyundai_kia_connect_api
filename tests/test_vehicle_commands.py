@@ -90,35 +90,13 @@ COMMANDS: dict[str, Callable[[ApiImpl, Token, Vehicle], Any]] = {
     "start_charge": lambda api, t, v: api.start_charge(t, v),
     "stop_charge": lambda api, t, v: api.stop_charge(t, v),
     "set_charge_limits": lambda api, t, v: api.set_charge_limits(t, v, 80, 90),
-    "door_power_off": lambda api, t, v: api.door_power_off(t, v),
-    "open_frunk": lambda api, t, v: api.open_frunk(t, v),
-    "turn_off_lamp": lambda api, t, v: api.turn_off_lamp(t, v),
-    "stop_rear_seat_alarm": lambda api, t, v: api.stop_rear_seat_alarm(t, v),
-    "set_charge_alarm": lambda api, t, v: api.set_charge_alarm(t, v, True),
 }
-
-_GSPA_ONLY_COMMANDS = (
-    "door_power_off",
-    "open_frunk",
-    "turn_off_lamp",
-    "stop_rear_seat_alarm",
-    "set_charge_alarm",
-)
 
 # Commands an implementation doesn't support must raise NotImplementedError.
 NOT_SUPPORTED = {
     ("br_hyundai", "start_charge"),
     ("br_hyundai", "stop_charge"),
     ("br_hyundai", "set_charge_limits"),
-    # Not yet in KiaCciApiEU's live-verified GSPA endpoints.
-    ("eu_cci_kia", "door_power_off"),
-    ("eu_cci_kia", "open_frunk"),
-    ("eu_cci_kia", "stop_rear_seat_alarm"),
-} | {
-    (impl, command)
-    for impl in IMPLEMENTATIONS
-    if not impl.startswith("eu_cci_")
-    for command in _GSPA_ONLY_COMMANDS
 }
 
 
