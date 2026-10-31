@@ -175,13 +175,20 @@ def test_start_push_false_when_vehicle_unknown():
     assert vm._push_session is None
 
 
-def test_start_push_false_when_push_unmarked():
+def test_start_push_skip_only_when_metadata_says_false():
+    """False = the car's metadata has no phone protocols: skip without
+    a registration. None = not judged yet: the attempt is correct."""
     vm = _make_vm()
-    vm.vehicles["careu1"].supports.mqtt_push = None
-    assert vm.start_push("careu1") is False
-    assert vm._push_session is None
     vm.vehicles["careu1"].supports.mqtt_push = False
     assert vm.start_push("careu1") is False
+    assert vm._push_session is None
+
+
+def test_start_push_attempts_when_unknown(monkeypatch):
+    vm = _make_vm()
+    vm.vehicles["careu1"].supports.mqtt_push = None
+    _connected_transport_factory(monkeypatch)
+    assert vm.start_push("careu1") is True
 
 
 def test_start_push_false_when_broker_info_missing():

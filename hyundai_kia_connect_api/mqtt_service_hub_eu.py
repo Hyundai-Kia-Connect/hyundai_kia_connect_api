@@ -203,9 +203,9 @@ class MqttServiceHubMixin:
             ]
         )
         # OTA protocols — only when the vehicle reports the capability.
-        if vehicle.supports_ota_progress is True:
+        if vehicle.supports.ota_progress is True:
             protocols.append("vehicle.ota.otaprogress")
-        if vehicle.supports_schedule_update is True:
+        if vehicle.supports.schedule_update is True:
             protocols.append("vehicle.ota.scheduleupdate")
 
         body = {
@@ -301,9 +301,7 @@ class MqttServiceHubMixin:
                 f"{'mqtt vehicle id' if not vid else 'client id'}"
             )
             return []
-        topics: list[str] = build_car_status_topics(
-            vid, vehicle.supports_speed_event is True
-        )
+        topics: list[str] = build_car_status_topics(vid)
         topics.extend(build_device_remote_topics(client_id))
         topics.extend(build_ota_topics(vehicle))
         return topics
@@ -520,15 +518,15 @@ class MqttServiceHubMixin:
 # protocol means the vehicle does not support that feature. The hu
 # entry carries the remote-control and closeremote protocol sets.
 _CAPS_PROTOCOL_KEYS: dict[str, tuple[str, ...]] = {
-    "supports_hvac_close_remote": ("device.closeremote.precondition",),
-    "supports_media_close_remote": ("device.closeremote.media.vehiclestatus",),
-    "supports_ota_progress": ("vehicle.ota.otaprogress",),
-    "supports_schedule_update": ("vehicle.ota.scheduleupdate",),
+    "hvac_close_remote": ("device.closeremote.precondition",),
+    "media_close_remote": ("device.closeremote.media.vehiclestatus",),
+    "ota_progress": ("vehicle.ota.otaprogress",),
+    "schedule_update": ("vehicle.ota.scheduleupdate",),
 }
 
-# Protocols with no confirmed topic mapping are left None (unknown) —
-# e.g. the location topic has no 1:1 protocol counterpart, so
-# supports_speed_event is never set from metadata.
+# The phone-side location topic has no confirmed 1:1 protocol in the
+# metadata, so there is no entry for it: location push stays unsubscribed
+# until a per-car run confirms the mapping.
 
 
 def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
@@ -542,14 +540,17 @@ def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
     are documented on the Vehicle capability fields.
     """
     protocols: set[str] | None = None
+    hu_present = False
     candidates = list(entries or [])
     for entry in candidates:
         if isinstance(entry, dict) and entry.get("unit") == "hu":
             raw = entry.get("protocols")
             if isinstance(raw, list):
                 protocols = {str(p) for p in raw}
+                hu_present = True
                 break
     if protocols is None:
+        # tmu-only (live-confirmed Kia shape): mqtt_push stays unknown.
         for entry in candidates:
             if not isinstance(entry, dict):
                 continue
@@ -563,8 +564,12 @@ def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
             "capability flags stay unknown"
         )
         return
-    for field, keys in _CAPS_PROTOCOL_KEYS.items():
-        setattr(vehicle, field, any(key in protocols for key in keys))
+    for name, keys in _CAPS_PROTOCOL_KEYS.items():
+        setattr(vehicle.supports, name, any(key in protocols for key in keys))
+    if hu_present:
+        vehicle.supports.mqtt_push = any(
+            "remotecontroller." in key for key in protocols
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -634,19 +639,17 @@ class CciPushMessage:
 # ---------------------------------------------------------------------------
 
 
-def build_car_status_topics(vehicle_id: str, include_location: bool) -> list[str]:
+def build_car_status_topics(vehicle_id: str) -> list[str]:
     """Build CarStatus topics for a vehicle.
 
     The res topic is excluded — the broker rejects phone-client
     subscriptions to it with rc=128.
     """
-    topics = [
+    # The location topic stays out (see the protocol-map note above).
+    return [
         TOPIC_PREFIX_VSS + vehicle_id,
         TOPIC_PREFIX_CONNECTION + vehicle_id,
     ]
-    if include_location:
-        topics.append(TOPIC_PREFIX_LOCATION + vehicle_id)
-    return topics
 
 
 def build_device_remote_topics(client_id: str) -> list[str]:
@@ -666,11 +669,11 @@ def build_ota_topics(vehicle: Vehicle) -> list[str]:
     if not vehicle.mqtt_vehicle_id:
         return []
     topics = []
-    if vehicle.supports_ota_progress is True:
+    if vehicle.supports.ota_progress is True:
         topics.append(
             TOPIC_PREFIX_VEHICLE + vehicle.mqtt_vehicle_id + POSTFIX_OTA_PROGRESS
         )
-    if vehicle.supports_schedule_update is True:
+    if vehicle.supports.schedule_update is True:
         topics.append(
             TOPIC_PREFIX_VEHICLE + vehicle.mqtt_vehicle_id + POSTFIX_OTA_SCHEDULEUPDATE
         )

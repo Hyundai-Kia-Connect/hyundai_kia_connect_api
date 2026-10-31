@@ -61,17 +61,17 @@ def _metadata_response(vehicle_payload: dict) -> _FakeResponse:
 
 class TestBuildCarStatusTopics:
     def test_base(self):
-        topics = build_car_status_topics("v1", False)
+        topics = build_car_status_topics("v1")
         # Res topic excluded — broker rejects rc=128
         assert topics == [
             TOPIC_PREFIX_VSS + "v1",
             TOPIC_PREFIX_CONNECTION + "v1",
         ]
 
-    def test_location_on_true(self):
-        topics = build_car_status_topics("v1", True)
-        assert len(topics) == 3
-        assert topics[-1] == TOPIC_PREFIX_LOCATION + "v1"
+    def test_location_topic_not_subscribed(self):
+        """The location topic has no confirmed metadata protocol yet."""
+        topics = build_car_status_topics("v1")
+        assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
 
 
 class TestBuildDeviceRemoteTopics:
@@ -88,14 +88,14 @@ class TestBuildOtaTopics:
     def test_unknown_capability_no_topics(self):
         vehicle = Vehicle()
         vehicle.mqtt_vehicle_id = "v1"
-        vehicle.supports_ota_progress = None  # unknown → not subscribed
+        vehicle.supports.ota_progress = None  # unknown → not subscribed
         assert build_ota_topics(vehicle) == []
 
     def test_explicit_true_topics(self):
         vehicle = Vehicle()
         vehicle.mqtt_vehicle_id = "v1"
-        vehicle.supports_ota_progress = True
-        vehicle.supports_schedule_update = True
+        vehicle.supports.ota_progress = True
+        vehicle.supports.schedule_update = True
         topics = build_ota_topics(vehicle)
         assert POSTFIX_OTA_PROGRESS in topics[0]
         assert POSTFIX_OTA_SCHEDULEUPDATE in topics[1]
@@ -198,12 +198,11 @@ def test_metadata_populates_capabilities_and_topics():
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.mqtt_vehicle_id == "mqtt-v1"
     # protocol present → True; list read, protocol absent → False
-    assert vehicle.supports_hvac_close_remote is True
-    assert vehicle.supports_media_close_remote is True
-    assert vehicle.supports_ota_progress is True
-    assert vehicle.supports_schedule_update is False
+    assert vehicle.supports.hvac_close_remote is True
+    assert vehicle.supports.media_close_remote is True
+    assert vehicle.supports.ota_progress is True
+    assert vehicle.supports.schedule_update is False
     # protocols have no location-topic counterpart → unknown (None)
-    assert vehicle.supports_speed_event is None
 
     topics = api.get_push_topics(_token(), vehicle)
     # location unknown → not subscribed
@@ -230,8 +229,8 @@ def test_metadata_absent_protocol_is_false_not_none():
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
-    assert vehicle.supports_ota_progress is False
-    assert vehicle.supports_schedule_update is False
+    assert vehicle.supports.ota_progress is False
+    assert vehicle.supports.schedule_update is False
     topics = api.get_push_topics(_token(), vehicle)
     assert not any("ota" in t for t in topics)
 
@@ -247,7 +246,7 @@ def test_metadata_unknown_shape_leaves_capabilities_unknown():
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
-    assert vehicle.supports_ota_progress is None
+    assert vehicle.supports.ota_progress is None
     topics = api.get_push_topics(_token(), vehicle)
     assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
     assert not any("ota" in t for t in topics)
@@ -272,7 +271,7 @@ def test_metadata_entry_level_capabilities():
     )
     api.get_push_vehicle_identity(Token(), vehicle)
     assert vehicle.hu_client_id == "hu-1"
-    assert vehicle.supports_schedule_update is True
+    assert vehicle.supports.schedule_update is True
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +320,7 @@ def test_register_push_vehicle_ota_protocols_conditional():
     session = _FakeSession([_FakeResponse(text="", status_code=200)])
     api._service_hub_session = session
 
-    vehicle.supports_ota_progress = None
+    vehicle.supports.ota_progress = None
     api.register_push_vehicle(Token(), vehicle)
     assert len(session.calls) == 1
     body = session.calls[0][2]["json"]
@@ -330,8 +329,8 @@ def test_register_push_vehicle_ota_protocols_conditional():
     assert body["carId"] == "careu1"
     assert body["brand"] == "K"
 
-    vehicle.supports_ota_progress = True
-    vehicle.supports_schedule_update = True
+    vehicle.supports.ota_progress = True
+    vehicle.supports.schedule_update = True
     api._service_hub_session = _FakeSession([_FakeResponse(text="", status_code=200)])
     api.register_push_vehicle(Token(), vehicle)
     body = api._service_hub_session.calls[0][2]["json"]
@@ -475,8 +474,8 @@ def test_metadata_prefers_hu_entry_over_tmu():
         ]
     )
     api.get_push_vehicle_identity(Token(), vehicle)
-    assert vehicle.supports_hvac_close_remote is True  # from hu, not tmu
-    assert vehicle.supports_schedule_update is True  # from hu
+    assert vehicle.supports.hvac_close_remote is True  # from hu, not tmu
+    assert vehicle.supports.schedule_update is True  # from hu
 
     api._service_hub_session = _FakeSession(
         [
@@ -497,7 +496,36 @@ def test_metadata_prefers_hu_entry_over_tmu():
     )
     vehicle2 = _vehicle()
     api.get_push_vehicle_identity(Token(), vehicle2)
-    assert vehicle2.supports_hvac_close_remote is False  # tmu fallback
+    assert vehicle2.supports.hvac_close_remote is False  # tmu fallback
+    # hu present but no RC protocol in its list = False (refined, real);
+    # tmu-only = unknown (Kia shape); the flag is never a region constant.
+    assert vehicle.supports.mqtt_push is False
+    assert vehicle2.supports.mqtt_push is None
+
+
+def test_metadata_hu_entry_with_phone_rc_says_push():
+    """The hu protocol list carrying the RC set = the per-car push signal."""
+    api = _kia_api()
+    vehicle = _vehicle()
+    api._service_hub_session = _FakeSession(
+        [
+            _metadata_response(
+                {
+                    "unit": "hu",
+                    "clientId": "c1",
+                    "vehicleId": "mqtt-v1",
+                    "protocols": [
+                        "device.remotecontroller.connect",
+                        "vehicle.remotecontroller.connect",
+                        "device.closeremote.precondition",
+                    ],
+                }
+            ),
+            _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
+        ]
+    )
+    api.get_push_vehicle_identity(Token(), vehicle)
+    assert vehicle.supports.mqtt_push is True
 
 
 # ---------------------------------------------------------------------------
@@ -697,7 +725,7 @@ def test_metadata_failures():
     )
     api._service_hub_get_metadata(token, vehicle)
     assert vehicle.hu_client_id is None
-    assert vehicle.supports_ota_progress is None
+    assert vehicle.supports.ota_progress is None
 
     class _Boom:
         def get(self, *a, **k):
@@ -734,7 +762,7 @@ def test_capabilities_fallback_skips_non_dict_entries():
     _apply_vehicle_capabilities(
         ["junk", {"unit": "tmu", "protocols": ["vehicle.ota.otaprogress"]}], vehicle
     )
-    assert vehicle.supports_ota_progress is True
+    assert vehicle.supports.ota_progress is True
 
 
 def test_build_ota_topics_without_vehicle_id():

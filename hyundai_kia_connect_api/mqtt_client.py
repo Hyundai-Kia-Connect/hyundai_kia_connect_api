@@ -103,6 +103,8 @@ class MqttTransport:
         # keepAliveInterval=15.
         self._client.reconnect_delay_set(min_delay=1, max_delay=30)
         self._client.connect_timeout = 10
+        # App-confirmed: MaxInflight=100 (the paho default is 10).
+        self._client.max_inflight_messages_set(100)
 
         self._client.on_connect = self._on_mqtt_connect
         self._client.on_connect_fail = self._on_mqtt_connect_fail

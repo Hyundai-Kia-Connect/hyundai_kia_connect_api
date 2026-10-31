@@ -88,6 +88,14 @@ class VehicleSupports:
     svm: bool | None = None
     # Service Hub registration + the receive-only MQTT broker
     mqtt_push: bool | None = None
+    # device.closeremote.precondition protocol (push metadata hu entry)
+    hvac_close_remote: bool | None = None
+    # device.closeremote.media.vehiclestatus protocol
+    media_close_remote: bool | None = None
+    # vehicle.ota.otaprogress protocol
+    ota_progress: bool | None = None
+    # vehicle.ota.scheduleupdate protocol
+    schedule_update: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -210,15 +218,8 @@ class Vehicle:
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).
-    # Capability flags: True = supported, False = not supported, None =
-    # not reported by the metadata read; conditional topics require True.
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
-    supports_hvac_close_remote: bool | None = None
-    supports_media_close_remote: bool | None = None
-    supports_speed_event: bool | None = None
-    supports_ota_progress: bool | None = None
-    supports_schedule_update: bool | None = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool | None = None
