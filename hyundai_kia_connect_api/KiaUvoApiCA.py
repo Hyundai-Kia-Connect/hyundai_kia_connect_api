@@ -731,17 +731,18 @@ class KiaUvoApiCA(ApiImpl):
         reports = report_list.get("MVRs") if isinstance(report_list, dict) else None
         if not reports:
             return
-        mvr_id = get_child_value(reports[0], "reportId")
-        date = get_child_value(reports[0], "reportDate")
-        if mvr_id in (None, vehicle.maintenance_report_last_id):
+        if get_child_value(reports[0], "reportId") in (
+            None,
+            vehicle.maintenance_report_last_id,
+        ):
             return
-        vehicle.maintenance_report_last_id = mvr_id
-        report = self._get_mvr_report(token, vehicle, mvr_id)
-        vehicle.maintenance_report_date = date
-        vehicle.maintenance_report_odometer = get_child_value(report, "odometer")
-        vehicle.maintenance_report_odometer_unit = get_child_value(
-            report, "odometerUnitStr"
+        vehicle.maintenance_report_last_id = get_child_value(reports[0], "reportId")
+        vehicle.maintenance_report_date = get_child_value(reports[0], "reportDate")
+        report = self._get_mvr_report(
+            token, vehicle, vehicle.maintenance_report_last_id
         )
+        vehicle.maintenance_report_odometer = get_child_value(report, "odometer")
+        vehicle.maintenance_report_odometer_unit = report.get("odometerUnitStr")
         vehicle.maintenance_report_systems = get_child_value(report, "systems")
 
     def _get_mvr_list(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
