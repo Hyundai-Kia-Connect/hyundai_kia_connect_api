@@ -48,8 +48,8 @@ def test_vehicle_supports_defaults_to_undetermined():
 
 def test_vehicle_supports_not_shared_between_vehicles():
     first, second = Vehicle(), Vehicle()
-    first.supports.surround_view = True
-    assert second.supports.surround_view is None
+    first.supports.svm = True
+    assert second.supports.svm is None
 
 
 @pytest.mark.parametrize(
@@ -57,23 +57,23 @@ def test_vehicle_supports_not_shared_between_vehicles():
     [
         (
             lambda: _spa_vehicle(ApiImplType1),
-            VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
+            VehicleSupports(window_control=True, valet_mode=True, svm=False),
         ),
         (
             lambda: _spa_vehicle(HyundaiBlueLinkApiBR),
-            VehicleSupports(window_control=True, valet_mode=False, surround_view=False),
+            VehicleSupports(window_control=True, valet_mode=False, svm=False),
         ),
         (
             lambda: _cci_vehicle(HyundaiCciApiEU),
-            VehicleSupports(window_control=True, valet_mode=True, surround_view=True),
+            VehicleSupports(window_control=True, valet_mode=True, svm=True),
         ),
         (
             lambda: _cci_vehicle(KiaCciApiEU),
-            VehicleSupports(window_control=True, valet_mode=True, surround_view=False),
+            VehicleSupports(window_control=True, valet_mode=True, svm=False),
         ),
         (
             lambda: _cci_vehicle(GenesisCciApiEU),
-            VehicleSupports(window_control=False, valet_mode=True, surround_view=False),
+            VehicleSupports(window_control=False, valet_mode=True, svm=False),
         ),
     ],
     ids=["type1", "br", "eu_cci_hyundai", "eu_cci_kia", "eu_cci_genesis"],
@@ -101,7 +101,7 @@ def test_api_holds_no_supports_attributes():
     [
         ("supports_window_control", "window_control"),
         ("supports_valet_mode", "valet_mode"),
-        ("supports_svm", "surround_view"),
+        ("supports_svm", "svm"),
     ],
 )
 def test_deprecated_flat_alias_reads_and_writes_supports(alias, item):

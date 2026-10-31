@@ -60,7 +60,7 @@ class HyundaiCciApiEU(GspaApiEU):
         # KiaCciApiEU keeps the inherited False until verified there too.
         for vehicle in vehicles:
             vehicle.supports.window_control = True
-            vehicle.supports.surround_view = True
+            vehicle.supports.svm = True
         return vehicles
 
     # ------------------------------------------------------------------

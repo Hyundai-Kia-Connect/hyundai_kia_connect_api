@@ -583,7 +583,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = True
-            vehicle.supports.surround_view = False
+            vehicle.supports.svm = False
             vehicles.append(vehicle)
 
         return vehicles

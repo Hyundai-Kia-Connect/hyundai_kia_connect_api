@@ -82,7 +82,7 @@
         'name': '库斯途',
         'registration_date': '2025-07-13 20:12:40.283',
         'supports': dict({
-          'surround_view': False,
+          'svm': False,
           'valet_mode': True,
           'window_control': True,
         }),
@@ -111,7 +111,7 @@
         'name': 'NO_Ioniq',
         'registration_date': '2025-01-10 16:51:44.886',
         'supports': dict({
-          'surround_view': False,
+          'svm': False,
           'valet_mode': True,
           'window_control': True,
         }),
@@ -126,7 +126,7 @@
         'name': 'IONIQ 5',
         'registration_date': '2021-09-04 14:07:51.955',
         'supports': dict({
-          'surround_view': False,
+          'svm': False,
           'valet_mode': True,
           'window_control': True,
         }),
@@ -141,7 +141,7 @@
         'name': 'KONA',
         'registration_date': '2022-12-02 19:21:05.307',
         'supports': dict({
-          'surround_view': False,
+          'svm': False,
           'valet_mode': True,
           'window_control': True,
         }),
@@ -170,7 +170,7 @@
         'name': '2023 IONIQ 5',
         'registration_date': '20230929',
         'supports': dict({
-          'surround_view': True,
+          'svm': True,
           'valet_mode': False,
           'window_control': False,
         }),
@@ -184,7 +184,7 @@
         'name': '2024 PALISADE',
         'registration_date': '20230825',
         'supports': dict({
-          'surround_view': True,
+          'svm': True,
           'valet_mode': False,
           'window_control': False,
         }),
@@ -199,7 +199,7 @@
         'name': '2020 IONIQ ELECTRIC',
         'registration_date': '20201102',
         'supports': dict({
-          'surround_view': True,
+          'svm': True,
           'valet_mode': False,
           'window_control': False,
         }),

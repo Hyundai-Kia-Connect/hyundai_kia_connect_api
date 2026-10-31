@@ -185,7 +185,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -391,7 +391,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -626,7 +626,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -861,7 +861,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': 0,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -1086,7 +1086,7 @@
       'stop_lamp_right': False,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -1303,7 +1303,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -1529,7 +1529,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -1755,7 +1755,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -1981,7 +1981,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -2207,7 +2207,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -2433,7 +2433,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -2649,7 +2649,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -3164,7 +3164,7 @@
       'stop_lamp_right': False,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -3691,7 +3691,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -4202,7 +4202,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -4717,7 +4717,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -5244,7 +5244,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -5771,7 +5771,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -6298,7 +6298,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -6813,7 +6813,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -7324,7 +7324,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -7835,7 +7835,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -8041,7 +8041,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -8247,7 +8247,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -8453,7 +8453,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -8659,7 +8659,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -9170,7 +9170,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': False,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -9391,7 +9391,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -9623,7 +9623,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': 0,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -9855,7 +9855,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': 0,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -10076,7 +10076,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -10292,7 +10292,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),
@@ -10523,7 +10523,7 @@
       'stop_lamp_right': None,
       'sunroof_is_open': None,
       'supports': dict({
-        'surround_view': None,
+        'svm': None,
         'valet_mode': None,
         'window_control': None,
       }),

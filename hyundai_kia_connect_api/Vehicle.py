@@ -83,7 +83,7 @@ class VehicleSupports:
 
     window_control: bool | None = None
     valet_mode: bool | None = None
-    surround_view: bool | None = None
+    svm: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -329,7 +329,7 @@ class Vehicle:
     supports_valet_mode = _deprecated_supports_alias(
         "supports_valet_mode", "valet_mode"
     )
-    supports_svm = _deprecated_supports_alias("supports_svm", "surround_view")
+    supports_svm = _deprecated_supports_alias("supports_svm", "svm")
 
     @property
     def daily_stats(self) -> list[DailyDrivingStats]:

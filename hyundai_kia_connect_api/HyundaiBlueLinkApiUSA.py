@@ -1241,7 +1241,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             vehicle.supports.valet_mode = False
             # SVM / Find My Car; the image is fetched on demand via
             # get_svm_details / request_svm_capture.
-            vehicle.supports.surround_view = True
+            vehicle.supports.svm = True
             result.append(vehicle)
 
         return result

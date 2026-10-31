@@ -18,7 +18,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 def test_vehicle_supports_svm_default_none():
     vehicle = _make_vehicle()
-    assert vehicle.supports.surround_view is None
+    assert vehicle.supports.svm is None
 
 
 def test_svm_details_can_be_imported():

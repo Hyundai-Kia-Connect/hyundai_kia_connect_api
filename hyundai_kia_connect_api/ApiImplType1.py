@@ -225,7 +225,7 @@ class ApiImplType1(ApiImpl):
         )
         vehicle.supports.window_control = True
         vehicle.supports.valet_mode = True
-        vehicle.supports.surround_view = False
+        vehicle.supports.svm = False
         return vehicle
 
     def _get_time_from_string(self, value: Any, timesection: Any) -> dt.time | None:
