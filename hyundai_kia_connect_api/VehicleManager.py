@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import re
 from datetime import timedelta
+from typing import Any
 
 from .ApiImpl import (
     ApiImpl,
@@ -417,6 +418,9 @@ class VehicleManager:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
         )
+
+    def set_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
+        return self.api.set_ota_update(self.token, self.get_vehicle(vehicle_id), start)
 
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
         return self.api.set_navigation(
