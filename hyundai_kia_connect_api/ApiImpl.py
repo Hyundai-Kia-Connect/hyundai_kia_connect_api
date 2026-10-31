@@ -725,6 +725,36 @@ class ApiImpl:
             "schedule_charging_and_climate is not implemented for this region"
         )
 
+    def schedule_reservation_charge(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_reservation_charge is not implemented for this region"
+        )
+
+    def schedule_reservation_hvac(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_reservation_hvac is not implemented for this region"
+        )
+
+    def schedule_reservation_engine(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_reservation_engine is not implemented for this region"
+        )
+
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         """Turns on the hazard lights for 30 seconds"""
         raise NotImplementedError(
