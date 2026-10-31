@@ -17,7 +17,7 @@ from .const import (
     ENGINE_TYPES,
 )
 from .exceptions import APIError
-from .GspaApiEU import GspaApiEU
+from .GspaApiEU import GspaApiEU, _parse_valet_mode
 from .Token import Token
 from .utils import (
     get_child_value,
@@ -275,3 +275,15 @@ class HyundaiCciApiEU(GspaApiEU):
         except Exception:
             vehicle.ota_update_available = None  # HA convention: unavailable = unknown
             _LOGGER.debug(f"{DOMAIN} - GSPA ota_updates update failed")
+
+        # Vehicle._valet_failed stops retries until force refresh (#1331).
+        if not vehicle._valet_failed:
+            vehicle._valet_failed = True
+            try:
+                valet = self._get_valet_status(token, vehicle)
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - GSPA valet_status update failed")
+            else:
+                if valet and isinstance(valet, dict) and "valetMode" in valet:
+                    vehicle.valet_mode_active = _parse_valet_mode(valet["valetMode"])
+                    vehicle._valet_failed = False

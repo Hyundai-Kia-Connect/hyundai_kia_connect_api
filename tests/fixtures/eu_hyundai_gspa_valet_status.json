@@ -1,0 +1,18 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Hyundai Santa Fe HEV",
+        "year": 2026,
+        "region": "EU",
+        "brand": "Hyundai",
+        "api_class": "GspaApiEU",
+        "endpoint": "gspa valet/vehicles/{carId}/status",
+        "description": "Valet status captured live on the reporter's own Hyundai Santa Fe HEV (2026-11-01) via lib PR #1331 design probe. valetMode is an int enum: the app (myHyundai 1.4.0, CCS SDK lib-domain ValetMode) defines ACTIVE(0), IGN_OFF(1), INACTIVE(2), INVALID(-1). This capture shows INACTIVE(2). The active-state values are unit-tested from the enum source and await a live flip on an outdoor car; a CA-app demo asset shows the same field carrying an extended active shape (startDate/endDateTime/runTime blocks) plus currentLocation, so the parser reads only valetMode and leaves the rest alone.",
+        "not_captured": [
+            "active-state values (0/1) and INVALID(-1) — unit-tested, no live capture yet"
+        ],
+        "expected": {
+            "valet_mode_active": false
+        }
+    },
+    "valetMode": 2
+}
