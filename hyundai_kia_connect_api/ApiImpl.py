@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     GEO_LOCATION_PROVIDERS,
     GOOGLE,
+    LAMP_MODE,
     OPENSTREETMAP,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
@@ -744,7 +745,7 @@ class ApiImpl:
         raise NotImplementedError("open_frunk is not implemented for this region")
 
     def turn_off_lamp(
-        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
         raise NotImplementedError("turn_off_lamp is not implemented for this region")
 

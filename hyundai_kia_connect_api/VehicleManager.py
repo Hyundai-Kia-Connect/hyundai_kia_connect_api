@@ -20,6 +20,7 @@ from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
+    LAMP_MODE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -308,7 +309,9 @@ class VehicleManager:
     def open_frunk(self, vehicle_id: str) -> str:
         return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
 
-    def turn_off_lamp(self, vehicle_id: str, mode: str = "all-off") -> str:
+    def turn_off_lamp(
+        self, vehicle_id: str, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
+    ) -> str:
         return self.api.turn_off_lamp(self.token, self.get_vehicle(vehicle_id), mode)
 
     def stop_rear_seat_alarm(self, vehicle_id: str) -> str:

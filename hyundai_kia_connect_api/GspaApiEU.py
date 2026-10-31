@@ -46,6 +46,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LAMP_MODE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -2316,9 +2317,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
 
     def turn_off_lamp(
-        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
-        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+        return self._gspa_control_command(
+            token, vehicle, "lamp", {"command": mode.value}
+        )
 
     def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
