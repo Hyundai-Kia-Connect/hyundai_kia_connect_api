@@ -13,6 +13,7 @@ The top-level files are status payloads, stored without the outer response envel
 | EU           | `KiaUvoApiEU`                | `eu_kia_` (no `ccs2`)   | `vehicleStatus.*`                                  |
 | EU (CCS2)    | `KiaUvoApiEU`                | `eu_kia_` (with `ccs2`) | `Green.*`, `Cabin.*`, `Body.*`                     |
 | EU (GSPA)    | `KiaCciApiEU`                | `eu_kia_gspa_`          | CCS2-style stored status                           |
+| EU (GSPA)    | `HyundaiCciApiEU`            | `eu_hyundai_gspa_`      | CCS2-style stored status (`state.Vehicle`)         |
 | BR           | `HyundaiBlueLinkApiBR`       | `br_`                   | `resMsg.state.Vehicle` (CCS2)                      |
 | CA           | `KiaUvoApiCA`                | `ca_`                   | `status.*`                                         |
 | AU           | `KiaUvoApiAU`                | `au_`                   | `status.*`                                         |

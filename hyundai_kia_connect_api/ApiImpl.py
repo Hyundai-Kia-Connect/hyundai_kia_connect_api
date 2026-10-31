@@ -5,6 +5,7 @@ import datetime as dt
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -434,7 +435,7 @@ class POIInfo:
         }
 
 
-class ApiImplSession(requests.Session):  # type: ignore[misc]
+class ApiImplSession(requests.Session):
     """Shared HTTP session with default timeout and connection pooling.
 
     All regions should use this session (or a subclass) for HTTP calls.
@@ -449,12 +450,14 @@ class ApiImplSession(requests.Session):  # type: ignore[misc]
     HTTP_CONNECT_TIMEOUT = 10
     HTTP_READ_TIMEOUT = 30
 
-    def request(self, method: str, url: str, **kwargs: object) -> requests.Response:
+    def request(
+        self, method: str | bytes, url: str | bytes, *args: Any, **kwargs: Any
+    ) -> requests.Response:
         kwargs.setdefault(
             "timeout", (self.HTTP_CONNECT_TIMEOUT, self.HTTP_READ_TIMEOUT)
         )
         try:
-            return super().request(method, url, **kwargs)
+            return super().request(method, url, *args, **kwargs)
         except requests.exceptions.Timeout as exc:
             from .exceptions import RequestTimeoutError
 

@@ -315,13 +315,15 @@ def test_vehicle_manager_routes_kia_to_kia_cci():
     assert isinstance(api, KiaCciApiEU)
 
 
-def test_vehicle_manager_routes_genesis_to_error():
-    """Genesis EU CCI raises APIError."""
+def test_vehicle_manager_routes_genesis_to_genesis_cci():
+    """Genesis EU CCI routes to GenesisCciApiEU (auth live-verified,
+    GSPA reads gated until a vehicle-attached live run)."""
+    from hyundai_kia_connect_api.GenesisCciApiEU import GenesisCciApiEU
     from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
     # REGION_EUROPE_CCI = 9, BRAND_GENESIS = 3
-    with pytest.raises(APIError, match="Genesis"):
-        VehicleManager.get_implementation_by_region_brand(9, 3, "en")
+    api = VehicleManager.get_implementation_by_region_brand(9, 3, "en")
+    assert isinstance(api, GenesisCciApiEU)
 
 
 def test_kia_schedule_reservation_charge_na_gated():
