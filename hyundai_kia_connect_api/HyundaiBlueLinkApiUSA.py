@@ -1,7 +1,5 @@
 """HyundaiBlueLinkAPIUSA.py"""
 
-# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
-
 import base64
 import datetime as dt
 import logging
@@ -1160,7 +1158,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if response.status_code == 502:
             try:
                 response_json = response.json()
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:
                 raise APIError("SVM request failed with HTTP 502")
             if response_json.get("errorSubCode") == "HT_533":
                 raise DuplicateRequestError(

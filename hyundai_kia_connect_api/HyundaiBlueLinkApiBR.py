@@ -1,7 +1,5 @@
 """HyundaiBlueLinkApiBR.py"""
 
-# pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
-
 import datetime as dt
 import logging
 import random

@@ -7,8 +7,6 @@ vehicle-read parsers (stored-status, driving info/history, breakdowns,
 CCS2 status). OTA and MQTT are handled in later PRs.
 """
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
-
 import datetime as dt
 import logging
 from typing import Any

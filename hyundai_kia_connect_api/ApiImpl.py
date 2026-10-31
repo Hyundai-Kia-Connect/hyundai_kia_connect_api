@@ -1,6 +1,5 @@
 """ApiImpl.py"""
 
-# pylint:disable=unnecessary-pass,missing-class-docstring,invalid-name,missing-function-docstring,wildcard-import,unused-wildcard-import,unused-argument,logging-fstring-interpolation
 import datetime as dt
 import logging
 from collections.abc import Sequence
@@ -601,7 +600,7 @@ class ApiImpl:
                             self.previous_latitude = vehicle.location_latitude
                             self.previous_longitude = vehicle.location_longitude
                             _LOGGER.debug(f"{DOMAIN} - geocode google")
-                    except Exception as ex:  # pylint: disable=broad-except
+                    except Exception as ex:
                         _LOGGER.warning(f"{DOMAIN} - failed geocode Google: {ex}")
                         vehicle.geocode = None
 

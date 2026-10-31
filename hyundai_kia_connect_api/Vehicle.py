@@ -1,4 +1,3 @@
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation
 """Vehicle class"""
 
 import datetime
