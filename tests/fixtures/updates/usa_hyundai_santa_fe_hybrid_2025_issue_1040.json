@@ -1,0 +1,29 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2025 Santa Fe Hybrid (evStatus N)",
+        "source": "kia_uvo #1040 debug log: enrollment details, vehicle status",
+        "follow_up_sources": "findMyCar: real HATA error from kia_uvo #937",
+        "not_captured": [],
+        "description": "Non-EV path (no trip details); identifiers and coordinates replaced, account blocks removed."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "ICE"
+    },
+    "responses": {
+        "GET /ac/v2/enrollment/details/user": {
+            "body": "$fixture:updates/responses/usa_hyundai_enrollment_1040.json"
+        },
+        "GET /ac/v2/rcs/rvs/vehicleStatus": {
+            "body": "$fixture:updates/responses/usa_hyundai_vehicle_status_1040.json"
+        },
+        "GET /ac/v2/rcs/rfc/findMyCar": {
+            "body": "$fixture:updates/responses/us_hyundai_findmycar_hata_error_937.json"
+        }
+    }
+}

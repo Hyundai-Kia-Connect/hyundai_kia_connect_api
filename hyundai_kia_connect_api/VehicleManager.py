@@ -4,41 +4,54 @@
 
 import datetime as dt
 import logging
+import re
+from datetime import timedelta
 
-import pytz
-
-from .exceptions import APIError
 from .ApiImpl import (
     ApiImpl,
     ClimateRequestOptions,
-    WindowRequestOptions,
+    OTPRequest,
+    POIInfo,
     ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
 )
-from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
-from .KiaUvoApiUSA import KiaUvoApiUSA
-from .KiaUvoApiCA import KiaUvoApiCA
-from .KiaUvoApiEU import KiaUvoApiEU
-from .KiaUvoApiCN import KiaUvoApiCN
-from .KiaUvoApiAU import KiaUvoApiAU
-from .Token import Token
-from .Vehicle import Vehicle
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
-    DOMAIN,
-    REGION_AUSTRALIA,
-    REGION_CANADA,
-    REGION_EUROPE,
-    REGION_USA,
-    REGION_CHINA,
-    REGIONS,
-    VEHICLE_LOCK_ACTION,
     CHARGE_PORT_ACTION,
-    OrderStatus,
+    DOMAIN,
+    ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
+    REGION_AUSTRALIA,
+    REGION_BRAZIL,
+    REGION_CANADA,
+    REGION_CHINA,
+    REGION_EUROPE,
+    REGION_EUROPE_CCI,
+    REGION_INDIA,
+    REGION_NZ,
+    REGION_USA,
+    REGIONS,
     VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
 )
+from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .GenesisCciApiEU import GenesisCciApiEU
+from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from .HyundaiCciApiEU import HyundaiCciApiEU
+from .KiaCciApiEU import KiaCciApiEU
+from .KiaUvoApiAU import KiaUvoApiAU
+from .KiaUvoApiCA import KiaUvoApiCA
+from .KiaUvoApiCN import KiaUvoApiCN
+from .KiaUvoApiEU import KiaUvoApiEU
+from .KiaUvoApiIN import KiaUvoApiIN
+from .KiaUvoApiUSA import KiaUvoApiUSA
+from .svm import SVMDetails
+from .Token import Token
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +66,9 @@ class VehicleManager:
         pin: str,
         geocode_api_enable: bool = False,
         geocode_api_use_email: bool = False,
+        geocode_provider: int = 1,
+        geocode_api_key: str | None = None,
+        token: Token | None = None,
         language: str = "en",
     ):
         self.region: int = region
@@ -61,43 +77,85 @@ class VehicleManager:
         self.password: str = password
         self.geocode_api_enable: bool = geocode_api_enable
         self.geocode_api_use_email: bool = geocode_api_use_email
+        self.geocode_provider: int = geocode_provider
         self.pin: str = pin
         self.language: str = language
+        self.geocode_api_key: str = geocode_api_key
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
         )
 
-        self.token: Token = None
-        self.vehicles: dict = {}
+        self.token: Token = token
+        self.vehicles: dict[str, Vehicle] = {}
+        self.otp_request: OTPRequest = None
 
-    def initialize(self) -> None:
-        self.token: Token = self.api.login(self.username, self.password)
-        self.token.pin = self.pin
+    def login(self) -> bool | OTPRequest:
+        """Return True on success, an OTPRequest if OTP is required, else False."""
+        result = self.api.login(
+            username=self.username,
+            password=self.password,
+            pin=self.pin,
+        )
+        if isinstance(result, Token):
+            self.token = result
+            self.initialize_vehicles()
+            return True
+        if isinstance(result, OTPRequest):
+            self.otp_request = result
+            return result
+        return False
+
+    def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
+        self.api.send_otp(self.otp_request, notify_type)
+
+    def verify_otp_and_complete_login(self, otp_code: str) -> None:
+        self.token = self.api.verify_otp_and_complete_login(
+            username=self.username,
+            password=self.password,
+            otp_code=otp_code,
+            otp_request=self.otp_request,
+            pin=self.pin,
+        )
+        self.initialize_vehicles()
+
+    def initialize_vehicles(self):
+        if len(self.vehicles) > 0:
+            _LOGGER.warning(
+                "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
+            )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
+            vehicle.supports_window_control = self.api.supports_window_control
+            vehicle.supports_valet_mode = self.api.supports_valet_mode
+            vehicle.supports_svm = self.api.supports_svm
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
 
     def update_all_vehicles_with_cached_state(self) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.update_vehicle_with_cached_state(vehicle_id)
 
     def update_vehicle_with_cached_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
+            vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
             self.api.update_vehicle_with_cached_state(self.token, vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
-                    self.token, vehicle, self.geocode_api_use_email
+                    token=self.token,
+                    vehicle=vehicle,
+                    use_email=self.geocode_api_use_email,
+                    provider=self.geocode_provider,
+                    API_KEY=self.geocode_api_key,
                 )
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
     def check_and_force_update_vehicles(self, force_refresh_interval: int) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.check_and_force_update_vehicle(force_refresh_interval, vehicle_id)
 
     def check_and_force_update_vehicle(
@@ -105,11 +163,11 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt = dt.datetime.now(pytz.utc)
+        started_at_utc: dt.datetime = dt.datetime.now(dt.UTC)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
             _LOGGER.debug(
-                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"  # noqa
+                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
             )
             if (
                 started_at_utc - vehicle.last_updated_at
@@ -121,28 +179,97 @@ class VehicleManager:
             self.update_vehicle_with_cached_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
-        for vehicle_id in self.vehicles.keys():
+        for vehicle_id in self.vehicles:
             self.force_refresh_vehicle_state(vehicle_id)
 
     def force_refresh_vehicle_state(self, vehicle_id: str) -> None:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
+            vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
             self.api.force_refresh_vehicle_state(self.token, vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
+    def get_svm_details(self, vehicle_id: str) -> SVMDetails:
+        """Return the latest cached SVM composite image and metadata.
+
+        Delegates to the region-specific API implementation. Raises
+        NotImplementedError on regions without SVM support.
+        """
+        return self.api.get_svm_details(self.token, self.get_vehicle(vehicle_id))
+
+    def request_svm_capture(
+        self, vehicle_id: str, acknowledged_warning: bool
+    ) -> SVMDetails:
+        """Trigger a fresh SVM capture and return the resulting image.
+
+        ``acknowledged_warning`` must be True; the caller must explicitly
+        acknowledge the safety warning before triggering a capture.
+        """
+        return self.api.request_svm_capture(
+            self.token, self.get_vehicle(vehicle_id), acknowledged_warning
+        )
+
     def check_and_refresh_token(self) -> bool:
         if self.token is None:
-            self.initialize()
-        if (
-            self.token.valid_until <= dt.datetime.now(pytz.utc)
-            or self.api.test_token(self.token) is False
-        ):
+            if self.login() is True:
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
+                return True
+            else:
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+        now_utc = dt.datetime.now(dt.UTC)
+        grace_period = timedelta(seconds=10)
+        min_supported_datetime = dt.datetime.min.replace(tzinfo=dt.UTC)
+        valid_until = self.token.valid_until
+        token_expired = False
+        if not isinstance(valid_until, dt.datetime):
+            token_expired = True
+        else:
+            if valid_until.tzinfo is None:
+                valid_until = valid_until.replace(tzinfo=dt.UTC)
+            if valid_until <= min_supported_datetime + grace_period:
+                token_expired = True
+            else:
+                token_expired = valid_until - grace_period <= now_utc
+        if token_expired or self.api.test_token(self.token) is False:
             _LOGGER.debug(f"{DOMAIN} - Refresh token expired")
-            self.token: Token = self.api.login(self.username, self.password)
-            self.token.pin = self.pin
-            self.vehicles = self.api.refresh_vehicles(self.token, self.vehicles)
+            try:
+                result = self.api.refresh_access_token(
+                    self.token,
+                )
+            except AuthenticationError:
+                # The legacy password field may hold a 48-char refresh token;
+                # a fallback login with it re-enters the refresh-token grant
+                # and wedges the account (kia_uvo #1888). Retry once with the
+                # credentials the manager was constructed with.
+                if (
+                    re.fullmatch(r"[A-Z0-9]{48}", self.token.password or "")
+                    and self.password
+                    and self.password != self.token.password
+                    and not re.fullmatch(r"[A-Z0-9]{48}", self.password)
+                ):
+                    _LOGGER.warning(
+                        f"{DOMAIN} - Refresh failed with a legacy "
+                        "refresh-token password; retrying login with the "
+                        "configured credentials"
+                    )
+                    result = self.api.login(self.username, self.password, self.pin)
+                else:
+                    raise
+            if isinstance(result, Token):
+                self.token = result
+                # Temp correction to fix bad data due to a bug.
+                if self.token.pin != self.pin:
+                    self.token.pin = self.pin
+                if len(self.vehicles) == 0:
+                    self.initialize_vehicles()
+            if isinstance(result, OTPRequest):
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+            self.api.refresh_vehicles(self.token, self.vehicles)
             return True
+        if len(self.vehicles) == 0:
+            self.initialize_vehicles()
         return False
 
     def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
@@ -198,7 +325,7 @@ class VehicleManager:
         action_id: str,
         synchronous: bool = False,
         timeout: int = 120,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         """
         Check for the status of a sent action/command.
 
@@ -267,6 +394,13 @@ class VehicleManager:
     def schedule_charging_and_climate(
         self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
     ) -> str:
+        """Set scheduled charging and/or climate for the vehicle.
+
+        ``None`` option fields mean "leave unchanged": the library resolves
+        them from the vehicle's current settings. On ccNC/EV5-appMode EVs a
+        scope whose options are all ``None`` skips its endpoint entirely;
+        calling with no field set raises ``ValueError``.
+        """
         return self.api.schedule_charging_and_climate(
             self.token, self.get_vehicle(vehicle_id), options
         )
@@ -281,6 +415,16 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.DEACTIVATE
         )
 
+    def set_vehicle_to_load_discharge_limit(self, vehicle_id: str, limit: int) -> str:
+        return self.api.set_vehicle_to_load_discharge_limit(
+            self.token, self.get_vehicle(vehicle_id), limit
+        )
+
+    def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
+        return self.api.set_navigation(
+            self.token, self.get_vehicle(vehicle_id), poi_list
+        )
+
     @staticmethod
     def get_implementation_by_region_brand(
         region: int, brand: int, language: str
@@ -289,6 +433,12 @@ class VehicleManager:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
             return KiaUvoApiEU(region, brand, language)
+        elif REGIONS[region] == REGION_EUROPE_CCI:
+            if BRANDS[brand] == BRAND_KIA:
+                return KiaCciApiEU(region, brand, language)
+            if BRANDS[brand] == BRAND_GENESIS:
+                return GenesisCciApiEU(region, brand, language)
+            return HyundaiCciApiEU(region, brand, language)
         elif REGIONS[region] == REGION_USA and (
             BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
         ):
@@ -299,5 +449,16 @@ class VehicleManager:
             return KiaUvoApiCN(region, brand, language)
         elif REGIONS[region] == REGION_AUSTRALIA:
             return KiaUvoApiAU(region, brand, language)
+        elif REGIONS[region] == REGION_NZ:
+            if BRANDS[brand] == BRAND_KIA:
+                return KiaUvoApiAU(region, brand, language)
+            else:
+                raise APIError(
+                    f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
+                )
+        elif REGIONS[region] == REGION_INDIA:
+            return KiaUvoApiIN(region, brand, language)
+        elif REGIONS[region] == REGION_BRAZIL:
+            return HyundaiBlueLinkApiBR(region, brand, language)
         else:
             raise APIError(f"Unknown region {region}")

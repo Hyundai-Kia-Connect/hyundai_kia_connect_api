@@ -1,0 +1,389 @@
+{
+    "_fixture_meta": {
+        "status": "captured in kia_uvo discussion #1909; eu_hyundai_gspa_ioniq_5_2022_stored_status",
+        "follow_up_sources": "none",
+        "not_captured": [
+            "gspa driving-info/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
+            "gspa driving-history/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
+            "gspa device-info/vehicles/{carId}/software-version (no capture — answered 503; the update path logs and continues)",
+            "gspa mru/vehicles/{carId}/ota-updates (no capture — answered 503; the update path logs and continues)"
+        ],
+        "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Hyundai Ioniq 5 + 2022, ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (KipK 19.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",
+        "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (KipK 19.10)"
+    },
+    "implementation": {
+        "region": "Europe (CCI/GSPA)",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 2
+    },
+    "responses": {
+        "GET /gspa/v1/status/vehicles/VEHICLE-1/stored-status": {
+            "status": 200,
+            "body": {
+                "data": {
+                    "serviceNo": "RVS-K",
+                    "lastUpdateTime": "1792419702137",
+                    "state": {
+                        "Vehicle": {
+                            "DrivingReady": 0,
+                            "Location": {
+                                "GeoCoord": {
+                                    "Latitude": 0.0,
+                                    "Longitude": 0.0,
+                                    "Type": 0,
+                                    "Altitude": 0.0
+                                },
+                                "Speed": {
+                                    "Value": 0,
+                                    "Unit": 0
+                                },
+                                "TimeStamp": {
+                                    "Year": 2026,
+                                    "Mon": 10,
+                                    "Day": 19,
+                                    "Hour": 11,
+                                    "Min": 18,
+                                    "Sec": 45
+                                },
+                                "Date": "20261019111845.000",
+                                "Offset": 2
+                            },
+                            "Body": {
+                                "Windshield": {
+                                    "Front": {
+                                        "Defog": {
+                                            "State": 0
+                                        },
+                                        "WasherFluid": {
+                                            "LevelLow": 0
+                                        }
+                                    },
+                                    "Rear": {
+                                        "Defog": {
+                                            "State": 0
+                                        }
+                                    }
+                                },
+                                "Hood": {
+                                    "Open": 0
+                                },
+                                "Lights": {
+                                    "Rear": {
+                                        "Right": {
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            },
+                                            "StopLamp": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "Left": {
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            },
+                                            "StopLamp": {
+                                                "Warning": 0
+                                            }
+                                        }
+                                    },
+                                    "Front": {
+                                        "Right": {
+                                            "High": {
+                                                "Warning": 0
+                                            },
+                                            "Low": {
+                                                "Warning": 0
+                                            },
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "Left": {
+                                            "High": {
+                                                "Warning": 0
+                                            },
+                                            "Low": {
+                                                "Warning": 0
+                                            },
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "HeadLamp": {
+                                            "SystemWarning": 0
+                                        }
+                                    },
+                                    "DischargeAlert": {
+                                        "State": 0
+                                    },
+                                    "TailLamp": {
+                                        "Alert": 0
+                                    },
+                                    "Hazard": {
+                                        "Alert": 0
+                                    }
+                                },
+                                "Trunk": {
+                                    "Open": 0
+                                }
+                            },
+                            "Cabin": {
+                                "SteeringWheel": {
+                                    "Heat": {
+                                        "State": 0
+                                    }
+                                },
+                                "HVAC": {
+                                    "Row1": {
+                                        "Driver": {
+                                            "Temperature": {
+                                                "Value": "15.0",
+                                                "Unit": 0
+                                            },
+                                            "Blower": {
+                                                "SpeedLevel": 0
+                                            }
+                                        }
+                                    },
+                                    "Temperature": {
+                                        "RangeType": 1
+                                    }
+                                },
+                                "Door": {
+                                    "Row2": {
+                                        "Right": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        },
+                                        "Left": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        }
+                                    },
+                                    "Row1": {
+                                        "Passenger": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        },
+                                        "Driver": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        }
+                                    }
+                                }
+                            },
+                            "Chassis": {
+                                "Axle": {
+                                    "Tire": {
+                                        "PressureLow": 0
+                                    },
+                                    "Row1": {
+                                        "Left": {
+                                            "Tire": {
+                                                "PressureLow": 0
+                                            }
+                                        },
+                                        "Right": {
+                                            "Tire": {
+                                                "PressureLow": 0
+                                            }
+                                        }
+                                    },
+                                    "Row2": {
+                                        "Left": {
+                                            "Tire": {
+                                                "PressureLow": 0
+                                            }
+                                        },
+                                        "Right": {
+                                            "Tire": {
+                                                "PressureLow": 0
+                                            }
+                                        }
+                                    }
+                                },
+                                "Brake": {
+                                    "Fluid": {
+                                        "Warning": 0
+                                    }
+                                }
+                            },
+                            "Drivetrain": {
+                                "Transmission": {
+                                    "ParkingPosition": 0
+                                },
+                                "FuelSystem": {
+                                    "DTE": {
+                                        "EV": 292,
+                                        "Unit": 1,
+                                        "Total": 292
+                                    }
+                                },
+                                "Odometer": 44082.4
+                            },
+                            "Electronics": {
+                                "PowerSupply": {
+                                    "Ignition3": 1,
+                                    "Accessory": 0
+                                },
+                                "Battery": {
+                                    "Charging": {
+                                        "WarningLevel": 65
+                                    },
+                                    "Level": 71,
+                                    "SensorReliability": 0
+                                },
+                                "FOB": {
+                                    "LowBattery": 0
+                                },
+                                "AutoCut": {
+                                    "DeliveryMode": 0,
+                                    "PowerMode": 2,
+                                    "BatteryPreWarning": 0
+                                }
+                            },
+                            "Green": {
+                                "Electric": {
+                                    "SmartGrid": {
+                                        "RealTimePower": 0
+                                    }
+                                },
+                                "Reservation": {
+                                    "OffPeakTime": {
+                                        "Mode": 0,
+                                        "EndMin": 0,
+                                        "EndHour": 0,
+                                        "StartMin": 0,
+                                        "StartHour": 0
+                                    },
+                                    "Departure": {
+                                        "Climate": {
+                                            "TemperatureUnit": 0,
+                                            "Temperature": "OFF",
+                                            "Activation": 0,
+                                            "Defrost": 0
+                                        },
+                                        "Climate2": {
+                                            "TemperatureUnit": 0,
+                                            "Temperature": "OFF",
+                                            "Activation": 0,
+                                            "Defrost": 0
+                                        },
+                                        "Schedule2": {
+                                            "Min": 0,
+                                            "Hour": 0,
+                                            "Sun": 0,
+                                            "Sat": 0,
+                                            "Fri": 0,
+                                            "Thu": 0,
+                                            "Wed": 0,
+                                            "Tue": 0,
+                                            "Mon": 0,
+                                            "Enable": 0
+                                        },
+                                        "Schedule1": {
+                                            "Min": 0,
+                                            "Hour": 0,
+                                            "Sun": 0,
+                                            "Sat": 0,
+                                            "Fri": 0,
+                                            "Thu": 0,
+                                            "Wed": 0,
+                                            "Tue": 0,
+                                            "Mon": 0,
+                                            "Enable": 0
+                                        }
+                                    }
+                                },
+                                "BatteryManagement": {
+                                    "BatteryRemain": {
+                                        "Ratio": 72
+                                    },
+                                    "BatteryConditioning": 0,
+                                    "SoH": {
+                                        "Ratio": 0
+                                    }
+                                },
+                                "ChargingDoor": {
+                                    "State": 2
+                                },
+                                "ChargingInformation": {
+                                    "TargetSoC": {
+                                        "Standard": 90,
+                                        "Quick": 90
+                                    },
+                                    "ExpectedTime": {
+                                        "EndMin": 0,
+                                        "EndHour": 0,
+                                        "EndDay": 0,
+                                        "StartMin": 0,
+                                        "StartHour": 0,
+                                        "StartDay": 0
+                                    },
+                                    "Charging": {
+                                        "RemainTime": 75,
+                                        "State": 0,
+                                        "RemainTimeUnit": 1
+                                    },
+                                    "SequenceDetails": 501,
+                                    "SequenceSubcode": -1,
+                                    "ConnectorFastening": {
+                                        "State": 0
+                                    },
+                                    "DTE": {
+                                        "TargetSoC": {
+                                            "Standard": 369,
+                                            "Quick": 369
+                                        }
+                                    },
+                                    "EstimatedTime": {
+                                        "Quick": 18,
+                                        "ICCB": 290,
+                                        "Standard": 75
+                                    }
+                                }
+                            },
+                            "Service": {
+                                "ConnectedCar": {
+                                    "RemoteControl": {
+                                        "Available": 1,
+                                        "WaitingTime": 168
+                                    }
+                                }
+                            },
+                            "RemoteControl": {
+                                "SleepMode": 0
+                            },
+                            "Date": "20261019142142.097"
+                        }
+                    }
+                },
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000"
+                }
+            }
+        },
+        "GET /gspa/v1/driving-info/vehicles/VEHICLE-1": {
+            "status": 503,
+            "body": null
+        },
+        "GET /gspa/v1/driving-history/vehicles/VEHICLE-1": {
+            "status": 503,
+            "body": null
+        },
+        "GET /gspa/v1/device-info/vehicles/VEHICLE-1/software-version": {
+            "status": 503,
+            "body": null
+        },
+        "GET /gspa/v1/mru/vehicles/VEHICLE-1/ota-updates": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

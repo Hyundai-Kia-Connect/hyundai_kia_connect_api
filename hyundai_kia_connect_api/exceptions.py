@@ -8,7 +8,11 @@ class HyundaiKiaException(Exception):
     Generic hyundaiKiaException exception.
     """
 
-    pass
+
+class PINMissingError(HyundaiKiaException):
+    """
+    Raised upon receipt of an authentication error.
+    """
 
 
 class AuthenticationError(HyundaiKiaException):
@@ -16,7 +20,47 @@ class AuthenticationError(HyundaiKiaException):
     Raised upon receipt of an authentication error.
     """
 
-    pass
+
+class AuthenticationBlockedError(AuthenticationError):
+    """The identity provider blocked the authorization request."""
+
+
+class AuthenticationCertificateError(AuthenticationError):
+    """The identity provider certificate could not be retrieved."""
+
+
+class AuthenticationSigninError(AuthenticationError):
+    """The identity provider rejected the sign-in response."""
+
+
+class AuthenticationTokenExpiredError(AuthenticationError):
+    """The authentication token has expired."""
+
+
+class AuthenticationInvalidCredentialsError(AuthenticationSigninError):
+    """The supplied username or password was rejected."""
+
+
+class AuthenticationRedirectError(AuthenticationError):
+    """The sign-in flow returned an unexpected redirect."""
+
+
+class AuthenticationTokenExchangeError(AuthenticationError):
+    """The token exchange was unsuccessful."""
+
+
+class AuthenticationCciTokenExchangeError(AuthenticationTokenExchangeError):
+    """The CCI token exchange was unsuccessful."""
+
+
+class AuthenticationCcsTokenExchangeError(AuthenticationTokenExchangeError):
+    """The CCS token exchange was unsuccessful."""
+
+
+class AuthenticationOTPRequired(AuthenticationError):
+    """
+    Raised when OTP is required for authentication.
+    """
 
 
 class APIError(HyundaiKiaException):
@@ -24,23 +68,17 @@ class APIError(HyundaiKiaException):
     Generic API error
     """
 
-    pass
-
 
 class DeviceIDError(APIError):
     """
     Raised upon receipt of an Invalid Device ID error.
     """
 
-    pass
-
 
 class RateLimitingError(APIError):
     """
     Raised when we get rate limited by the server
     """
-
-    pass
 
 
 class NoDataFound(APIError):
@@ -49,15 +87,11 @@ class NoDataFound(APIError):
     Disabling the car is the solution.
     """
 
-    pass
-
 
 class ServiceTemporaryUnavailable(APIError):
     """
     Raised when Service Temporary Unavailable
     """
-
-    pass
 
 
 class DuplicateRequestError(APIError):
@@ -66,7 +100,19 @@ class DuplicateRequestError(APIError):
     and the server temporarily rejects requests.
     """
 
-    pass
+
+class SafetyAcknowledgmentError(APIError):
+    """
+    Raised when a safety-critical command requires explicit user acknowledgment
+    before it can be executed (e.g. SVM/Find My Car capture).
+    """
+
+
+class UnsupportedControlError(APIError):
+    """
+    Raised when the vehicle does not support the requested control action.
+    API returns resCode 4005 for unsupported actions (e.g. stop_climate on HEV).
+    """
 
 
 class RequestTimeoutError(APIError):
@@ -74,12 +120,17 @@ class RequestTimeoutError(APIError):
     Raised when (supposedly) the server fails to establish a connection with the car.
     """
 
-    pass
-
 
 class InvalidAPIResponseError(APIError):
     """
     Raised upon receipt of an invalid API response.
     """
 
-    pass
+
+class ConsentRequiredError(AuthenticationError):
+    """
+    Raised when the OAuth signin succeeds but the user must accept
+    a consent/authorization page before tokens can be issued.
+    This typically means the user needs to log in via a browser once
+    to accept terms, then use the refresh token going forward.
+    """

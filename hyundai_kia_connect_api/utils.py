@@ -2,10 +2,35 @@
 """utils.py"""
 
 import datetime
+import logging
 import re
+from enum import IntEnum
+from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 
-def get_child_value(data, key):
+def to_int_enum[T: IntEnum](
+    enum_class: type[T], value: str | int | T | None
+) -> T | None:
+    """Convert string, int, or existing IntEnum to the specified IntEnum type.
+
+    Handles "1" -> 1 -> WINDOW_STATE.OPEN conversions.
+    Returns None if value is None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, enum_class):
+        return value
+    try:
+        # Convert string to int if needed
+        int_value = int(value) if isinstance(value, str) else value
+        return enum_class(int_value)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid {enum_class.__name__} value: {value}") from e
+
+
+def get_child_value(data: Any, key: str) -> Any:
     value = data
     for x in key.split("."):
         try:
@@ -18,7 +43,24 @@ def get_child_value(data, key):
     return value
 
 
-def get_float(value):
+def window_is_open(
+    state: dict[str, Any], open_key: str, open_level_key: str
+) -> bool | None:
+    """Whether a CCS2 window is open (fully open or vented).
+
+    CCS2 status exposes ``Open`` (fully-open flag) and ``OpenLevel`` (vent
+    level). A vented window reports ``Open=0`` with ``OpenLevel>0``; that must
+    be treated as open, not closed (see issue #1215). Returns ``None`` when
+    both fields are absent so callers can distinguish "unknown" from "closed".
+    """
+    open_value = get_child_value(state, open_key)
+    open_level = get_child_value(state, open_level_key)
+    if open_value is None and open_level is None:
+        return None
+    return bool(open_value) or bool(open_level)
+
+
+def get_float(value: Any) -> Any:
     if value is None:
         return None
     if isinstance(value, float):
@@ -33,44 +75,251 @@ def get_float(value):
     return value  # original fallback
 
 
-def get_hex_temp_into_index(value):
-    if value is not None:
-        value = value.replace("H", "")
-        value = int(value, 16)
-        return value
-    else:
-        return None
-
-
-def get_index_into_hex_temp(value):
-    if value is not None:
-        value = hex(value).split("x")
-        value = value[1] + "H"
-        value = value.zfill(3).upper()
-        return value
-    else:
-        return None
-
-
-def parse_datetime(value, timezone) -> datetime.datetime:
+def float_or_none(value: str | float | None) -> float | None:
+    """Coerce to float; return None for missing or non-numeric values."""
     if value is None:
-        return datetime.datetime(2000, 1, 1, tzinfo=timezone)
-
-    value = value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
-    m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
-    return datetime.datetime(
-        year=int(m.group(1)),
-        month=int(m.group(2)),
-        day=int(m.group(3)),
-        hour=int(m.group(4)),
-        minute=int(m.group(5)),
-        second=int(m.group(6)),
-        tzinfo=timezone,
-    )
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):  # fmt: skip
+        return None
 
 
-def get_safe_local_datetime(date: datetime) -> datetime:
+def int_or_none(value: str | float | None) -> int | None:
+    """Coerce to int; return None for missing or non-numeric values."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):  # fmt: skip
+        return None
+
+
+def bool_or_none(value: Any) -> bool | None:
+    """Cast to bool, preserving None (None -> None, else bool(value)).
+
+    Use for API fields that may be absent (e.g. oil/aux warnings on vehicles
+    without the sensor) so the downstream entity is not created when unreported.
+    """
+    return None if value is None else bool(value)
+
+
+def flag_or_none(value: Any) -> bool | None:
+    """Map a 0/1 status flag to bool; any other value is unknown (None).
+
+    CCS2 reports features the car lacks with other codes, e.g. a PV5 without
+    a sunroof sends ``Body.Sunroof.Glass.Open = 2`` (see issue #1457).
+    """
+    if value in (0, 1):
+        return bool(value)
+    return None
+
+
+def pressure_or_none(value: float | None) -> int | float | None:
+    """Return a tire pressure raw value, or None if it's the no-reading sentinel.
+
+    None passes through; 255 (0xFF, TPMS "no reading" — the CCS2 status returns
+    it for all tires when the sensors haven't reported yet, e.g. car off / before
+    driving) -> None; everything else is returned as-is for the caller to scale.
+    With any unit's scale 255 yields an impossible value (25.5 bar / 255 psi /
+    1275 kPa), so it must surface as unknown. ``PressureLow`` already flags
+    actual low/flat tires, so 0 is NOT treated as a sentinel. See kia_uvo #1783,
+    API #1232.
+    """
+    if value is None or value == 255:
+        return None
+    return value
+
+
+def ccs2_reservation_time_or_none(hour: Any, minute: Any) -> datetime.time | None:
+    """Parse a CCS2 Green.Reservation time field (OffPeakTime, Schedule{1,2}).
+
+    The API uses out-of-range values ``31:70`` (hour=31, minute=70, Mode=0)
+    as the "unconfigured" default on ccNC EVs (Kia EV3 AU/EU, #1269,
+    kia_uvo #1108); that must resolve to None silently rather than spam HA
+    logs as a malformed-block warning. ``hour``/``minute`` None (stub block,
+    e.g. EV9 ``Schedule={"Enable": False}``) also -> None. A genuine type
+    error (string in a numeric field) raises so the caller can warn — that
+    is a real API breakage, not the known sentinel.
+    """
+    if hour is None or minute is None:
+        return None
+    h, m = int(hour), int(minute)  # raises on string/null -> caller warns
+    if h > 23 or m > 59 or h < 0 or m < 0:
+        return None  # sentinel 31:70 — unconfigured, not malformed
+    return datetime.time(h, m)
+
+
+def normalize_battery_soc(
+    value: float | None,
+    sensor_reliability: int | None = None,
+) -> int | None:
+    """Normalize 12V auxiliary battery state-of-charge.
+
+    Returns None when the car reports an unavailable or unreliable reading:
+    - sensor_reliability == 1  (CCS2 flag: "sensor unreliable")
+    - value is None
+    - value outside 0..100 (sentinel 0xFF=255, -1, etc.)
+
+    Otherwise returns int(value). A warning is logged only for out-of-range
+    sentinels (not for sensor_reliability==1, which is an expected state after
+    12V reset or during an ICCU failure on IONIQ 5 / Kia EV).
+    """
+    if sensor_reliability == 1:
+        return None
+    if value is None:
+        return None
+    if value < 0 or value > 100:
+        _LOGGER.warning(
+            "Invalid 12V auxiliary battery SOC value %s (expected 0..100); "
+            "treating as unavailable. A persistent 255/0xFF reading on "
+            "IONIQ 5 / Kia EV can be an early symptom of ICCU failure — "
+            "see kia_uvo#1771.",
+            value,
+        )
+        return None
+    return int(value)
+
+
+def normalize_battery_soh(value: Any) -> Any:
+    """Return an EV battery state of health, or None if it isn't a real reading.
+
+    Vehicles that don't report it send 0, and some send 255 (0xFF), so only
+    values in (0, 100] are kept. See kia_uvo #1935.
+    """
+    soh = float_or_none(value)
+    if soh is None or not 0 < soh <= 100:
+        return None
+    return value
+
+
+def get_hex_temp_into_index(value: str | None) -> int | None:
+    if value is not None:
+        return int(value.replace("H", ""), 16)
+    else:
+        return None
+
+
+def get_index_into_hex_temp(value: int | None) -> str | None:
+    if value is not None:
+        return (hex(value).split("x")[1] + "H").zfill(3).upper()
+    else:
+        return None
+
+
+def parse_datetime(
+    value: str | None, timezone: datetime.tzinfo | None
+) -> datetime.datetime | None:
+    """Parse an API timestamp into an aware datetime.
+
+    The two accepted formats are not equivalent. "Tue, 24 Jun 2025 16:18:10
+    GMT" states its own zone, so it is read as UTC and converted into
+    ``timezone``. The compact "20250624161810" states no zone, so it is only
+    labelled with ``timezone``; no conversion happens. A caller whose compact
+    value is UTC must therefore pass ``datetime.UTC`` and convert itself
+    (see the CCS2 'Date' field, #1147).
+    """
+    # Missing timestamp must surface as None (HA renders "unknown") rather than
+    # a 2000-01-01 sentinel that renders as "27 years ago". See kia_uvo #1771.
+    if value is None:
+        return None
+
+    # Try parsing the new format: Tue, 24 Jun 2025 16:18:10 GMT
+    try:
+        dt_object = datetime.datetime.strptime(value, "%a, %d %b %Y %H:%M:%S GMT")
+
+        if timezone:
+            # First, make it aware of UTC since 'GMT' implies UTC
+            utc_dt = dt_object.replace(tzinfo=datetime.UTC)
+            # Then convert to the target timezone
+            return utc_dt.astimezone(timezone)
+        else:
+            return dt_object
+    except ValueError:
+        # If the new format parsing fails, try the old format
+        value = (
+            value.replace("-", "").replace("T", "").replace(":", "").replace("Z", "")
+        )
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", value)
+        if m:
+            return datetime.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=timezone,
+            )
+        else:
+            raise ValueError(f"Unable to parse datetime value: {value}")
+
+
+def get_safe_local_datetime(
+    date: datetime.datetime | None,
+) -> datetime.datetime | None:
     """get safe local datetime"""
     if date is not None and hasattr(date, "tzinfo") and date.tzinfo is not None:
         date = date.astimezone()
     return date
+
+
+def detect_timezone_for_date(
+    date: datetime.datetime,
+    ref_date: datetime.datetime,
+    timezones: list[datetime.timezone],
+) -> datetime.timezone | None:
+    """
+    Guess an appropriate timezone given a date with an unknown timezone and a
+    nearby reference time in any valid timezone.
+    """
+    for tz in timezones:
+        delta = (ref_date - date.replace(tzinfo=tz)).total_seconds()
+        # Timezones differing by half an hour exist, 20 minutes should hopefully
+        # be enough to cover clock skew and API processing times.
+        if abs(delta) < 20 * 60:
+            return tz
+    return None
+
+
+def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime | None:
+    """Parse date string in format YYYYMMDD or YYYYMMDDHHMMSS to datetime.
+
+    Used by Brazilian API to parse date strings.
+
+    Args:
+        date_string: Date string in format YYYYMMDD or YYYYMMDDHHMMSS
+        tz: Timezone to apply to the parsed datetime
+
+    Returns:
+        Parsed datetime object with timezone, or None if parsing fails
+    """
+    if not date_string:
+        return None
+
+    # Try full datetime format first (YYYYMMDDHHMMSS)
+    if len(date_string) >= 14:
+        m = re.match(r"(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})", date_string)
+        if m:
+            return datetime.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                hour=int(m.group(4)),
+                minute=int(m.group(5)),
+                second=int(m.group(6)),
+                tzinfo=tz,
+            )
+
+    # Try date only format (YYYYMMDD)
+    if len(date_string) >= 8:
+        m = re.match(r"(\d{4})(\d{2})(\d{2})", date_string)
+        if m:
+            return datetime.datetime(
+                year=int(m.group(1)),
+                month=int(m.group(2)),
+                day=int(m.group(3)),
+                tzinfo=tz,
+            )
+
+    return None

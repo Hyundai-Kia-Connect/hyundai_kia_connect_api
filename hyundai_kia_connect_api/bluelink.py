@@ -3,18 +3,27 @@
 """Connects to the Bluelink API and query the vehicle."""
 
 import argparse
+import dataclasses
 import datetime
 import json
 import logging
 import os
 import sys
 import textwrap
+from typing import Any
 
 import hyundai_kia_connect_api
 from hyundai_kia_connect_api import const
 
 
-def print_vehicle(vehicle):
+class EnhancedJSONEncoder(json.JSONEncoder):
+    def default(self, o: Any) -> Any:
+        if dataclasses.is_dataclass(o) and not isinstance(o, type):
+            return dataclasses.asdict(o)
+        return super().default(o)
+
+
+def print_vehicle(vehicle: hyundai_kia_connect_api.Vehicle) -> None:
     print("Identification")
     print("  id:", vehicle.id)
     print("  name:", vehicle.name)
@@ -193,10 +202,15 @@ def print_vehicle(vehicle):
     print("  month_trip_info:", vehicle.month_trip_info)
     print("  day_trip_info:", vehicle.day_trip_info)
     print("Debug")
-    print(textwrap.indent(json.dumps(vehicle.data, indent=2, sort_keys=True), " "))
+    print(
+        textwrap.indent(
+            json.dumps(vehicle.data, indent=2, sort_keys=True, cls=EnhancedJSONEncoder),
+            " ",
+        )
+    )
 
 
-def vehicle_to_dict(vehicle):
+def vehicle_to_dict(vehicle: hyundai_kia_connect_api.Vehicle) -> dict[str, Any]:
     return {
         "identification": {
             "id": vehicle.id,
@@ -362,13 +376,15 @@ def vehicle_to_dict(vehicle):
 
 
 class DateTimeEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, (datetime.date, datetime.datetime)):
             return obj.isoformat()
 
 
-def cmd_info(vm, args):
-    for vehicle_id, vehicle in vm.vehicles.items():
+def cmd_info(
+    vm: hyundai_kia_connect_api.VehicleManager, args: argparse.Namespace
+) -> int:
+    for vehicle in vm.vehicles.values():
         print_vehicle(vehicle)
     if args.json:
         data = {id: vehicle_to_dict(v) for id, v in vm.vehicles.items()}
@@ -376,7 +392,7 @@ def cmd_info(vm, args):
     return 0
 
 
-def main():
+def main() -> int:
     default_username = os.environ.get("BLUELINK_USERNAME", "")
     default_password = os.environ.get("BLUELINK_PASSWORD", "")
     default_pin = None
@@ -435,8 +451,8 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.ERROR)
 
     # Reverse lookup.
-    region = [k for k, v in const.REGIONS.items() if v == args.region][0]
-    brand = [k for k, v in const.BRANDS.items() if v == args.brand][0]
+    region = next(k for k, v in const.REGIONS.items() if v == args.region)
+    brand = next(k for k, v in const.BRANDS.items() if v == args.brand)
 
     vm = hyundai_kia_connect_api.VehicleManager(
         region=region,
@@ -447,10 +463,10 @@ def main():
         geocode_api_enable=True,
         geocode_api_use_email=True,
     )
-    # TODO: Cache token.
     vm.check_and_refresh_token()
     vm.update_all_vehicles_with_cached_state()
-    return args.func(vm, args)
+    result: int = args.func(vm, args)
+    return result
 
 
 if __name__ == "__main__":

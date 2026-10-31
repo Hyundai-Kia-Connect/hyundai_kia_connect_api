@@ -1,87 +1,154 @@
 """KiaUvoAPIUSA.py"""
 
-# pylint:disable=logging-fstring-interpolation,unused-argument,missing-timeout,bare-except,missing-function-docstring,invalid-name,unnecessary-pass,broad-exception-raised
+# pylint:disable=logging-fstring-interpolation,unused-argument,bare-except,missing-function-docstring,invalid-name,unnecessary-pass,broad-exception-raised
 import datetime as dt
 import logging
-import random
-import secrets
 import ssl
-import string
 import time
-import typing
+import uuid
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any, cast
 
 import certifi
-import pytz
-import requests
 from requests import RequestException, Response
-from requests.adapters import HTTPAdapter
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
-from .ApiImpl import ApiImpl, ClimateRequestOptions
-from .Token import Token
-from .Vehicle import Vehicle
+from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
 from .const import (
     DISTANCE_UNITS,
     DOMAIN,
+    ENGINE_TYPES,
     LOGIN_TOKEN_LIFETIME,
-    OrderStatus,
+    ORDER_STATUS,
+    OTP_NOTIFY_TYPE,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
 )
-from .utils import get_child_value, parse_datetime
+from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .Token import Token
+from .utils import get_child_value, normalize_battery_soc, parse_datetime
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
 
-# This is the key part of our patch. We get the standard SSLContext that requests would
-# normally use, and add ciphers that Kia USA may need for compatibility.
+def create_kia_tls12_context() -> ssl.SSLContext:
+    """An SSL context pinned exactly to TLS 1.2 with the legacy ciphers
+    Kia USA requires (see CIPHERS in HyundaiBlueLinkApiUSA)."""
+    context = create_urllib3_context(
+        ciphers="DEFAULT:@SECLEVEL=1",
+        ssl_minimum_version=ssl.TLSVersion.TLSv1_2,
+        ssl_maximum_version=ssl.TLSVersion.TLSv1_2,
+    )
+    context.options |= 0x4
+    return context
+
+
+class _KiaTls12Connection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards.
+    """
+
+    def connect(self) -> None:
+        self.ssl_context = create_kia_tls12_context()
+        super().connect()
+
+
+class _KiaTls12ConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _KiaTls12Connection
+
+
+class _KiaTls12PoolManager(PoolManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
+class _KiaTls12ProxyManager(ProxyManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _KiaTls12ConnectionPool,
+        }
+
+
 class KiaSSLAdapter(HTTPAdapter):
-    def init_poolmanager(self, *args, **kwargs):
-        context = create_urllib3_context(
-            ciphers="DEFAULT:@SECLEVEL=1", ssl_version=ssl.PROTOCOL_TLSv1_2
-        )
-        context.options |= 0x4
-        kwargs["ssl_context"] = context
+    """An HTTPAdapter mounting pools whose connections pin Kia USA's TLS
+    1.2 legacy-cipher setup (see _KiaTls12Connection for why)."""
+
+    def init_poolmanager(
+        self,
+        connections: int = DEFAULT_POOLSIZE,
+        maxsize: int = DEFAULT_POOLSIZE,
+        block: bool = DEFAULT_POOLBLOCK,
+        **kwargs: Any,
+    ) -> None:
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _KiaTls12PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
+
+    def proxy_manager_for(self, proxy: str, **kwargs: Any) -> Any:
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _KiaTls12ProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=DEFAULT_POOLSIZE,
+            maxsize=DEFAULT_POOLSIZE,
+            block=DEFAULT_POOLBLOCK,
+            **kwargs,
+        )
+        return manager
 
 
-class AuthError(RequestException):
-    """AuthError"""
-
-    pass
-
-
-def request_with_active_session(func):
-    def request_with_active_session_wrapper(*args, **kwargs):
+def request_with_active_session[F: Callable[..., Any]](func: F) -> F:
+    def request_with_active_session_wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
-        except AuthError:
+        except AuthenticationError:
             _LOGGER.debug(
                 f"{DOMAIN} - Got invalid session, attempting to repair and resend"
             )
             self = args[0]
             token = kwargs["token"]
             vehicle = kwargs["vehicle"]
-            new_token = self.login(token.username, token.password)
-            _LOGGER.debug(
-                f"{DOMAIN} - Old token:{token.access_token}, new token:{new_token.access_token}"  # noqa
+            new_token = self.login(
+                token.username, token.password, pin=token.pin, token=token
             )
             token.access_token = new_token.access_token
+            token.refresh_token = new_token.refresh_token
             token.valid_until = new_token.valid_until
             json_body = kwargs.get("json_body", None)
-            vehicle = self.refresh_vehicles(token, vehicle)
+            self.refresh_vehicles(token, vehicle)
             if json_body is not None and json_body.get("vinKey", None):
                 json_body["vinKey"] = [vehicle.key]
             response = func(*args, **kwargs)
             return response
 
-    return request_with_active_session_wrapper
+    return cast(F, request_with_active_session_wrapper)
 
 
-def request_with_logging(func):
-    def request_with_logging_wrapper(*args, **kwargs):
+def request_with_logging[F: Callable[..., Any]](func: F) -> F:
+    def request_with_logging_wrapper(*args: Any, **kwargs: Any) -> Any:
         url = kwargs["url"]
         json_body = kwargs.get("json_body")
         if json_body is not None:
@@ -99,69 +166,96 @@ def request_with_logging(func):
             and response_json["status"]["errorCode"] in [1003, 1005]
         ):
             _LOGGER.debug(f"{DOMAIN} - Error: session invalid")
-            raise AuthError
+            raise AuthenticationError("Session invalid")
         _LOGGER.error(f"{DOMAIN} - Error: unknown error response {response.text}")
         raise RequestException
 
-    return request_with_logging_wrapper
+    return cast(F, request_with_logging_wrapper)
+
+
+def _retry_on_auth_error[F: Callable[..., Any]](func: F) -> F:
+    """Token-only retry decorator: re-login and retry once on AuthenticationError.
+
+    Symmetric with request_with_active_session but for methods that only take
+    a token (get_vehicles / refresh_vehicles). No threading.Lock, matching
+    request_with_active_session's concurrency behavior.
+    """
+
+    def _retry_on_auth_error_wrapper(
+        self: Any, token: Token, *args: Any, **kwargs: Any
+    ) -> Any:
+        try:
+            return func(self, token, *args, **kwargs)
+        except AuthenticationError:
+            _LOGGER.debug(
+                f"{DOMAIN} - Session expired during {func.__name__}, re-logging in"
+            )
+            try:
+                new_token = self.login(
+                    token.username, token.password, pin=token.pin, token=token
+                )
+            except Exception as e:
+                raise AuthenticationError(f"Re-login failed: {e}") from e
+            if isinstance(new_token, OTPRequest):
+                raise AuthenticationOTPRequired("OTP required to refresh token")
+            token.access_token = new_token.access_token
+            token.refresh_token = new_token.refresh_token
+            token.valid_until = new_token.valid_until
+            return func(self, token, *args, **kwargs)
+
+    return cast(F, _retry_on_auth_error_wrapper)
 
 
 class KiaUvoApiUSA(ApiImpl):
     """KiaUvoApiUSA"""
 
-    def __init__(self, region: int, brand: int, language) -> None:
+    data_timezone = dt.UTC
+    temperature_range = range(62, 83)
+
+    def __init__(self, region: int, brand: int, language: str) -> None:
         self.LANGUAGE: str = language
-        self.temperature_range = range(62, 83)
 
         # Randomly generate a plausible device id on startup
-        self.device_id = (
-            "".join(
-                random.choice(string.ascii_letters + string.digits) for _ in range(22)
-            )
-            + ":"
-            + secrets.token_urlsafe(105)
-        )
+        self.device_id = str(uuid.uuid4()).upper()
 
         self.BASE_URL: str = "api.owners.kia.com"
         self.API_URL: str = "https://" + self.BASE_URL + "/apigw/v1/"
-        self._session = None
+        self.session = ApiImplSession()
+        self.session.mount("https://", KiaSSLAdapter())
 
-    @property
-    def session(self):
-        if not self._session:
-            self._session = requests.Session()
-            self._session.mount("https://", KiaSSLAdapter())
-        return self._session
-
-    def api_headers(self) -> dict:
+    def api_headers(self) -> dict[str, Any]:
         offset = time.localtime().tm_gmtoff / 60 / 60
+        # Generate clientuuid as hash of device_id (similar to iOS app)
+        client_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, self.device_id))
+
         headers = {
-            "content-type": "application/json;charset=UTF-8",
-            "accept": "application/json, text/plain, */*",
+            "content-type": "application/json;charset=utf-8",
+            "accept": "application/json",
             "accept-encoding": "gzip, deflate, br",
             "accept-language": "en-US,en;q=0.9",
+            "accept-charset": "utf-8",
             "apptype": "L",
-            "appversion": "7.12.1",
-            "clientid": "MWAMOBILE",
+            "appversion": "7.22.0",
+            "clientid": "SPACL716-APL",
+            "clientuuid": client_uuid,
             "from": "SPA",
             "host": self.BASE_URL,
             "language": "0",
             "offset": str(int(offset)),
-            "ostype": "Android",
-            "osversion": "11",
-            "secretkey": "98er-w34rf-ibf3-3f6h",
+            "ostype": "iOS",
+            "osversion": "15.8.5",
+            "phonebrand": "iPhone",
+            "secretkey": "sydnat-9kykci-Kuhtep-h5nK",
             "to": "APIGW",
-            "tokentype": "G",
-            "user-agent": "okhttp/4.10.0",
+            "tokentype": "A",
+            "user-agent": "KIAPrimo_iOS/37 CFNetwork/1335.0.3.4 Darwin/21.6.0",
         }
-        # Should produce something like "Mon, 18 Oct 2021 07:06:26 GMT".
-        # May require adjusting locale to en_US
-        date = datetime.now(tz=pytz.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        date = datetime.now(tz=dt.UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
         headers["date"] = date
         headers["deviceid"] = self.device_id
         return headers
 
-    def authed_api_headers(self, token: Token, vehicle: Vehicle):
+    def authed_api_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         headers = self.api_headers()
         headers["sid"] = token.access_token
         headers["vinkey"] = vehicle.key
@@ -170,7 +264,7 @@ class KiaUvoApiUSA(ApiImpl):
     @request_with_active_session
     @request_with_logging
     def post_request_with_logging_and_active_session(
-        self, token: Token, url: str, json_body: dict, vehicle: Vehicle
+        self, token: Token, url: str, json_body: dict[str, Any], vehicle: Vehicle
     ) -> Response:
         headers = self.authed_api_headers(token, vehicle)
         return self.session.post(url, json=json_body, headers=headers)
@@ -183,108 +277,283 @@ class KiaUvoApiUSA(ApiImpl):
         headers = self.authed_api_headers(token, vehicle)
         return self.session.get(url, headers=headers)
 
-    def login(self, username: str, password: str) -> Token:
-        """Login into cloud endpoints and return Token"""
+    def _send_otp(
+        self, otp_key: str | None, notify_type: str, xid: str | None
+    ) -> dict[str, Any]:
+        """Send OTP to email or phone"""
+        url = self.API_URL + "cmm/sendOTP"
+        headers = self.api_headers()
+        headers["otpkey"] = otp_key
+        headers["notifytype"] = notify_type
+        _LOGGER.debug(f"{DOMAIN} - Sending OTP to {notify_type}")
+        headers["xid"] = xid
+        response = self.session.post(url, json={}, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Send OTP Response {response.text}")
+        return cast(dict[str, Any], response.json())
 
+    def _verify_otp(
+        self, otp_key: str | None, otp_code: str, xid: str | None
+    ) -> tuple[str, str]:
+        """Verify OTP code and return sid and rmtoken"""
+        url = self.API_URL + "cmm/verifyOTP"
+        headers = self.api_headers()
+        headers["otpkey"] = otp_key
+        headers["xid"] = xid
+        data = {"otp": otp_code}
+        response = self.session.post(url, json=data, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Verify OTP Response {response.text}")
+        response_json = response.json()
+        status = response_json.get("status")
+        status = status if isinstance(status, dict) else {}
+        if status.get("statusCode"):
+            raise AuthenticationError(
+                f"OTP verification failed: {status.get('errorMessage', '')}"
+            )
+        sid = response.headers.get("sid")
+        rmtoken = response.headers.get("rmtoken")
+        if not sid or not rmtoken:
+            raise APIError(
+                f"No sid or rmtoken in OTP verification response. Headers: {response.headers}"
+            )
+        return sid, rmtoken
+
+    def _complete_login_with_otp(
+        self, username: str, password: str, sid: str, rmtoken: str
+    ) -> str:
+        """Complete login with sid and rmtoken to get final session id"""
         url = self.API_URL + "prof/authUser"
-
         data = {
-            "deviceKey": "",
+            "deviceKey": self.device_id,
             "deviceType": 2,
             "userCredential": {"userId": username, "password": password},
         }
         headers = self.api_headers()
+        headers["sid"] = sid
+        headers["rmtoken"] = rmtoken
         response = self.session.post(url, json=data, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
-        session_id = response.headers.get("sid")
-        if not session_id:
-            raise Exception(
-                f"{DOMAIN} - No session id returned in login. Response: {response.text} headers {response.headers} cookies {response.cookies}"  # noqa
-            )
-        _LOGGER.debug(f"got session id {session_id}")
-        valid_until = dt.datetime.now(pytz.utc) + LOGIN_TOKEN_LIFETIME
+        _LOGGER.debug(f"{DOMAIN} - Complete Login Response {response.text}")
+        final_sid = response.headers.get("sid")
+        if not final_sid:
+            raise APIError(f"No final sid returned. Response: {response.text}")
+        return final_sid
+
+    def send_otp(self, otp_request: OTPRequest, notify_type: OTP_NOTIFY_TYPE) -> None:
+        """Public helper to send OTP to the selected destination."""
+        self._send_otp(otp_request.otp_key, notify_type.value, otp_request.request_id)
+
+    def verify_otp_and_complete_login(
+        self,
+        username: str,
+        password: str,
+        otp_code: str,
+        otp_request: OTPRequest,
+        pin: str | None = None,
+    ) -> Token:
+        """Verify OTP and complete the login producing a Token."""
+        sid, rmtoken = self._verify_otp(
+            otp_request.otp_key, otp_code, otp_request.request_id
+        )
+        final_sid = self._complete_login_with_otp(username, password, sid, rmtoken)
+        _LOGGER.debug("OTP Successful, obtained final session id")
+        valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
         return Token(
             username=username,
             password=password,
-            access_token=session_id,
+            access_token=final_sid,
+            refresh_token=rmtoken,
             valid_until=valid_until,
+            device_id=self.device_id,
+            pin=pin,
         )
 
-    def get_vehicles(self, token: Token) -> list[Vehicle]:
-        """Return all Vehicle instances for a given Token"""
+    def login(
+        self,
+        username: str,
+        password: str,
+        pin: str | None = None,
+        token: Token | None = None,
+    ) -> Token | OTPRequest:
+        """Login into cloud endpoints and return Token
+
+        Parameters
+        ----------
+        username : str
+            User email address
+        password : str
+            User password
+        pin : str, optional
+        token : Token, optional
+            Existing token with stored rmtoken for reuse
+
+        Returns
+        -------
+        Token
+            Token object with access_token (sid) and refresh_token (rmtoken)
+        """
+        url = self.API_URL + "prof/authUser"
+        data = {
+            "deviceKey": self.device_id,
+            "deviceType": 2,
+            "userCredential": {"userId": username, "password": password},
+            "tncFlag": 1,
+        }
+        if token and getattr(token, "device_id", None):
+            self.device_id = token.device_id
+        headers = self.api_headers()
+        if token and token.refresh_token:
+            data["deviceKey"] = self.device_id
+            _LOGGER.debug(f"{DOMAIN} - Attempting login with stored Refresh Token")
+            headers["rmtoken"] = token.refresh_token
+        response = self.session.post(url, json=data, headers=headers)
+        _LOGGER.debug(f"{DOMAIN} - Sign In Response {response.text}")
+        response_json = response.json()
+        session_id = response.headers.get("sid")
+        if session_id:
+            _LOGGER.debug(f"Got session id {session_id}")
+            valid_until = dt.datetime.now(dt.UTC) + LOGIN_TOKEN_LIFETIME
+            new_token = Token(
+                username=username,
+                password=password,
+                access_token=session_id,
+                valid_until=valid_until,
+                device_id=self.device_id,
+                pin=pin,
+            )
+            if token:
+                new_token.refresh_token = token.refresh_token
+            return new_token
+        if "payload" in response_json and "otpKey" in response_json["payload"]:
+            payload = response_json["payload"]
+            if payload.get("rmTokenExpired"):
+                _LOGGER.info(f"{DOMAIN} - Stored rmtoken has expired, need new OTP")
+            return OTPRequest(
+                otp_key=payload["otpKey"],
+                request_id=response.headers.get("xid", ""),
+                email=payload.get("email"),
+                sms=payload.get("phone"),
+                has_email=bool(payload.get("hasEmail")),
+                has_sms=bool(payload.get("hasPhone")),
+            )
+        status = response_json.get("status")
+        status = status if isinstance(status, dict) else {}
+        if status.get("errorCode") == 1001:
+            raise AuthenticationError(
+                f"Invalid Email or Password: {status.get('errorMessage', '')}"
+            )
+        raise APIError(f"No session id returned in login. Response: {response.text}")
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh the token using the refresh token"""
+        return self.login(token.username, token.password, pin=token.pin, token=token)
+
+    def _get_vehicle_summary(self, token: Token) -> list[dict[str, Any]]:
         url = self.API_URL + "ownr/gvl"
         headers = self.api_headers()
         headers["sid"] = token.access_token
         response = self.session.get(url, headers=headers)
         _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         response = response.json()
+        status = response.get("status")
+        status = status if isinstance(status, dict) else {}
+        if (
+            status.get("statusCode") == 1
+            and status.get("errorType") == 1
+            and status.get("errorCode") in (1003, 1005)
+        ):
+            raise AuthenticationError("Session invalid")
+        if "payload" not in response:
+            raise APIError("Missing payload in response")
+        return cast(list[dict[str, Any]], response["payload"]["vehicleSummary"])
+
+    @_retry_on_auth_error
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Return all Vehicle instances for a given Token"""
         result = []
-        for entry in response["payload"]["vehicleSummary"]:
+        for entry in self._get_vehicle_summary(token):
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleIdentifier"],
                 name=entry["nickName"],
                 model=entry["modelName"],
                 key=entry["vehicleKey"],
+                engine_type=self._engine_type_from_fuel_type(entry.get("fuelType")),
                 timezone=self.data_timezone,
             )
             result.append(vehicle)
         return result
 
-    def refresh_vehicles(
-        self, token: Token, vehicles: typing.Union[list[Vehicle], Vehicle]
-    ) -> typing.Union[list[Vehicle], Vehicle]:
+    @staticmethod
+    def _engine_type_from_fuel_type(fuel_type: Any) -> ENGINE_TYPES | None:
+        # Only fuelType=4 (EV) is confirmed against a live Kia USA account
+        # (2020 Niro EV). Mappings for ICE/PHEV/HEV are unknown, so leave
+        # engine_type as None for those and let _update_vehicle_properties
+        # refine it from the cached state's evStatus presence.
+        if fuel_type == 4:
+            return ENGINE_TYPES.EV
+        return None
+
+    @_retry_on_auth_error
+    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle] | Vehicle) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
         """
-        url = self.API_URL + "ownr/gvl"
-        headers = self.api_headers()
-        headers["sid"] = token.access_token
-        response = self.session.get(url, headers=headers)
-        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response {response.text}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Type Passed in: {type(vehicles)}")
         _LOGGER.debug(f"{DOMAIN} - Vehicles Passed in: {vehicles}")
-
-        response = response.json()
+        summary = self._get_vehicle_summary(token)
         if isinstance(vehicles, dict):
-            for entry in response["payload"]["vehicleSummary"]:
-                if vehicles[entry["vehicleIdentifier"]]:
-                    vehicles[entry["vehicleIdentifier"]].name = entry["nickName"]
-                    vehicles[entry["vehicleIdentifier"]].model = entry["modelName"]
-                    vehicles[entry["vehicleIdentifier"]].key = entry["vehicleKey"]
+            for entry in summary:
+                vid = entry.get("vehicleIdentifier")
+                if vid is None:
+                    continue
+                vobj = vehicles.get(vid)
+                if vobj is not None:
+                    vobj.name = entry.get("nickName")
+                    vobj.model = entry.get("modelName")
+                    vobj.key = entry.get("vehicleKey")
                 else:
                     vehicle: Vehicle = Vehicle(
-                        id=entry["vehicleIdentifier"],
-                        name=entry["nickName"],
-                        model=entry["modelName"],
-                        key=entry["vehicleKey"],
+                        id=vid,
+                        name=entry.get("nickName"),
+                        model=entry.get("modelName"),
+                        key=entry.get("vehicleKey"),
                         timezone=self.data_timezone,
                     )
-                    vehicles.append(vehicle)
-                return vehicles
+                    vehicles[vid] = vehicle
         else:
             # For readability work with vehicle without s
-            vehicle = vehicles
-            for entry in response["payload"]["vehicleSummary"]:
-                if vehicle.id == entry["vehicleIdentifier"]:
-                    vehicle.name = entry["nickName"]
-                    vehicle.model = entry["modelName"]
-                    vehicle.key = entry["vehicleKey"]
-                    return vehicle
+            single = cast(Vehicle, vehicles)
+            for entry in summary:
+                if single.id == entry["vehicleIdentifier"]:
+                    single.name = entry["nickName"]
+                    single.model = entry["modelName"]
+                    single.key = entry["vehicleKey"]
 
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_cached_vehicle_state(token, vehicle)
         self._update_vehicle_properties(vehicle, state)
+        # Only EV/PHEV vehicles have charge targets; skip the /evc/gts call
+        # for ICE vehicles. engine_type is set in get_vehicles from the
+        # fuelType hint and refined in _update_vehicle_properties from the
+        # cached state (evStatus presence => EV/PHEV, gasModeRange => PHEV).
+        if vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV):
+            self._get_charge_targets(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
-        self._get_forced_vehicle_state(token, vehicle)
+        state = self._get_forced_vehicle_state(token, vehicle)
         # Force update needs work to return the correct data for processing
         # self._update_vehicle_properties(vehicle, state)
         # Temp call a cached state since we are removing this from parent logic in
         # other commits should be removed when the above is fixed
         self.update_vehicle_with_cached_state(token, vehicle)
+        # The cmm/gvi (cached) endpoint does not return targetSOC for some
+        # vehicles (e.g. 2020 Kia Niro EV), but the rems/rvs (force refresh)
+        # response does include it. Parse charge limits from the force refresh
+        # response after the cached update so they aren't lost.
+        self._update_charge_limits_from_force_refresh(vehicle, state)
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         vehicle.last_updated_at = parse_datetime(
             get_child_value(
@@ -304,9 +573,11 @@ class KiaUvoApiUSA(ApiImpl):
             get_child_value(state, "service.msopServiceOdometer"),
             DISTANCE_UNITS[3],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",  # noqa
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.batteryStatus.stateOfCharge",
+            )
         )
         vehicle.engine_is_running = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.engine"
@@ -321,7 +592,7 @@ class KiaUvoApiUSA(ApiImpl):
             air_temp = self.temperature_range[0]
         if air_temp == "HIGH":
             air_temp = self.temperature_range[-1]
-        if air_temp:
+        if air_temp not in (None, "OFF"):
             vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
         vehicle.defrost_is_on = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.defrost"
@@ -342,31 +613,15 @@ class KiaUvoApiUSA(ApiImpl):
 
         vehicle.steering_wheel_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.steeringWheel",
         )
         vehicle.back_window_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.rearWindow",
         )
         vehicle.side_mirror_heater_is_on = get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",  # noqa
-        )
-        vehicle.front_left_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.flSeatHeatState",  # noqa
-        )
-        vehicle.front_right_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.frSeatHeatState",  # noqa
-        )
-        vehicle.rear_left_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rlSeatHeatState",  # noqa
-        )
-        vehicle.rear_right_seat_heater_is_on = get_child_value(
-            state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.seatHeaterVentState.rrSeatHeatState",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.climate.heatingAccessory.sideMirror",
         )
         vehicle.is_locked = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorLock"
@@ -387,6 +642,9 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.hood_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.hood"
         )
+        vehicle.sunroof_is_open = get_child_value(
+            state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.sunroofOpen"
+        )
 
         vehicle.trunk_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.doorStatus.trunk"
@@ -404,6 +662,26 @@ class KiaUvoApiUSA(ApiImpl):
         vehicle.back_right_window_is_open = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.windowOpen.backRight"
         )
+        if vehicle.front_left_window_is_open is None:
+            vehicle.front_left_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFL",
+            )
+        if vehicle.front_right_window_is_open is None:
+            vehicle.front_right_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowFR",
+            )
+        if vehicle.back_left_window_is_open is None:
+            vehicle.back_left_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRL",
+            )
+        if vehicle.back_right_window_is_open is None:
+            vehicle.back_right_window_is_open = get_child_value(
+                state,
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.windowStatus.windowRR",
+            )
         vehicle.ev_battery_percentage = get_child_value(
             state,
             "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryStatus",
@@ -416,84 +694,116 @@ class KiaUvoApiUSA(ApiImpl):
             state,
             "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPlugin",
         )
+        vehicle.ev_charging_power = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.realTimePower",
+        )
         ChargeDict = get_child_value(
             state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC"
         )
-        try:
-            vehicle.ev_charge_limits_ac = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
-            ][-1]
-            vehicle.ev_charge_limits_dc = [
-                x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
-            ][-1]
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+        if ChargeDict is not None:
+            try:
+                ac_values = [
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 1
+                ]
+                dc_values = [
+                    x["targetSOClevel"] for x in ChargeDict if x["plugType"] == 0
+                ]
+                if (
+                    ac_values
+                    and isinstance(ac_values[-1], (int, float))
+                    and not isinstance(ac_values[-1], bool)
+                ):
+                    vehicle.ev_charge_limits_ac = int(ac_values[-1])
+                if (
+                    dc_values
+                    and isinstance(dc_values[-1], (int, float))
+                    and not isinstance(dc_values[-1], bool)
+                ):
+                    vehicle.ev_charge_limits_dc = int(dc_values[-1])
+            except Exception:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Failed to parse targetSOC from cached response. "
+                    f"Data: {ChargeDict}"
+                )
+        else:
+            # cmm/gvi does not include targetSOC for some vehicles (e.g. 2020
+            # Kia Niro EV).  Preserve any values previously set by a force
+            # refresh rather than overwriting them with None.
+            _LOGGER.debug(
+                f"{DOMAIN} - targetSOC not present in cached response. "
+                "Charge limits will be populated on next force refresh."
+            )
 
         vehicle.ev_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
                 )
             ],
         )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.timeInterval.value",
             ),
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc1.value",
             ),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc2.value",
             ),
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.remainChargeTime.0.etc3.value",
             ),
             "m",
+        )
+        vehicle.ev_battery_precondition_enabled = get_child_value(
+            state,
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.batteryPrecondition",
         )
         vehicle.total_driving_range = (
             get_child_value(
                 state,
-                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",  # noqa
+                "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
                 )
             ],
         )
         if get_child_value(
             state,
-            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+            "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
         ):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",  # noqa
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
                     )
                 ],
             )
@@ -501,12 +811,12 @@ class KiaUvoApiUSA(ApiImpl):
             vehicle.fuel_driving_range = (
                 get_child_value(
                     state,
-                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",  # noqa
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.value",
                 ),
                 DISTANCE_UNITS[
                     get_child_value(
                         state,
-                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",  # noqa
+                        "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.distanceToEmpty.unit",
                     )
                 ],
             )
@@ -542,9 +852,32 @@ class KiaUvoApiUSA(ApiImpl):
             state, "lastVehicleInfo.activeDTC.dtcCategory"
         )
 
+        if vehicle.engine_type is None:
+            # fuelType in ownr/gvl only reliably maps 4 -> EV; for anything
+            # else we infer from the cached state. Presence of an evStatus
+            # block means a high-voltage battery (EV or PHEV); absence
+            # means ICE. PHEVs additionally report a gasModeRange block,
+            # which pure EVs never do.
+            ev_status = get_child_value(
+                state, "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus"
+            )
+            if ev_status:
+                gas_mode_range = get_child_value(
+                    state,
+                    "lastVehicleInfo.vehicleStatusRpt.vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                )
+                if gas_mode_range is not None:
+                    vehicle.engine_type = ENGINE_TYPES.PHEV
+                else:
+                    vehicle.engine_type = ENGINE_TYPES.EV
+            else:
+                vehicle.engine_type = ENGINE_TYPES.ICE
+
         vehicle.data = state
 
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.API_URL + "cmm/gvi"
 
         body = {
@@ -571,12 +904,11 @@ class KiaUvoApiUSA(ApiImpl):
         )
 
         response_body = response.json()
-        return response_body["payload"]["vehicleInfoList"][0]
+        return cast(dict[str, Any], response_body["payload"]["vehicleInfoList"][0])
 
-    def get_location(self, token: Token, vehicle_id: str) -> None:
-        pass
-
-    def _get_forced_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         url = self.API_URL + "rems/rvs"
         body = {
             "requestType": 0
@@ -586,7 +918,135 @@ class KiaUvoApiUSA(ApiImpl):
             token=token, url=url, json_body=body, vehicle=vehicle
         )
         response_body = response.json()
-        return response_body
+        return cast(dict[str, Any], response_body)
+
+    def _update_charge_limits_from_force_refresh(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        """Parse targetSOC from the rems/rvs (force refresh) response.
+
+        The cmm/gvi (cached state) endpoint does not include targetSOC data
+        for some vehicles, but the rems/rvs endpoint does.  When the force
+        refresh response contains valid numeric charge limits they are
+        always used (they are the freshest source).  If the force refresh
+        response lacks valid data, any existing cached values are preserved
+        so we never overwrite good data with None.
+        """
+        charge_dict = get_child_value(
+            state,
+            "payload.vehicleStatusRpt.vehicleStatus.evStatus.targetSOC",
+        )
+        if charge_dict is None:
+            _LOGGER.debug(f"{DOMAIN} - targetSOC not found in force refresh response")
+            return
+        _LOGGER.debug(
+            f"{DOMAIN} - Found targetSOC in force refresh response: {charge_dict}"
+        )
+        try:
+            ac_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 1]
+            dc_values = [x["targetSOClevel"] for x in charge_dict if x["plugType"] == 0]
+            new_ac = ac_values[-1] if ac_values else None
+            new_dc = dc_values[-1] if dc_values else None
+
+            if isinstance(new_ac, (int, float)) and not isinstance(new_ac, bool):
+                vehicle.ev_charge_limits_ac = int(new_ac)
+            elif new_ac is not None and vehicle.ev_charge_limits_ac is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_ac})"
+                )
+            elif new_ac is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid AC charge limit "
+                    f"({new_ac!r}) and no cached value to preserve"
+                )
+
+            if isinstance(new_dc, (int, float)) and not isinstance(new_dc, bool):
+                vehicle.ev_charge_limits_dc = int(new_dc)
+            elif new_dc is not None and vehicle.ev_charge_limits_dc is not None:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}), keeping cached value "
+                    f"({vehicle.ev_charge_limits_dc})"
+                )
+            elif new_dc is not None:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Force refresh returned invalid DC charge limit "
+                    f"({new_dc!r}) and no cached value to preserve"
+                )
+
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge limits from force refresh - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception as err:
+            _LOGGER.warning(
+                f"{DOMAIN} - Failed to parse targetSOC from force refresh response: "
+                f"{err}. Data: {charge_dict}",
+                exc_info=True,
+            )
+
+    def _get_charge_targets(self, token: Token, vehicle: Vehicle) -> None:
+        """Read current charge targets via the dedicated /evc/gts endpoint.
+
+        The cmm/gvi and rems/rvs endpoints do not return targetSOC for some
+        vehicles (e.g. 2020 Kia Niro EV).  The /evc/gts endpoint reliably
+        returns the current AC and DC charge target percentages.
+
+        Note: On a freshly authenticated session, the first call to this
+        endpoint may return targetSOClevel=0 for both plug types until the
+        server populates the cache (a force refresh or a few minutes of
+        session activity is usually enough). We treat 0 as "no data" and
+        preserve any previously cached values rather than overwriting with
+        a bogus 0.  Valid charge limits are 50-100 per the chargeFeature
+        metadata (minTargetSOC=50, maxTargetSOC=100), so 0 is never a
+        legitimate value.
+        """
+        url = self.API_URL + "evc/gts"
+        try:
+            response = self.get_request_with_logging_and_active_session(
+                token=token, url=url, vehicle=vehicle
+            )
+            response_json = response.json()
+            if response_json["status"]["statusCode"] != 0:
+                _LOGGER.debug(
+                    f"{DOMAIN} - /evc/gts returned error: "
+                    f"{response_json['status']['errorMessage']}"
+                )
+                return
+            target_soc_list = response_json.get("payload", {}).get("targetSOClist")
+            if not target_soc_list:
+                _LOGGER.debug(f"{DOMAIN} - /evc/gts returned empty targetSOClist")
+                return
+            for entry in target_soc_list:
+                plug_type = entry.get("plugType")
+                level = entry.get("targetSOClevel")
+                if not isinstance(level, (int, float)) or isinstance(level, bool):
+                    continue
+                level = int(level)
+                if level <= 0:
+                    # Skip zero/negative values - typically returned on fresh
+                    # sessions before server-side cache populates. Preserve
+                    # any existing cached values instead.
+                    _LOGGER.debug(
+                        f"{DOMAIN} - /evc/gts returned level={level} for "
+                        f"plugType={plug_type}, preserving cached value"
+                    )
+                    continue
+                if plug_type == 1:
+                    vehicle.ev_charge_limits_ac = level
+                elif plug_type == 0:
+                    vehicle.ev_charge_limits_dc = level
+            _LOGGER.debug(
+                f"{DOMAIN} - Charge targets from /evc/gts - "
+                f"AC: {vehicle.ev_charge_limits_ac}, DC: {vehicle.ev_charge_limits_dc}"
+            )
+        except Exception:
+            _LOGGER.debug(
+                f"{DOMAIN} - Failed to get charge targets from /evc/gts",
+                exc_info=True,
+            )
 
     def check_action_status(
         self,
@@ -595,17 +1055,25 @@ class KiaUvoApiUSA(ApiImpl):
         action_id: str,
         synchronous: bool = False,
         timeout: int = 0,
-    ) -> OrderStatus:
+    ) -> ORDER_STATUS:
         url = self.API_URL + "cmm/gts"
         body = {"xid": action_id}
-        response = self.post_request_with_logging_and_active_session(
-            token=token, url=url, json_body=body, vehicle=vehicle
-        )
-        response_json = response.json()
-        last_action_completed = all(v == 0 for v in response_json["payload"].values())
-        return last_action_completed
+        attempts = max(1, timeout // 2) if synchronous else 1
+        for attempt in range(attempts):
+            response = self.post_request_with_logging_and_active_session(
+                token=token, url=url, json_body=body, vehicle=vehicle
+            )
+            payload = response.json()["payload"]
+            # Every pending-command counter at 0 means the action finished.
+            if all(v == 0 for v in payload.values()):
+                return ORDER_STATUS.SUCCESS
+            if attempt < attempts - 1:
+                time.sleep(2)
+        return ORDER_STATUS.TIMEOUT if synchronous else ORDER_STATUS.PENDING
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "rems/door/lock"
@@ -620,7 +1088,7 @@ class KiaUvoApiUSA(ApiImpl):
 
         return response.headers["Xid"]
 
-    def _seat_settings(self, level) -> dict:
+    def _seat_settings(self, level: int | None) -> dict[str, Any]:
         # See const.SEAT_STATUS for the list and descriptions of levels.
         #
         # The values were determined empirically, see https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/718
@@ -679,10 +1147,11 @@ class KiaUvoApiUSA(ApiImpl):
         url = self.API_URL + "rems/start"
         if options.set_temp is None:
             options.set_temp = 70
+        set_temp: float | str = options.set_temp
         if options.set_temp < 62:
-            options.set_temp = "LOW"
+            set_temp = "LOW"
         elif options.set_temp > 82:
-            options.set_temp = "HIGH"
+            set_temp = "HIGH"
         if options.climate is None:
             options.climate = True
         if options.heating is None:
@@ -698,7 +1167,7 @@ class KiaUvoApiUSA(ApiImpl):
             "remoteClimate": {
                 "airTemp": {
                     "unit": 1,
-                    "value": str(options.set_temp),
+                    "value": str(set_temp),
                 },
                 "airCtrl": options.climate,
                 "defrost": options.defrost,

@@ -1,0 +1,199 @@
+# serializer version: 1
+# name: test_vehicle_list[ca_hyundai]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/vhcllst',
+      }),
+    ]),
+    'refresh_vehicles': list([
+    ]),
+    'vehicles': dict({
+      'VEHICLE-1': dict({
+        'VIN': 'TESTVIN0000000001',
+        'dtc_count': 0,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-1',
+        'model': 'KONA EV',
+        'name': 'Kona VÉ',
+        'year': 2021,
+      }),
+      'VEHICLE-2': dict({
+        'VIN': 'TESTVIN0000000002',
+        'dtc_count': 0,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-2',
+        'name': 'KONA EV',
+        'year': 1900,
+      }),
+      'VEHICLE-3': dict({
+        'VIN': 'TESTVIN0000000003',
+        'dtc_count': 0,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-3',
+        'model': 'KONA EV',
+        'name': 'KONA EV',
+        'year': 2024,
+      }),
+    }),
+  })
+# ---
+# name: test_vehicle_list[ca_kia]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vhcllst',
+      }),
+    ]),
+    'refresh_vehicles': list([
+    ]),
+    'vehicles': dict({
+      'VEHICLE-1': dict({
+        'VIN': 'TESTVIN0000000001',
+        'dtc_count': 0,
+        'engine_type': 'ENGINE_TYPES.PHEV',
+        'id': 'VEHICLE-1',
+        'model': 'Sportage',
+        'name': 'Sportage',
+        'year': 2024,
+      }),
+    }),
+  })
+# ---
+# name: test_vehicle_list[cn_kia]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'GET',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles',
+      }),
+    ]),
+    'refresh_vehicles': list([
+    ]),
+    'vehicles': dict({
+      'VEHICLE-1': dict({
+        'VIN': 'TESTVIN0000000001',
+        'ccu_ccs2_protocol_support': 0,
+        'engine_type': 'ENGINE_TYPES.ICE',
+        'id': 'VEHICLE-1',
+        'model': '库斯途',
+        'name': '库斯途',
+        'registration_date': '2025-07-13 20:12:40.283',
+        'timezone': 'Asia/Shanghai',
+      }),
+    }),
+  })
+# ---
+# name: test_vehicle_list[eu_hyundai]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'GET',
+        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles',
+      }),
+    ]),
+    'refresh_vehicles': list([
+    ]),
+    'vehicles': dict({
+      'VEHICLE-1': dict({
+        'VIN': 'TESTVIN0000000001',
+        'ccu_ccs2_protocol_support': 0,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-1',
+        'model': 'IONIQ 5',
+        'name': 'NO_Ioniq',
+        'registration_date': '2025-01-10 16:51:44.886',
+        'timezone': 'Europe/Berlin',
+      }),
+      'VEHICLE-2': dict({
+        'VIN': 'TESTVIN0000000002',
+        'ccu_ccs2_protocol_support': 0,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-2',
+        'model': 'IONIQ 5',
+        'name': 'IONIQ 5',
+        'registration_date': '2021-09-04 14:07:51.955',
+        'timezone': 'Europe/Berlin',
+      }),
+      'VEHICLE-3': dict({
+        'VIN': 'TESTVIN0000000003',
+        'ccu_ccs2_protocol_support': 0,
+        'engine_type': 'ENGINE_TYPES.HEV',
+        'id': 'VEHICLE-3',
+        'model': 'KONA',
+        'name': 'KONA',
+        'registration_date': '2022-12-02 19:21:05.307',
+        'timezone': 'Europe/Berlin',
+      }),
+    }),
+  })
+# ---
+# name: test_vehicle_list[usa_hyundai]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'GET',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/enrollment/details/user',
+      }),
+    ]),
+    'refresh_vehicles': list([
+    ]),
+    'vehicles': dict({
+      'H00000000001VTESTVIN0000000001': dict({
+        'VIN': 'TESTVIN0000000001',
+        'engine_type': 'ENGINE_TYPES.EV',
+        'generation': 2,
+        'id': 'H00000000001VTESTVIN0000000001',
+        'model': 'IONIQ 5',
+        'name': '2023 IONIQ 5',
+        'registration_date': '20230929',
+      }),
+      'H00000000002VTESTVIN0000000002': dict({
+        'VIN': 'TESTVIN0000000002',
+        'engine_type': 'ENGINE_TYPES.ICE',
+        'generation': 2,
+        'id': 'H00000000002VTESTVIN0000000002',
+        'model': 'PALISADE',
+        'name': '2024 PALISADE',
+        'registration_date': '20230825',
+      }),
+      'H00000000003VTESTVIN0000000003': dict({
+        'VIN': 'TESTVIN0000000003',
+        'enabled': False,
+        'engine_type': 'ENGINE_TYPES.EV',
+        'generation': 2,
+        'id': 'H00000000003VTESTVIN0000000003',
+        'model': 'IONIQ ELECTRIC',
+        'name': '2020 IONIQ ELECTRIC',
+        'registration_date': '20201102',
+      }),
+    }),
+  })
+# ---
+# name: test_vehicle_list[usa_kia]
+  dict({
+    'get_vehicles': list([
+      dict({
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/ownr/gvl',
+      }),
+    ]),
+    'refresh_vehicles': list([
+      dict({
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/ownr/gvl',
+      }),
+    ]),
+    'vehicles': dict({
+      'VEHICLE-1': dict({
+        'engine_type': 'ENGINE_TYPES.EV',
+        'id': 'VEHICLE-1',
+        'key': 'KEY-1',
+        'model': 'EV6',
+        'name': 'My EV6',
+      }),
+    }),
+  })
+# ---

@@ -1,18 +1,19 @@
 name: Release
 # Controls when the workflow will run
 on:
-    # Triggers the workflow on push or pull request events but only for the master branch
-    push:
-        branches: [master]
     workflow_dispatch:
+    schedule:
+        # kia_uvo's bump-api-dependency runs at 01:30 UTC and its weekly
+        # release at 08:00 UTC Sunday; releasing first lets both pick this up.
+        - cron: "30 0 * * *"
 jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - name: Gets semantic release info
               id: semantic_release_info
-              uses: jossef/action-semantic-release-info@v2
+              uses: jossef/action-semantic-release-info@v3.0.0
               env:
                   GITHUB_TOKEN: ${{ github.token }}
             - name: Update Version and Commit
@@ -27,7 +28,7 @@ jobs:
                   git tag ${{ steps.semantic_release_info.outputs.git_tag }}
             - name: Push changes
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: ad-m/github-push-action@v0.8.0
+              uses: ad-m/github-push-action@v1.3.0
               with:
                   github_token: ${{ github.token }}
                   tags: true
@@ -52,14 +53,16 @@ jobs:
               run: python -m build
             - name: Publish package to PyPi Test
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
+              uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
               with:
                   user: __token__
                   password: ${{ secrets.TEST_PYPI_API_TOKEN }}
                   repository_url: https://test.pypi.org/legacy/
+                  verbose: true
             - name: Publish package to PyPi Live
               if: ${{steps.semantic_release_info.outputs.version != ''}}
-              uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
+              uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086
               with:
                   user: __token__
                   password: ${{ secrets.PYPI_API_TOKEN }}
+                  verbose: true

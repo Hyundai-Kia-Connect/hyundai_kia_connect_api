@@ -1,0 +1,82 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "brand": "Kia",
+        "endpoint": "POST spa/vehicles/{id}/drvhistory periodTarget=1",
+        "source": "get_driving_info responseAlltime debug log in kia_uvo #867 (e-Niro)",
+        "description": "Real response; msgId replaced."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "drivingInfo": [
+            {
+                "drivingPeriod": 0,
+                "totalPwrCsp": 1115521,
+                "motorPwrCsp": 928264,
+                "climatePwrCsp": 100012,
+                "eDPwrCsp": 87130,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 321876,
+                "calculativeOdo": 7452
+            },
+            {
+                "drivingPeriod": 1,
+                "totalPwrCsp": 12971,
+                "motorPwrCsp": 10793,
+                "climatePwrCsp": 1162,
+                "eDPwrCsp": 1013,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 3742,
+                "calculativeOdo": 86.65116279069767
+            }
+        ],
+        "drivingInfoDetail": [
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202404",
+                "totalPwrCsp": 142431,
+                "motorPwrCsp": 119215,
+                "climatePwrCsp": 9862,
+                "eDPwrCsp": 13320,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 46172,
+                "calculativeOdo": 961
+            },
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202403",
+                "totalPwrCsp": 363592,
+                "motorPwrCsp": 309325,
+                "climatePwrCsp": 25523,
+                "eDPwrCsp": 28740,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 107866,
+                "calculativeOdo": 2469
+            },
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202402",
+                "totalPwrCsp": 373199,
+                "motorPwrCsp": 309262,
+                "climatePwrCsp": 37500,
+                "eDPwrCsp": 26360,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 99634,
+                "calculativeOdo": 2429
+            },
+            {
+                "drivingPeriod": 1,
+                "drivingDate": "202401",
+                "totalPwrCsp": 236299,
+                "motorPwrCsp": 190462,
+                "climatePwrCsp": 27127,
+                "eDPwrCsp": 18710,
+                "batteryMgPwrCsp": 0,
+                "regenPwr": 68204,
+                "calculativeOdo": 1593
+            }
+        ]
+    },
+    "msgId": "MSG-1"
+}

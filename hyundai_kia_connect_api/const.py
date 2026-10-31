@@ -12,17 +12,30 @@ BRAND_HYUNDAI = "Hyundai"
 BRAND_GENESIS = "Genesis"
 BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
 
+GOOGLE = "google"
+OPENSTREETMAP = "openstreetmap"
+GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
+
 REGION_EUROPE = "Europe"
 REGION_CANADA = "Canada"
 REGION_USA = "USA"
 REGION_CHINA = "China"
 REGION_AUSTRALIA = "Australia"
+REGION_NZ = "New Zealand"
+REGION_INDIA = "India"
+REGION_BRAZIL = "Brazil"
+REGION_EUROPE_CCI = "Europe (CCI/GSPA)"
+
 REGIONS = {
     1: REGION_EUROPE,
     2: REGION_CANADA,
     3: REGION_USA,
     4: REGION_CHINA,
     5: REGION_AUSTRALIA,
+    6: REGION_INDIA,
+    7: REGION_NZ,
+    8: REGION_BRAZIL,
+    9: REGION_EUROPE_CCI,
 }
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
@@ -40,6 +53,40 @@ DISTANCE_UNITS = {
 TEMPERATURE_C = "°C"
 TEMPERATURE_F = "°F"
 TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
+
+PRESSURE_KPA = "kPa"
+PRESSURE_BAR = "bar"
+PRESSURE_PSI = "psi"
+
+
+class PressureUnit(IntEnum):
+    """Tire-pressure display unit (Chassis.Axle.Tire.PressureUnit, CCS2).
+
+    The car's tire-pressure display unit is user-selectable (psi | kPa | bar);
+    the enum maps to consecutive ints matching the car's selector order.
+    """
+
+    PSI = 0
+    KPA = 1
+    BAR = 2
+
+
+# Model B (live-confirmed EU Santa Fe 2026): raw Pressure is in the car's
+# display unit, and the scale depends on the unit:
+#   bar (PressureUnit.BAR): raw 27 -> 2.7  (x0.1, 0.1-bar steps)
+#   psi (PressureUnit.PSI): raw 38 -> 38   (x1, integer psi)
+#   kPa (PressureUnit.KPA): raw 51 -> 255   (x5, 5-kPa steps) — live-confirmed.
+PRESSURE_UNITS = {
+    PressureUnit.PSI: PRESSURE_PSI,
+    PressureUnit.KPA: PRESSURE_KPA,
+    PressureUnit.BAR: PRESSURE_BAR,
+}
+# Raw Pressure -> display-value scale per PressureUnit (model B).
+PRESSURE_SCALES = {
+    PressureUnit.PSI: 1.0,
+    PressureUnit.KPA: 5.0,
+    PressureUnit.BAR: 0.1,
+}
 
 SEAT_STATUS = {
     None: None,
@@ -72,6 +119,16 @@ class ENGINE_TYPES(Enum):
     HEV = "HEV"
 
 
+# Vehicle-list "type" codes; codes not listed leave engine_type as None.
+ENGINE_TYPES_BY_VEHICLE_TYPE = {
+    "GN": ENGINE_TYPES.ICE,
+    "EV": ENGINE_TYPES.EV,
+    "PHEV": ENGINE_TYPES.PHEV,
+    "PE": ENGINE_TYPES.PHEV,
+    "HV": ENGINE_TYPES.HEV,
+}
+
+
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
@@ -82,7 +139,7 @@ class CHARGE_PORT_ACTION(Enum):
     OPEN = "open"
 
 
-class OrderStatus(Enum):
+class ORDER_STATUS(Enum):
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"
     # order executed by vehicle and response returned
@@ -102,6 +159,26 @@ class WINDOW_STATE(IntEnum):
     VENTILATION = 2
 
 
+class CONNECTOR_FASTENING_STATE(IntEnum):
+    DISCONNECTED = 0
+    CONNECTED = 1
+    # The app SDK maps 0/1/2 (2 = Connected); state 2 has never shown up in
+    # a capture, so it stays outside the enum until named from one. An
+    # unreported or out-of-range value holds as None.
+
+
+class SEAT_LOCATION(str, Enum):
+    """Driver seat location (GSPA drvSeatLoc wire values)."""
+
+    LEFT = "L"
+    RIGHT = "R"
+
+
 class VALET_MODE_ACTION(Enum):
     ACTIVATE = "activate"
     DEACTIVATE = "deactivate"
+
+
+class OTP_NOTIFY_TYPE(Enum):
+    EMAIL = "EMAIL"
+    SMS = "SMS"

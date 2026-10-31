@@ -1,0 +1,1490 @@
+# serializer version: 1
+# name: test_vehicle_command[au_hyundai-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'close',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+          }),
+          'tempCode': '08H',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': True,
+            'heating1': 1,
+          }),
+          'tempCode': '10H',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_hyundai-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'open',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.hyundai.com.au:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[br_hyundai-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v1/user/pin',
+      }),
+      dict({
+        'body': dict({
+          'action': 'close',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v2/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[br_hyundai-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v1/user/pin',
+      }),
+      dict({
+        'body': dict({
+          'action': 'start',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'hvacType': 1,
+          'options': dict({
+            'airCtrl': 1,
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'drvSeatOptCmd': 0,
+            }),
+          }),
+          'tempCode': '15H',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v2/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[br_hyundai-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v1/user/pin',
+      }),
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v2/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[br_hyundai-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v1/user/pin',
+      }),
+      dict({
+        'body': dict({
+          'action': 'open',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://br-ccapi.hyundai.com.br/api/v2/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-lock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/drlck',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-set_charge_limits]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'tsoc': list([
+            dict({
+              'level': 90,
+              'plugType': 0,
+            }),
+            dict({
+              'level': 80,
+              'plugType': 1,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/setsoc',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-start_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rcstrt',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-start_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'hvacInfo': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-stop_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rcstp',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-stop_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rfoff',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[ca_kia-unlock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/drulck',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'close',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 1,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/user/pin',
+      }),
+      dict({
+        'body': dict({
+          'action': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v2/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[cn_kia-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'open',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.cn-ccapi.kia.com/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-lock]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-lock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-set_charge_limits]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'command': 'set',
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge-target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-start_charge]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-start_climate]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+          'hvacTemp': '21',
+          'hvacTempType': 1,
+          'ignitionDuration': 10,
+          'sideRearMirrorHeating': 0,
+          'tempUnit': 'C',
+          'windshieldFrontDefogState': False,
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-stop_charge]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-stop_climate]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_hyundai-unlock]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.hyundai.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-unlock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-lock]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-lock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-set_charge_limits]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'command': 'set',
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge-target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-start_charge]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-start_climate]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+          'hvacTemp': '21',
+          'hvacTempType': 1,
+          'ignitionDuration': 10,
+          'sideRearMirrorHeating': 0,
+          'tempUnit': 'C',
+          'windshieldFrontDefogState': False,
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-stop_charge]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-stop_climate]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_cci_kia-unlock]
+  dict({
+    'action_id': 'gspa:SID-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://cci-api-eu.kia.com/auth/v1/pin',
+      }),
+      dict({
+        'body': dict({
+          'command': 'set',
+        }),
+        'method': 'POST',
+        'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/remote/vehicles/VEHICLE-ID/door-unlock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'close',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': True,
+            'heating1': 1,
+          }),
+          'tempCode': '10H',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'open',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'close',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+          'drvSeatLoc': 'L',
+          'hvacTemp': 21,
+          'hvacTempType': 1,
+          'ignitionDuration': 10,
+          'seatClimateInfo': dict({
+            'drvSeatClimateState': None,
+            'psgSeatClimateState': None,
+            'rlSeatClimateState': None,
+            'rrSeatClimateState': None,
+          }),
+          'sideRearMirrorHeating': 0,
+          'strgWhlHeating': None,
+          'tempUnit': 'C',
+          'windshieldFrontDefogState': False,
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[eu_kia_ccs2-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'open',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'close',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 1,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'stop',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'action': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v2/spa/vehicles/VEHICLE-ID/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[in_hyundai-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'open',
+          'deviceId': '0123456789abcdef0123456789abcdef',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.in-ccapi.hyundai.connected-car.io:8080/api/v1/spa/vehicles/VEHICLE-ID/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-lock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'userName': 'user',
+          'vin': 'VIN0000000000000',
+        }),
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/rcs/rdo/off',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-set_charge_limits]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/evc/charge/targetsoc/set',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-start_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/evc/charge/start',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-start_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'airCtrl': 1,
+          'airTemp': dict({
+            'unit': 1,
+            'value': '21',
+          }),
+          'defrost': False,
+          'heating1': 0,
+        }),
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/evc/fatc/start',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-stop_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/evc/charge/stop',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-stop_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/evc/fatc/stop',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_hyundai-unlock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'userName': 'user',
+          'vin': 'VIN0000000000000',
+        }),
+        'method': 'POST',
+        'url': 'https://api.telematics.hyundaiusa.com/ac/v2/rcs/rdo/on',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-lock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/rems/door/lock',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-set_charge_limits]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://api.owners.kia.com/apigw/v1/evc/sts',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-start_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'chargeRatio': 100,
+        }),
+        'method': 'POST',
+        'url': 'https://api.owners.kia.com/apigw/v1/evc/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-start_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'remoteClimate': dict({
+            'airCtrl': True,
+            'airTemp': dict({
+              'unit': 1,
+              'value': 'LOW',
+            }),
+            'defrost': False,
+            'heatingAccessory': dict({
+              'rearWindow': 0,
+              'sideMirror': 0,
+              'steeringWheel': 0,
+              'steeringWheelStep': 0,
+            }),
+            'ignitionOnDuration': dict({
+              'unit': 4,
+              'value': 10,
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://api.owners.kia.com/apigw/v1/rems/start',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-stop_charge]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/evc/cancel',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-stop_climate]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/rems/stop',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[usa_kia-unlock]
+  dict({
+    'action_id': 'TX-1',
+    'requests': list([
+      dict({
+        'body': None,
+        'method': 'GET',
+        'url': 'https://api.owners.kia.com/apigw/v1/rems/door/unlock',
+      }),
+    ]),
+  })
+# ---

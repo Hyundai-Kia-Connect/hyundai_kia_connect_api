@@ -1,0 +1,429 @@
+"""Tests for CCS2 protocol _update_vehicle_properties_ccs2 using JSON fixtures.
+
+Tests ApiImplType1._update_vehicle_properties_ccs2 with fixtures that use
+the newer CCS2 protocol structure (Drivetrain/Cabin/Green/Body/Chassis paths).
+TargetSoC in CCS2 is direct scalar values, not arrays.
+"""
+
+import datetime as dt
+import json
+
+import pytest
+
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.const import PressureUnit
+from hyundai_kia_connect_api.Vehicle import Vehicle
+from tests.fixture_helpers import (
+    discover_fixtures,
+    load_fixture,
+)
+
+CCS2_FIXTURE_FILES = discover_fixtures("eu_kia_ev9_")
+
+
+@pytest.fixture
+def ccs2_api() -> ApiImplType1:
+    api = ApiImplType1.__new__(ApiImplType1)
+    api.data_timezone = None
+    api.temperature_range = [x * 0.5 for x in range(28, 60)]
+    return api
+
+
+@pytest.fixture
+def vehicle() -> Vehicle:
+    return Vehicle()
+
+
+def _window_state(open_front_left=0, open_level_front_left=0, **levels) -> dict:
+    """Build a CCS2 state dict from the EV9 fixture with Window overridden.
+
+    Reuses the real fixture so every non-window branch of
+    ``_update_vehicle_properties_ccs2`` still has the fields it expects; only
+    ``Cabin.Window`` is replaced with the given Open/OpenLevel values.
+    """
+    import copy
+
+    data = copy.deepcopy(load_fixture(CCS2_FIXTURE_FILES[0]))
+    row1 = {
+        "Driver": {"Open": open_front_left, "OpenLevel": open_level_front_left},
+        "Passenger": {
+            "Open": levels.get("open_front_right", 0),
+            "OpenLevel": levels.get("open_level_front_right", 0),
+        },
+    }
+    row2 = {
+        "Left": {
+            "Open": levels.get("open_back_left", 0),
+            "OpenLevel": levels.get("open_level_back_left", 0),
+        },
+        "Right": {
+            "Open": levels.get("open_back_right", 0),
+            "OpenLevel": levels.get("open_level_back_right", 0),
+        },
+    }
+    data["Cabin"]["Window"] = {"Row1": row1, "Row2": row2}
+    return data
+
+
+class TestCCS2WindowOpenLevel:
+    """CCS2 vents report Open=0, OpenLevel>0 and must parse as open (#1215)."""
+
+    def test_closed_windows_are_false(self, ccs2_api, vehicle):
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, _window_state())
+        assert vehicle.front_left_window_is_open is False
+        assert vehicle.front_right_window_is_open is False
+        assert vehicle.back_left_window_is_open is False
+        assert vehicle.back_right_window_is_open is False
+
+    def test_vented_window_is_open(self, ccs2_api, vehicle):
+        # Vent: Open=0, OpenLevel=1 (issue #1215 reproduction)
+        ccs2_api._update_vehicle_properties_ccs2(
+            vehicle, _window_state(open_level_front_left=1, open_level_front_right=1)
+        )
+        assert vehicle.front_left_window_is_open is True
+        assert vehicle.front_right_window_is_open is True
+        assert vehicle.back_left_window_is_open is False
+        assert vehicle.back_right_window_is_open is False
+
+    def test_fully_open_window_is_open(self, ccs2_api, vehicle):
+        ccs2_api._update_vehicle_properties_ccs2(
+            vehicle, _window_state(open_front_left=1, open_back_right=1)
+        )
+        assert vehicle.front_left_window_is_open is True
+        assert vehicle.back_right_window_is_open is True
+
+    def test_missing_window_fields_are_none(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        del data["Cabin"]["Window"]
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.front_left_window_is_open is None
+        assert vehicle.back_right_window_is_open is None
+
+
+@pytest.fixture
+def ccs2_state_new_fields():
+    """A complete, parser-safe CCS2 state (EU EV9 2024 fixture) with the new
+    Tier 1 fields overlaid: tire Pressure values + PressureUnit, DrivingMode,
+    OilLevelWarning, Auxiliary.FailWarning. load_fixture returns a fresh dict
+    per call, so per-test mutation (e.g. popping Pressure) is safe."""
+    state = load_fixture("eu_kia_ev9_2024_ccs2.json")
+    axle = state["Chassis"]["Axle"]
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 27
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 26
+    axle["Tire"]["PressureUnit"] = 2
+    state.setdefault("Chassis", {}).setdefault("DrivingMode", {})["State"] = "Eco"
+    state.setdefault("Drivetrain", {}).setdefault("InternalCombustionEngine", {})[
+        "OilLevelWarning"
+    ] = 0
+    state.setdefault("Electronics", {}).setdefault("Battery", {}).setdefault(
+        "Auxiliary", {}
+    )["FailWarning"] = 0
+    # Car-ON overlay: Accessory/Ignition3=1, SleepMode=0 (asleep=False).
+    state.setdefault("Electronics", {}).setdefault("PowerSupply", {})["Accessory"] = 1
+    state.setdefault("Electronics", {}).setdefault("PowerSupply", {})["Ignition3"] = 1
+    state.setdefault("RemoteControl", {})["SleepMode"] = 0
+    return state
+
+
+def test_tire_pressure_values_bar(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (EU Santa Fe 2026, car display unit = bar, PressureUnit=2):
+    # raw 27/27/27/26 -> 2.7/2.7/2.7/2.6 bar (raw x 0.1).
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 2.7
+    assert vehicle.tire_pressure_front_right == 2.7
+    assert vehicle.tire_pressure_rear_left == 2.7
+    assert vehicle.tire_pressure_rear_right == 2.6
+    assert vehicle.tire_pressure_unit == PressureUnit.BAR
+    assert vehicle.tire_pressure_front_left_unit == "bar"
+    assert vehicle.tire_pressure_rear_right_unit == "bar"
+
+
+def test_tire_pressure_values_psi(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Confirmed live (car display unit = psi, PressureUnit=0): raw 38/38/37/36
+    # -> 38/38/37/36 psi (raw x 1, integer psi). Model B (raw unit-dependent).
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 0
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 38
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 38
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 37
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 36
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 38.0
+    assert vehicle.tire_pressure_front_right == 38.0
+    assert vehicle.tire_pressure_rear_left == 37.0
+    assert vehicle.tire_pressure_rear_right == 36.0
+    assert vehicle.tire_pressure_unit == PressureUnit.PSI
+    assert vehicle.tire_pressure_front_left_unit == "psi"
+
+
+def test_tire_pressure_values_kpa(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Live-confirmed 2026-07-02: PressureUnit=1 (kPa), raw in 5-kPa steps.
+    # Dashboard 255/255/255/250 kPa -> raw 51/51/51/50 -> value = raw x 5 = kPa.
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 1
+    axle["Row1"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row1"]["Right"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Left"]["Tire"]["Pressure"] = 51
+    axle["Row2"]["Right"]["Tire"]["Pressure"] = 50
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left == 255.0
+    assert vehicle.tire_pressure_rear_right == 250.0
+    assert vehicle.tire_pressure_unit == PressureUnit.KPA
+    assert vehicle.tire_pressure_front_left_unit == "kPa"
+
+
+def test_tire_pressure_missing_leaves_none(ccs2_api, vehicle, ccs2_state_new_fields):
+    # Older CCS2 responses (e.g. EU EV9 2024) report PressureLow but no Pressure
+    # and no PressureUnit -> values + units stay None (entity not created).
+    for row in ("Row1", "Row2"):
+        for side in ("Left", "Right"):
+            ccs2_state_new_fields["Chassis"]["Axle"][row][side]["Tire"].pop("Pressure")
+    ccs2_state_new_fields["Chassis"]["Axle"]["Tire"].pop("PressureUnit")
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_unit is None
+    assert vehicle.tire_pressure_front_left_unit is None
+
+
+def test_tire_pressure_unknown_unit_does_not_crash(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # Some vehicles return a PressureUnit not in the enum (e.g. 3 — see API #1230,
+    # kia_uvo #1784/#1785). An unknown unit must NOT raise ValueError and break the
+    # whole vehicle update; it degrades gracefully: unit None, values None, no
+    # entities created.
+    ccs2_state_new_fields["Chassis"]["Axle"]["Tire"]["PressureUnit"] = 3
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row1"]["Left"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row1"]["Right"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row2"]["Left"]["Tire"]["Pressure"] = 27
+    ccs2_state_new_fields["Chassis"]["Axle"]["Row2"]["Right"]["Tire"]["Pressure"] = 26
+    # Must not raise.
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_unit is None
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    assert vehicle.tire_pressure_front_left_unit is None
+
+
+def test_tire_pressure_sensor_sentinel_is_unknown(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # When the TPMS hasn't reported (car off / before driving), the API returns
+    # raw Pressure = 255 (0xFF) for all tires — a "no reading" sentinel, NOT a
+    # real pressure. Applying the scale gives impossible values (25.5 bar /
+    # 255 psi / 1275 kPa). Treat 255 as unknown -> None, no entity value.
+    # See kia_uvo #1783, API #1232 (live-confirmed on EU Santa Fe + Kia EV3).
+    axle = ccs2_state_new_fields["Chassis"]["Axle"]
+    axle["Tire"]["PressureUnit"] = 2  # bar
+    for row in ("Row1", "Row2"):
+        for side in ("Left", "Right"):
+            axle[row][side]["Tire"]["Pressure"] = 255
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.tire_pressure_unit == PressureUnit.BAR
+    assert vehicle.tire_pressure_front_left is None
+    assert vehicle.tire_pressure_front_right is None
+    assert vehicle.tire_pressure_rear_left is None
+    assert vehicle.tire_pressure_rear_right is None
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.drive_mode == "Eco"
+
+
+def test_oil_level_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is False
+
+
+def test_oil_level_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No OilLevelWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Drivetrain"]["InternalCombustionEngine"][
+        "OilLevelWarning"
+    ]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.oil_level_warning_is_on is None
+
+
+def test_battery_auxiliary_fail_warning_false(ccs2_api, vehicle, ccs2_state_new_fields):
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is False
+
+
+def test_battery_auxiliary_fail_warning_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    # No FailWarning -> attribute stays None (entity not created downstream).
+    del ccs2_state_new_fields["Electronics"]["Battery"]["Auxiliary"]["FailWarning"]
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.battery_auxiliary_fail_warning_is_on is None
+
+
+def test_power_supply_sleep_mapped(ccs2_api, vehicle, ccs2_state_new_fields):
+    # CCS2 gap vs CA/IN flat: accessory_on/ign3/sleep_mode_check mapped.
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.accessory_on is True
+    assert vehicle.ign3 is True
+    assert vehicle.sleep_mode_check is False
+
+
+def test_power_supply_sleep_missing_leaves_none(
+    ccs2_api, vehicle, ccs2_state_new_fields
+):
+    ccs2_state_new_fields.pop("Electronics", None)
+    ccs2_state_new_fields.pop("RemoteControl", None)
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, ccs2_state_new_fields)
+    assert vehicle.accessory_on is None
+    assert vehicle.ign3 is None
+    assert vehicle.sleep_mode_check is None
+
+
+class TestCCS2LocationTimestampNone:
+    """kia_uvo #1771 sidetask: missing Location.TimeStamp must yield
+    location_last_updated_at None, not a 2000-01-01 sentinel ("27 years ago").
+    """
+
+    def test_location_timestamp_none_yields_none(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        del data["Location"]["TimeStamp"]
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        assert vehicle.location_latitude == 48.8566
+        assert vehicle.location_longitude == 2.3522
+        assert vehicle.location_last_updated_at is None
+
+    def test_location_timestamp_present_yields_datetime(self, ccs2_api, vehicle):
+        data = load_fixture(CCS2_FIXTURE_FILES[0])
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+        ts = vehicle.location_last_updated_at
+        assert ts is not None
+        assert ts.year == 2024 and ts.month == 9 and ts.day == 15
+        assert ts.hour == 14 and ts.minute == 0 and ts.second == 0
+
+
+def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
+    """Unknown OffPeakTime.Mode (e.g. reserved 1) -> attrs None, no crash."""
+    data = load_fixture("eu_kia_ev6_2024_ccs2_off.json")
+    data = json.loads(json.dumps(data))  # deep copy
+    data["Green"]["Reservation"]["OffPeakTime"]["Mode"] = 1
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_schedule_charge_enabled is None
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+    # window still parsed even if Mode unknown
+    assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
+
+
+def test_ccs2_off_peak_sentinel_31_70_is_none_silent(ccs2_api, vehicle, caplog):
+    """OffPeakTime 31:70 sentinel (Kia EV3 AU/EU, #1269) -> None, no warning.
+
+    The "unconfigured" default StartHour=31/StartMin=70/EndHour=31/EndMin=70
+    with Mode=0 must not spam HA logs as a malformed-block warning. The
+    fields resolve to None and Mode=0 still sets ev_schedule_charge_enabled=False.
+    Schedule1/2 carry the same sentinel and resolve to None too.
+    """
+    data = json.loads(json.dumps(load_fixture("eu_kia_ev6_2024_ccs2_off.json")))
+    data["Green"]["Reservation"]["OffPeakTime"] = {
+        "StartHour": 31,
+        "StartMin": 70,
+        "EndHour": 31,
+        "EndMin": 70,
+        "Mode": 0,
+    }
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Hour"] = 31
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Min"] = 70
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Hour"] = 31
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Min"] = 70
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hyundai_kia_connect_api"):
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_off_peak_start_time is None
+    assert vehicle.ev_off_peak_end_time is None
+    assert vehicle.ev_schedule_charge_enabled is False  # Mode=0
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+    assert vehicle.ev_first_departure_time is None  # Schedule1 31:70 sentinel
+    assert vehicle.ev_second_departure_time is None  # Schedule2 31:70 sentinel
+    # No malformed-block warning for the known sentinel.
+    assert "malformed" not in caplog.text
+
+
+def test_schedule_charging_off_peak_flag_only(ccs2_api, vehicle):
+    """charge_only=True must send offPeakPowerFlag=2 ("off-peak tariffs only")."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=True,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+    # The flat dispatch writes the climate scope too (departures are set):
+    # report a temperature so the unresolvable-temperature guard passes.
+    vehicle.ev_first_departure_climate_temperature = (21.0, "°C")
+
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 2
+
+
+def test_schedule_charging_off_peak_flag_prioritised(ccs2_api, vehicle):
+    """charge_only=False must send offPeakPowerFlag=1 ("off-peak tariffs prioritised")."""
+    from hyundai_kia_connect_api.ApiImpl import ScheduleChargingClimateRequestOptions
+
+    options = ScheduleChargingClimateRequestOptions(
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        second_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            enabled=False, days=[0], time=dt.time()
+        ),
+        charging_enabled=True,
+        off_peak_start_time=dt.time(11, 0),
+        off_peak_end_time=dt.time(17, 0),
+        off_peak_charge_only_enabled=False,
+    )
+
+    captured = {}
+
+    class _FakeResp:
+        def json(self):
+            return {"resCode": 0, "msgId": "test-msg", "resMsg": None}
+
+    class _FakeSession:
+        def post(self, url, json=None, headers=None, **kwargs):
+            captured["payload"] = json
+            return _FakeResp()
+
+    ccs2_api.session = _FakeSession()
+    ccs2_api._get_control_headers = lambda token, vehicle: {}
+    ccs2_api.SPA_API_URL_V2 = "https://example/api/v2/spa/"
+    vehicle.id = "test-vehicle-id"
+    vehicle.ev_first_departure_climate_temperature = (21.0, "°C")
+    ccs2_api.schedule_charging_and_climate(token=None, vehicle=vehicle, options=options)
+    assert captured["payload"]["offPeakPowerInfo"]["offPeakPowerFlag"] == 1

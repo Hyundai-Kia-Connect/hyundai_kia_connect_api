@@ -1,0 +1,870 @@
+"""HyundaiBlueLinkApiBR.py"""
+
+# pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
+
+import datetime as dt
+import logging
+import random
+import uuid
+from datetime import timedelta
+from time import sleep
+from typing import Any, cast
+from urllib.parse import parse_qs, urljoin, urlparse
+
+from requests import Response
+
+from .ApiImpl import (
+    ApiImplSession,
+    ClimateRequestOptions,
+    POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
+from .ApiImplType1 import (
+    ApiImplType1,
+    _check_response_for_errors,
+    _retry_on_device_id_error,
+)
+from .const import (
+    BRAND_HYUNDAI,
+    BRANDS,
+    DOMAIN,
+    ORDER_STATUS,
+    VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
+    WINDOW_STATE,
+)
+from .exceptions import APIError, AuthenticationError
+from .Token import Token
+from .utils import get_index_into_hex_temp
+from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
+
+_LOGGER = logging.getLogger(__name__)
+
+# The Brazilian signin endpoint returns {"step": N} (HTTP 200, no redirectUrl)
+# when the account must complete an action in the Bluelink app / web portal
+# before OAuth can proceed. The step numbers map to the routes handled by
+# toStep() in the login SPA bundle (/web/v1/user static JS).
+_SIGNIN_STEP_MESSAGES = {
+    0: "the account must accept the terms of service",
+    3: "the account must accept the data-access agreement",
+    4: "the account must re-accept updated terms of service",
+    5: "the account password has expired and must be reset",
+    6: "the account is not activated yet",
+    7: "identity verification is required",
+    8: "identity verification is required",
+    9: "the account is blocked",
+    10: "email verification is required",
+    11: "the account email must be changed",
+    12: "identity verification is required",
+    13: "email verification is required",
+}
+
+
+class HyundaiBlueLinkApiBR(ApiImplType1):
+    """Brazilian Hyundai BlueLink API implementation.
+
+    Extends ApiImplType1 to reuse its CCS2 status parser
+    (``_update_vehicle_properties_ccs2``); BR overrides its own auth, headers,
+    endpoint selection and force-refresh flow.
+    """
+
+    supports_window_control: bool = True
+    # BR does not implement valet mode; keep it off (ApiImplType1 defaults True).
+    supports_valet_mode: bool = False
+    data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+
+    def __init__(self, region: int, brand: int, language: str = "pt-BR"):
+        if BRANDS[brand] != BRAND_HYUNDAI:
+            raise APIError(
+                f"Unknown brand {BRANDS[brand]} for region Brazil. "
+                "Only Hyundai is supported."
+            )
+
+        self.language = language
+        self.base_url = "br-ccapi.hyundai.com.br"
+        self.api_url = f"https://{self.base_url}/api/v1/"
+        self.api_v2_url = f"https://{self.base_url}/api/v2/"
+        self.ccsp_service_id = "03f7df9b-7626-4853-b7bd-ad1e8d722bd5"
+        self.ccsp_application_id = "513a491a-0d7c-4d6a-ac03-a2df127d73b0"
+        self.basic_authorization_header = (
+            "Basic MDNmN2RmOWItNzYyNi00ODUzLWI3YmQtYWQxZThkNzIyYmQ1On"
+            "lRejJiYzZDbjhPb3ZWT1I3UkRXd3hUcVZ3V0czeUtCWUZEZzBIc09Yc3l4eVBsSA=="
+        )
+
+        self.api_headers = {
+            "Content-Type": "application/json; charset=UTF-8",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Encoding": "br;q=1.0, gzip;q=0.9, deflate;q=0.8",
+            "Accept-Language": "pt-BR;q=1.0, en-US;q=0.9",
+            "User-Agent": "BR_BlueLink/1.0.14 (com.hyundai.bluelink.br; build:10132; iOS 18.4.0) Alamofire/5.9.1",
+            "Host": self.base_url,
+            "offset": "-3",
+            "ccuCCS2ProtocolSupport": "0",
+        }
+
+        self.session = ApiImplSession()
+        self.temperature_range = range(62, 82)
+        # Registered with /spa/notifications/register on first use and
+        # reused for the lifetime of this object, so a full login does not
+        # register a new push device every time.
+        self._registered_device_id: str | None = None
+
+    def _build_api_url(self, path: str) -> str:
+        """Build full API URL from path."""
+        return urljoin(self.api_url, path.lstrip("/"))
+
+    def _build_api_v2_url(self, path: str) -> str:
+        """Build API v2 URL from path."""
+        return urljoin(self.api_v2_url, path.lstrip("/"))
+
+    def _get_stamp(self) -> str:
+        """BR does not use the Stamp header; required by the shared retry helper."""
+        return ""
+
+    def _get_device_id(self, stamp: str | None = None) -> str:
+        """Register a push device and return the server-issued device id.
+
+        The BR backend validates ``ccsp-device-id`` against its own device
+        registry: it rejects both client-generated UUIDs and ids it has since
+        invalidated, answering ``resCode 4002`` ("Invalid deviceId") on every
+        authenticated SPA call. The id therefore has to be obtained from
+        ``/spa/notifications/register``, the same way EU and IN do it.
+
+        Always registers a fresh id and caches it, so the retry path can
+        recover from a server-side invalidation.
+        """
+        registration_id = f"{random.randrange(10**80):064x}"[:64]
+        url = self._build_api_url("/spa/notifications/register")
+        payload = {
+            "pushRegId": registration_id,
+            "pushType": "APNS",
+            "uuid": str(uuid.uuid4()),
+        }
+        headers = dict(self.api_headers)
+        headers["ccsp-service-id"] = self.ccsp_service_id
+        headers["ccsp-application-id"] = self.ccsp_application_id
+
+        _LOGGER.debug(f"{DOMAIN} - Registering device at {url}")
+        response = self.session.post(url, headers=headers, json=payload)
+        self._raise_auth_error(response, "device registration")
+        response_json = response.json()
+        _check_response_for_errors(response_json)
+
+        device_id = response_json["resMsg"]["deviceId"]
+        self._registered_device_id = device_id
+        return cast(str, device_id)
+
+    def _ensure_device_id(self) -> str:
+        """Return this session's registered device id, registering one if needed."""
+        return self._registered_device_id or self._get_device_id()
+
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict[str, Any]:
+        """Get headers with authentication.
+
+        ``ccs2_support`` matches the ApiImplType1 signature; BR sends no
+        CCS2 protocol header, so it is ignored.
+        """
+        headers = dict(self.api_headers)
+        device_id = token.device_id or self._ensure_device_id()
+        headers["ccsp-device-id"] = device_id
+        headers["ccsp-application-id"] = self.ccsp_application_id
+        headers["Authorization"] = f"Bearer {token.access_token}"
+        return headers
+
+    def _raise_auth_error(self, response: Response, context: str) -> None:
+        """Surface a readable auth error for non-2xx BR auth responses.
+
+        Reads the response body (JSON: ``{step}``, ``{errCode, errMsg}``, or
+        arbitrary) and raises ``AuthenticationError``. Falls back to a short body
+        snippet when the body is not JSON. No-op for status < 400. Only
+        step/errCode/errMsg are surfaced — the whole body is never dumped.
+        """
+        if response.status_code < 400:
+            return
+        try:
+            data = response.json()
+        except ValueError:
+            snippet = (response.text or "")[:200]
+            raise AuthenticationError(
+                f"Brazilian Hyundai {context} failed: HTTP {response.status_code}. "
+                f"Response not JSON: {snippet!r}"
+            ) from None
+        step = data.get("step")
+        reason = _SIGNIN_STEP_MESSAGES.get(step)
+        if reason is not None:
+            raise AuthenticationError(
+                f"Brazilian Hyundai login incomplete: {reason} "
+                f"({context} step={step}). Complete this in the Bluelink app "
+                "or web portal, then retry."
+            )
+        err_code = data.get("errCode") or data.get("errorCode")
+        err_msg = data.get("errMsg") or data.get("errorMessage")
+        if err_code or err_msg:
+            raise AuthenticationError(
+                f"Brazilian Hyundai {context} failed: "
+                f"errCode={err_code!r}, errMsg={err_msg!r}"
+            )
+        raise AuthenticationError(
+            f"Brazilian Hyundai {context} failed: HTTP {response.status_code} "
+            f"(keys={sorted(data.keys())})"
+        )
+
+    def _get_cookies(self) -> dict[str, Any]:
+        """Request cookies from the API for authentication."""
+        params = {
+            "response_type": "code",
+            "client_id": self.ccsp_service_id,
+            "redirect_uri": self._build_api_url("/user/oauth2/redirect"),
+        }
+
+        url = self._build_api_url("/user/oauth2/authorize")
+        _LOGGER.debug(f"{DOMAIN} - Requesting cookies from {url}")
+        response = self.session.get(url, params=params)
+        self._raise_auth_error(response, "cookie request")
+        # The session cookie ('account') is set during the 302 redirect, so it
+        # lives in the session cookie jar rather than on the final response.
+        return cast(dict[str, Any], self.session.cookies.get_dict())
+
+    def _get_authorization_code(
+        self, cookies: dict[str, Any], username: str, password: str
+    ) -> str:
+        """Get authorization code from redirect URL."""
+        url = self._build_api_url("/user/signin")
+        data = {"email": username, "password": password}
+
+        headers = {
+            "Referer": "https://br-ccapi.hyundai.com.br/web/v1/user/signin",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept": "*/*",
+            "Connection": "keep-alive",
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Host": self.api_headers["Host"],
+            "Accept-Language": "pt-BR,en-US;q=0.9,en;q=0.8",
+            "Origin": "https://br-ccapi.hyundai.com.br",
+            "User-Agent": (
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) "
+                "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148_CCS_APP_iOS"
+            ),
+        }
+
+        response = self.session.post(url, json=data, cookies=cookies, headers=headers)
+        self._raise_auth_error(response, "signin")
+        response_data = response.json()
+
+        redirect_url = response_data.get("redirectUrl")
+        if not redirect_url:
+            # The account authenticated but must complete an action before
+            # OAuth can proceed (see _SIGNIN_STEP_MESSAGES). Surface a clear
+            # message instead of a raw KeyError on "redirectUrl".
+            step = response_data.get("step")
+            reason = _SIGNIN_STEP_MESSAGES.get(step)
+            if reason is not None:
+                raise AuthenticationError(
+                    f"Brazilian Hyundai login incomplete: {reason} "
+                    f"(signin step={step}). Complete this in the Bluelink app "
+                    "or web portal, then retry."
+                )
+            raise AuthenticationError(
+                "Brazilian Hyundai login failed: no redirectUrl in signin "
+                f"response (keys={sorted(response_data.keys())}). "
+                "Check your username and password."
+            )
+
+        _LOGGER.debug(f"{DOMAIN} - Got redirect URL")
+        parsed_url = urlparse(redirect_url)
+        code_list = parse_qs(parsed_url.query).get("code")
+        if not code_list:
+            raise AuthenticationError(
+                "Brazilian Hyundai login failed: no authorization code in redirect URL."
+            )
+        return cast(str, code_list[0])
+
+    def _get_auth_response(self, authorization_code: str) -> dict[str, Any]:
+        """Request access token from the API."""
+        url = self._build_api_url("/user/oauth2/token")
+        body = {
+            "client_id": self.ccsp_service_id,
+            "grant_type": "authorization_code",
+            "code": authorization_code,
+            "redirect_uri": self._build_api_url("/user/oauth2/redirect"),
+        }
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+            "User-Agent": self.api_headers["User-Agent"],
+            "Authorization": self.basic_authorization_header,
+        }
+
+        response = self.session.post(url, data=body, headers=headers)
+        self._raise_auth_error(response, "token request")
+        return cast(dict[str, Any], response.json())
+
+    def login(
+        self,
+        username: str,
+        password: str,
+        pin: str | None = None,
+    ) -> Token:
+        """Login to Brazilian Hyundai API."""
+        _LOGGER.debug(f"{DOMAIN} - Logging in to Brazilian API")
+
+        cookies = self._get_cookies()
+        authorization_code = self._get_authorization_code(cookies, username, password)
+        auth_response = self._get_auth_response(authorization_code)
+
+        expires_in_seconds = auth_response["expires_in"]
+        expires_at = dt.datetime.now(dt.UTC) + timedelta(seconds=expires_in_seconds)
+
+        return Token(
+            access_token=auth_response["access_token"],
+            refresh_token=auth_response["refresh_token"],
+            valid_until=expires_at,
+            username=username,
+            password=password,
+            device_id=self._ensure_device_id(),
+            pin=pin,
+        )
+
+    def refresh_access_token(self, token: Token) -> Token:
+        """Refresh the access token with BR's oauth2 refresh_token grant.
+
+        ``ApiImplType1.refresh_access_token`` targets ``USER_API_URL`` /
+        ``BASE_URL`` / ``BASIC_AUTHORIZATION``, none of which BR defines, so it
+        raised ``AttributeError`` on every call, swallowed it in its
+        ``except Exception`` and fell back to a full login on *every* poll. It
+        also prefixes the token type onto ``access_token``, while BR builds its
+        own ``Bearer`` prefix in ``_get_authenticated_headers``, so the
+        inherited implementation could not have worked here even if the
+        attributes existed.
+
+        Falls back to a full login when there is no refresh token or the
+        exchange fails (an expired refresh token is the normal case).
+        """
+        if token.refresh_token:
+            try:
+                url = self._build_api_url("/user/oauth2/token")
+                body = {
+                    "client_id": self.ccsp_service_id,
+                    "grant_type": "refresh_token",
+                    "refresh_token": token.refresh_token,
+                }
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                    "User-Agent": self.api_headers["User-Agent"],
+                    "Authorization": self.basic_authorization_header,
+                }
+
+                response = self.session.post(url, data=body, headers=headers)
+                self._raise_auth_error(response, "token refresh")
+                auth_response = response.json()
+
+                expires_at = dt.datetime.now(dt.UTC) + timedelta(
+                    seconds=auth_response["expires_in"]
+                )
+                _LOGGER.debug(f"{DOMAIN} - Access token refreshed")
+                return Token(
+                    access_token=auth_response["access_token"],
+                    refresh_token=auth_response.get(
+                        "refresh_token", token.refresh_token
+                    ),
+                    valid_until=expires_at,
+                    username=token.username,
+                    password=token.password,
+                    device_id=token.device_id,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, pin=token.pin)
+
+    @_retry_on_device_id_error
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Get list of vehicles."""
+        url = self._build_api_url("/spa/vehicles")
+        headers = self._get_authenticated_headers(token)
+
+        response = self.session.get(url, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Got vehicles response")
+        _check_response_for_errors(response)
+        if "resMsg" not in response or "vehicles" not in response.get("resMsg", {}):
+            raise APIError("Missing resMsg or vehicles in response")
+        return [
+            self._vehicle_from_spa_entry(entry)
+            for entry in response["resMsg"]["vehicles"]
+        ]
+
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
+        """Return the server-cached CCS2 vehicle status (does not wake the car).
+
+        BR vehicles report ``ccuCCS2ProtocolSupport: 0`` but the cached status
+        is served in CCS2 format at ``/ccs2/carstatus/latest`` (including
+        location). The legacy ``/status/latest`` endpoint is the remote-control
+        command result on BR and always returns 503 / resCode 5031.
+        """
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest")
+        headers = self._get_authenticated_headers(token)
+        response = self.session.get(url, headers=headers).json()
+        _check_response_for_errors(response)
+        return cast(dict[str, Any], response["resMsg"]["state"]["Vehicle"])
+
+    @_retry_on_device_id_error
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Update with the server-cached CCS2 state (does not wake the car)."""
+        state = self._get_cached_vehicle_state(token, vehicle)
+        self._update_vehicle_properties_ccs2(vehicle, state)
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Force a fresh reading from the vehicle (wakes the car).
+
+        BR CCS2 force is asynchronous: ``GET /ccs2/carstatus`` only acknowledges,
+        then the vehicle pushes a fresh snapshot to ``/ccs2/carstatus/latest``.
+        Wake, wait for the car to report, then read the cached snapshot. If the
+        snapshot's ``lastUpdateTime`` did not advance, the car did not report in
+        time — do not apply stale data; raise so the coordinator surfaces
+        ``UpdateFailed`` and entities go unavailable until the next poll.
+        """
+        headers = self._get_authenticated_headers(token)
+        latest_url = self._build_api_url(
+            f"/spa/vehicles/{vehicle.id}/ccs2/carstatus/latest"
+        )
+        trigger_url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/ccs2/carstatus")
+
+        # Baseline: current cached lastUpdateTime before waking.
+        pre = self.session.get(latest_url, headers=headers)
+        pre.raise_for_status()
+        baseline_ts = pre.json()["resMsg"].get("lastUpdateTime")
+
+        # Wake the vehicle; errors propagate so a failed wake does not fall
+        # through to a stale /latest apply.
+        self.session.get(trigger_url, headers=headers).raise_for_status()
+        sleep(25)
+
+        response = self.session.get(latest_url, headers=headers)
+        response.raise_for_status()
+        resmsg = response.json()["resMsg"]
+        if resmsg.get("lastUpdateTime") == baseline_ts:
+            raise APIError(
+                "Brazilian Hyundai force refresh did not return fresh data "
+                "in time; vehicle may be unreachable."
+            )
+        self._update_vehicle_properties_ccs2(vehicle, resmsg["state"]["Vehicle"])
+
+    def _ensure_control_token(self, token: Token) -> str:
+        """Ensure we have a valid control token for remote commands."""
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if token.control_token and token.control_token_expiry - 5 > now:
+            return token.control_token
+
+        if not token.pin:
+            raise APIError("PIN is required for remote commands.")
+
+        device_id = token.device_id or self._ensure_device_id()
+        token.device_id = device_id
+
+        url = self._build_api_url("/user/pin")
+        headers = self._get_authenticated_headers(token)
+        payload = {"pin": token.pin, "deviceId": device_id}
+
+        response = self.session.put(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("controlToken") is None:
+            raise APIError("Failed to obtain control token.")
+
+        control_token = f"Bearer {data['controlToken']}"
+        expires_in = data.get("expiresTime", 0)
+
+        token.control_token = control_token
+        token.control_token_expiry = now + (expires_in or 600)
+        return control_token
+
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        """Lock or unlock the vehicle."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self._ensure_device_id()
+
+        url = self._build_api_v2_url(
+            f"spa/vehicles/{vehicle.id}/control/door",
+        )
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"deviceId": device_id, "action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Lock action request: %s", payload)
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Lock action response: %s", data)
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Lock action failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return cast(str, data.get("msgId"))
+
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        """Check status of a previously submitted remote command."""
+        if synchronous:
+            if timeout < 1:
+                raise APIError("Timeout must be 1 or higher for synchronous checks.")
+
+            end_time = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=timeout)
+            while dt.datetime.now(dt.UTC) < end_time:
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
+                if state == ORDER_STATUS.PENDING:
+                    sleep(5)
+                    continue
+                return state
+
+            return ORDER_STATUS.TIMEOUT
+
+        url = self._build_api_url(f"/spa/notifications/{vehicle.id}/records")
+        headers = self._get_authenticated_headers(token)
+
+        response = self.session.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Action status response: %s", data)
+
+        records = data.get("resMsg", [])
+        for record in records:
+            if record.get("recordId") != action_id:
+                continue
+
+            result = (record.get("result") or "").lower()
+            if result == "success":
+                return ORDER_STATUS.SUCCESS
+            if result == "fail":
+                return ORDER_STATUS.FAILED
+            if result == "non-response":
+                return ORDER_STATUS.TIMEOUT
+            if result in ("", "pending", None):
+                return ORDER_STATUS.PENDING
+
+        return ORDER_STATUS.UNKNOWN
+
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        """Open or close all windows (BR API controls all windows together)."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self._ensure_device_id()
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/window")
+
+        # Brazilian API uses simple action for all windows at once
+        # Check if any window should be open, otherwise close
+        action = "open"
+        if (
+            options.front_left == WINDOW_STATE.CLOSED
+            or options.front_right == WINDOW_STATE.CLOSED
+            or options.back_left == WINDOW_STATE.CLOSED
+            or options.back_right == WINDOW_STATE.CLOSED
+        ):
+            action = "close"
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"action": action, "deviceId": device_id}
+        _LOGGER.debug(f"{DOMAIN} - Window action request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Window action response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Window action failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return cast(str, data.get("msgId"))
+
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        """Turn on hazard lights (lights only, no horn)."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self._ensure_device_id()
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/light")
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        _LOGGER.debug(f"{DOMAIN} - Hazard lights request")
+
+        response = self.session.post(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Hazard lights response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Hazard lights failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return cast(str, data.get("msgId"))
+
+    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list[Any]:
+        """Get notification history (for debugging and tracking command results)."""
+        url = self._build_api_url(f"/spa/notifications/{vehicle.id}/history")
+        headers = self._get_authenticated_headers(token)
+
+        response = self.session.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Notification history response")
+
+        return cast(list[Any], data.get("resMsg", []))
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        """Start climate control with temperature and seat heating settings."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self._ensure_device_id()
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
+
+        # Set defaults
+        if options.set_temp is None:
+            options.set_temp = 21  # 21°C default
+        if options.duration is None:
+            options.duration = 10  # 10 minutes default
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
+        if options.front_left_seat is None:
+            options.front_left_seat = 0
+
+        # Convert temperature to hex code
+        # BR API uses direct Celsius value converted to hex
+        temp_celsius = int(options.set_temp)
+        temp_code = get_index_into_hex_temp(temp_celsius)
+
+        # Map seat heating level (0-5 in ClimateRequestOptions to 0-8 for BR API)
+        # 0=off, 1-3=heat levels, 4-5=cool levels (BR uses similar mapping)
+        seat_heat_cmd = options.front_left_seat if options.front_left_seat else 0
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {
+            "action": "start",
+            "options": {
+                "airCtrl": 1 if options.climate else 0,
+                "heating1": int(options.heating),
+                "seatHeaterVentCMD": {"drvSeatOptCmd": seat_heat_cmd},
+                "defrost": options.defrost,
+                "igniOnDuration": options.duration,
+            },
+            "hvacType": 1,
+            "deviceId": device_id,
+            "tempCode": temp_code,
+            "unit": "C",
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Start climate request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Start climate response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Start climate failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return cast(str, data.get("msgId"))
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        """Stop climate control."""
+        control_token = self._ensure_control_token(token)
+        device_id = token.device_id or self._ensure_device_id()
+
+        url = self._build_api_v2_url(f"spa/vehicles/{vehicle.id}/control/engine")
+
+        headers = self._get_authenticated_headers(token)
+        headers["Authorization"] = control_token
+        headers["ccsp-device-id"] = device_id
+        headers["ccuCCS2ProtocolSupport"] = str(vehicle.ccu_ccs2_protocol_support or 0)
+
+        payload = {"action": "stop", "deviceId": device_id}
+
+        _LOGGER.debug(f"{DOMAIN} - Stop climate request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Stop climate response: {data}")
+
+        if data.get("retCode") != "S":
+            raise APIError(
+                f"Stop climate failed: {data.get('resCode')} {data.get('resMsg')}"
+            )
+
+        return cast(str, data.get("msgId"))
+
+    # Commands below are inherited from ApiImplType1 but have no BR endpoint
+    # (the inherited versions build URLs from SPA_API_URL, which BR never
+    # sets), so they raise NotImplementedError like the ApiImpl base.
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("start_charge is not implemented for Brazil")
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("stop_charge is not implemented for Brazil")
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        raise NotImplementedError("set_charging_current is not implemented for Brazil")
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        raise NotImplementedError("set_charge_limits is not implemented for Brazil")
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        raise NotImplementedError(
+            "set_vehicle_to_load_discharge_limit is not implemented for Brazil"
+        )
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_charging_and_climate is not implemented for Brazil"
+        )
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "start_hazard_lights_and_horn is not implemented for Brazil"
+        )
+
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        raise NotImplementedError("set_navigation is not implemented for Brazil")
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        raise NotImplementedError("valet_mode_action is not implemented for Brazil")
+
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        """Update monthly trip info."""
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
+        data = {"tripPeriodType": 0, "setTripMonth": yyyymm_string}
+
+        headers = self._get_authenticated_headers(token)
+        response = self.session.post(url, json=data, headers=headers)
+
+        try:
+            response.raise_for_status()
+            trip_data = response.json()["resMsg"]
+
+            if trip_data.get("monthTripDayCnt", 0) > 0:
+                result = MonthTripInfo(
+                    yyyymm=yyyymm_string,
+                    day_list=[],
+                    summary=TripInfo(
+                        drive_time=trip_data.get("tripDrvTime"),
+                        idle_time=trip_data.get("tripIdleTime"),
+                        distance=trip_data.get("tripDist"),
+                        avg_speed=trip_data.get("tripAvgSpeed"),
+                        max_speed=trip_data.get("tripMaxSpeed"),
+                    ),
+                )
+
+                for day in trip_data.get("tripDayList", []):
+                    processed_day = DayTripCounts(
+                        yyyymmdd=day["tripDayInMonth"],
+                        trip_count=day["tripCntDay"],
+                    )
+                    result.day_list.append(processed_day)
+
+                vehicle.month_trip_info = result
+        except Exception as e:
+            _LOGGER.warning(f"{DOMAIN} - Failed to get month trip info: {e}")
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        """Update daily trip info."""
+        url = self._build_api_url(f"/spa/vehicles/{vehicle.id}/tripinfo")
+        data = {"tripPeriodType": 1, "setTripDay": yyyymmdd_string}
+
+        headers = self._get_authenticated_headers(token)
+        response = self.session.post(url, json=data, headers=headers)
+
+        try:
+            response.raise_for_status()
+            trip_data = response.json()["resMsg"]
+            day_trip_list = trip_data.get("dayTripList", [])
+
+            if len(day_trip_list) > 0:
+                msg = day_trip_list[0]
+                result = DayTripInfo(
+                    yyyymmdd=yyyymmdd_string,
+                    trip_list=[],
+                    summary=TripInfo(
+                        drive_time=msg.get("tripDrvTime"),
+                        idle_time=msg.get("tripIdleTime"),
+                        distance=msg.get("tripDist"),
+                        avg_speed=msg.get("tripAvgSpeed"),
+                        max_speed=msg.get("tripMaxSpeed"),
+                    ),
+                )
+
+                for trip in msg.get("tripList", []):
+                    processed_trip = TripInfo(
+                        hhmmss=trip.get("tripTime"),
+                        drive_time=trip.get("tripDrvTime"),
+                        idle_time=trip.get("tripIdleTime"),
+                        distance=trip.get("tripDist"),
+                        avg_speed=trip.get("tripAvgSpeed"),
+                        max_speed=trip.get("tripMaxSpeed"),
+                    )
+                    result.trip_list.append(processed_trip)
+
+                vehicle.day_trip_info = result
+        except Exception as e:
+            _LOGGER.warning(f"{DOMAIN} - Failed to get day trip info: {e}")

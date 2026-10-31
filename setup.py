@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 """The setup script."""
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -13,26 +11,33 @@ with open("HISTORY.rst") as history_file:
 with open("requirements.txt") as f:
     requirements = f.read().splitlines()
 
-long_description = readme + "\n\n" + history
 long_description = readme
 
 test_requirements = [
-    "pytest>=3",
+    "pytest>=8",
+    "syrupy>=4.0.0",
 ]
 
 setup(
     author="Fuat Akgun",
     author_email="fuatakgun@gmail.com",
-    python_requires=">=3.10",
+    python_requires=">=3.12",
     classifiers=[
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
+        "Typing :: Typed",
     ],
-    description="Python Boilerplate contains all the boilerplate you need to create a Python package.",
+    description="Python API for Hyundai, Kia, and Genesis car infotainment systems",
     install_requires=requirements,
+    extras_require={
+        "google": ["geopy>=2.2.0"],
+        "image": ["Pillow>=10.0.0", "numpy>=1.26.0"],
+    },
     license="MIT license",
     long_description=long_description,
     include_package_data=True,
@@ -47,6 +52,6 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api",
-    version="3.32.12",
+    version="4.44.0",
     zip_safe=False,
 )

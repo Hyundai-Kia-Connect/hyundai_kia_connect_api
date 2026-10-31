@@ -1,0 +1,42 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "brand": "Kia",
+        "endpoint": "tods/api/vhcllst",
+        "vehicles": "2024 Sportage (PHEV)",
+        "source": "Get Vehicles Response debug log in kia_uvo #881",
+        "description": "Real vehicle list. Vehicle id, VIN and modelCode replaced."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "vehicles": [
+            {
+                "vehicleId": "VEHICLE-1",
+                "nickName": "Sportage",
+                "modelCode": "XXX",
+                "modelName": "Sportage",
+                "modelYear": "2024",
+                "fuelKindCode": "P",
+                "trim": "",
+                "engine": "",
+                "exteriorColor": "KDG",
+                "dtcCount": 0,
+                "subscriptionStatus": "A",
+                "subscriptionEndDate": "20270512",
+                "mileageForNextService": 9864.4,
+                "daysForNextService": "20250516",
+                "overviewMessage": "",
+                "defaultVehicle": true,
+                "enrollmentStatus": "4",
+                "genType": "G1",
+                "valetParkingModeOn": 1,
+                "mainBatteryType": 0,
+                "isBasicPackage": false,
+                "vin": "TESTVIN0000000001"
+            }
+        ]
+    }
+}

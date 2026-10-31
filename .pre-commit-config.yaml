@@ -3,23 +3,24 @@ ci:
     autoupdate_commit_msg: "chore: pre-commit autoupdate"
 repos:
     - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.9.6
+      rev: v0.17.2
       hooks:
           - id: ruff
             args:
                 - --fix
           - id: ruff-format
     - repo: https://github.com/codespell-project/codespell
-      rev: v2.4.1
+      rev: v2.4.3
       hooks:
           - id: codespell
             args:
-                - --ignore-words-list=fro,hass,fatc
+                - --ignore-words-list=fro,hass,fatc,inster
                 - --skip="./.*,*.csv,*.json,*.ambr"
                 - --quiet-level=2
             exclude_types: [csv, json]
+            exclude: "cipher_params.json"
     - repo: https://github.com/pre-commit/pre-commit-hooks
-      rev: v5.0.0
+      rev: v6.0.0
       hooks:
           - id: trailing-whitespace
           - id: end-of-file-fixer
@@ -28,11 +29,13 @@ repos:
           - id: check-json
             exclude: (.vscode|.devcontainer)
     - repo: https://github.com/asottile/pyupgrade
-      rev: v3.19.1
+      rev: v3.22.0
       hooks:
           - id: pyupgrade
+            args:
+                - --py312-plus
     - repo: https://github.com/adrienverge/yamllint.git
-      rev: v1.35.1
+      rev: v1.38.0
       hooks:
           - id: yamllint
             exclude: (.github|.vscode|.devcontainer)
@@ -41,7 +44,7 @@ repos:
       hooks:
           - id: prettier
     - repo: https://github.com/cdce8p/python-typing-update
-      rev: v0.7.0
+      rev: v0.9.0
       hooks:
           # Run `python-typing-update` hook manually from time to time
           # to update python typing syntax.
@@ -50,13 +53,22 @@ repos:
           - id: python-typing-update
             stages: [manual]
             args:
-                - --py311-plus
+                - --py312-plus
                 - --force
                 - --keep-updates
             files: ^(/.+)?[^/]+\.py$
     - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v1.15.0
+      rev: v2.4.0
       hooks:
           - id: mypy
             args: [--strict, --ignore-missing-imports]
-            files: ^(/.+)?[^/]+\.py$
+            files: ^hyundai_kia_connect_api/.+\.py$
+            # Keep in sync with requirements.txt. types-requests is needed
+            # because requests ships no type hints.
+            additional_dependencies:
+                - beautifulsoup4>=4.15.0
+                - requests
+                - types-requests
+                - certifi>=2026.10.23
+                - tzdata>=2026.5
+                - pycryptodome>=3.24.1,<4

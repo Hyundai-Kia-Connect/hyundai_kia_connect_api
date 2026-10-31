@@ -1,48 +1,72 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow runs the pytest suite across the supported Python versions.
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
 name: Test Builds
 
 on:
-    pull_request_target:
+    push:
+        branches:
+            - master
+    pull_request:
         branches:
             - master
 
 jobs:
     build:
         runs-on: ubuntu-latest
-        name: "test py${{matrix.python-version}}"
+        name: "test py${{ matrix.python-version }}"
         strategy:
             fail-fast: false
             matrix:
-                python-version: ["3.12"]
+                python-version: ["3.12", "3.13", "3.14"]
 
         steps:
-            - uses: actions/checkout@v4
-              with:
-                  ref: ${{github.event.pull_request.head.ref}}
-                  repository: ${{github.event.pull_request.head.repo.full_name}}
+            - uses: actions/checkout@v7
             - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: ${{ matrix.python-version }}
+                  cache: pip
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  python -m pip install flake8 pytest
-                  if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-            - name: Lint with flake8
+                  python -m pip install -e .[image] pytest syrupy
+            - name: Run tests
+              run: pytest
+
+    # Its own job so coverage shows as a separate "Coverage" check, with the
+    # report on the run's summary page.
+    coverage:
+        runs-on: ubuntu-latest
+        name: Coverage
+        steps:
+            - uses: actions/checkout@v7
+            - name: Set up Python 3.13
+              uses: actions/setup-python@v7
+              with:
+                  python-version: "3.13"
+                  cache: pip
+            - name: Install dependencies
               run: |
-                  # stop the build if there are Python syntax errors or undefined names
-                  flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-                  # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-                  flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-            - name: Test with pytest
+                  python -m pip install --upgrade pip
+                  python -m pip install -e .[image] pytest pytest-cov syrupy
+            - name: Run tests with coverage
+              run: pytest --cov=hyundai_kia_connect_api --cov-report=term-missing --cov-report=xml
+            - name: Write coverage summary
               env:
-                  KIA_CA_CDNNINJA_USERNAME: ${{ secrets.KIA_CA_CDNNINJA_USERNAME }}
-                  KIA_CA_CDNNINJA_PASSWORD: ${{ secrets.KIA_CA_CDNNINJA_PASSWORD }}
-                  KIA_CA_CDNNINJA_PIN: ${{ secrets.KIA_CA_CDNNINJA_PIN }}
-                  KIA_EU_FUATAKGUN_USERNAME: ${{ secrets.KIA_EU_FUATAKGUN_USERNAME }}
-                  KIA_EU_FUATAKGUN_PASSWORD: ${{ secrets.KIA_EU_FUATAKGUN_PASSWORD }}
+                  CODECOV_URL: ${{ github.event_name == 'pull_request' && format('https://app.codecov.io/gh/{0}/pull/{1}', github.repository, github.event.pull_request.number) || format('https://app.codecov.io/gh/{0}/commit/{1}', github.repository, github.sha) }}
               run: |
-                  pytest
+                  {
+                    echo "## Coverage: $(coverage report --format=total)%"
+                    echo
+                    echo "Full report: [Codecov]($CODECOV_URL)"
+                    echo
+                    coverage report --format=markdown --skip-covered
+                  } >> "$GITHUB_STEP_SUMMARY"
+            # Fork PRs have no secrets; the action then uploads tokenless.
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v7
+              with:
+                  files: coverage.xml
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  fail_ci_if_error: false

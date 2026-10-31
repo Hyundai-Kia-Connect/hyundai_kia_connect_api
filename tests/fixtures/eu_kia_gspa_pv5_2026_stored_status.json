@@ -1,0 +1,525 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia PV5 Passenger",
+        "year": 2026,
+        "region": "EU",
+        "brand": "Kia",
+        "api_class": "KiaCciApiEU (GSPA CCI)",
+        "endpoint": "gspa status/vehicles/{carId}/stored-status",
+        "description": "GSPA stored-status captured live on a Kia PV5 Passenger (2026, EV, EU CCI, region 9). Structure and key names are unchanged. Only identifying leaves were replaced: Date, Version (CCU build string), Drivetrain.Odometer, and in the envelope lastUpdateTime and metaInfo.msgId. All remaining values are the real ones from the vehicle, so the value ranges and enum values in #1321 can be checked against this file. This tree has no Location/GeoCoord node, no VIN, and the Plug&Charge contract slots are empty.",
+        "envelope": {
+            "serviceNo": "RVS-K",
+            "lastUpdateTime": "1789000000000",
+            "metaInfo": {
+                "retCode": "S",
+                "resCode": "200-000",
+                "msgId": "<redacted>",
+                "message": "Success"
+            }
+        }
+    },
+    "Body": {
+        "Hood": {
+            "Open": 0
+        },
+        "Lights": {
+            "DischargeAlert": {
+                "State": 0
+            },
+            "Front": {
+                "HeadLamp": {
+                    "SystemWarning": 0
+                },
+                "Left": {
+                    "High": {
+                        "Warning": 0
+                    },
+                    "Low": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "LampState": 0,
+                        "Warning": 0
+                    }
+                },
+                "Right": {
+                    "High": {
+                        "Warning": 0
+                    },
+                    "Low": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "LampState": 0,
+                        "Warning": 0
+                    }
+                }
+            },
+            "Rear": {
+                "Left": {
+                    "StopLamp": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                },
+                "Right": {
+                    "StopLamp": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                }
+            },
+            "TurnSignalMode": 0,
+            "TailLamp": {
+                "Alert": 0
+            },
+            "Hazard": {
+                "Alert": 0
+            }
+        },
+        "Sunroof": {
+            "Glass": {
+                "Open": 2
+            }
+        },
+        "Trunk": {
+            "Open": 0
+        },
+        "Windshield": {
+            "Front": {
+                "Defog": {
+                    "State": 0
+                },
+                "Heat": {
+                    "State": 0
+                },
+                "WasherFluid": {
+                    "LevelLow": 0
+                }
+            },
+            "Rear": {
+                "Defog": {
+                    "State": 0
+                }
+            }
+        }
+    },
+    "Cabin": {
+        "Door": {
+            "Row1": {
+                "Driver": {
+                    "Lock": 0,
+                    "Open": 0
+                },
+                "Passenger": {
+                    "Lock": 0,
+                    "Open": 0
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Lock": 0,
+                    "Open": 0
+                },
+                "Right": {
+                    "Lock": 0,
+                    "Open": 0
+                }
+            }
+        },
+        "HVAC": {
+            "OutsideTemperature": {
+                "Unit": 0,
+                "Value": "19.5"
+            },
+            "Row1": {
+                "Driver": {
+                    "Blower": {
+                        "SpeedLevel": 0
+                    },
+                    "Temperature": {
+                        "Unit": 0,
+                        "Value": "OFF"
+                    }
+                }
+            },
+            "Temperature": {
+                "RangeType": 1
+            },
+            "Vent": {
+                "AirCleaning": {
+                    "Indicator": 1,
+                    "SymbolColor": 0
+                },
+                "FineDust": {
+                    "Level": 0,
+                    "State": 0
+                }
+            }
+        },
+        "RestMode": {
+            "State": 0
+        },
+        "SteeringWheel": {
+            "Heat": {
+                "RemoteControl": {
+                    "Step": 0
+                },
+                "State": 0
+            }
+        },
+        "Window": {
+            "Row1": {
+                "Driver": {
+                    "Open": 0,
+                    "OpenLevel": 0
+                },
+                "Passenger": {
+                    "Open": 0,
+                    "OpenLevel": 0
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Open": 0,
+                    "OpenLevel": 0
+                },
+                "Right": {
+                    "Open": 0,
+                    "OpenLevel": 0
+                }
+            }
+        }
+    },
+    "Chassis": {
+        "Axle": {
+            "Row1": {
+                "Left": {
+                    "Tire": {
+                        "Pressure": 255,
+                        "PressureLow": 0,
+                        "WheelSpeed": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "Pressure": 255,
+                        "PressureLow": 0
+                    }
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Tire": {
+                        "Pressure": 255,
+                        "PressureLow": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "Pressure": 255,
+                        "PressureLow": 0
+                    }
+                }
+            },
+            "Tire": {
+                "PressureLow": 0,
+                "PressureUnit": 2
+            }
+        },
+        "Brake": {
+            "Fluid": {
+                "Warning": 0
+            }
+        },
+        "Driving": {
+            "WheelDriveType": {
+                "ControllerState2": 1
+            }
+        },
+        "DrivingMode": {
+            "State": "Normal"
+        }
+    },
+    "ConnectedService": {
+        "OTA": {
+            "ControllerStatus": 0
+        }
+    },
+    "Date": "20260101090000.000",
+    "Drivetrain": {
+        "FuelSystem": {
+            "AverageFuelEconomy": {
+                "Accumulated": 19.3,
+                "AfterRefuel": 16.7,
+                "Drive": 16.6,
+                "Unit": 5
+            },
+            "DTE": {
+                "Total": 237,
+                "Unit": 1
+            },
+            "FuelLevel": 0,
+            "LowFuelWarning": 0
+        },
+        "Odometer": 12345.0,
+        "Transmission": {
+            "GearPosition": 0,
+            "ParkingPosition": 1
+        }
+    },
+    "DrivingReady": 0,
+    "Electronics": {
+        "AutoCut": {
+            "BatteryPreWarning": 0,
+            "DeliveryMode": 2,
+            "PowerMode": 2
+        },
+        "Battery": {
+            "Charging": {
+                "WarningLevel": 65
+            },
+            "Level": 88,
+            "PowerStateAlert": {
+                "ClassC": 2
+            },
+            "SensorReliability": 0
+        },
+        "FOB": {
+            "LowBattery": 0
+        },
+        "PowerSupply": {
+            "Accessory": 0,
+            "Ignition1": 0,
+            "Ignition3": 0
+        }
+    },
+    "Green": {
+        "BatteryManagement": {
+            "BatteryCapacity": {
+                "Value": 256320,
+                "Unit": "kJ"
+            },
+            "BatteryConditioning": 0,
+            "BatteryPackVoltage": 413.2,
+            "BatteryPreCondition": {
+                "Status": 0,
+                "TemperatureLevel": 2
+            },
+            "BatteryRemain": {
+                "Ratio": 56.5,
+                "Value": 153756,
+                "Unit": "kJ"
+            },
+            "ChillerRPM": 0,
+            "HeatingState": 0,
+            "Temperature": {
+                "CoolingWaterInlet": 20,
+                "Max": {
+                    "Decimal": 22,
+                    "Raw": 22
+                },
+                "Min": {
+                    "Decimal": 20.5,
+                    "Raw": 20
+                }
+            },
+            "WinterModeOperation": 1
+        },
+        "ChargingConnector": {
+            "LockState": 0
+        },
+        "ChargingInformation": {
+            "Charging": {
+                "RemainTime": 0,
+                "SoC": {
+                    "Decimal": 0.1,
+                    "Raw": 58
+                }
+            },
+            "ConnectorFastening": {
+                "State": 0
+            },
+            "DTE": {
+                "TargetSoC": {
+                    "Quick": 332,
+                    "Standard": 332
+                }
+            },
+            "ElectricCurrentLevel": {
+                "State": 1
+            },
+            "EstimatedTime": {
+                "ICCB": 420,
+                "Quick": 21,
+                "Standard": 106
+            },
+            "ExpectedTime": {
+                "EndDay": 7,
+                "EndHour": 31,
+                "EndMin": 63,
+                "StartDay": 7,
+                "StartHour": 31,
+                "StartMin": 63
+            },
+            "SequenceDetails": 0,
+            "SequenceSubcode": 0,
+            "Setting": {
+                "CompleteAlarm": {
+                    "Before10min": 1,
+                    "Before20min": 0,
+                    "Before30min": 0,
+                    "Off": 0
+                }
+            },
+            "TargetSoC": {
+                "Quick": 80,
+                "Standard": 80
+            }
+        },
+        "DrivingHistory": {
+            "Average": 16.7,
+            "Unit": 1
+        },
+        "DrivingReady": 0,
+        "Electric": {
+            "SmartGrid": {
+                "RealTimePower": 0,
+                "VehicleToLoad": {
+                    "DischargeLimitation": {
+                        "DTE": 78,
+                        "RemainTime": 0,
+                        "SoC": 20
+                    },
+                    "Mode": 1
+                }
+            }
+        },
+        "EnergyInformation": {
+            "DTE": {
+                "Invalid": 0,
+                "TrailerCorrelationValue": 1
+            }
+        },
+        "PlugAndCharge": {
+            "ContractCertificate": {
+                "Changeable": 1,
+                "Mode": 1,
+                "SelectedCert": 0
+            },
+            "ContractCertificate1": {
+                "CompanyMask": 0,
+                "Mon": 0,
+                "State": 2,
+                "Year": 0
+            },
+            "ContractCertificate2": {
+                "CompanyMask": 0,
+                "Mon": 0,
+                "State": 2,
+                "Year": 0
+            },
+            "ContractCertificate3": {
+                "CompanyMask": 0,
+                "Mon": 0,
+                "State": 2,
+                "Year": 0
+            },
+            "ContractCertificate4": {
+                "CompanyMask": 0,
+                "Mon": 0,
+                "State": 2,
+                "Year": 0
+            },
+            "ContractCertificate5": {
+                "CompanyMask": 0,
+                "Mon": 0,
+                "State": 2,
+                "Year": 0
+            }
+        },
+        "PowerConsumption": {
+            "Moment": {
+                "BatteryCooling": 0,
+                "BatteryHeater": 0,
+                "ClimateAirConditioning": 0
+            },
+            "Prediction": {
+                "Climate": 0
+            }
+        },
+        "Reservation": {
+            "Departure": {
+                "Climate": {
+                    "Activation": 0,
+                    "Defrost": 0,
+                    "TemperatureHex": "00",
+                    "TemperatureUnit": 0,
+                    "Temperature": "OFF"
+                },
+                "Schedule1": {
+                    "Enable": 0,
+                    "Fri": 0,
+                    "Hour": 31,
+                    "Min": 70,
+                    "Mon": 0,
+                    "Sat": 0,
+                    "Sun": 0,
+                    "Thu": 0,
+                    "Tue": 0,
+                    "Wed": 0
+                },
+                "Schedule2": {
+                    "Activation": 0,
+                    "Climate": {
+                        "Defrost": 0,
+                        "TemperatureHex": "00",
+                        "Temperature": "OFF"
+                    },
+                    "Enable": 0,
+                    "Fri": 0,
+                    "Hour": 31,
+                    "Min": 70,
+                    "Mon": 0,
+                    "Sat": 0,
+                    "Sun": 0,
+                    "Thu": 0,
+                    "Tue": 0,
+                    "Wed": 0
+                }
+            },
+            "OffPeakTime": {
+                "EndHour": 17,
+                "EndMin": 30,
+                "Mode": 2,
+                "StartHour": 14,
+                "StartMin": 20
+            }
+        }
+    },
+    "Offset": "0",
+    "RemoteControl": {
+        "SleepMode": 1
+    },
+    "Service": {
+        "ConnectedCar": {
+            "RemoteControl": {
+                "Available": 1,
+                "WaitingTime": 336
+            },
+            "ActiveAlert": {
+                "Available": 1
+            }
+        }
+    },
+    "Version": "CCU0000000000000000",
+    "Server": {
+        "Option": {
+            "HvacTempType": 1
+        }
+    }
+}

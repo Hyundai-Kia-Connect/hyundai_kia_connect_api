@@ -1,38 +1,258 @@
 """ApiImplType1.py"""
 
+import base64
 import datetime as dt
-from typing import Optional
+import functools
+import logging
+import math
+import random
+import threading
+import time
+import uuid
+from collections.abc import Callable, Sequence
+from time import sleep
+from typing import Any, cast
+from urllib.parse import parse_qs, urlparse
 
 from .ApiImpl import (
     ApiImpl,
+    ApiImplSession,
+    ClimateRequestOptions,
+    OTPRequest,
+    POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+    _fill_schedule_options_from_vehicle,
+    _guard_schedule_temperature,
+    _schedule_charging_scopes,
+    _vehicle_temperature_unit,
 )
-from .Token import Token
-from .Vehicle import Vehicle
-
-from .utils import (
-    get_child_value,
-    parse_datetime,
-)
-
 from .const import (
+    CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
+    DOMAIN,
     ENGINE_TYPES,
+    ENGINE_TYPES_BY_VEHICLE_TYPE,
+    ORDER_STATUS,
+    PRESSURE_SCALES,
+    SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    VALET_MODE_ACTION,
+    VEHICLE_LOCK_ACTION,
+    PressureUnit,
+)
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    DeviceIDError,
+    DuplicateRequestError,
+    InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+    UnsupportedControlError,
+)
+from .Token import Token
+from .utils import (
+    bool_or_none,
+    ccs2_reservation_time_or_none,
+    flag_or_none,
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+    normalize_battery_soc,
+    normalize_battery_soh,
+    parse_datetime,
+    pressure_or_none,
+    window_is_open,
+)
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
+    """On DeviceIDError, re-register device_id and retry once.
+
+    EU server invalidates device_id when push delivery fails. Instead of
+    proactively rotating device_id after every control command (which causes
+    race conditions), we retry only when the error actually occurs.
+    """
+    _device_id_lock = threading.Lock()
+
+    @functools.wraps(func)
+    def wrapper(self: Any, token: Token, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return func(self, token, *args, **kwargs)
+        except DeviceIDError:
+            with _device_id_lock:
+                _LOGGER.debug(f"{DOMAIN} - DeviceIDError, re-registering device_id")
+                stamp = self._get_stamp()
+                token.device_id = self._get_device_id(stamp)
+            return func(self, token, *args, **kwargs)
+
+    return cast(F, wrapper)
+
+
+def _check_response_for_errors(response: dict[str, Any]) -> None:
+    """
+    Checks for errors in the API response.
+    If an error is found, an exception is raised.
+    retCode known values:
+    - S: success
+    - F: failure
+    resCode / resMsg known values:
+    - 0000: no error
+    - 4002:  "Invalid request body - invalid deviceId",
+             relogin will resolve but a bandaid.
+    - 4004: "Duplicate request"
+    - 4081: "Request timeout"
+    - 5031: "Unavailable remote control - Service Temporary Unavailable"
+    - 5091: "Exceeds number of requests"
+    - 5921: "No Data Found v2 - No Data Found v2"
+    - 9999: "Undefined Error - Response timeout"
+    :param response: the API's JSON response
+    """
+
+    error_code_mapping = {
+        "7501": AuthenticationError,
+        "4002": DeviceIDError,
+        "4004": DuplicateRequestError,
+        "4005": UnsupportedControlError,
+        "4081": RequestTimeoutError,
+        "5031": ServiceTemporaryUnavailable,
+        "5091": RateLimitingError,
+        "5921": NoDataFound,
+        "9999": RequestTimeoutError,
+    }
+
+    error_message_to_exception_mapping = {
+        "Key not authorized: Token is expired": AuthenticationError,
+        "Key not authorized: token has expired": AuthenticationError,
+    }
+
+    if not any(
+        x in response for x in ["retCode", "resCode", "resMsg", "error", "access_token"]
+    ):
+        _LOGGER.error(f"Unknown API response format: {response}")
+        raise InvalidAPIResponseError()
+
+    if "retCode" in response and response["retCode"] == "F":
+        if response["resCode"] in error_code_mapping:
+            raise error_code_mapping[response["resCode"]](response["resMsg"])
+        raise APIError(
+            f"Server returned:  '{response['resCode']}' '{response['resMsg']}'"
+        )
+    elif "error" in response:
+        error_reason = response["error"]
+        if error_reason in error_message_to_exception_mapping:
+            _LOGGER.error(f"API error: {error_reason}")
+            raise error_message_to_exception_mapping[error_reason](error_reason)
+        else:
+            _LOGGER.error(f"Unknown error in API response: {error_reason}")
+            raise APIError(f"Unknown error in API response: {error_reason}")
+    elif "retCode" in response and "retMsg" in response:
+        retMSG = response["retMsg"]
+        if retMSG == "Received unexpected statusCode":
+            raise AuthenticationError(retMSG)
+
+
+def _filled[T](value: T | None) -> T:
+    """Narrow a schedule option set by _fill_schedule_options_from_vehicle."""
+    assert value is not None
+    return value
 
 
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
+    supports_window_control: bool = True
+    supports_valet_mode: bool = True
+    # resMsg key holding the all-time entry of the drvhistory response.
+    DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
+    # Set by each region's __init__.
+    BASE_URL: str
+    USER_API_URL: str
+    SPA_API_URL: str
+    SPA_API_URL_V2: str
+    CCSP_SERVICE_ID: str
+    APP_ID: str
+    BASIC_AUTHORIZATION: str
+    CFB: bytes
+    temperature_range: Sequence[float]
+    PUSH_TYPE: str
+    LANGUAGE: str
+
     def __init__(self) -> None:
         """Initialize."""
+        self.session = ApiImplSession()
+
+    @_retry_on_device_id_error
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        url = self.SPA_API_URL + "vehicles"
+        response = self.session.get(
+            url,
+            headers=self._get_authenticated_headers(token),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Vehicles Response: {response}")
+        _check_response_for_errors(response)
+        return [
+            self._vehicle_from_spa_entry(entry)
+            for entry in response["resMsg"]["vehicles"]
+        ]
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        return Vehicle(
+            id=entry["vehicleId"],
+            name=entry["nickname"],
+            model=entry["vehicleName"],
+            registration_date=entry["regDate"],
+            VIN=entry["vin"],
+            timezone=self.data_timezone,
+            engine_type=ENGINE_TYPES_BY_VEHICLE_TYPE.get(entry["type"]),
+            # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
+            # those vehicles on the legacy status path.
+            ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
+        )
+
+    def _get_time_from_string(self, value: Any, timesection: Any) -> dt.time | None:
+        if value is None:
+            return None
+        try:
+            if not str(value).strip() or int(value) == 0:
+                return None  # "0000" / "0" / "" = unset EV timer (issue #1206)
+            lastTwo = int(value[-2:])
+            if lastTwo > 60:
+                value = int(value) + 40
+            if int(value) > 1260:
+                return dt.datetime.strptime(str(value), "%H%M").time()
+            d = dt.datetime.strptime(str(value), "%I%M")
+            if timesection and timesection > 0:
+                d += dt.timedelta(hours=12)
+            return d.time()
+        except (ValueError, TypeError) as e:  # fmt: skip
+            _LOGGER.warning(
+                "Could not parse EV timer value %r (timesection=%r): %s",
+                value,
+                timesection,
+                e,
+            )
+            return None
 
     def _get_authenticated_headers(
-        self, token: Token, ccs2_support: Optional[int] = None
-    ) -> dict:
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict[str, Any]:
         return {
             "Authorization": token.access_token,
             "ccsp-service-id": self.CCSP_SERVICE_ID,
@@ -46,10 +266,405 @@ class ApiImplType1(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
-        if get_child_value(state, "Date"):
+    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        control_token, _ = self._get_control_token(token)
+        authenticated_headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        return authenticated_headers | {
+            "Authorization": control_token,
+            "AuthorizationCCSP": control_token,
+        }
+
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        """Authenticated headers for the shared per-vehicle read helpers.
+
+        AU and CN override this to omit the CCS2 protocol-support value.
+        """
+        return self._get_authenticated_headers(token, vehicle.ccu_ccs2_protocol_support)
+
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        if get_child_value(state, "status.time"):
             vehicle.last_updated_at = parse_datetime(
-                get_child_value(state, "Date"), self.data_timezone
+                get_child_value(state, "status.time"), self.data_timezone
+            )
+        else:
+            vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
+
+        if get_child_value(state, "status.odometer.value"):
+            vehicle.odometer = (
+                get_child_value(state, "status.odometer.value"),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "status.odometer.unit",
+                    )
+                ],
+            )
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "status.battery.batSoc")
+        )
+        vehicle.engine_is_running = get_child_value(state, "status.engine")
+
+        # Converts temp to usable number. Currently only support celsius.
+        # "FFH" is the CN sentinel for "no valid temperature" (AC off / not
+        # reported) — live-verified on a 2025 Custo.  Its decoded index falls
+        # far outside temperature_range, so skip it silently instead of
+        # raising IndexError.
+        air_temp_value = get_child_value(state, "status.airTemp.value")
+        if air_temp_value and air_temp_value != "FFH":
+            try:
+                tempIndex = cast(int, get_hex_temp_into_index(air_temp_value))
+                vehicle.air_temperature = (
+                    self.temperature_range[tempIndex],
+                    TEMPERATURE_UNITS[
+                        get_child_value(
+                            state,
+                            "status.airTemp.unit",
+                        )
+                    ],
+                )
+            except (ValueError, IndexError):
+                _LOGGER.debug(f"{DOMAIN} - Unparsable airTemp value: {air_temp_value}")
+        vehicle.defrost_is_on = get_child_value(state, "status.defrost")
+        steer_wheel_heat = get_child_value(state, "status.steerWheelHeat")
+        if steer_wheel_heat in [0, 2]:
+            vehicle.steering_wheel_heater_is_on = False
+        elif steer_wheel_heat == 1:
+            vehicle.steering_wheel_heater_is_on = True
+
+        vehicle.back_window_heater_is_on = get_child_value(
+            state, "status.sideBackWindowHeat"
+        )
+        vehicle.side_mirror_heater_is_on = get_child_value(
+            state, "status.sideMirrorHeat"
+        )
+        vehicle.front_left_seat_status = SEAT_STATUS.get(
+            get_child_value(state, "status.seatHeaterVentState.flSeatHeatState")
+        )
+        vehicle.front_right_seat_status = SEAT_STATUS.get(
+            get_child_value(state, "status.seatHeaterVentState.frSeatHeatState")
+        )
+        vehicle.rear_left_seat_status = SEAT_STATUS.get(
+            get_child_value(state, "status.seatHeaterVentState.rlSeatHeatState")
+        )
+        vehicle.rear_right_seat_status = SEAT_STATUS.get(
+            get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
+        )
+        vehicle.is_locked = get_child_value(state, "status.doorLock")
+        vehicle.front_left_door_is_open = get_child_value(
+            state, "status.doorOpen.frontLeft"
+        )
+        vehicle.front_right_door_is_open = get_child_value(
+            state, "status.doorOpen.frontRight"
+        )
+        vehicle.back_left_door_is_open = get_child_value(
+            state, "status.doorOpen.backLeft"
+        )
+        vehicle.back_right_door_is_open = get_child_value(
+            state, "status.doorOpen.backRight"
+        )
+        vehicle.hood_is_open = get_child_value(state, "status.hoodOpen")
+        vehicle.front_left_window_is_open = get_child_value(
+            state, "status.windowOpen.frontLeft"
+        )
+        vehicle.front_right_window_is_open = get_child_value(
+            state, "status.windowOpen.frontRight"
+        )
+        vehicle.back_left_window_is_open = get_child_value(
+            state, "status.windowOpen.backLeft"
+        )
+        vehicle.back_right_window_is_open = get_child_value(
+            state, "status.windowOpen.backRight"
+        )
+        vehicle.tire_pressure_rear_left_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRL")
+        )
+        vehicle.tire_pressure_front_left_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFL")
+        )
+        vehicle.tire_pressure_front_right_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampFR")
+        )
+        vehicle.tire_pressure_rear_right_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampRR")
+        )
+        vehicle.tire_pressure_all_warning_is_on = bool(
+            get_child_value(state, "status.tirePressureLamp.tirePressureLampAll")
+        )
+        vehicle.trunk_is_open = get_child_value(state, "status.trunkOpen")
+        vehicle.ev_battery_percentage = get_child_value(
+            state, "status.evStatus.batteryStatus"
+        )
+        vehicle.ev_battery_is_charging = get_child_value(
+            state, "status.evStatus.batteryCharge"
+        )
+
+        vehicle.ev_battery_is_plugged_in = get_child_value(
+            state, "status.evStatus.batteryPlugin"
+        )
+
+        ev_charge_port_door_is_open = get_child_value(
+            state, "status.evStatus.chargePortDoorOpenStatus"
+        )
+
+        if ev_charge_port_door_is_open == 1:
+            vehicle.ev_charge_port_door_is_open = True
+        elif ev_charge_port_door_is_open == 2:
+            vehicle.ev_charge_port_door_is_open = False
+        if (
+            get_child_value(
+                state,
+                "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+            )
+            is not None
+        ):
+            vehicle.total_driving_range = (
+                round(
+                    float(
+                        get_child_value(
+                            state,
+                            "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.value",
+                        )
+                    ),
+                    1,
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "status.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                    )
+                ],
+            )
+        if (
+            get_child_value(
+                state,
+                "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+            )
+            is not None
+        ):
+            vehicle.ev_driving_range = (
+                round(
+                    float(
+                        get_child_value(
+                            state,
+                            "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.value",
+                        )
+                    ),
+                    1,
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "status.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                    )
+                ],
+            )
+        vehicle.ev_estimated_current_charge_duration = (
+            get_child_value(state, "status.evStatus.remainTime2.atc.value"),
+            "m",
+        )
+        vehicle.ev_estimated_fast_charge_duration = (
+            get_child_value(state, "status.evStatus.remainTime2.etc1.value"),
+            "m",
+        )
+        vehicle.ev_estimated_portable_charge_duration = (
+            get_child_value(state, "status.evStatus.remainTime2.etc2.value"),
+            "m",
+        )
+        vehicle.ev_estimated_station_charge_duration = (
+            get_child_value(state, "status.evStatus.remainTime2.etc3.value"),
+            "m",
+        )
+
+        target_soc_list = get_child_value(
+            state, "status.evStatus.reservChargeInfos.targetSOClist"
+        )
+        try:
+            vehicle.ev_charge_limits_ac = [
+                x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 1
+            ][-1]
+            vehicle.ev_charge_limits_dc = [
+                x["targetSOClevel"] for x in target_soc_list if x["plugType"] == 0
+            ][-1]
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - SOC Levels couldn't be found. May not be an EV.")
+        if (
+            get_child_value(
+                state,
+                "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+            )
+            is not None
+        ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
+                ),
+                DISTANCE_UNITS[
+                    get_child_value(
+                        state,
+                        "status.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                    )
+                ],
+            )
+        elif get_child_value(
+            state,
+            "status.dte.value",
+        ):
+            vehicle.fuel_driving_range = (
+                get_child_value(
+                    state,
+                    "status.dte.value",
+                ),
+                DISTANCE_UNITS[get_child_value(state, "status.dte.unit")],
+            )
+
+        vehicle.ev_target_range_charge_AC = (
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "status.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
+        )
+        vehicle.ev_target_range_charge_DC = (
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",
+            ),
+            DISTANCE_UNITS[
+                get_child_value(
+                    state,
+                    "status.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
+                )
+            ],
+        )
+        vehicle.ev_first_departure_enabled = get_child_value(
+            state,
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservChargeSet",
+        )
+        vehicle.ev_second_departure_enabled = get_child_value(
+            state,
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservChargeSet",
+        )
+        vehicle.ev_first_departure_days = get_child_value(
+            state,
+            "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.day",
+        )
+        vehicle.ev_second_departure_days = get_child_value(
+            state,
+            "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.day",
+        )
+
+        vehicle.ev_first_departure_time = self._get_time_from_string(
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.time",
+            ),
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail.reservInfo.time.timeSection",
+            ),
+        )
+
+        vehicle.ev_second_departure_time = self._get_time_from_string(
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.time",
+            ),
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail.reservInfo.time.timeSection",
+            ),
+        )
+
+        vehicle.ev_off_peak_start_time = self._get_time_from_string(
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.time",
+            ),
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.starttime.timeSection",
+            ),
+        )
+
+        vehicle.ev_off_peak_end_time = self._get_time_from_string(
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.time",
+            ),
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerTime1.endtime.timeSection",
+            ),
+        )
+
+        # offPeakPowerFlag semantics match the apps' vehicle data model:
+        # 1 = considering peak time ("off-peak tariffs prioritised"),
+        # 2 = only peak time ("off-peak tariffs only"), 0 = not applied.
+        if get_child_value(
+            state,
+            "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+        ):
+            if (
+                get_child_value(
+                    state,
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+                )
+                == 2
+            ):
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif (
+                get_child_value(
+                    state,
+                    "status.evStatus.reservChargeInfos.offpeakPowerInfo.offPeakPowerFlag",
+                )
+                == 1
+            ):
+                vehicle.ev_off_peak_charge_only_enabled = False
+
+        vehicle.washer_fluid_warning_is_on = get_child_value(
+            state, "status.washerFluidStatus"
+        )
+        vehicle.brake_fluid_warning_is_on = get_child_value(
+            state, "status.breakOilStatus"
+        )
+        vehicle.fuel_level = get_child_value(state, "status.fuelLevel")
+        vehicle.fuel_level_is_low = get_child_value(state, "status.lowFuelLight")
+        vehicle.air_control_is_on = get_child_value(state, "status.airCtrlOn")
+        vehicle.smart_key_battery_warning_is_on = get_child_value(
+            state, "status.smartKeyBatteryWarning"
+        )
+
+        if get_child_value(state, "vehicleLocation.coord.lat"):
+            vehicle.location = (
+                get_child_value(state, "vehicleLocation.coord.lat"),
+                get_child_value(state, "vehicleLocation.coord.lon"),
+                parse_datetime(
+                    get_child_value(state, "vehicleLocation.time"), self.data_timezone
+                ),
+            )
+        vehicle.data = state
+
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        if get_child_value(state, "Date"):
+            # CCS2 'Date' is always in UTC, convert to the region timezone.
+            # Always use a named timezone to ensure DST adjustment.
+            # In EU, CCS2 'Offset' is always 1 (CET), but CEST is UTC+0100.
+            # In AU, CCS2 'Offset' is 10 (AEST), but AEDT is UTC+1100.
+            date = parse_datetime(get_child_value(state, "Date"), dt.UTC)
+            vehicle.last_updated_at = (
+                date.astimezone(self.data_timezone) if date else None
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
@@ -58,8 +673,9 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Drivetrain.Odometer"),
             DISTANCE_UNITS[1],
         )
-        vehicle.car_battery_percentage = get_child_value(
-            state, "Electronics.Battery.Level"
+        vehicle.car_battery_percentage = normalize_battery_soc(
+            get_child_value(state, "Electronics.Battery.Level"),
+            get_child_value(state, "Electronics.Battery.SensorReliability"),
         )
 
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
@@ -68,9 +684,25 @@ class ApiImplType1(ApiImpl):
             state,
             "Cabin.HVAC.Row1.Driver.Temperature.Value",
         )
+        unit = get_child_value(
+            state,
+            "Cabin.HVAC.Row1.Driver.Temperature.Unit",
+        )
 
-        if air_temp != "OFF":
-            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[1])
+        if air_temp not in (None, "OFF") and unit in TEMPERATURE_UNITS:
+            vehicle.air_temperature = (air_temp, TEMPERATURE_UNITS[unit])
+        elif air_temp_unit := TEMPERATURE_UNITS.get(unit):
+            # With climate off the setpoint is "OFF" but the unit is still
+            # reported; keep it so consumers know the car's unit.
+            vehicle._air_temperature_unit = air_temp_unit
+
+        outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
+        outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
+        if outside_temp is not None and outside_temp_unit is not None:
+            vehicle.outside_temperature = (
+                outside_temp,
+                TEMPERATURE_UNITS[outside_temp_unit],
+            )
 
         defrost_is_on = get_child_value(state, "Body.Windshield.Front.Defog.State")
         if defrost_is_on in [0, 2]:
@@ -92,23 +724,55 @@ class ApiImplType1(ApiImpl):
 
         # TODO: status.sideMirrorHeat
 
-        vehicle.front_left_seat_status = SEAT_STATUS[
+        vehicle.front_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row1.Driver.Climate.State")
-        ]
+        )
 
-        vehicle.front_right_seat_status = SEAT_STATUS[
+        vehicle.front_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row1.Passenger.Climate.State")
-        ]
+        )
 
-        vehicle.rear_left_seat_status = SEAT_STATUS[
+        vehicle.rear_left_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row2.Left.Climate.State")
-        ]
+        )
 
-        vehicle.rear_right_seat_status = SEAT_STATUS[
+        vehicle.rear_right_seat_status = SEAT_STATUS.get(
             get_child_value(state, "Cabin.Seat.Row2.Right.Climate.State")
-        ]
+        )
 
-        # TODO: status.doorLock
+        vehicle.headlamp_status = get_child_value(
+            state, "Body.Lights.Front.HeadLamp.SystemWarning"
+        )
+        vehicle.headlamp_left_low = get_child_value(
+            state, "Body.Lights.Front.Left.Low.Warning"
+        )
+        vehicle.headlamp_right_low = get_child_value(
+            state, "Body.Lights.Front.Right.Low.Warning"
+        )
+        vehicle.headlamp_left_high = get_child_value(
+            state, "Body.Lights.Front.Left.High.Warning"
+        )
+        vehicle.headlamp_right_high = get_child_value(
+            state, "Body.Lights.Front.Right.High.Warning"
+        )
+        vehicle.stop_lamp_left = get_child_value(
+            state, "Body.Lights.Rear.Left.StopLamp.Warning"
+        )
+        vehicle.stop_lamp_right = get_child_value(
+            state, "Body.Lights.Rear.Right.StopLamp.Warning"
+        )
+        vehicle.turn_signal_left_front = get_child_value(
+            state, "Body.Lights.Front.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_front = get_child_value(
+            state, "Body.Lights.Front.Right.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_left_rear = get_child_value(
+            state, "Body.Lights.Rear.Left.TurnSignal.Warning"
+        )
+        vehicle.turn_signal_right_rear = get_child_value(
+            state, "Body.Lights.Rear.Right.TurnSignal.Warning"
+        )
 
         vehicle.front_left_door_is_open = get_child_value(
             state, "Cabin.Door.Row1.Driver.Open"
@@ -123,26 +787,57 @@ class ApiImplType1(ApiImpl):
             state, "Cabin.Door.Row2.Right.Open"
         )
 
-        # TODO: should the windows and trunc also be checked?
-        vehicle.is_locked = not (
-            vehicle.front_left_door_is_open
-            or vehicle.front_right_door_is_open
-            or vehicle.back_left_door_is_open
-            or vehicle.back_right_door_is_open
+        vehicle.front_left_door_is_locked = (
+            not bool(get_child_value(state, "Cabin.Door.Row1.Driver.Lock"))
+            if get_child_value(state, "Cabin.Door.Row1.Driver.Lock") is not None
+            else None
+        )
+        vehicle.front_right_door_is_locked = (
+            not bool(get_child_value(state, "Cabin.Door.Row1.Passenger.Lock"))
+            if get_child_value(state, "Cabin.Door.Row1.Passenger.Lock") is not None
+            else None
+        )
+        vehicle.back_left_door_is_locked = (
+            not bool(get_child_value(state, "Cabin.Door.Row2.Left.Lock"))
+            if get_child_value(state, "Cabin.Door.Row2.Left.Lock") is not None
+            else None
+        )
+        vehicle.back_right_door_is_locked = (
+            not bool(get_child_value(state, "Cabin.Door.Row2.Right.Lock"))
+            if get_child_value(state, "Cabin.Door.Row2.Right.Lock") is not None
+            else None
+        )
+
+        vehicle.is_locked = (
+            vehicle.front_left_door_is_locked
+            and vehicle.front_right_door_is_locked
+            and vehicle.back_left_door_is_locked
+            and vehicle.back_right_door_is_locked
         )
 
         vehicle.hood_is_open = get_child_value(state, "Body.Hood.Open")
-        vehicle.front_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Driver.Open"
+        vehicle.front_left_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row1.Driver.Open",
+            "Cabin.Window.Row1.Driver.OpenLevel",
         )
-        vehicle.front_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row1.Passenger.Open"
+        vehicle.front_right_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row1.Passenger.Open",
+            "Cabin.Window.Row1.Passenger.OpenLevel",
         )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Left.Open"
+        vehicle.back_left_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row2.Left.Open",
+            "Cabin.Window.Row2.Left.OpenLevel",
         )
-        vehicle.back_right_window_is_open = get_child_value(
-            state, "Cabin.Window.Row2.Right.Open"
+        vehicle.back_right_window_is_open = window_is_open(
+            state,
+            "Cabin.Window.Row2.Right.Open",
+            "Cabin.Window.Row2.Right.OpenLevel",
+        )
+        vehicle.sunroof_is_open = flag_or_none(
+            get_child_value(state, "Body.Sunroof.Glass.Open")
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
@@ -159,26 +854,188 @@ class ApiImplType1(ApiImpl):
         vehicle.tire_pressure_all_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Tire.PressureLow")
         )
+        # Tire pressure values (model B: raw is in the car's display unit; the
+        # scale depends on PressureUnit). Live-confirmed EU Santa Fe 2026:
+        #   bar (PressureUnit.BAR) raw 27 -> 2.7  (x0.1, 0.1-bar steps)
+        #   psi (PressureUnit.PSI) raw 38 -> 38   (x1, integer psi)
+        #   kPa (PressureUnit.KPA) raw 51 -> 255  (x5, 5-kPa steps)
+        # See const.PRESSURE_UNITS / PRESSURE_SCALES. Per-tire *_unit labels are
+        # read-only properties on Vehicle deriving from tire_pressure_unit.
+        _pu_raw = get_child_value(state, "Chassis.Axle.Tire.PressureUnit")
+        if _pu_raw is None:
+            vehicle.tire_pressure_unit = None
+        else:
+            try:
+                vehicle.tire_pressure_unit = PressureUnit(_pu_raw)
+            except ValueError:
+                # PressureUnit outside {0:psi,1:kpa,2:bar}; e.g. 3 on
+                # indirect-TPMS vehicles (no direct sensor, kia_uvo #1786) ->
+                # the car reports no per-tire pressure, so unavailable is
+                # correct. Expected on some vehicles, so debug, not warning.
+                _LOGGER.debug(
+                    "%s - Tire PressureUnit %r not in {0:psi,1:kpa,2:bar}; "
+                    "tire pressure values ignored",
+                    DOMAIN,
+                    _pu_raw,
+                )
+                vehicle.tire_pressure_unit = None
+        _scale = (
+            PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+            if vehicle.tire_pressure_unit is not None
+            else None
+        )
+        # 255 (0xFF) is the TPMS "no reading" sentinel (car off / before
+        # driving) -> pressure_or_none returns None so the entity shows
+        # unavailable instead of an impossible value. See kia_uvo #1783, #1232.
+        _pfl = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
+        )
+        _pfr = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row1.Right.Tire.Pressure")
+        )
+        _prl = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row2.Left.Tire.Pressure")
+        )
+        _prr = pressure_or_none(
+            get_child_value(state, "Chassis.Axle.Row2.Right.Tire.Pressure")
+        )
+        vehicle.tire_pressure_front_left = (
+            round(_pfl * _scale, 1) if _pfl is not None and _scale is not None else None
+        )
+        vehicle.tire_pressure_front_right = (
+            round(_pfr * _scale, 1) if _pfr is not None and _scale is not None else None
+        )
+        vehicle.tire_pressure_rear_left = (
+            round(_prl * _scale, 1) if _prl is not None and _scale is not None else None
+        )
+        vehicle.tire_pressure_rear_right = (
+            round(_prr * _scale, 1) if _prr is not None and _scale is not None else None
+        )
+        # Drive mode (e.g. "Eco", "Sport", "Comfort", "Snow", "Smart").
+        vehicle.drive_mode = get_child_value(state, "Chassis.DrivingMode.State")
+        # Low oil level warning (HEV/ICE). None when unreported (no sensor -> no
+        # entity downstream).
+        vehicle.oil_level_warning_is_on = bool_or_none(
+            get_child_value(
+                state, "Drivetrain.InternalCombustionEngine.OilLevelWarning"
+            )
+        )
+        # 12V auxiliary battery fault warning. None when unreported.
+        vehicle.battery_auxiliary_fail_warning_is_on = bool_or_none(
+            get_child_value(state, "Electronics.Battery.Auxiliary.FailWarning")
+        )
+        # Power/ignition/sleep — gap vs CA/IN flat format.
+        vehicle.accessory_on = bool_or_none(
+            get_child_value(state, "Electronics.PowerSupply.Accessory")
+        )
+        vehicle.ign3 = bool_or_none(
+            get_child_value(state, "Electronics.PowerSupply.Ignition3")
+        )
+        vehicle.sleep_mode_check = bool_or_none(
+            get_child_value(state, "RemoteControl.SleepMode")
+        )
         vehicle.trunk_is_open = get_child_value(state, "Body.Trunk.Open")
 
         vehicle.ev_battery_percentage = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Ratio"
         )
+
+        vehicle.ev_battery_pack_voltage = get_child_value(
+            state, "Green.BatteryManagement.BatteryPackVoltage"
+        )
+        vehicle.ev_battery_chiller_rpm = get_child_value(
+            state, "Green.BatteryManagement.ChillerRPM"
+        )
+
+        battery_heating_state = get_child_value(
+            state, "Green.BatteryManagement.HeatingState"
+        )
+        if battery_heating_state is not None:
+            vehicle.ev_battery_heating_state = bool(battery_heating_state)
+
+        vehicle.ev_battery_water_temperature = (
+            get_child_value(
+                state, "Green.BatteryManagement.Temperature.CoolingWaterInlet"
+            ),
+            TEMPERATURE_UNITS[0],
+        )
+        vehicle.ev_battery_temperature_min = (
+            get_child_value(state, "Green.BatteryManagement.Temperature.Min.Raw"),
+            TEMPERATURE_UNITS[0],
+        )
+        vehicle.ev_battery_temperature_max = (
+            get_child_value(state, "Green.BatteryManagement.Temperature.Max.Raw"),
+            TEMPERATURE_UNITS[0],
+        )
+
+        winter_mode = get_child_value(
+            state, "Green.BatteryManagement.WinterModeOperation"
+        )
+
+        # EV battery preconditioning toggle.
+        # EV (e.g. IONIQ 5) reports Green.BatteryManagement.BatteryPreCondition.Status
+        # — a configuration setting (stable across ignition/climate state), not a
+        # runtime flag (BatteryConditioning is the runtime flag). HEV (e.g. Santa
+        # Fe) reports only WinterModeOperation; "winter mode" is itself the
+        # battery preconditioning/winter-heating toggle there, so keep it as the
+        # fallback (preserves existing HEV behaviour, no regression).
+        # Status enum mapping matches the official app (kia_uvo #1823, dump:
+        # Status=2 with preconditioning off in vehicle settings):
+        #   0 / 2 / 6 = off, 3 / 4 = on.
+        # Pre-#1205 this sensor aliased WinterModeOperation, which is absent on
+        # EVs -> the sensor never appeared (see API #1187).
+        battery_precondition_status = get_child_value(
+            state, "Green.BatteryManagement.BatteryPreCondition.Status"
+        )
+        if battery_precondition_status is not None:
+            vehicle.ev_battery_precondition_enabled = battery_precondition_status in (
+                3,
+                4,
+            )
+            # WinterModeOperation is not a user-facing "Winter Mode" toggle on
+            # EVs (kia_uvo #1823) — leave ev_battery_winter_mode unset (None).
+        elif winter_mode is not None:
+            vehicle.ev_battery_precondition_enabled = bool(winter_mode)
+            vehicle.ev_battery_winter_mode = bool(winter_mode)
+
+        if get_child_value(state, "Green.Electric.SmartGrid.RealTimePower") is not None:
+            vehicle.ev_charging_power = get_child_value(
+                state, "Green.Electric.SmartGrid.RealTimePower"
+            )
         vehicle.ev_battery_remain = get_child_value(
             state, "Green.BatteryManagement.BatteryRemain.Value"
         )
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        vehicle.ev_battery_soh_percentage = get_child_value(
-            state, "Green.BatteryManagement.SoH.Ratio"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
+        if battery_soh := normalize_battery_soh(
+            get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
+        ):
+            vehicle.ev_battery_soh_percentage = battery_soh
+        # ConnectorFastening.State follows the connector LOCK, not the
+        # cable: plugged-but-idle reads 0, a released lock after a charge
+        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
+        # kia_uvo#1837 "unplugged when charging stopped"). The plug sensor
+        # therefore stays unknown on this path; the enum field carries
+        # the reported state.
+        vehicle.ev_battery_is_plugged_in = None
+        fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
+        vehicle.ev_connector_fastening_state = None
+        if fastening_raw is not None:
+            try:
+                vehicle.ev_connector_fastening_state = CONNECTOR_FASTENING_STATE(
+                    int(fastening_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ConnectorFastening.State %r not in "
+                    "{0: disconnected, 1: connected}",
+                    DOMAIN,
+                    fastening_raw,
+                )
+                vehicle.ev_connector_fastening_state = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -189,13 +1046,13 @@ class ApiImplType1(ApiImpl):
             float(
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Total",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Total",
                 )
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
@@ -206,7 +1063,16 @@ class ApiImplType1(ApiImpl):
                 vehicle.total_driving_range,
                 vehicle.total_driving_range_unit,
             )
-        # TODO: vehicle.ev_driving_range for non EV
+        elif vehicle.engine_type == ENGINE_TYPES.PHEV:
+            # PHEV reports the electric-only range separately in DTE.EV
+            # (DTE.Total includes the ICE range). HEV/ICE have no plug and no
+            # EV-only range, so ev_driving_range stays None for them.
+            ev_range = get_child_value(state, "Drivetrain.FuelSystem.DTE.EV")
+            if ev_range is not None:
+                vehicle.ev_driving_range = (
+                    float(ev_range),
+                    vehicle.total_driving_range_unit,
+                )
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -217,7 +1083,7 @@ class ApiImplType1(ApiImpl):
             "m",
         )
         vehicle.ev_estimated_fast_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
             "m",
         )
         vehicle.ev_estimated_portable_charge_duration = (
@@ -225,7 +1091,7 @@ class ApiImplType1(ApiImpl):
             "m",
         )
         vehicle.ev_estimated_station_charge_duration = (
-            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Quick"),
+            get_child_value(state, "Green.ChargingInformation.EstimatedTime.Standard"),
             "m",
         )
         vehicle.ev_charge_limits_ac = get_child_value(
@@ -243,24 +1109,24 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
-                "Green.ChargingInformation.DTE.TargetSoC.Standard",  # noqa
+                "Green.ChargingInformation.DTE.TargetSoC.Standard",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
         vehicle.ev_target_range_charge_DC = (
             get_child_value(
                 state,
-                "Green.ChargingInformation.DTE.TargetSoC.Quick",  # noqa
+                "Green.ChargingInformation.DTE.TargetSoC.Quick",
             ),
             DISTANCE_UNITS[
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",  # noqa
+                    "Drivetrain.FuelSystem.DTE.Unit",
                 )
             ],
         )
@@ -272,11 +1138,152 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Green.Reservation.Departure.Schedule2.Enable")
         )
 
-        # TODO: vehicle.ev_first_departure_days --> Green.Reservation.Departure.Schedule1.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_second_departure_days --> Green.Reservation.Departure.Schedule2.(Mon,Tue,Wed,Thu,Fri,Sat,Sun) # noqa
-        # TODO: vehicle.ev_first_departure_time --> Green.Reservation.Departure.Schedule1.(Min,Hour) # noqa
-        # TODO: vehicle.ev_second_departure_time --> Green.Reservation.Departure.Schedule2.(Min,Hour) # noqa
-        # TODO: vehicle.ev_off_peak_charge_only_enabled --> unknown settings are in  --> Green.Reservation.OffPeakTime and OffPeakTime2 # noqa
+        vehicle.ev_power_consumption_battery_cooling = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryCooling"
+        )
+
+        vehicle.ev_power_consumption_battery_heater = get_child_value(
+            state, "Green.PowerConsumption.Moment.BatteryHeater"
+        )
+        vehicle.ev_power_consumption_air_conditioning = get_child_value(
+            state, "Green.PowerConsumption.Moment.ClimateAirConditioning"
+        )
+
+        # Green.Reservation.OffPeakTime — off-peak charging window + priority mode.
+        # Mode 0 = off, 2 = target-priority (off-peak tariffs prioritized),
+        # 3 = time-priority (charge only during off-peak). 1 is reserved/unused.
+        # When the block is absent (HEV / unconfigured EV) all fields stay None —
+        # do NOT synthesise dt.time(0,0), which would create phantom time
+        # entities downstream and collide with a legitimate midnight window.
+        # The 31:70 "unconfigured" sentinel (#1269) is handled silently by
+        # ccs2_reservation_time_or_none.
+        off_peak = get_child_value(state, "Green.Reservation.OffPeakTime")
+        if off_peak:
+            try:
+                vehicle.ev_off_peak_start_time = ccs2_reservation_time_or_none(
+                    off_peak.get("StartHour"), off_peak.get("StartMin")
+                )
+                vehicle.ev_off_peak_end_time = ccs2_reservation_time_or_none(
+                    off_peak.get("EndHour"), off_peak.get("EndMin")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
+                vehicle.ev_off_peak_start_time = None
+                vehicle.ev_off_peak_end_time = None
+
+            mode = off_peak.get("Mode")
+            if mode == 0:
+                vehicle.ev_schedule_charge_enabled = False
+                vehicle.ev_off_peak_charge_only_enabled = None
+            elif mode == 2:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = False
+            elif mode == 3:
+                vehicle.ev_schedule_charge_enabled = True
+                vehicle.ev_off_peak_charge_only_enabled = True
+            elif mode is not None:
+                _LOGGER.warning("%s - unknown CCS2 OffPeakTime.Mode: %s", DOMAIN, mode)
+        # off_peak is None/falsy -> no OffPeakTime block (HEV/unconfigured) ->
+        # ev_off_peak_* and ev_schedule_charge_enabled stay None (None default).
+
+        # Departure schedules — same None-when-absent rule. A missing or
+        # stub Schedule block (e.g. EV9 ships Schedule1 = {"Enable": False}
+        # with no Hour/Min) must yield None time/days, not a synthesised
+        # dt.time(0,0). ev_*_departure_enabled is set earlier from the
+        # Enable field and is unaffected. Guard on Hour presence so a
+        # disabled-but-remembered schedule (EV6: Enable=0 + Hour present)
+        # still parses, while an unconfigured stub (EV9: no Hour) stays None.
+        # The 31:70 sentinel can also appear here (ccNC EVs, #1269) and is
+        # handled silently by ccs2_reservation_time_or_none.
+        schedule1 = get_child_value(state, "Green.Reservation.Departure.Schedule1")
+        schedule2 = get_child_value(state, "Green.Reservation.Departure.Schedule2")
+        if schedule1 and "Hour" in schedule1:
+            try:
+                vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
+                    schedule1.get("Hour"), schedule1.get("Min")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
+            vehicle.ev_first_departure_days = [
+                i
+                for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+                if schedule1.get(k) == 1
+            ] or None
+        if schedule2 and "Hour" in schedule2:
+            try:
+                vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
+                    schedule2.get("Hour"), schedule2.get("Min")
+                )
+            except (TypeError, ValueError):
+                _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
+            vehicle.ev_second_departure_days = [
+                i
+                for i, k in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"])
+                if schedule2.get(k) == 1
+            ] or None
+
+        # Departure climate: Green.Reservation.Departure.Climate (Schedule 1)
+        # and Green.Reservation.Departure.Schedule2.Climate
+        climate1 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Climate"
+        ) or get_child_value(state, "Green.Reservation.Departure.Climate")
+        climate2 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Climate"
+        )
+        default_temp_unit = (
+            climate1.get("TemperatureUnit", 0)
+            if climate1 and climate1.get("TemperatureUnit") is not None
+            else 0
+        )
+
+        def _parse_departure_climate(
+            climate: dict[str, Any],
+            schedule_activation: object = None,
+        ) -> tuple[bool | None, bool | None, tuple[float, str | None] | None]:
+            activation = (
+                schedule_activation
+                if schedule_activation is not None
+                else climate.get("Activation")
+            )
+            enabled = bool(activation) if activation is not None else None
+            defrost_val = climate.get("Defrost")
+            defrost = bool(defrost_val) if defrost_val is not None else None
+            temp: tuple[float, str | None] | None = None
+            temp_val = climate.get("Temperature")
+            if temp_val is not None:
+                try:
+                    temp_float = float(temp_val)
+                    unit_int = climate.get("TemperatureUnit")
+                    if unit_int is None:
+                        unit_int = default_temp_unit
+                    unit_str = TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0])
+                    temp = (temp_float, unit_str)
+                except (ValueError, TypeError):
+                    pass
+            return enabled, defrost, temp
+
+        if climate1:
+            enabled, defrost, temp = _parse_departure_climate(climate1)
+            if enabled is not None:
+                vehicle.ev_first_departure_climate_enabled = enabled
+            if defrost is not None:
+                vehicle.ev_first_departure_climate_defrost = defrost
+            if temp is not None:
+                vehicle.ev_first_departure_climate_temperature = temp
+
+        if climate2:
+            sched2_activation = get_child_value(
+                state, "Green.Reservation.Departure.Schedule2.Activation"
+            )
+            enabled, defrost, temp = _parse_departure_climate(
+                climate2, sched2_activation
+            )
+            if enabled is not None:
+                vehicle.ev_second_departure_climate_enabled = enabled
+            if defrost is not None:
+                vehicle.ev_second_departure_climate_defrost = defrost
+            if temp is not None:
+                vehicle.ev_second_departure_climate_temperature = temp
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -295,11 +1302,16 @@ class ApiImplType1(ApiImpl):
         vehicle.smart_key_battery_warning_is_on = bool(
             get_child_value(state, "Electronics.FOB.LowBattery")
         )
+        if vehicle._ev_estimated_current_charge_duration is not None:
+            if vehicle._ev_estimated_current_charge_duration == 0:
+                vehicle.ev_battery_is_charging = False
+            elif vehicle._ev_estimated_current_charge_duration > 0:
+                vehicle.ev_battery_is_charging = True
 
         if get_child_value(state, "Location.GeoCoord.Latitude"):
-            location_last_updated_at = dt.datetime(
-                2000, 1, 1, tzinfo=self.data_timezone
-            )
+            # Missing Location.TimeStamp must surface as None (HA "unknown")
+            # rather than a 2000-01-01 sentinel that renders as "27 years ago".
+            # See kia_uvo #1771 sidetask.
             timestamp = get_child_value(state, "Location.TimeStamp")
             if timestamp is not None:
                 location_last_updated_at = dt.datetime(
@@ -311,6 +1323,8 @@ class ApiImplType1(ApiImpl):
                     second=int(get_child_value(timestamp, "Sec")),
                     tzinfo=self.data_timezone,
                 )
+            else:
+                location_last_updated_at = None
 
             vehicle.location = (
                 get_child_value(state, "Location.GeoCoord.Latitude"),
@@ -319,3 +1333,1075 @@ class ApiImplType1(ApiImpl):
             )
 
         vehicle.data = state
+
+    @_retry_on_device_id_error
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
+
+            payload = {"action": "start", "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
+            )
+
+            payload = {"command": "start"}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
+        response = self.session.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
+
+            payload = {"action": "stop", "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = (
+                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
+            )
+
+            payload = {"command": "stop"}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
+        response = self.session.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            raise UnsupportedControlError(
+                "set_charging_current requires CCS2 protocol support"
+            )
+        url = (
+            self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/chargingcurrent"
+        )
+
+        body = {"chargingCurrent": level}
+        response = self.session.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Charging Current Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/charge/target"
+
+        body = {
+            "targetSOClist": [
+                {
+                    "plugType": 0,
+                    "targetSOClevel": int(dc),
+                },
+                {
+                    "plugType": 1,
+                    "targetSOClevel": int(ac),
+                },
+            ]
+        }
+        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Body: {body}")
+        response = self.session.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Charge Limits Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        url = (
+            self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/charge/dischargelimit"
+        )
+
+        body = {"dischargingLimit": int(limit)}
+        response = self.session.post(
+            url,
+            json=body,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set v2l limit Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
+
+            payload = {"action": action.value, "deviceId": token.device_id}
+            headers = self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            )
+
+        else:
+            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/door"
+
+            payload = {"command": action.value}
+            headers = self._get_control_headers(token, vehicle)
+
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
+
+        response = self.session.post(url, json=payload, headers=headers).json()
+        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def check_action_status(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
+        url = self.SPA_API_URL + "notifications/" + vehicle.id + "/records"
+
+        if synchronous:
+            if timeout < 1:
+                raise APIError("Timeout must be 1 or higher")
+
+            end_time = dt.datetime.now() + dt.timedelta(seconds=timeout)
+            while end_time > dt.datetime.now():
+                # recursive call with Synchronous set to False
+                state = self.check_action_status(
+                    token, vehicle, action_id, synchronous=False
+                )
+                if state == ORDER_STATUS.PENDING:
+                    # state pending: recheck regularly
+                    # (until we get a final state or exceed the timeout)
+                    sleep(5)
+                else:
+                    # any other state is final
+                    return state
+
+            # if we exit the loop after the set timeout, return a Timeout state
+            return ORDER_STATUS.TIMEOUT
+
+        else:
+            response = self.session.get(
+                url,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - Check last action status Response: {response}")
+            _check_response_for_errors(response)
+
+            for action in response["resMsg"]:
+                if action["recordId"] == action_id:
+                    if action["result"] == "success":
+                        return ORDER_STATUS.SUCCESS
+                    elif action["result"] == "fail":
+                        return ORDER_STATUS.FAILED
+                    elif action["result"] == "non-response":
+                        return ORDER_STATUS.TIMEOUT
+                    elif action["result"] is None:
+                        _LOGGER.info(
+                            "Action status not set yet by server - try again in a few seconds"
+                        )
+                        return ORDER_STATUS.PENDING
+
+            # if iterate the whole notifications list and
+            # can't find the action, raise an exception
+            # Old code: raise APIError(f"No action found with ID {action_id}")
+            return ORDER_STATUS.UNKNOWN
+
+    @_retry_on_device_id_error
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id
+        url = url + "/ccs2"  # does not depend on vehicle.ccu_ccs2_protocol_support
+        url = url + "/reservation/chargehvac"
+
+        # ccNC/EV5-appMode EVs (EV6/EV9) use two flat endpoints instead of the
+        # combined /ccs2/reservation/chargehvac, which is a no-op for them.
+        # Dispatch by ccu_ccs2_protocol_support (== ccNC head unit) + EV type.
+        if vehicle.ccu_ccs2_protocol_support and vehicle.engine_type == ENGINE_TYPES.EV:
+            charge_active, climate_active = _schedule_charging_scopes(options)
+            if not (charge_active or climate_active):
+                raise ValueError("no schedule changes requested")
+            return self._schedule_ev5_flat(
+                token,
+                vehicle,
+                options,
+                charge_active=charge_active,
+                climate_active=climate_active,
+            )
+
+        # Combined path: both scopes are always sent in one payload; None
+        # fields are filled from the vehicle's current settings (None = leave
+        # unchanged).
+        _guard_schedule_temperature(options, vehicle)
+        _fill_schedule_options_from_vehicle(
+            options, vehicle, scopes=("charge", "climate")
+        )
+        departures = [
+            _filled(options.first_departure),
+            _filled(options.second_departure),
+        ]
+        departure_times = [_filled(dep.time) for dep in departures]
+        off_peak_start = _filled(options.off_peak_start_time)
+        off_peak_end = _filled(options.off_peak_end_time)
+
+        temperature_unit = _vehicle_temperature_unit(vehicle) or 0
+
+        def _build_combined_fatc_set(
+            dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+        ) -> dict[str, object]:
+            temp: float = dep.temperature if dep.temperature is not None else 21.0
+            if temperature_unit == 0:
+                temp = round(temp * 2.0) / 2.0
+                if temp > 27.0:
+                    temp = 27.0
+                elif temp < 17.0:
+                    temp = 17.0
+            return {
+                "airCtrl": 1 if dep.climate_enabled else 0,
+                "airTemp": {
+                    "value": f"{temp:.1f}",
+                    "hvacTempType": 1,
+                    "unit": temperature_unit,
+                },
+                "heating1": 0,
+                "defrost": dep.defrost if dep.defrost is not None else False,
+            }
+
+        payload: dict[str, Any] = {
+            "reservChargeInfo" + str(i + 1): {
+                "reservChargeSet": departures[i].enabled,
+                "reservInfo": {
+                    "day": departures[i].days,
+                    "time": {
+                        "time": departure_times[i].strftime("%I%M"),
+                        "timeSection": 1 if departure_times[i] >= dt.time(12, 0) else 0,
+                    },
+                },
+                "reservFatcSet": _build_combined_fatc_set(departures[i]),
+            }
+            for i in range(2)
+        }
+
+        payload = payload | {
+            "offPeakPowerInfo": {
+                "offPeakPowerTime1": {
+                    "endtime": {
+                        "timeSection": 1 if off_peak_end >= dt.time(12, 0) else 0,
+                        "time": off_peak_end.strftime("%I%M"),
+                    },
+                    "starttime": {
+                        "timeSection": 1 if off_peak_start >= dt.time(12, 0) else 0,
+                        "time": off_peak_start.strftime("%I%M"),
+                    },
+                },
+                # Flag semantics match the apps' vehicle data model:
+                # 1 = considering peak time ("off-peak tariffs prioritised"),
+                # 2 = only peak time ("off-peak tariffs only"), 0 = not applied.
+                "offPeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            },
+            "reservFlag": 1 if options.charging_enabled else 0,
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Schedule Charging and Climate Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    def _schedule_ev5_flat(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+        *,
+        charge_active: bool,
+        climate_active: bool,
+    ) -> str:
+        """Set scheduled charging + climate for ccNC/EV5-appMode EVs.
+
+        EV5-appMode vehicles (ccNC EV6/EV9) use two flat endpoints instead of
+        the combined /ccs2/reservation/chargehvac: charge settings go to
+        /ccs2/reservation/charge (flat body, lowercase ``offpeakPowerFlag``),
+        departure-climate presets to /ccs2/reservation/hvac.
+
+        ``None`` option fields mean "leave unchanged": active-scope fields are
+        filled from the vehicle's current settings, and a scope with no
+        requested change skips its endpoint entirely.
+        """
+        charge_payload: dict[str, object] | None = None
+        hvac_payload: dict[str, object] | None = None
+
+        if charge_active:
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
+            off_peak_start = _filled(options.off_peak_start_time)
+            off_peak_end = _filled(options.off_peak_end_time)
+            charge_payload = {
+                "reservFlag": 1 if options.charging_enabled else 0,
+                # EV5 flat-path enum is the OPPOSITE of the combined path:
+                # 1 = only off-peak, 2 = prioritised (#1312 live evidence,
+                # Kia PV5). Do not "align" it with the combined path.
+                "offpeakPowerFlag": (1 if options.off_peak_charge_only_enabled else 2),
+                "reservStartTime": {
+                    "time": off_peak_start.strftime("%I%M"),
+                    "timeSection": 1 if off_peak_start >= dt.time(12, 0) else 0,
+                },
+                "reservEndTime": {
+                    "time": off_peak_end.strftime("%I%M"),
+                    "timeSection": 1 if off_peak_end >= dt.time(12, 0) else 0,
+                },
+            }
+
+        if climate_active:
+            _guard_schedule_temperature(options, vehicle)
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
+            departures = [
+                _filled(options.first_departure),
+                _filled(options.second_departure),
+            ]
+            departure_times = [_filled(dep.time) for dep in departures]
+            temperature_unit = _vehicle_temperature_unit(vehicle) or 0
+
+            def _build_flat_hvac_set(
+                dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+            ) -> dict[str, object]:
+                temp: float = dep.temperature if dep.temperature is not None else 21.0
+                if temperature_unit == 0:
+                    temp = round(temp * 2.0) / 2.0
+                    if temp > 27.0:
+                        temp = 27.0
+                    elif temp < 17.0:
+                        temp = 17.0
+                return {
+                    "airCtrl": 1 if dep.climate_enabled else 0,
+                    "airTemp": {
+                        "value": f"{temp:.1f}",
+                        "hvacTempType": 1,
+                        "unit": temperature_unit,
+                    },
+                    "defrost": dep.defrost if dep.defrost is not None else False,
+                }
+
+            hvac_payload = {
+                "reservedHVACInfo" + str(i + 1): {
+                    "reservHVACflag": 1 if departures[i].enabled else 0,
+                    "reservInfo": {
+                        "day": departures[i].days,
+                        "time": {
+                            "time": departure_times[i].strftime("%I%M"),
+                            "timeSection": (
+                                1 if departure_times[i] >= dt.time(12, 0) else 0
+                            ),
+                        },
+                    },
+                    "reservHVACSet": _build_flat_hvac_set(departures[i]),
+                }
+                for i in range(2)
+            }
+
+        base_url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/reservation"
+        charge_msg_id = ""
+        hvac_msg_id = ""
+        if charge_payload is not None:
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge request: {charge_payload}")
+            charge_response = self.session.post(
+                base_url + "/charge",
+                json=charge_payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule charge response: {charge_response}")
+            _check_response_for_errors(charge_response)
+            charge_msg_id = charge_response["msgId"]
+        if hvac_payload is not None and charge_payload is not None:
+            # Two-scope write (#1316): the vehicle processes /charge first,
+            # and a /hvac POST sent while the charge action is still running
+            # fails with 4004 (channel busy). Live data: the charge record
+            # settles ~6 s after the POST. Wait for the action record to
+            # settle (the same /notifications/.../records read the
+            # action-status path uses; timeout=15 catches a ~6 s settle with
+            # the 5 s poll interval) before sending /hvac.
+            state = self.check_action_status(
+                token, vehicle, charge_msg_id, synchronous=True, timeout=15
+            )
+            if state not in (ORDER_STATUS.SUCCESS,):
+                if state in (ORDER_STATUS.TIMEOUT, ORDER_STATUS.PENDING):
+                    raise DuplicateRequestError(
+                        f"The charge schedule was applied (msgId {charge_msg_id}) "
+                        f"but the charge action record is still "
+                        f"{state.name.lower()}: the vehicle channel stayed busy "
+                        f"and the climate scope was not sent. Retry the "
+                        f"climate scope separately."
+                    )
+                raise APIError(
+                    f"The charge schedule action ended in state "
+                    f"{state.name.lower()} (msgId {charge_msg_id}); the "
+                    f"climate scope was not sent."
+                )
+        if hvac_payload is not None:
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac request: {hvac_payload}")
+            try:
+                hvac_response = self.session.post(
+                    base_url + "/hvac",
+                    json=hvac_payload,
+                    headers=self._get_control_headers(token, vehicle),
+                ).json()
+                _check_response_for_errors(hvac_response)
+            except DuplicateRequestError as exc:
+                if charge_payload is None:
+                    raise
+                raise DuplicateRequestError(
+                    f"The charge schedule was applied (msgId {charge_msg_id}) "
+                    f"but the vehicle still did not accept the climate scope: "
+                    f"{exc}"
+                ) from exc
+            _LOGGER.debug(f"{DOMAIN} - EV5 schedule hvac response: {hvac_response}")
+            hvac_msg_id = hvac_response["msgId"]
+
+        return charge_msg_id if charge_active else hvac_msg_id
+
+    @_retry_on_device_id_error
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+
+        # Defaults are located here to be region specific
+
+        if options.set_temp is None:
+            options.set_temp = 21
+        if options.duration is None:
+            options.duration = 5
+        if options.defrost is None:
+            options.defrost = False
+        if options.climate is None:
+            options.climate = True
+        if options.heating is None:
+            options.heating = 0
+        if not vehicle.ccu_ccs2_protocol_support:
+            hex_set_temp = get_index_into_hex_temp(
+                self.temperature_range.index(options.set_temp)
+            )
+
+            payload = {
+                "action": "start",
+                "hvacType": 0,
+                "options": {
+                    "defrost": options.defrost,
+                    "heating1": int(options.heating),
+                    "igniOnDuration": options.duration,
+                },
+                "tempCode": hex_set_temp,
+                "unit": "C",
+            }
+            _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+        else:
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/temperature"
+            )
+            # For RHD vehicles the driver sits on the right, so the front
+            # physical seats map to passenger/driver respectively.
+            drv_seat_loc = self._get_drv_seat_loc(vehicle)
+            if drv_seat_loc == SEAT_LOCATION.RIGHT:
+                drv_seat, psg_seat = options.front_right_seat, options.front_left_seat
+            else:
+                drv_seat, psg_seat = options.front_left_seat, options.front_right_seat
+            payload = {
+                "command": "start",
+                "ignitionDuration": options.duration,
+                "strgWhlHeating": options.steering_wheel,
+                "hvacTempType": 1,
+                "hvacTemp": options.set_temp,
+                # heating 1/2/4 engage the rear-window + side-mirror heaters;
+                # 0 (off) and 3 (steering wheel only) leave them off.
+                "sideRearMirrorHeating": 1 if options.heating in (1, 2, 4) else 0,
+                "drvSeatLoc": drv_seat_loc,
+                "seatClimateInfo": {
+                    "drvSeatClimateState": drv_seat,
+                    "psgSeatClimateState": psg_seat,
+                    "rrSeatClimateState": options.rear_right_seat,
+                    "rlSeatClimateState": options.rear_left_seat,
+                },
+                "tempUnit": "C",
+                "windshieldFrontDefogState": options.defrost,
+            }
+            _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Climate Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        if not vehicle.ccu_ccs2_protocol_support:
+            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
+            payload = {
+                "action": "stop",
+                "hvacType": 0,
+                "options": {
+                    "defrost": True,
+                    "heating1": 1,
+                },
+                "tempCode": "10H",
+                "unit": "C",
+            }
+            _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_authenticated_headers(
+                    token, vehicle.ccu_ccs2_protocol_support
+                ),
+            ).json()
+        else:
+            url = (
+                self.SPA_API_URL_V2
+                + "vehicles/"
+                + vehicle.id
+                + "/ccs2/control/temperature"
+            )
+            payload = {
+                "command": "stop",
+            }
+            _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
+            response = self.session.post(
+                url,
+                json=payload,
+                headers=self._get_control_headers(token, vehicle),
+            ).json()
+        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
+        response = self.session.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/hornlight"
+
+        payload = {"command": "on"}
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Request: {payload}")
+        response = self.session.post(
+            url,
+            json=payload,
+            headers=self._get_control_headers(token, vehicle),
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights and Horn Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/windowcurtain"
+
+        payload = {
+            "backLeft": options.back_left,
+            "backRight": options.back_right,
+            "frontLeft": options.front_left,
+            "frontRight": options.front_right,
+        }
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Window State Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/location/routes"
+        payload = {
+            "deviceID": token.device_id,
+            "poiInfoList": [poi.to_dict() for poi in poi_list],
+        }
+        _LOGGER.debug(f"{DOMAIN} - Set Navigation Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Set Navigation Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    def _refresh_access_token_headers(self) -> dict[str, str]:
+        """Extra headers for the refresh_token grant. Default: none.
+
+        AU and IN override to add the Stamp header.
+        """
+        return {}
+
+    def refresh_access_token(self, token: Token) -> Token | OTPRequest:
+        """Refresh access token using the stored refresh token.
+
+        Uses the OAuth2 refresh_token grant to get a new access token
+        without repeating the full login flow. Falls back to full login
+        if the refresh token is missing or the exchange fails.
+
+        Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
+        Shared by AU, IN and CN (all use the same endpoint format).
+        KiaUvoApiEU overrides this with the CCI token-refresh flow
+        (v2/auth/token-refresh + CCS re-exchange).
+
+        No Stamp header is sent by default. Regions whose server requires
+        it (AU, confirmed live in kia_uvo #1778; IN, whose login flow has
+        always sent it on this grant) add it via
+        _refresh_access_token_headers. If the exchange fails, this falls
+        back to self.login().
+        """
+        if token.refresh_token:
+            try:
+                url = self.USER_API_URL + "oauth2/token"
+                headers = {
+                    "Authorization": self.BASIC_AUTHORIZATION,
+                    "Content-type": "application/x-www-form-urlencoded",
+                    "Host": self.BASE_URL,
+                    "Connection": "close",
+                    "Accept-Encoding": "gzip, deflate",
+                    "User-Agent": USER_AGENT_OK_HTTP,
+                }
+                headers.update(self._refresh_access_token_headers())
+                data = "grant_type=refresh_token&refresh_token=" + token.refresh_token
+                response = self.session.post(url, data=data, headers=headers)
+                response_json = response.json()
+                _check_response_for_errors(response_json)
+
+                token_type = response_json["token_type"]
+                access_token = token_type + " " + response_json["access_token"]
+                new_refresh_token = response_json.get(
+                    "refresh_token", token.refresh_token
+                )
+                expires_in = int(response_json.get("expires_in", 86400))
+
+                valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in)
+
+                _LOGGER.debug(
+                    f"{DOMAIN} - Access token refreshed successfully, "
+                    f"expires in {expires_in}s"
+                )
+
+                return Token(
+                    username=token.username,
+                    password=token.password,
+                    access_token=access_token,
+                    refresh_token=new_refresh_token,
+                    device_id=token.device_id,
+                    valid_until=valid_until,
+                    pin=token.pin,
+                )
+            except Exception:
+                _LOGGER.warning(
+                    f"{DOMAIN} - Refresh token exchange failed, "
+                    "falling back to full login"
+                )
+        return self.login(token.username, token.password, token.pin)
+
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
+        # Return cached control token if still valid
+        if token.control_token is not None and token.control_token_expiry > time.time():
+            return token.control_token, token.control_token_expiry
+
+        url = self.USER_API_URL + "pin?token="
+        headers = {
+            "Authorization": token.access_token,
+            "Content-type": "application/json",
+            "Host": self.BASE_URL,
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        data = {"deviceId": token.device_id, "pin": token.pin}
+        response = self.session.put(url, json=data, headers=headers)
+        response = response.json()
+        if response.get("controlToken") is None:
+            _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
+            raise APIError("PIN verification failed, ensure PIN is entered correctly.")
+        control_token = "Bearer " + response["controlToken"]
+        control_token_expire_at = math.floor(
+            dt.datetime.now().timestamp() + response["expiresTime"]
+        )
+        # Cache control token and expiry for reuse
+        token.control_token = control_token
+        token.control_token_expiry = control_token_expire_at
+        return control_token, control_token_expire_at
+
+    def _set_session_language(self, cookies: dict[str, Any]) -> None:
+        # Set Language for Session #
+        url = self.USER_API_URL + "language"
+        headers = {"Content-type": "application/json"}
+        payload = {"lang": self.LANGUAGE}
+        _ = self.session.post(url, json=payload, headers=headers, cookies=cookies)
+
+    def _get_stamp(self) -> str:
+        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
+        result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
+        return base64.b64encode(result).decode("utf-8")
+
+    def _get_device_id(self, stamp: str) -> str:
+        my_hex = f"{random.randrange(10**80):064x}"
+        registration_id = my_hex[:64]
+        url = self.SPA_API_URL + "notifications/register"
+        payload = {
+            "pushRegId": registration_id,
+            "pushType": self.PUSH_TYPE,
+            "uuid": str(uuid.uuid4()),
+        }
+
+        headers = {
+            "ccsp-service-id": self.CCSP_SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "Stamp": stamp,
+            "Content-Type": "application/json;charset=UTF-8",
+            "Host": self.BASE_URL,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
+        response = self.session.post(url, headers=headers, json=payload)
+        response = response.json()
+        _check_response_for_errors(response)
+        _LOGGER.debug(f"{DOMAIN} - Get Device ID response: {response}")
+
+        device_id = response["resMsg"]["deviceId"]
+        return cast(str, device_id)
+
+    def _get_authorization_code_with_redirect_url(
+        self, username: str, password: str, cookies: dict[str, Any]
+    ) -> str:
+        url = self.USER_API_URL + "signin"
+        headers = {"Content-type": "application/json"}
+        data = {"email": username, "password": password}
+        response = self.session.post(
+            url, json=data, headers=headers, cookies=cookies
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Sign In Response: {response}")
+        parsed_url = urlparse(response["redirectUrl"])
+        authorization_code = "".join(parse_qs(parsed_url.query)["code"])
+        return authorization_code
+
+    def _get_forced_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/status"
+        response = self.session.get(
+            url, headers=self._get_vehicle_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Received forced vehicle data: {response}")
+        _check_response_for_errors(response)
+        mapped_response = {}
+        mapped_response["vehicleStatus"] = response["resMsg"]
+        return mapped_response
+
+    def _get_charge_limits(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        # Not currently used as value is in the general get.
+        # Most likely this forces the car the update it.
+        url = f"{self.SPA_API_URL}vehicles/{vehicle.id}/charge/target"
+
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Request")
+        response = self.session.get(
+            url, headers=self._get_vehicle_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Get Charging Limits Response: {response}")
+        _check_response_for_errors(response)
+        # API sometimes returns multiple entries per plug type and they conflict.
+        # The car itself says the last entry per plug type is the truth when tested
+        # (EU Ioniq Electric Facelift MY 2019)
+        if response["resMsg"] is not None:
+            return cast(dict[str, Any] | None, response["resMsg"])
+        return None
+
+    @_retry_on_device_id_error
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/control/valet"
+
+        payload = {"action": action.value}
+        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Valet Mode Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    def _get_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        date_string: str,
+        trip_period_type: int,
+    ) -> dict[str, Any]:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/tripinfo"
+        if trip_period_type == 0:  # month
+            payload = {"tripPeriodType": 0, "setTripMonth": date_string}
+        else:
+            payload = {"tripPeriodType": 1, "setTripDay": date_string}
+
+        _LOGGER.debug(f"{DOMAIN} - get_trip_info Request {payload}")
+        response = self.session.post(
+            url,
+            json=payload,
+            headers=self._get_vehicle_headers(token, vehicle),
+        )
+        response = response.json()
+        _LOGGER.debug(f"{DOMAIN} - get_trip_info response {response}")
+        _check_response_for_errors(response)
+        return cast(dict[str, Any], response)
+
+    def update_month_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymm_string: str,
+    ) -> None:
+        """
+        feature only available for some regions.
+        Updates the vehicle.month_trip_info for the specified month.
+
+        Default this information is None:
+
+        month_trip_info: MonthTripInfo = None
+        """
+        vehicle.month_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymm_string,
+            0,  # month trip info
+        )
+        msg = json_result["resMsg"]
+        if msg.get("monthTripDayCnt", 0) > 0 or len(msg.get("tripDayList", [])) > 0:
+            result = MonthTripInfo(
+                yyyymm=yyyymm_string,
+                day_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+
+            for day in msg["tripDayList"]:
+                processed_day = DayTripCounts(
+                    yyyymmdd=day["tripDayInMonth"],
+                    trip_count=day["tripCntDay"],
+                )
+                result.day_list.append(processed_day)
+
+            vehicle.month_trip_info = result
+
+    def _parse_day_trip(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str, trip: dict[str, Any]
+    ) -> TripInfo | None:
+        """Build a TripInfo from one entry of a day's tripList.
+
+        IN overrides this to fetch /tripinfo/detail for entries that lack
+        the full trip fields.
+        """
+        return TripInfo(
+            hhmmss=trip["tripTime"],
+            drive_time=trip["tripDrvTime"],
+            idle_time=trip["tripIdleTime"],
+            distance=trip["tripDist"],
+            avg_speed=trip["tripAvgSpeed"],
+            max_speed=trip["tripMaxSpeed"],
+        )
+
+    def update_day_trip_info(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymmdd_string: str,
+    ) -> None:
+        """
+        feature only available for some regions.
+        Updates the vehicle.day_trip_info information for the specified day.
+
+        Default this information is None:
+
+        day_trip_info: DayTripInfo = None
+        """
+        vehicle.day_trip_info = None
+        json_result = self._get_trip_info(
+            token,
+            vehicle,
+            yyyymmdd_string,
+            1,  # day trip info
+        )
+        day_trip_list = json_result["resMsg"]["dayTripList"]
+        if len(day_trip_list) > 0:
+            msg = day_trip_list[0]
+            result = DayTripInfo(
+                yyyymmdd=yyyymmdd_string,
+                trip_list=[],
+                summary=TripInfo(
+                    drive_time=msg["tripDrvTime"],
+                    idle_time=msg["tripIdleTime"],
+                    distance=msg["tripDist"],
+                    avg_speed=msg["tripAvgSpeed"],
+                    max_speed=msg["tripMaxSpeed"],
+                ),
+            )
+            for trip in msg["tripList"]:
+                processed_trip = self._parse_day_trip(
+                    token, vehicle, yyyymmdd_string, trip
+                )
+                if processed_trip is not None:
+                    result.trip_list.append(processed_trip)
+
+            vehicle.day_trip_info = result
+
+    @_retry_on_device_id_error
+    def _get_driving_info(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/drvhistory"
+
+        responseAlltime = self.session.post(
+            url,
+            json={"periodTarget": 1},
+            headers=self._get_vehicle_headers(token, vehicle),
+        )
+        responseAlltime = responseAlltime.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info responseAlltime {responseAlltime}")
+        _check_response_for_errors(responseAlltime)
+
+        response30d = self.session.post(
+            url,
+            json={"periodTarget": 0},
+            headers=self._get_vehicle_headers(token, vehicle),
+        )
+        response30d = response30d.json()
+        _LOGGER.debug(f"{DOMAIN} - get_driving_info response30d {response30d}")
+        _check_response_for_errors(response30d)
+        alltime_key = self.DRIVING_INFO_ALLTIME_KEY
+        if get_child_value(responseAlltime, f"resMsg.{alltime_key}.0"):
+            drivingInfo = responseAlltime["resMsg"][alltime_key][0]
+
+            drivingInfo["dailyStats"] = []
+            if get_child_value(response30d, "resMsg.drivingInfoDetail.0"):
+                for day in response30d["resMsg"]["drivingInfoDetail"]:
+                    processedDay = DailyDrivingStats(
+                        date=dt.datetime.strptime(day["drivingDate"], "%Y%m%d"),
+                        total_consumed=get_child_value(day, "totalPwrCsp"),
+                        engine_consumption=get_child_value(day, "motorPwrCsp"),
+                        climate_consumption=get_child_value(day, "climatePwrCsp"),
+                        onboard_electronics_consumption=get_child_value(
+                            day, "eDPwrCsp"
+                        ),
+                        battery_care_consumption=get_child_value(
+                            day, "batteryMgPwrCsp"
+                        ),
+                        regenerated_energy=get_child_value(day, "regenPwr"),
+                        distance=get_child_value(day, "calculativeOdo"),
+                        distance_unit=vehicle.odometer_unit,
+                    )
+                    drivingInfo["dailyStats"].append(processedDay)
+
+            for drivingInfoItem in response30d["resMsg"]["drivingInfo"]:
+                if (
+                    drivingInfoItem["drivingPeriod"] == 0
+                    and next(
+                        (
+                            v
+                            for k, v in drivingInfoItem.items()
+                            if k.lower() == "calculativeodo"
+                        ),
+                        0,
+                    )
+                    > 0
+                ):
+                    drivingInfo["consumption30d"] = round(
+                        drivingInfoItem["totalPwrCsp"]
+                        / drivingInfoItem["calculativeOdo"]
+                    )
+                    break
+
+            return cast(dict[str, Any] | None, drivingInfo)
+        else:
+            _LOGGER.debug(
+                f"{DOMAIN} - Driving info didn't return valid data. This may be normal if the car doesn't support it."
+            )
+            return None
+
+    def _update_vehicle_drive_info(
+        self, vehicle: Vehicle, state: dict[str, Any] | None
+    ) -> None:
+        vehicle.total_power_consumed = get_child_value(state, "totalPwrCsp")
+        vehicle.total_power_regenerated = get_child_value(state, "regenPwr")
+        vehicle.power_consumption_30d = get_child_value(state, "consumption30d")
+        vehicle.daily_stats = get_child_value(state, "dailyStats")

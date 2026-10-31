@@ -5,6 +5,7 @@ include LICENSE
 include README.rst
 include requirements.txt
 
+recursive-include hyundai_kia_connect_api *.json py.typed
 recursive-include tests *
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]

@@ -1,0 +1,209 @@
+"""Tests for ApiImplType1.refresh_access_token (shared by AU, IN, CN).
+
+The base implementation sends the refresh_token grant to ``oauth2/token``
+without a Stamp header. AU requires Stamp on the refresh_token grant —
+confirmed live in kia_uvo #1778 (errCode 4002 "Invalid parameters" without
+it) — and IN's login flow has always sent it on that grant, so both override
+the ``_refresh_access_token_headers`` hook to add ``Stamp`` while still
+inheriting the base method. If a region's refresh fails, the base falls back to
+``self.login()`` — no regression vs. pre-PR.
+"""
+
+import datetime as dt
+from unittest.mock import patch
+
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
+from hyundai_kia_connect_api.KiaUvoApiAU import KiaUvoApiAU
+from hyundai_kia_connect_api.KiaUvoApiCN import KiaUvoApiCN
+from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
+from hyundai_kia_connect_api.Token import Token
+
+
+def _make_token(**overrides) -> Token:
+    defaults = {
+        "username": "user@test.com",
+        "password": "MyPassword123!",
+        "access_token": "Bearer old-access-token",
+        "refresh_token": "OLDREFRESHTOKEN1234567890123456789012345678",
+        "device_id": "device-123",
+        "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        "pin": "1234",
+    }
+    defaults.update(overrides)
+    return Token(**defaults)
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+def _ok_payload():
+    return {
+        "retCode": "S",
+        "resCode": "0000",
+        "token_type": "Bearer",
+        "access_token": "new-access-token",
+        "refresh_token": "new-refresh-token",
+        "expires_in": 86400,
+    }
+
+
+class TestType1RefreshAccessTokenNoStamp:
+    """The base implementation must not send a Stamp header."""
+
+    def setup_method(self):
+        self.api = ApiImplType1()
+        # Minimal attributes the base method reads.
+        self.api.USER_API_URL = "https://example.test/api/v1/user/"
+        self.api.BASE_URL = "example.test"
+        self.api.BASIC_AUTHORIZATION = "Basic test=="
+
+    def test_does_not_send_stamp_header(self):
+        captured = {}
+
+        def fake_post(url, data=None, headers=None, **kwargs):
+            captured["url"] = url
+            captured["data"] = data
+            captured["headers"] = headers
+            return _FakeResponse(_ok_payload())
+
+        with patch(
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
+        ):
+            self.api.refresh_access_token(_make_token())
+
+        assert "Stamp" not in captured["headers"], (
+            "refresh_access_token must not send a Stamp header — CN proves the "
+            "refresh_token grant does not require it"
+        )
+        # The base implementation never calls _get_stamp (CN has no _get_stamp),
+        # so there is nothing to mock on the base class.
+
+    def test_posts_to_oauth2_token_with_refresh_grant(self):
+        captured = {}
+
+        def fake_post(url, data=None, headers=None, **kwargs):
+            captured["url"] = url
+            captured["data"] = data
+            return _FakeResponse(_ok_payload())
+
+        with patch(
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
+        ):
+            self.api.refresh_access_token(_make_token())
+
+        assert captured["url"] == "https://example.test/api/v1/user/oauth2/token"
+        assert "grant_type=refresh_token" in captured["data"]
+        assert "OLDREFRESHTOKEN1234567890123456789012345678" in captured["data"]
+
+    def test_returns_new_token_preserving_device_id(self):
+        with patch(
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
+            return_value=_FakeResponse(_ok_payload()),
+        ):
+            result = self.api.refresh_access_token(_make_token(device_id="keep-this"))
+
+        assert result.access_token == "Bearer new-access-token"
+        assert result.refresh_token == "new-refresh-token"
+        assert result.device_id == "keep-this"
+        assert result.username == "user@test.com"
+        assert result.pin == "1234"
+
+    def test_falls_back_to_login_on_exchange_failure(self):
+        with (
+            patch(
+                "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
+                return_value=_FakeResponse(
+                    {"retCode": "F", "resCode": "7501", "resMsg": "auth"}
+                ),
+            ),
+            patch.object(
+                ApiImplType1, "login", return_value="login-fallback"
+            ) as mock_login,
+        ):
+            result = self.api.refresh_access_token(_make_token())
+
+        mock_login.assert_called_once()
+        assert result == "login-fallback"
+
+    def test_falls_back_to_login_when_refresh_token_missing(self):
+        with patch.object(
+            ApiImplType1, "login", return_value="login-fallback"
+        ) as mock_login:
+            result = self.api.refresh_access_token(_make_token(refresh_token=None))
+        mock_login.assert_called_once()
+        assert result == "login-fallback"
+
+    def test_preserves_old_refresh_token_when_response_omits_it(self):
+        payload = _ok_payload()
+        del payload["refresh_token"]
+        with patch(
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
+            return_value=_FakeResponse(payload),
+        ):
+            result = self.api.refresh_access_token(
+                _make_token(refresh_token="ORIGINAL-RT")
+            )
+        assert result.refresh_token == "ORIGINAL-RT"
+
+
+class TestRegionsUseBaseRefreshAccessToken:
+    """AU, IN, CN must inherit the base implementation (no per-region override)."""
+
+    def test_au_does_not_override_refresh_access_token(self):
+        # AU must use ApiImplType1.refresh_access_token, not its own.
+        assert KiaUvoApiAU.refresh_access_token is ApiImplType1.refresh_access_token
+
+    def test_in_does_not_override_refresh_access_token(self):
+        assert KiaUvoApiIN.refresh_access_token is ApiImplType1.refresh_access_token
+
+    def test_cn_overrides_refresh_access_token(self):
+        # 2026 rewrite: the China servers no longer accept the refresh_token
+        # grant on /api/v1/user/oauth2/token (errCode 4002 with a valid UARS
+        # refresh token, live-verified).  CN now overrides refresh_access_token
+        # with a silentsignin-based flow that falls back to a full login.
+        assert KiaUvoApiCN.refresh_access_token is not ApiImplType1.refresh_access_token
+
+    def test_au_refresh_sends_stamp(self):
+        # AU requires the Stamp header on the refresh_token grant — confirmed
+        # live in kia_uvo #1778 (errCode 4002 "Invalid parameters" without it).
+        # AU overrides the _refresh_access_token_headers hook, not the method.
+        api = KiaUvoApiAU(region=5, brand=2, language="en")
+        captured = {}
+
+        def fake_post(url, data=None, headers=None, **kwargs):
+            captured["headers"] = headers
+            return _FakeResponse(_ok_payload())
+
+        with patch(
+            "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post", side_effect=fake_post
+        ):
+            api.refresh_access_token(_make_token())
+
+        assert "Stamp" in captured["headers"]
+        assert captured["headers"]["Stamp"]
+
+    def test_in_refresh_sends_stamp(self):
+        # IN's login flow always sent Stamp on the refresh_token grant, so the
+        # shared refresh path keeps sending it via the header hook.
+        api = KiaUvoApiIN(region=6, brand=1, language="en")
+        captured = {}
+
+        def fake_post(url, data=None, headers=None, **kwargs):
+            captured["headers"] = headers
+            return _FakeResponse(_ok_payload())
+
+        with (
+            patch.object(api, "_get_stamp", return_value="IN-STAMP"),
+            patch(
+                "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
+                side_effect=fake_post,
+            ),
+        ):
+            api.refresh_access_token(_make_token())
+
+        assert captured["headers"]["Stamp"] == "IN-STAMP"

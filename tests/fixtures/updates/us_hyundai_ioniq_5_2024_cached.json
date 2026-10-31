@@ -1,0 +1,43 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/us_hyundai_ioniq_5_2024_cached.json (Hyundai Ioniq 5 2024)",
+        "follow_up_sources": "evTripDetails, findMyCar: kia_uvo #1455",
+        "not_captured": [],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV"
+    },
+    "responses": {
+        "GET /ac/v2/enrollment/details/user": {
+            "body": {
+                "enrolledVehicleDetails": [
+                    {
+                        "vehicleDetails": {
+                            "$fixture": "us_hyundai_ioniq_5_2024_cached.json#vehicleDetails",
+                            "regid": "VEHICLE-1",
+                            "vin": "TESTVIN0000000001"
+                        }
+                    }
+                ]
+            }
+        },
+        "GET /ac/v2/rcs/rvs/vehicleStatus": {
+            "body": {
+                "vehicleStatus": "$fixture:us_hyundai_ioniq_5_2024_cached.json#vehicleStatus"
+            }
+        },
+        "GET /ac/v2/ts/alerts/maintenance/evTripDetails": {
+            "body": "$fixture:updates/responses/us_hyundai_evtripdetails.json"
+        },
+        "GET /ac/v2/rcs/rfc/findMyCar": {
+            "body": "$fixture:updates/responses/us_hyundai_findmycar_feature_off.json"
+        }
+    }
+}

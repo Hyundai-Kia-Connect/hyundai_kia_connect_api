@@ -1,0 +1,45 @@
+name: Limit open PRs per author
+
+on:
+    pull_request_target:
+        types:
+            - opened
+            - reopened
+
+permissions:
+    pull-requests: write
+
+jobs:
+    limit:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/github-script@v9
+              with:
+                  script: |
+                      const MAX_OPEN_PRS = 4;
+                      const EXEMPT_ASSOCIATIONS = ["OWNER", "MEMBER", "COLLABORATOR"];
+
+                      const pr = context.payload.pull_request;
+                      if (EXEMPT_ASSOCIATIONS.includes(pr.author_association) || pr.user.type === "Bot") {
+                          return;
+                      }
+
+                      const openPrs = await github.paginate(github.rest.pulls.list, {
+                          ...context.repo,
+                          state: "open",
+                          per_page: 100,
+                      });
+                      const authorPrs = openPrs.filter((p) => p.user.login === pr.user.login);
+                      if (authorPrs.length <= MAX_OPEN_PRS) {
+                          return;
+                      }
+
+                      const otherPrs = authorPrs
+                          .filter((p) => p.number !== pr.number)
+                          .map((p) => `- #${p.number}`)
+                          .join("\n");
+                      await github.rest.issues.createComment({
+                          ...context.repo,
+                          issue_number: pr.number,
+                          body: `Thanks for the contribution! You currently have ${authorPrs.length} open pull requests, and this repository asks contributors to keep at most ${MAX_OPEN_PRS} open at a time. Please follow up on your existing PRs before opening new ones:\n\n${otherPrs}`,
+                      });

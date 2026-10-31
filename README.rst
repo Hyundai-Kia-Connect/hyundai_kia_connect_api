@@ -1,6 +1,7 @@
 Code Maintainers Wanted
 =======================
-I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others who are interested in jumping in are welcome to join the project!   Even just pull requests are appreciated!
+
+I no longer have a Kia or Hyundai so don't maintain this like I used to.  Others who are interested in jumping in are welcome to join the project! Even just pull requests are appreciated!
 
 Introduction
 ============
@@ -18,7 +19,20 @@ API Usage
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
-Python 3.10 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
+Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
+
+China (Hyundai Bluelink / Kia UVO CN)
+-------------------------------------
+
+China support was rewritten in 2026 against the current China Bluelink iOS app (com.hyundai-motor.cn.bluelink).  Highlights and differences vs other regions:
+
+- Login uses a five-step flow through the UARS service (uars-{k|h}.hmgmobility.com.cn); the OAuth authorization code is exchanged server-side by UARS and the tokens are returned inside the callback page. Only the Hyundai brand has been live-verified; Kia constants are included from the app binary but are untested.
+- Access tokens live 6 hours.  There is no working refresh_token grant on the China servers, so ``refresh_access_token`` re-authenticates silently when possible and otherwise performs a full password login (same pattern as Canada).
+- Remote control on non-CCS2 vehicles uses the plain access token; a PIN is only required for CCS2-style control commands.  ``pin`` should be passed to ``VehicleManager`` as usual.
+- Push device registration uses ``pushType: APNS`` (not GCM) and requires a ``providerDeviceId`` field.
+- Control-command latency is high (1-2 minutes to reach SUCCESS); consumers should use generous polling timeouts.
+
+Python 3.12 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
     region: int
     brand: int,
@@ -26,12 +40,34 @@ Python 3.10 or newer is required to use this package. Vehicle manager is the key
     password: str
     pin: str (required for CA, and potentially USA, otherwise pass a blank string)
 
+    Optional parameters are::
+    geocode_api_enable: bool
+    geocode_api_use_email: bool
+    geocode_provider: int
+    geocode_api_key: str
+    language: str
+
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL}
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
+    GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
+
 
 Once this is done you can now make the following calls against the vehicle manager::
+
+
+ #login
+
+ login(self)
+
+ #OTP Details
+
+ #Sent OTP
+ send_otp(self, method)
+
+ #Verify OTP
+ verify_otp(self, otp_code)
 
  #Checks the token is still valid and updates it if not.  Should be called before anything else if the code has been running for any length of time.
  check_and_refresh_token(self)
@@ -112,6 +148,7 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
                     for trip in reversed(vehicle.day_trip_info.trip_list):  # show oldest first
                         print(f"{day.yyyymmdd},{trip.hhmmss},{trip.drive_time},{trip.idle_time},{trip.distance},{trip.avg_speed},{trip.max_speed}")
 
+In India the day trip list only carries start/end times, so each trip's figures come from a per-trip detail call (cached per trip). India trips also report ``trip.end_hhmmss`` and the driving-behaviour counters ``trip.hard_braking_count``, ``trip.rapid_acceleration_count`` and ``trip.excessive_speed_count``.
 
 CLI Usage
 =========
