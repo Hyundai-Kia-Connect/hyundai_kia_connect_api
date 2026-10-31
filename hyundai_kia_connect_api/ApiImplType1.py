@@ -28,6 +28,7 @@ from .ApiImpl import (
     _vehicle_temperature_unit,
 )
 from .const import (
+    CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
@@ -1011,12 +1012,30 @@ class ApiImplType1(ApiImpl):
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        vehicle.ev_battery_is_plugged_in = get_child_value(
-            state, "Green.ChargingInformation.ElectricCurrentLevel.State"
-        )
-        vehicle.ev_battery_is_plugged_in = get_child_value(
+        # ConnectorFastening.State follows the connector LOCK, not the
+        # cable: plugged-but-idle reads 0, a released lock after a charge
+        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
+        # kia_uvo#1837 "unplugged when charging stopped"). The plug sensor
+        # therefore stays unknown on this path; the enum field carries
+        # the reported state.
+        vehicle.ev_battery_is_plugged_in = None
+        fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
+        vehicle.ev_connector_fastening_state = None
+        if fastening_raw is not None:
+            try:
+                vehicle.ev_connector_fastening_state = CONNECTOR_FASTENING_STATE(
+                    int(fastening_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ConnectorFastening.State %r not in "
+                    "{0: disconnected, 1: connected}",
+                    DOMAIN,
+                    fastening_raw,
+                )
+                vehicle.ev_connector_fastening_state = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -1988,8 +2007,8 @@ class ApiImplType1(ApiImpl):
 
         Calls the v1 oauth2/token endpoint with grant_type=refresh_token.
         Shared by AU, IN and CN (all use the same endpoint format).
-        KiaUvoApiEU overrides this with a v2 endpoint that uses a JSON
-        body instead of form-urlencoded.
+        KiaUvoApiEU overrides this with the CCI token-refresh flow
+        (v2/auth/token-refresh + CCS re-exchange).
 
         No Stamp header is sent by default. Regions whose server requires
         it (AU, confirmed live in kia_uvo #1778; IN, whose login flow has
