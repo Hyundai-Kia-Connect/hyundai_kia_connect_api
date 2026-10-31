@@ -54,8 +54,6 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
-    supports_mqtt_push: bool = True
-
     CCSP_CLIENT_SERVICE_ID = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
     PUSH_PROVIDER_ID = "33258e5f-b8c8-459e-add1-1e94217ba148"
 
@@ -65,10 +63,12 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
     def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
         vehicles = super()._parse_vehicles_from_cci(data)
         # SVM reads confirmed live on the EU GSPA endpoints;
-        # KiaCciApiEU keeps the inherited False until verified there too.
+        # KiaCciApiEU keeps the inherited unknown until verified there too.
         for vehicle in vehicles:
             vehicle.supports.window_control = True
             vehicle.supports.svm = True
+            # MQTT push registered per broker on the Service Hub.
+            vehicle.supports.mqtt_push = True
         return vehicles
 
     # ------------------------------------------------------------------

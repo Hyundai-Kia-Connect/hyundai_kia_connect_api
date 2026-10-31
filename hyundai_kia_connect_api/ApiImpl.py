@@ -523,8 +523,6 @@ class ApiImpl:
     # Push contract — regions that support push override these
     # (today: the CCI/EU lineage).
 
-    supports_mqtt_push: bool = False
-
     def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
         """MQTT broker config for this region's push infrastructure."""
         raise NotImplementedError(

@@ -86,6 +86,8 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
+    # Service Hub registration + the receive-only MQTT broker
+    mqtt_push: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:

@@ -496,7 +496,8 @@ class VehicleManager:
         Returns False when push is unavailable (unsupported region, no
         broker info, rejected registration); ``APIError`` propagates.
         """
-        if not getattr(self.api, "supports_mqtt_push", False):
+        vehicle = self.vehicles.get(vehicle_id)
+        if vehicle is None or vehicle.supports.mqtt_push is not True:
             _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
             return False
         self._ensure_push_session()

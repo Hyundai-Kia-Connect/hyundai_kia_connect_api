@@ -94,6 +94,7 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
         vehicles = super()._parse_vehicles_from_cci(data)
         for vehicle in vehicles:
             vehicle.supports.window_control = True
+            vehicle.supports.mqtt_push = True
         return vehicles
 
     # Action-status polling on the EU CCI backend returned PENDING for
@@ -101,8 +102,6 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     # check_action_status stays gated in this region: outcomes reach the
     # integration through vehicle-status pushes or the cached state read.
     # Observed per command on EV6, EV3, eNiro, I5, Tucson and IONIQ 6.
-
-    supports_mqtt_push: bool = True
 
     # Push (Service Hub) REST base, live-probed on production.
     SERVICE_HUB_BASE = "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010"

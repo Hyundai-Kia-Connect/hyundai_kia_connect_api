@@ -25,8 +25,6 @@ _ManagerModule = "hyundai_kia_connect_api.VehicleManager"
 class FakePushApi:
     """Minimal ApiImpl double implementing the push contract."""
 
-    supports_mqtt_push = True
-
     def __init__(self):
         self.broker: dict | None = {
             "mqtt_host": "broker.example",
@@ -84,6 +82,7 @@ def _make_vm() -> VehicleManager:
     vm.token = Token()
     vehicle = Vehicle()
     vehicle.id = "careu1"
+    vehicle.supports.mqtt_push = True
     vm.vehicles = {"careu1": vehicle}
     return vm
 
@@ -151,14 +150,23 @@ def test_start_push_true_and_configures_transport(monkeypatch):
     _connected_transport_factory(monkeypatch)
     assert vm.start_push("careu1") is True
     assert vm._push_session is not None and vm._push_session._client is not None
-    assert vm.api.supports_mqtt_push is True
+    assert vm.vehicles["careu1"].supports.mqtt_push is True
     assert vm._push_session._client.configured["broker_host"] == "broker.example"
     assert vm._push_session._client.configured["client_id"] == "dev-client"
 
 
-def test_start_push_false_when_region_unsupported():
+def test_start_push_false_when_vehicle_unknown():
     vm = _make_vm()
-    vm.api.supports_mqtt_push = False  # type: ignore[attr-defined]
+    assert vm.start_push("careu-missing") is False
+    assert vm._push_session is None
+
+
+def test_start_push_false_when_push_unmarked():
+    vm = _make_vm()
+    vm.vehicles["careu1"].supports.mqtt_push = None
+    assert vm.start_push("careu1") is False
+    assert vm._push_session is None
+    vm.vehicles["careu1"].supports.mqtt_push = False
     assert vm.start_push("careu1") is False
 
 
@@ -173,6 +181,7 @@ def test_start_push_second_vehicle_reuses_client(monkeypatch):
     vm = _make_vm()
     vm.vehicles["careu2"] = Vehicle()
     vm.vehicles["careu2"].id = "careu2"
+    vm.vehicles["careu2"].supports.mqtt_push = True
     assert vm.start_push("careu1") is True
     assert vm.start_push("careu2") is True
     assert len(FakeTransport.instances) == 1

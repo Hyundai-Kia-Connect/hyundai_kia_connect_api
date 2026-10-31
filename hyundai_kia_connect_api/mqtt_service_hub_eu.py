@@ -46,7 +46,7 @@ class MqttServiceHubMixin:
 
     Mixed into both ``HyundaiCciApiEU`` and ``KiaCciApiEU``; all
     brand-specific values (SERVICE_HUB_BASE, CCSP_CLIENT_SERVICE_ID,
-    PUSH_PROVIDER_ID, supports_mqtt_push) and the session state
+    PUSH_PROVIDER_ID) and the session state
     (_service_hub_session, _service_hub_tid) live on the host class.
     """
 
@@ -349,7 +349,7 @@ class MqttServiceHubMixin:
         if not base:
             _LOGGER.error(
                 f"{DOMAIN} - Pull base URL missing on {type(self).__name__} "
-                "(supports_mqtt_push=True requires SERVICE_HUB_BASE)"
+                "(mqtt_push requires SERVICE_HUB_BASE)"
             )
             return ""
         return f"https://{base}"

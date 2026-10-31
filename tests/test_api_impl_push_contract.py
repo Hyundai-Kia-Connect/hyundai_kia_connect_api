@@ -8,9 +8,10 @@ from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
-def test_default_supports_mqtt_push_false():
-    impl = ApiImpl()
-    assert impl.supports_mqtt_push is False
+def test_capabilities_live_on_vehicle_supports():
+    vehicle = Vehicle(id="v1", name="test", model="test")
+    # Tri-state: unknown until the region's parser sets it.
+    assert vehicle.supports.mqtt_push is None
 
 
 @pytest.mark.parametrize(

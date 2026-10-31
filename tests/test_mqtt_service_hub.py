@@ -411,7 +411,6 @@ def test_query_encoding_preserves_at_sign():
 
 def test_cci_classes_implement_contract():
     for api in (HyundaiCciApiEU(region=9, brand=2, language="en"), _kia_api()):
-        assert api.supports_mqtt_push is True
         for name in (
             "get_push_broker_info",
             "register_push_client",
