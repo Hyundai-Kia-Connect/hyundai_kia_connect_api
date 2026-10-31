@@ -27,7 +27,7 @@ from hyundai_kia_connect_api.exceptions import (
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
+from hyundai_kia_connect_api.Vehicle import Vehicle
 
 ENVELOPE = {"rc": "0000", "rs": {"SID": "sid-1"}, "msg": "success"}
 
@@ -53,7 +53,7 @@ def _make_vehicle(ccs2: int = 1) -> Vehicle:
     vehicle = Vehicle()
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
-    vehicle.supports = VehicleSupports(window_control=True)
+    vehicle.supports.window_control = True
     return vehicle
 
 

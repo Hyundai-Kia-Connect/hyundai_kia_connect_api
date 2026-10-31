@@ -61,7 +61,6 @@ from .Vehicle import (
     MonthTripInfo,
     TripInfo,
     Vehicle,
-    VehicleSupports,
 )
 
 CIPHERS = "DEFAULT@SECLEVEL=1"
@@ -1237,12 +1236,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 timezone=self.data_timezone,
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=int(entry.get("vehicleGeneration", "2")),
-                # SVM / Find My Car; the image is fetched on demand via
-                # get_svm_details / request_svm_capture.
-                supports=VehicleSupports(
-                    window_control=False, valet_mode=False, surround_view=True
-                ),
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            # SVM / Find My Car; the image is fetched on demand via
+            # get_svm_details / request_svm_capture.
+            vehicle.supports.surround_view = True
             result.append(vehicle)
 
         return result

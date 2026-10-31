@@ -75,7 +75,6 @@ from .Vehicle import (
     MonthTripInfo,
     TripInfo,
     Vehicle,
-    VehicleSupports,
 )
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
@@ -212,7 +211,7 @@ class ApiImplType1(ApiImpl):
         ]
 
     def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
-        return Vehicle(
+        vehicle = Vehicle(
             id=entry["vehicleId"],
             name=entry["nickname"],
             model=entry["vehicleName"],
@@ -223,10 +222,11 @@ class ApiImplType1(ApiImpl):
             # The China vehicle list omits ccuCCS2ProtocolSupport; 0 keeps
             # those vehicles on the legacy status path.
             ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            supports=VehicleSupports(
-                window_control=True, valet_mode=True, surround_view=False
-            ),
         )
+        vehicle.supports.window_control = True
+        vehicle.supports.valet_mode = True
+        vehicle.supports.surround_view = False
+        return vehicle
 
     def _get_time_from_string(self, value: Any, timesection: Any) -> dt.time | None:
         if value is None:

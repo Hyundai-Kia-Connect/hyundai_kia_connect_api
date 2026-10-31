@@ -95,7 +95,7 @@ from .utils import (
     parse_datetime,
     pressure_or_none,
 )
-from .Vehicle import Vehicle, VehicleSupports
+from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -569,23 +569,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             else:
                 entry_engine_type = ENGINE_TYPES.ICE
 
-            vehicles.append(
-                Vehicle(
-                    id=vehicle_id,
-                    name=entry.get(
-                        "vehicleNameView",
-                        entry.get("nickname", entry.get("vehicleName", "")),
-                    ),
-                    model=entry.get("vehicleModelName", entry.get("modelName", "")),
-                    VIN=entry.get("vin", ""),
-                    timezone=self.data_timezone,
-                    engine_type=entry_engine_type,
-                    ccu_ccs2_protocol_support=ccs2_support,
-                    supports=VehicleSupports(
-                        window_control=False, valet_mode=True, surround_view=False
-                    ),
-                )
+            vehicle = Vehicle(
+                id=vehicle_id,
+                name=entry.get(
+                    "vehicleNameView",
+                    entry.get("nickname", entry.get("vehicleName", "")),
+                ),
+                model=entry.get("vehicleModelName", entry.get("modelName", "")),
+                VIN=entry.get("vin", ""),
+                timezone=self.data_timezone,
+                engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=ccs2_support,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = True
+            vehicle.supports.surround_view = False
+            vehicles.append(vehicle)
 
         return vehicles
 

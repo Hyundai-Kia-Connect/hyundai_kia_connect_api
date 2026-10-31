@@ -106,8 +106,10 @@ def test_api_holds_no_supports_attributes():
 )
 def test_deprecated_flat_alias_reads_and_writes_supports(alias, item):
     vehicle = Vehicle()
+    supports = vehicle.supports
     with pytest.deprecated_call():
         setattr(vehicle, alias, True)
+    assert vehicle.supports is supports
     assert getattr(vehicle.supports, item) is True
     with pytest.deprecated_call():
         assert getattr(vehicle, alias) is True
