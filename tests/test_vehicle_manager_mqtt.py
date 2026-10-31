@@ -159,8 +159,7 @@ def test_start_push_true_and_configures_transport(monkeypatch):
 
 
 def test_start_push_connects_unauthenticated_when_credentials_none(monkeypatch):
-    # Genesis mode: the g broker refuses the credential form (live rc=135)
-    # and serves the delivery ACL at subscribe time.
+    # Genesis broker shape (live): the credential form is refused.
     vm = _make_vm()
     vm.api.get_push_credentials = lambda token: None  # type: ignore[method-assign]
     _connected_transport_factory(monkeypatch)
