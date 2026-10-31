@@ -948,10 +948,6 @@ class MqttPushSession:
             self._client = None
         self._vehicle_ids.clear()
 
-    @property
-    def vehicle_ids(self) -> set[str]:
-        return set(self._vehicle_ids)
-
     def _on_push_disconnect(self, reason: str) -> None:
         """Reconnect with capped exponential backoff on unexpected drops.
 
