@@ -20,6 +20,7 @@ from hyundai_kia_connect_api.exceptions import (
     AuthenticationSigninError,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
+from hyundai_kia_connect_api.GspaApiEU import GspaApiEU
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -870,3 +871,39 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.ota_update_available is None
     assert vehicle._ota_checked is True  # checked — don't retry until force refresh
+
+
+# ── force_refresh_vehicle_state() — shared poll + Hyundai extras ──
+
+
+def test_force_refresh_resets_flags_and_loads_extras():
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    vehicle._ota_checked = True
+    vehicle._valet_failed = True
+    with (
+        patch.object(GspaApiEU, "force_refresh_vehicle_state") as shared,
+        patch.object(api, "_update_vehicle_extras") as extras,
+    ):
+        api.force_refresh_vehicle_state(_make_token(), vehicle)
+    shared.assert_called_once()
+    extras.assert_called_once()
+    assert vehicle._ota_checked is False
+    assert vehicle._valet_failed is False
+
+
+def test_force_refresh_failure_skips_extras():
+    """A failed shared refresh propagates; flags and extras stay untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle()
+    vehicle._ota_checked = True
+    with (
+        patch.object(
+            GspaApiEU, "force_refresh_vehicle_state", side_effect=APIError("timeout")
+        ),
+        patch.object(api, "_update_vehicle_extras") as extras,
+        pytest.raises(APIError),
+    ):
+        api.force_refresh_vehicle_state(_make_token(), vehicle)
+    extras.assert_not_called()
+    assert vehicle._ota_checked is True
