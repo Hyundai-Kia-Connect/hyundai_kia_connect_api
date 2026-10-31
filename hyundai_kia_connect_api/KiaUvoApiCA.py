@@ -653,6 +653,7 @@ class KiaUvoApiCA(ApiImpl):
         # Update service after the fact so we still have the old odometer
         # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
+        self._update_maintenance_report(token, vehicle)
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
@@ -711,11 +712,60 @@ class KiaUvoApiCA(ApiImpl):
         # Update service after the fact so we still have the old odometer
         # reading available for above.
         self._update_vehicle_properties_service(vehicle, service)
+        self._update_maintenance_report(token, vehicle)
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
+
+    def _update_maintenance_report(self, token: Token, vehicle: Vehicle) -> None:
+        """Fetch the newest monthly maintenance report when a new one appears.
+
+        The list call runs on every update (same per-poll pattern as the
+        next-service read); the report is re-fetched only when its id changes.
+        """
+        report_list = self._get_mvr_list(token, vehicle)
+        reports = report_list.get("MVRs") if isinstance(report_list, dict) else None
+        if not reports:
+            return
+        if get_child_value(reports[0], "reportId") in (
+            None,
+            vehicle.maintenance_report_last_id,
+        ):
+            return
+        vehicle.maintenance_report_last_id = get_child_value(reports[0], "reportId")
+        vehicle.maintenance_report_date = get_child_value(reports[0], "reportDate")
+        report = self._get_mvr_report(
+            token, vehicle, vehicle.maintenance_report_last_id
+        )
+        vehicle.maintenance_report_odometer = get_child_value(report, "odometer")
+        vehicle.maintenance_report_odometer_unit = report.get("odometerUnitStr")
+        vehicle.maintenance_report_systems = get_child_value(report, "systems")
+
+    def _get_mvr_list(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        url = self.API_URL + "gtmvrlst"
+        headers = self.API_HEADERS.copy()
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        response = self.sessions.post(url, headers=headers, json={})
+        response_json = response.json()
+        self._check_response_for_errors(response_json)
+        return response_json.get("result") or {}
+
+    def _get_mvr_report(
+        self, token: Token, vehicle: Vehicle, report_id: int
+    ) -> dict[str, Any]:
+        url = self.API_URL + "gtmvrrpt"
+        headers = self.API_HEADERS.copy()
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        response = self.sessions.post(
+            url, headers=headers, json={"reportId": report_id}
+        )
+        response_json = response.json()
+        self._check_response_for_errors(response_json)
+        return response_json.get("result", {}).get("MVR") or {}
 
     def _update_vehicle_properties_base(
         self, vehicle: Vehicle, state: dict[str, Any]

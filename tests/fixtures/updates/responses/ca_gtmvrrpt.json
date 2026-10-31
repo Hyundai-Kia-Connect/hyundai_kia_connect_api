@@ -1,0 +1,162 @@
+{
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "MVR": {
+            "reportId": 1002003001,
+            "reportDate": "2026-10-25",
+            "odometer": 77685.8,
+            "odometerUnit": 1,
+            "odometerUnitStr": "km",
+            "systems": [
+                {
+                    "name": "CHASSIS",
+                    "subSystems": [
+                        {
+                            "name": "Blind Spot Collision Warning",
+                            "code": "BCW",
+                            "status": "G",
+                            "img": "img_engine_w.png"
+                        },
+                        {
+                            "name": "Electronic Parking Brake",
+                            "code": "EPB",
+                            "status": "G",
+                            "img": "img_powerbrake_w.png"
+                        },
+                        {
+                            "name": "Electronic Power Steering",
+                            "code": "EPS",
+                            "status": "G",
+                            "img": "img_epowersteer_w.png"
+                        },
+                        {
+                            "name": "Electronic Stability Control",
+                            "code": "ESC",
+                            "status": "G",
+                            "img": "img_esc.png"
+                        },
+                        {
+                            "name": "Identity Authentication Unit",
+                            "code": "IAU",
+                            "status": "G",
+                            "img": "img_engine_w.png"
+                        },
+                        {
+                            "name": "Lane Departure Warning System",
+                            "code": "LKAS",
+                            "status": "G",
+                            "img": "img_lkas_w.png"
+                        },
+                        {
+                            "name": "Smart Cruise Control",
+                            "code": "SCC",
+                            "status": "G",
+                            "img": "img_smartcruisecontrol_w.png"
+                        },
+                        {
+                            "name": "Tire Pressure Monitoring System",
+                            "code": "TPMS",
+                            "status": "G",
+                            "img": "img_tpms_w.png"
+                        }
+                    ]
+                },
+                {
+                    "name": "POWERTRAIN",
+                    "subSystems": [
+                        {
+                            "name": "Engine Control System",
+                            "code": "Engine",
+                            "status": "G",
+                            "img": "img_engine_w.png"
+                        },
+                        {
+                            "name": "Transmission Control System",
+                            "code": "AT",
+                            "status": "G",
+                            "img": "img_transmission_w.png"
+                        }
+                    ]
+                },
+                {
+                    "name": "SAFETY",
+                    "subSystems": [
+                        {
+                            "name": "Airbag System",
+                            "code": "Airbag",
+                            "status": "G",
+                            "img": "img_airbag_w.png"
+                        }
+                    ]
+                }
+            ],
+            "drivingInfo": {
+                "startsCount": 101,
+                "runTime": 114327,
+                "runTimeUnit": 3,
+                "mileageTime": 99807,
+                "mileageTimeUnit": 3,
+                "idleEngineTime": 14485,
+                "idleEngineTimeUnit": 3,
+                "runDistance": 1326,
+                "runDistanceUnit": 1,
+                "refuelCount": 0,
+                "tirePressureFL": null,
+                "tirePressureFR": null,
+                "tirePressureRL": null,
+                "tirePressureRR": null,
+                "totalPwrCsp": null,
+                "motorPwrCsp": null,
+                "climatePwrCsp": null,
+                "edPwrCsp": null,
+                "regenPwr": null,
+                "cumulativeOdo": null,
+                "cumulativeOdoUnit": null
+            },
+            "recallDetail": [
+                {
+                    "title": "Third-Row Ejection Mitigation ",
+                    "summary": "Issue: \nThe subject vehicles may not meet the allowable third row headform displacement requirements set forth in Canadian Motor Vehicle Safety Standard (\u201cCMVSS\u201d) No. 226, \u201cEjection Mitigation.\u201d\n\nSafety Risk:  \nA vehicle that fails to comply with this standard might have increased risk of injury to third row occupants during certain crashes including a rollover.\n\nPrecautions: \nNo precautionary measures are to be taken at this moment; however, if you experience any issues with your vehicle, please contact your dealer immediately.\n\nCorrective Actions: \nHyundai Canada will notify owners in writing advising them to bring their vehicles to a dealership for an installation of a protective film. The remedy procedure will be performed at no charge to the owner.  ",
+                    "startDate": "2026-05-20",
+                    "repairStatus": "Incomplete",
+                    "recallNumber": "R0299",
+                    "tranportCanadaId": "2026 - 023"
+                },
+                {
+                    "title": "WINDSHIELD WIPER ISSUE  ",
+                    "summary": "Issue:\nOn certain vehicles, the windshield wiper motor may stop working when snow and/or ice builds up on the windshield.\n\nSafety Risk:\nWindshield wipers that don't work properly could affect a driver's visibility. This could increase the risk of a crash.\n\nCorrective Actions:\nHyundai will notify owners by mail and instruct you to take your vehicle to a dealer to replace the driver's windshield wiper arm. Hyundai advises that if the wipers stop working, you should clear any buildup of snow or ice before restarting the wipers.",
+                    "startDate": "2023-03-21",
+                    "repairStatus": "Complete",
+                    "recallNumber": "R0222 - Exp",
+                    "tranportCanadaId": "2023 - 148"
+                },
+                {
+                    "title": "Seat Belt Buckle Assembly ",
+                    "summary": "Issue: \nThe subject vehicles are equipped with seat belt buckle assemblies that may have been manufactured with out-of-specification components by the supplier, resulting in interference within the latch channel. Improperly produced seat belt buckles, combined with slow insertion of the seat belt tongue plate, may prevent the seat belt buckle from fully latching. \n\nSafety Risk:  \nAn inability to fasten the seat belt in an occupied seat could increase the risk of injury to occupant(s) during a crash.\n\nPrecautions: \nOwners are advised to fasten the seat belt firmly into the buckle with quick and direct motion. Once buckled, pull on the belt to confirm the seat belt is fully seated into the buckle. Fasten and confirm seat belts are fully buckled for all passengers who require assistance, such as children. If the seat belt does not remain secured, cannot be fastened completely, or if you experience any other issue with the seatbelt(s), contact your Hyundai dealer to have the vehicle inspected.\n\nCorrective Actions: \nHyundai Canada will notify owners in writing advising them to bring their vehicles to a dealership for an inspection and/or replacement of the seat belt buckle assemblies, as necessary. The remedy procedure will be performed at no charge to the owner.  ",
+                    "startDate": "2025-09-27",
+                    "repairStatus": "Complete",
+                    "recallNumber": "R0286",
+                    "tranportCanadaId": "2025 - 476"
+                },
+                {
+                    "title": "Engine Control Unit (ECU) Update",
+                    "summary": "Issue: \nOn certain vehicles, the Engine Management System (EMS) calibration could result in the engine not properly setting the air-fuel mixture. Not keeping the air-to-fuel ratio at an optimal level may result in increased NOx, NMOG and particulate matter emissions. \n \nPollution Risk: \nVehicles may exceed NMOG+NOx and Particulate Matter emissions standards. \n \nCorrective Actions: \nHyundai Canada will notify owners in writing to bring their vehicles to a Hyundai dealer to have the ECU software updated. The remedy procedure will be performed at no charge to owners. \n\nPrecautions:\nNo precautions are required for this issue. \n",
+                    "startDate": "2026-02-03",
+                    "repairStatus": "Complete",
+                    "recallNumber": "C0708",
+                    "tranportCanadaId": "ECR-H0003-26-001"
+                }
+            ]
+        }
+    },
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/gtmvrrpt",
+        "source": "read-only capture from a contributor session, kia_uvo #2025 work (PALISADE 2023)",
+        "vehicles": "1 vehicle",
+        "description": "Newest maintenance report: odometer, systems, drivingInfo and recall detail; report ids replaced."
+    }
+}

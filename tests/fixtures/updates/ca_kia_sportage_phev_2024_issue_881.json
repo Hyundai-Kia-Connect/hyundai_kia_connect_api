@@ -2,7 +2,7 @@
     "_fixture_meta": {
         "vehicles": "2024 Sportage (PHEV)",
         "source": "kia_uvo #881 debug log: cached status, nxtsvc",
-        "follow_up_sources": "vrfypin: kia_uvo #459; fndmcr: real 6504 location error from kia_uvo #906",
+        "follow_up_sources": "vrfypin: kia_uvo #459; fndmcr: real 6504 location error from kia_uvo #906; gtmvrlst/gtmvrrpt from the read-only capture in kia_uvo #2025 work (PALISADE 2023)",
         "not_captured": [],
         "description": "Location lookup fails, so the update keeps no location; identifiers replaced."
     },
@@ -28,6 +28,12 @@
         },
         "POST /tods/api/fndmcr": {
             "body": "$fixture:updates/responses/ca_fndmcr_error_6504.json"
+        },
+        "POST /tods/api/gtmvrlst": {
+            "body": "$fixture:updates/responses/ca_gtmvrlst.json"
+        },
+        "POST /tods/api/gtmvrrpt": {
+            "body": "$fixture:updates/responses/ca_gtmvrrpt.json"
         }
     }
 }
