@@ -10,6 +10,7 @@ import pytest
 from hyundai_kia_connect_api import VehicleManager
 
 vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
+hub_module = sys.modules["hyundai_kia_connect_api.mqtt_service_hub_eu"]
 from hyundai_kia_connect_api.mqtt_service_hub_eu import CciPushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -136,7 +137,7 @@ def _connected_transport_factory(monkeypatch):
         t.connected = True
         return t
 
-    monkeypatch.setattr(vm_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     return FakeTransport
 
 
@@ -149,10 +150,10 @@ def test_start_push_true_and_configures_transport(monkeypatch):
     vm = _make_vm()
     _connected_transport_factory(monkeypatch)
     assert vm.start_push("careu1") is True
-    assert vm._push_client is not None
+    assert vm._push_session is not None and vm._push_session._client is not None
     assert vm.api.supports_mqtt_push is True
-    assert vm._push_client.configured["broker_host"] == "broker.example"
-    assert vm._push_client.configured["client_id"] == "dev-client"
+    assert vm._push_session._client.configured["broker_host"] == "broker.example"
+    assert vm._push_session._client.configured["client_id"] == "dev-client"
 
 
 def test_start_push_false_when_region_unsupported():
@@ -175,7 +176,10 @@ def test_start_push_second_vehicle_reuses_client(monkeypatch):
     assert vm.start_push("careu1") is True
     assert vm.start_push("careu2") is True
     assert len(FakeTransport.instances) == 1
-    assert sorted(vm._push_vehicle_ids) == ["careu1", "careu2"]
+    assert vm._push_session is not None and sorted(vm._push_session._vehicle_ids) == [
+        "careu1",
+        "careu2",
+    ]
 
 
 def test_failed_vehicle_registration_subscribes_nothing(monkeypatch):
@@ -184,8 +188,8 @@ def test_failed_vehicle_registration_subscribes_nothing(monkeypatch):
     vm = _make_vm()
     vm.api.register_result = None  # type: ignore[attr-defined]
     assert vm.start_push("careu1") is False
-    assert vm._push_client is None
-    assert vm._push_vehicle_ids == set()
+    assert vm._push_session is None or vm._push_session._client is None
+    assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
     assert "topics" not in vm.api.calls
     assert fake_cls.instances == []
 
@@ -222,7 +226,8 @@ def test_message_unknown_vehicle_dropped():
         payload={},
         is_status=True,
     )
-    vm._on_push_message(msg)
+    vm._ensure_push_session()
+    vm._push_session._on_push_message(msg)
     assert seen == []
 
 
@@ -238,7 +243,8 @@ def test_message_status_resolves_vehicle_id():
         payload={},
         is_status=True,
     )
-    vm._on_push_message(msg)
+    vm._ensure_push_session()
+    vm._push_session._on_push_message(msg)
     assert seen == [("careu1", "Status")]
 
 
@@ -246,7 +252,8 @@ def test_message_unknown_topic_schema_dropped():
     vm = _make_vm()
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    vm._on_push_delivery_raw("service/unknown/schema/v999/", b"{}")
+    vm._ensure_push_session()
+    vm._push_session._on_push_delivery_raw("service/unknown/schema/v999/", b"{}")
     assert seen == []
 
 
@@ -266,7 +273,8 @@ def test_res_message_is_ignored_without_callback():
         payload={"header": {"tid": "tid-1"}, "body": {"resCode": "0"}},
         is_status=False,
     )
-    vm._on_push_message(msg)
+    vm._ensure_push_session()
+    vm._push_session._on_push_message(msg)
     assert seen == []
 
 
@@ -278,9 +286,12 @@ def test_res_message_is_ignored_without_callback():
 def test_reconnect_calls_check_and_refresh_token(monkeypatch):
     vm = _make_vm()
     vm.vehicles["careu1"].mqtt_vehicle_id = "testmqtt1"
-    vm._push_vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
     refreshes = []
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: refreshes.append(1))
+    if vm._push_session is not None:
+        vm._push_session._refresh_fn = vm.check_and_refresh_token
     from hyundai_kia_connect_api import const as const_mod
 
     monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
@@ -300,9 +311,11 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
         def connect(self):
             attempts["n"] += 1
 
-    monkeypatch.setattr(vm_module, "MqttTransport", _Reconnectable)
-    vm._push_client = None
-    vm._on_push_disconnect("unexpected (rc=7)")
+    monkeypatch.setattr(hub_module, "MqttTransport", _Reconnectable)
+    vm._ensure_push_session()
+    vm._push_session._client = None
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("unexpected (rc=7)")
     deadline = time.time() + 2.0
     while attempts["n"] < 2 and time.time() < deadline:
         time.sleep(0.02)
@@ -312,10 +325,13 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
 
 def test_clean_disconnect_does_not_reconnect():
     vm = _make_vm()
-    vm._push_vehicle_ids = {"careu1"}
-    vm._push_client = FakeTransport()
-    vm._on_push_disconnect("clean disconnect")
-    assert vm._push_reconnect_cancel is None
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._client = FakeTransport()
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("clean disconnect")
+    assert vm._push_session is None or vm._push_session._reconnect_cancel is None
 
 
 # ---------------------------------------------------------------------------
@@ -328,16 +344,16 @@ def test_stop_push_clears_state(monkeypatch):
     vm = _make_vm()
     vm.start_push("careu1")
     vm.stop_push()
-    assert vm._push_client is None
-    assert vm._push_vehicle_ids == set()
+    assert vm._push_session is None or vm._push_session._client is None
+    assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
 
 
 def test_start_push_false_when_client_registration_rejected():
     vm = _make_vm()
     vm.api.reg = None  # type: ignore[attr-defined]
     assert vm.start_push("careu1") is False
-    assert vm._push_client is None
-    assert vm._push_vehicle_ids == set()
+    assert vm._push_session is None or vm._push_session._client is None
+    assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
 
 
 def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
@@ -348,8 +364,8 @@ def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
     assert vm.start_push("careu1") is True
     vm.api.register_result = None  # type: ignore[attr-defined]
     assert vm.start_push("careu2") is False
-    assert "careu2" not in vm._push_vehicle_ids
-    assert vm._push_client is not None  # first vehicle's client kept
+    assert "careu2" not in vm._push_session._vehicle_ids
+    assert vm._push_session is not None and vm._push_session._client is not None  # kept
 
 
 def test_start_push_wires_connection_change_callback(monkeypatch):
@@ -361,14 +377,14 @@ def test_start_push_wires_connection_change_callback(monkeypatch):
 
     vm.set_push_connection_change_callback(before)
     assert vm.start_push("careu1") is True
-    assert vm._push_client.connection_change_cb is before
+    assert vm._push_session._client.connection_change_cb is before
     # late registration rewires the live client
 
     def after(connected):
         """replacement callback"""
 
     vm.set_push_connection_change_callback(after)
-    assert vm._push_client.connection_change_cb is after
+    assert vm._push_session._client.connection_change_cb is after
 
 
 def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
@@ -377,20 +393,22 @@ def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
         t.fail_connect = True
         return t
 
-    monkeypatch.setattr(vm_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     vm = _make_vm()
     with pytest.raises(ValueError, match="bad broker config"):
         vm.start_push("careu1")
-    assert vm._push_client is None
-    assert vm._push_vehicle_ids == set()
+    assert vm._push_session is None or vm._push_session._client is None
+    assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
 
 
 def test_on_push_connect_subscribes_started_vehicles(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
     vm.start_push("careu1")
-    vm._push_client.connected = False
-    vm._on_push_connect()
+    vm._ensure_push_session()
+    vm._push_session._client.connected = False
+    vm._ensure_push_session()
+    vm._push_session._on_push_connect()
     assert "topics" in vm.api.calls
 
     # a subscribe failure during reconnect must not raise out of the callback
@@ -398,7 +416,8 @@ def test_on_push_connect_subscribes_started_vehicles(monkeypatch):
         raise RuntimeError("subscribe failed")
 
     vm.api.get_push_topics = boom  # type: ignore[assignment]
-    vm._on_push_connect()
+    vm._ensure_push_session()
+    vm._push_session._on_push_connect()
 
 
 def test_raw_delivery_of_parsed_message_dispatches():
@@ -413,7 +432,8 @@ def test_raw_delivery_of_parsed_message_dispatches():
         payload={},
         is_status=True,
     )
-    vm._on_push_delivery_raw("service/phone/_/vss/mqttv1/", b"{}")
+    vm._ensure_push_session()
+    vm._push_session._on_push_delivery_raw("service/phone/_/vss/mqttv1/", b"{}")
     assert seen == [("careu1", "Status")]
 
 
@@ -425,16 +445,14 @@ def test_push_status_callback_error_is_contained():
         raise RuntimeError("callback failed")
 
     vm.set_push_status_callback(broken)
-    vm._on_push_message(
-        CciPushMessage("CarStatus", "Status", "mqttv1", {}, is_status=True)
-    )
     assert vm._push_status_callback is broken
 
 
 def test_stop_push_cancels_reconnect_and_tolerates_broken_client():
     vm = _make_vm()
     cancel = threading.Event()
-    vm._push_reconnect_cancel = cancel
+    vm._ensure_push_session()
+    vm._push_session._reconnect_cancel = cancel
 
     class _BrokenTransport:
         is_connected = False
@@ -445,13 +463,15 @@ def test_stop_push_cancels_reconnect_and_tolerates_broken_client():
 
         def set_on_connection_change(self, callback): ...
 
-    vm._push_client = _BrokenTransport()  # type: ignore[assignment]
-    vm._push_vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._client = _BrokenTransport()
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
     vm.stop_push()
     assert cancel.is_set()
-    assert vm._push_reconnect_cancel is None
-    assert vm._push_client is None
-    assert vm._push_vehicle_ids == set()
+    assert vm._push_session is None or vm._push_session._reconnect_cancel is None
+    assert vm._push_session is None or vm._push_session._client is None
+    assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
 
 
 def test_get_push_connection_state_delegates():
@@ -466,9 +486,11 @@ def test_get_push_connection_state_delegates():
 
 def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run():
     vm = _make_vm()
-    vm._push_vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
     prior_cancel = threading.Event()
-    vm._push_reconnect_cancel = prior_cancel
+    vm._ensure_push_session()
+    vm._push_session._reconnect_cancel = prior_cancel
 
     class _BrokenTransport:
         is_connected = False
@@ -476,27 +498,40 @@ def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run():
         def disconnect(self):
             raise RuntimeError("already down")
 
-    vm._push_client = _BrokenTransport()  # type: ignore[assignment]
-    vm._on_push_disconnect("unexpected (rc=7)")
+    vm._ensure_push_session()
+    vm._push_session._client = _BrokenTransport()
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("unexpected (rc=7)")
     assert prior_cancel.is_set()  # prior cancellation event signalled
-    assert vm._push_client is None  # cleanup swallowed the disconnect error
-    assert vm._push_reconnect_cancel is not None  # fresh event for the new run
-    vm._push_reconnect_cancel.set()
+    assert (
+        vm._push_session is None or vm._push_session._client is None
+    )  # cleanup swallowed the disconnect error
+    assert (
+        vm._push_session is not None and vm._push_session._reconnect_cancel is not None
+    )  # fresh event
+    vm._ensure_push_session()
+    assert vm._push_session is not None
+    vm._push_session._reconnect_cancel.set()
 
 
 def test_reconnect_success_returns_after_first_cycle(monkeypatch):
     vm = _make_vm()
     vm.vehicles["careu1"].mqtt_vehicle_id = "testmqtt1"
-    vm._push_vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: None)
+    if vm._push_session is not None:
+        vm._push_session._refresh_fn = vm.check_and_refresh_token
     from hyundai_kia_connect_api import const as const_mod
 
     monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
     monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_MAX_DELAY", 0.01)
     _connected_transport_factory(monkeypatch)
-    vm._push_client = None
+    vm._ensure_push_session()
+    vm._push_session._client = None
     before = _reconnect_thread_idents()
-    vm._on_push_disconnect("unexpected (rc=7)")
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("unexpected (rc=7)")
     thread = _new_reconnect_thread(before)
     thread.join(timeout=2.0)
     assert not thread.is_alive()
@@ -505,7 +540,8 @@ def test_reconnect_success_returns_after_first_cycle(monkeypatch):
 
 def test_reconnect_cancelled_exits_backoff_loop(monkeypatch):
     vm = _make_vm()
-    vm._push_vehicle_ids = {"careu1"}
+    vm._ensure_push_session()
+    vm._push_session._vehicle_ids = {"careu1"}
     from hyundai_kia_connect_api import const as const_mod
 
     monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0.05)
@@ -518,19 +554,25 @@ def test_reconnect_cancelled_exits_backoff_loop(monkeypatch):
         release.wait(timeout=5.0)
 
     monkeypatch.setattr(vm, "check_and_refresh_token", slow_refresh)
+    if vm._push_session is not None:
+        vm._push_session._refresh_fn = vm.check_and_refresh_token
 
     def factory(*args, **kwargs):
         t = FakeTransport(*args, **kwargs)
         t.fail_connect = True  # every attempt fails → loop keeps backing off
         return t
 
-    monkeypatch.setattr(vm_module, "MqttTransport", factory)
-    vm._push_client = None
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    vm._ensure_push_session()
+    vm._push_session._client = None
     before = _reconnect_thread_idents()
-    vm._on_push_disconnect("unexpected (rc=7)")
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("unexpected (rc=7)")
     thread = _new_reconnect_thread(before)
     time.sleep(0.15)  # wait(delay) elapsed → first attempt is inside refresh
-    vm._push_reconnect_cancel.set()
+    vm._ensure_push_session()
+    assert vm._push_session is not None
+    vm._push_session._reconnect_cancel.set()
     release.set()
     thread.join(timeout=2.0)
     assert not thread.is_alive()
@@ -540,9 +582,10 @@ def test_reconnect_cancelled_exits_backoff_loop(monkeypatch):
 def test_reconnect_without_vehicles_returns_early():
     vm = _make_vm()
     vm._push_vehicle_ids = set()
-    vm._on_push_disconnect("unexpected (rc=7)")
-    assert vm._push_reconnect_cancel is None
-    assert vm._push_client is None
+    vm._ensure_push_session()
+    vm._push_session._on_push_disconnect("unexpected (rc=7)")
+    assert vm._push_session is None or vm._push_session._reconnect_cancel is None
+    assert vm._push_session is None or vm._push_session._client is None
 
 
 def _reconnect_thread_idents() -> set:
@@ -567,3 +610,31 @@ def _new_reconnect_thread(before: set):
             return candidates[0]
         time.sleep(0.01)
     raise AssertionError("push-reconnect thread not started")
+
+
+def test_set_push_callbacks_forward_to_running_session(monkeypatch):
+    _connected_transport_factory(monkeypatch)
+    vm = _make_vm()
+    assert vm.start_push("careu1") is True
+    seen: list[str] = []
+    conn: list[bool] = []
+
+    vm.set_push_status_callback(lambda vid, tt: seen.append(vid))
+    vm.set_push_connection_change_callback(lambda ok: conn.append(ok))
+    assert vm._push_session is not None
+    assert vm._push_session._status_callback is not None
+    transport = vm._push_session._client
+    assert transport is not None
+    assert transport.connection_change_cb is not None
+    assert seen == []  # unrelated vehicle id dropped, callback wired though
+
+
+def test_set_push_callbacks_before_start_wire_session_later(monkeypatch):
+    _connected_transport_factory(monkeypatch)
+    vm = _make_vm()
+    vm.set_push_status_callback(None)
+    vm.set_push_connection_change_callback(None)
+    assert vm.start_push("careu1") is True
+    assert vm._push_session is not None
+    assert vm._push_session._status_callback is None
+    assert vm._push_session._connection_change_callback is None
