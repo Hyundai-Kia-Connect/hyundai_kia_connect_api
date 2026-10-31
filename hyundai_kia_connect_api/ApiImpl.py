@@ -620,17 +620,6 @@ class ApiImpl:
         """Stops climate or remote start.  Returns the tracking ID"""
         raise NotImplementedError("stop_climate is not implemented for this region")
 
-    def start_engine(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        options: ClimateRequestOptions | None = None,
-    ) -> str:
-        raise NotImplementedError("start_engine is not implemented for this region")
-
-    def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
-        raise NotImplementedError("stop_engine is not implemented for this region")
-
     def start_pet_care(
         self,
         token: Token,

@@ -2378,10 +2378,21 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             info["rrSeatClimateState"] = options.rear_right_seat
         return info if info else None
 
+    @staticmethod
+    def _climate_endpoint(vehicle: Vehicle) -> str:
+        # ICE and HEV need the engine running; EV/PHEV precondition from the
+        # battery through "temperature" (the only endpoint live-proven).
+        if vehicle.engine_type in (ENGINE_TYPES.ICE, ENGINE_TYPES.HEV):
+            return "engine"
+        return "temperature"
+
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
+        endpoint = self._climate_endpoint(vehicle)
         body: dict[str, Any] = {"command": "start"}
+        if endpoint == "engine" and options.climate is not None:
+            body["hvacCtrl"] = 1 if options.climate else 0
         if options.set_temp is not None:
             body["hvacTemp"] = str(options.set_temp)
         if options.defrost is not None:
@@ -2415,63 +2426,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             # PV5; the vehicle reports Server.Option.HvacTempType = 1).
             body.setdefault("tempUnit", "C")
             body.setdefault("hvacTempType", 1)
-        return self._gspa_control_command(token, vehicle, "temperature", body)
+        return self._gspa_control_command(token, vehicle, endpoint, body)
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
-            token, vehicle, "temperature", {"command": "stop"}
+            token, vehicle, self._climate_endpoint(vehicle), {"command": "stop"}
         )
-
-    def start_engine(
-        self,
-        token: Token,
-        vehicle: Vehicle,
-        options: ClimateRequestOptions | None = None,
-    ) -> str:
-        """Remote start via the engine endpoint.
-
-        Accepts the same climate fields as start_climate plus hvacCtrl
-        (options.climate) — confirmed endpoint shape.
-        """
-        body: dict[str, Any] = {"command": "start"}
-        if options:
-            if options.set_temp is not None:
-                body["hvacTemp"] = str(options.set_temp)
-            if options.defrost is not None:
-                body["windshieldFrontDefogState"] = options.defrost
-            if options.climate is not None:
-                body["hvacCtrl"] = 1 if options.climate else 0
-            if options.heating is not None:
-                # Same mapping as start_climate (see there for rationale).
-                body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
-            if options.temp_unit is not None:
-                # tempUnit is a string on the wire ("C"/"F"); the 0/1 int
-                # form is rejected with 400-002 (live-proven on a PV5,
-                # 2026-09-19).
-                body["tempUnit"] = "F" if options.temp_unit == 1 else "C"
-            if options.hvac_temp_type is not None:
-                body["hvacTempType"] = options.hvac_temp_type
-            if options.driver_seat_location is not None:
-                body["drvSeatLoc"] = options.driver_seat_location
-            if options.duration is not None:
-                body["ignitionDuration"] = options.duration
-            if options.steering_wheel is not None:
-                body["strgWhlHeating"] = options.steering_wheel
-            if options.side_rear_mirror_heating is not None:
-                body["sideRearMirrorHeating"] = options.side_rear_mirror_heating
-            seat_info = self._build_seat_climate_info(options)
-            if seat_info:
-                body["seatClimateInfo"] = seat_info
-            if options.set_temp is not None:
-                # Without tempUnit/hvacTempType the backend ignores hvacTemp
-                # and applies the car's stored set point instead (live-proven
-                # on a PV5; the vehicle reports Server.Option.HvacTempType = 1).
-                body.setdefault("tempUnit", "C")
-                body.setdefault("hvacTempType", 1)
-        return self._gspa_control_command(token, vehicle, "engine", body)
-
-    def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
-        return self._gspa_control_command(token, vehicle, "engine", {"command": "stop"})
 
     def start_pet_care(
         self,

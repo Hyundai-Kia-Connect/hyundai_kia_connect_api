@@ -276,14 +276,6 @@ class VehicleManager:
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
-    def start_engine(
-        self, vehicle_id: str, options: ClimateRequestOptions | None = None
-    ) -> str:
-        return self.api.start_engine(self.token, self.get_vehicle(vehicle_id), options)
-
-    def stop_engine(self, vehicle_id: str) -> str:
-        return self.api.stop_engine(self.token, self.get_vehicle(vehicle_id))
-
     def start_pet_care(
         self, vehicle_id: str, options: ClimateRequestOptions | None = None
     ) -> str:
