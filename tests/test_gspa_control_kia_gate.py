@@ -13,7 +13,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
-from hyundai_kia_connect_api.const import CHARGE_PORT_ACTION, VEHICLE_LOCK_ACTION
+from hyundai_kia_connect_api.const import (
+    CHARGE_PORT_ACTION,
+    LAMP_MODE,
+    VEHICLE_LOCK_ACTION,
+)
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -118,7 +122,7 @@ def test_kia_lamp_passes_gate():
     ):
         get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
         post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
-        action_id = api.turn_off_lamp(token, vehicle, "all-off")
+        action_id = api.turn_off_lamp(token, vehicle, LAMP_MODE.ALL_OFF)
     assert action_id == "gspa:sid-1"
     assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/lamp")
     assert post.call_args.kwargs["json"] == {"command": "all-off"}
