@@ -13,7 +13,6 @@ from hyundai_kia_connect_api.ApiImpl import (
 )
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
-    ENGINE_TYPES,
     ORDER_STATUS,
     SEAT_LOCATION,
     VALET_MODE_ACTION,
@@ -50,11 +49,10 @@ def _make_token() -> Token:
     )
 
 
-def _make_vehicle(ccs2: int = 1, engine_type: ENGINE_TYPES | None = None) -> Vehicle:
+def _make_vehicle(ccs2: int = 1) -> Vehicle:
     vehicle = Vehicle()
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
-    vehicle.engine_type = engine_type
     return vehicle
 
 
@@ -71,11 +69,11 @@ def _run_command_on(api, meth, *args, **kwargs):
     return action_id, post.call_args
 
 
-def _run_command(meth, *args, engine_type=None, **kwargs):
+def _run_command(meth, *args, **kwargs):
     """Run a public control method with mocked transport+PIN; return the POST call."""
     api = _make_api()
     token = _make_token()
-    vehicle = _make_vehicle(engine_type=engine_type)
+    vehicle = _make_vehicle()
     with (
         patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
         patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
@@ -405,22 +403,18 @@ def test_start_climate_heating_maps_to_side_rear_mirror():
         assert body["sideRearMirrorHeating"] == flag
 
 
-def test_start_climate_ice_heating_maps_to_side_rear_mirror():
+def test_start_engine_heating_maps_to_side_rear_mirror():
     options = ClimateRequestOptions(heating=2)
-    _, call = _run_command(
-        HyundaiCciApiEU.start_climate, options, engine_type=ENGINE_TYPES.ICE
-    )
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
     assert call.args[0].endswith("/engine")
     body = call.kwargs["json"]
     assert "heating1" not in body
     assert body["sideRearMirrorHeating"] == 1
 
 
-def test_start_climate_ice_maps_climate_field():
+def test_start_engine_maps_climate_field():
     options = ClimateRequestOptions(set_temp=22.0, climate=True)
-    _, call = _run_command(
-        HyundaiCciApiEU.start_climate, options, engine_type=ENGINE_TYPES.ICE
-    )
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
     body = call.kwargs["json"]
     assert call.args[0].endswith("/engine")
     assert body["command"] == "start"
@@ -432,9 +426,8 @@ def test_start_climate_ice_maps_climate_field():
     assert body["hvacTempType"] == 1
 
 
-def test_stop_climate_ice():
-    _, call = _run_command(HyundaiCciApiEU.stop_climate, engine_type=ENGINE_TYPES.ICE)
-    assert call.args[0].endswith("/engine")
+def test_stop_engine():
+    _, call = _run_command(HyundaiCciApiEU.stop_engine)
     assert call.kwargs["json"] == {"command": "stop"}
 
 
