@@ -273,6 +273,26 @@ class VehicleManager:
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
+    def start_pet_care(
+        self, vehicle_id: str, options: ClimateRequestOptions | None = None
+    ) -> str:
+        return self.api.start_pet_care(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def stop_pet_care(self, vehicle_id: str) -> str:
+        return self.api.stop_pet_care(self.token, self.get_vehicle(vehicle_id))
+
+    def start_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.start_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def stop_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.stop_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
     def lock(self, vehicle_id: str) -> str:
         return self.api.lock_action(
             self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
