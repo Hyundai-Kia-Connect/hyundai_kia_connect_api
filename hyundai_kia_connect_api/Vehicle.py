@@ -79,7 +79,7 @@ class DailyDrivingStats:
 
 @dataclass
 class VehicleSupports:
-    """Set by each region in ``get_vehicles``. ``None`` means unknown; treat it as unsupported."""
+    """Whether the vehicle supports each VehicleManager call; ``None`` is unknown."""
 
     # VehicleManager.set_windows_state
     window_control: bool | None = None
