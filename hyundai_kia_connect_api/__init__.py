@@ -12,7 +12,7 @@ from .HyundaiCciApiEU import HyundaiCciApiEU
 from .KiaCciApiEU import KiaCciApiEU
 from .svm import SVMDetails
 from .Token import Token
-from .Vehicle import Vehicle
+from .Vehicle import Vehicle, VehicleSupports
 from .VehicleManager import VehicleManager
 
 __all__ = [
@@ -27,5 +27,6 @@ __all__ = [
     "Token",
     "Vehicle",
     "VehicleManager",
+    "VehicleSupports",
     "WindowRequestOptions",
 ]

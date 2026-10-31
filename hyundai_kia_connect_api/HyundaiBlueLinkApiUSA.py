@@ -267,11 +267,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _SVM_POLL_TIMEOUT_SECONDS = 120
     _SVM_INITIAL_WAIT_SECONDS = 15
 
-    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
-    # Capability is declared per-region (like supports_window_control); the
-    # actual image is fetched on demand via get_svm_details / request_svm_capture.
-    supports_svm: bool = True
-
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
@@ -1240,6 +1235,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=int(entry.get("vehicleGeneration", "2")),
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            # SVM / Find My Car; the image is fetched on demand via
+            # get_svm_details / request_svm_capture.
+            vehicle.supports.svm = True
             result.append(vehicle)
 
         return result

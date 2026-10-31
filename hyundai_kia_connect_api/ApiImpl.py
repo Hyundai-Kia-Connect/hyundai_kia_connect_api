@@ -468,9 +468,6 @@ class ApiImpl:
     temperature_range: Sequence[float] | None = None
     previous_latitude: float | None = None
     previous_longitude: float | None = None
-    supports_window_control: bool = False
-    supports_valet_mode: bool = False
-    supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""

@@ -619,6 +619,9 @@ class KiaUvoApiCA(ApiImpl):
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            vehicle.supports.svm = False
             result.append(vehicle)
         return result
 

@@ -209,7 +209,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     and the GSPA secure-request layer."""
 
     data_timezone = dt.UTC
-    supports_valet_mode = True
 
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
@@ -568,20 +567,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             else:
                 entry_engine_type = ENGINE_TYPES.ICE
 
-            vehicles.append(
-                Vehicle(
-                    id=vehicle_id,
-                    name=entry.get(
-                        "vehicleNameView",
-                        entry.get("nickname", entry.get("vehicleName", "")),
-                    ),
-                    model=entry.get("vehicleModelName", entry.get("modelName", "")),
-                    VIN=entry.get("vin", ""),
-                    timezone=self.data_timezone,
-                    engine_type=entry_engine_type,
-                    ccu_ccs2_protocol_support=ccs2_support,
-                )
+            vehicle = Vehicle(
+                id=vehicle_id,
+                name=entry.get(
+                    "vehicleNameView",
+                    entry.get("nickname", entry.get("vehicleName", "")),
+                ),
+                model=entry.get("vehicleModelName", entry.get("modelName", "")),
+                VIN=entry.get("vin", ""),
+                timezone=self.data_timezone,
+                engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=ccs2_support,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = True
+            vehicle.supports.svm = False
+            vehicles.append(vehicle)
 
         return vehicles
 
@@ -2501,7 +2502,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         GSPA supports scope commands only (all windows or front windows);
         a mixed per-window request raises UnsupportedControlError.
         """
-        if not self.supports_window_control:
+        if not vehicle.supports.window_control:
             raise APIError("Window control not supported")
         drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
         front = (options.front_left, options.front_right)
