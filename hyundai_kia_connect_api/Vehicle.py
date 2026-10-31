@@ -79,26 +79,11 @@ class DailyDrivingStats:
 
 @dataclass
 class VehicleSupports:
-    """What a vehicle supports, read as ``vehicle.supports.<item>``.
+    """Set by each region in ``get_vehicles``. ``None`` means unknown; treat it as unsupported."""
 
-    Set by each region when it builds the vehicle in ``get_vehicles``.
-    Consumers (e.g. Home Assistant) use these to decide which entities and
-    services to expose.
-
-    Each item is tri-state: ``True`` supported, ``False`` not supported,
-    ``None`` not yet determined. Treat ``None`` as unsupported when gating.
-
-    Each item gates a library call (a remote command or a support fetch such
-    as SVM) and is named after it, never after a region's raw API flag.
-
-    Add an item only together with a region that decides it: add a field
-    here and set it where that region builds its vehicles. Library code also
-    checks ``vehicle.supports``.
-    """
-
-    window_control: bool | None = None  # set_windows_state
-    valet_mode: bool | None = None  # valet_mode_action
-    # Surround View Monitor (SVM) / Find My Car; get_svm_details
+    window_control: bool | None = None
+    valet_mode: bool | None = None
+    # SVM / Find My Car
     surround_view: bool | None = None
 
 
@@ -132,7 +117,6 @@ class Vehicle:
     generation: int | None = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
-    # What this vehicle supports; see VehicleSupports.
     supports: VehicleSupports = field(default_factory=VehicleSupports)
 
     # Shared (EV/PHEV/HEV/IC)
