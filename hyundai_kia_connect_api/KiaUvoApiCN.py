@@ -48,8 +48,6 @@ Everything marked ``# CN-UNVERIFIED`` below rests on static analysis only and
 still needs a live regression pass (see case notes U1-U8).
 """
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,unused-argument,line-too-long,too-many-lines
-
 import base64
 import datetime as dt
 import json

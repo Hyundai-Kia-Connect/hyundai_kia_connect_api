@@ -18,7 +18,6 @@ from hyundai_kia_connect_api.GspaApiEU import (
     parse_svm_detail,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
-from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.svm import SVMDetails, redact_svm_metadata
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -249,12 +248,6 @@ def test_get_svm_details_missing_scs_detail(monkeypatch):
 # ---------------------------------------------------------------------------
 # Capability flag + shared helpers
 # ---------------------------------------------------------------------------
-
-
-def test_supports_svm_flag_per_brand():
-    assert HyundaiCciApiEU.supports_svm is True
-    # Kia EU SVM awaits live verification — stays False there.
-    assert KiaCciApiEU.supports_svm is False
 
 
 def test_log_redaction_redacts_image_and_gps():

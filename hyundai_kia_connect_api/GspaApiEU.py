@@ -8,8 +8,6 @@ REQUEST_ID_HEADER, DEVICE_ID_HEADER.  Login, token refresh, X-Stamp
 computation, and GSPA GET helpers live here.
 """
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
-
 from __future__ import annotations
 
 import base64
@@ -48,6 +46,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LAMP_MODE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -211,7 +210,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     and the GSPA secure-request layer."""
 
     data_timezone = dt.UTC
-    supports_valet_mode = True
 
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
@@ -570,20 +568,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             else:
                 entry_engine_type = ENGINE_TYPES.ICE
 
-            vehicles.append(
-                Vehicle(
-                    id=vehicle_id,
-                    name=entry.get(
-                        "vehicleNameView",
-                        entry.get("nickname", entry.get("vehicleName", "")),
-                    ),
-                    model=entry.get("vehicleModelName", entry.get("modelName", "")),
-                    VIN=entry.get("vin", ""),
-                    timezone=self.data_timezone,
-                    engine_type=entry_engine_type,
-                    ccu_ccs2_protocol_support=ccs2_support,
-                )
+            vehicle = Vehicle(
+                id=vehicle_id,
+                name=entry.get(
+                    "vehicleNameView",
+                    entry.get("nickname", entry.get("vehicleName", "")),
+                ),
+                model=entry.get("vehicleModelName", entry.get("modelName", "")),
+                VIN=entry.get("vin", ""),
+                timezone=self.data_timezone,
+                engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=ccs2_support,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = True
+            vehicle.supports.svm = False
+            vehicles.append(vehicle)
 
         return vehicles
 
@@ -2333,9 +2333,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
 
     def turn_off_lamp(
-        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
-        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+        return self._gspa_control_command(
+            token, vehicle, "lamp", {"command": mode.value}
+        )
 
     def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -2518,7 +2520,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         GSPA supports scope commands only (all windows or front windows);
         a mixed per-window request raises UnsupportedControlError.
         """
-        if not self.supports_window_control:
+        if not vehicle.supports.window_control:
             raise APIError("Window control not supported")
         drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
         front = (options.front_left, options.front_right)

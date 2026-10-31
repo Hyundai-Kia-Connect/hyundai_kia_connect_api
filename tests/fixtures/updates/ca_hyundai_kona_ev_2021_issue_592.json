@@ -2,7 +2,7 @@
     "_fixture_meta": {
         "vehicles": "2021 Kona EV (EV)",
         "source": "kia_uvo #592 (status, nxtsvc, selsoc) and #459 (vrfypin, fndmcr), same owner and car",
-        "follow_up_sources": "same car",
+        "follow_up_sources": "same car; gtmvrlst/gtmvrrpt from the read-only capture in kia_uvo #2025 work (PALISADE 2023)",
         "not_captured": ["POST evTripDetails (no capture with a body)"],
         "description": "Whole update chain from one car; identifiers and coordinates replaced."
     },
@@ -35,6 +35,12 @@
         "POST /tods/api/alerts/maintenance/evTripDetails": {
             "status": 503,
             "body": null
+        },
+        "POST /tods/api/gtmvrlst": {
+            "body": "$fixture:updates/responses/ca_gtmvrlst.json"
+        },
+        "POST /tods/api/gtmvrrpt": {
+            "body": "$fixture:updates/responses/ca_gtmvrrpt.json"
         }
     }
 }

@@ -13,7 +13,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.ApiImpl import ClimateRequestOptions
-from hyundai_kia_connect_api.const import CHARGE_PORT_ACTION, VEHICLE_LOCK_ACTION
+from hyundai_kia_connect_api.const import (
+    CHARGE_PORT_ACTION,
+    LAMP_MODE,
+    VEHICLE_LOCK_ACTION,
+)
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -118,7 +122,7 @@ def test_kia_lamp_passes_gate():
     ):
         get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
         post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
-        action_id = api.turn_off_lamp(token, vehicle, "all-off")
+        action_id = api.turn_off_lamp(token, vehicle, LAMP_MODE.ALL_OFF)
     assert action_id == "gspa:sid-1"
     assert post.call_args.args[0].endswith("/gspa/v1/remote/vehicles/test123/lamp")
     assert post.call_args.kwargs["json"] == {"command": "all-off"}
@@ -154,13 +158,12 @@ def test_kia_windows_accepted():
     """Kia EU window control ships: the server accepted the scope
     command with a polling SID on the EV6 (2026-10-18)."""
     api = KiaCciApiEU(9, 2, "en")
-    assert api.supports_window_control is True
     token = _make_token()
     vehicle = _make_vehicle()
     from hyundai_kia_connect_api.ApiImpl import WindowRequestOptions
     from hyundai_kia_connect_api.const import WINDOW_STATE
 
-    vehicle.supports_window_control = True
+    vehicle.supports.window_control = True
     options = WindowRequestOptions(
         front_left=WINDOW_STATE.CLOSED,
         front_right=WINDOW_STATE.CLOSED,

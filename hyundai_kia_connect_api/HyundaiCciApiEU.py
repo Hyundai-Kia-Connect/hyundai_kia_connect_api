@@ -7,8 +7,6 @@ vehicle-read parsers (stored-status, driving info/history, breakdowns,
 CCS2 status). OTA and MQTT are handled in later PRs.
 """
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
-
 import datetime as dt
 import logging
 from typing import Any
@@ -51,15 +49,17 @@ class HyundaiCciApiEU(GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
 
-    # SVM reads confirmed live on the EU GSPA endpoints;
-    # KiaCciApiEU keeps the inherited False until verified there too.
-    supports_svm: bool = True
-
-    # CCS2 EU vehicles support GSPA window control.
-    supports_window_control: bool = True
-
     # Hyundai EU CCI remote control is live-verified.
     GSPA_REMOTE_CONTROL_VERIFIED = True
+
+    def _parse_vehicles_from_cci(self, data: dict[str, Any]) -> list[Vehicle]:
+        vehicles = super()._parse_vehicles_from_cci(data)
+        # SVM reads confirmed live on the EU GSPA endpoints;
+        # KiaCciApiEU keeps the inherited False until verified there too.
+        for vehicle in vehicles:
+            vehicle.supports.window_control = True
+            vehicle.supports.svm = True
+        return vehicles
 
     # ------------------------------------------------------------------
     # Driving info + history (GSPA, read-only)

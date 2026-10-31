@@ -1,7 +1,5 @@
 """HyundaiBlueLinkAPIUSA.py"""
 
-# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
-
 import base64
 import datetime as dt
 import logging
@@ -268,11 +266,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _SVM_POLL_INTERVAL_SECONDS = 15
     _SVM_POLL_TIMEOUT_SECONDS = 120
     _SVM_INITIAL_WAIT_SECONDS = 15
-
-    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
-    # Capability is declared per-region (like supports_window_control); the
-    # actual image is fetched on demand via get_svm_details / request_svm_capture.
-    supports_svm: bool = True
 
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
@@ -1160,7 +1153,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if response.status_code == 502:
             try:
                 response_json = response.json()
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:
                 raise APIError("SVM request failed with HTTP 502")
             if response_json.get("errorSubCode") == "HT_533":
                 raise DuplicateRequestError(
@@ -1242,6 +1235,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=int(entry.get("vehicleGeneration", "2")),
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            # SVM / Find My Car; the image is fetched on demand via
+            # get_svm_details / request_svm_capture.
+            vehicle.supports.svm = True
             result.append(vehicle)
 
         return result
