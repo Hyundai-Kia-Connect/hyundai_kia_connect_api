@@ -419,8 +419,10 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), limit
         )
 
-    def set_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
-        return self.api.set_ota_update(self.token, self.get_vehicle(vehicle_id), start)
+    def start_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
+        return self.api.start_ota_update(
+            self.token, self.get_vehicle(vehicle_id), start
+        )
 
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
         return self.api.set_navigation(

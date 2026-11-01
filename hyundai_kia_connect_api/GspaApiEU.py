@@ -2983,7 +2983,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             path_prefix="mru/vehicles",
         )
 
-    def set_ota_update(
+    def start_ota_update(
         self, token: Token, vehicle: Vehicle, start: bool
     ) -> dict[str, Any]:
         """Start or cancel a CCU OTA update via GSPA.
