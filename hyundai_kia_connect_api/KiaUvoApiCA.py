@@ -104,7 +104,7 @@ class _SessionTicketConnectionPool(HTTPSConnectionPool):
 
 
 class _SessionTicketPoolManager(PoolManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.pool_classes_by_scheme = {
             "http": HTTPConnectionPool,
@@ -113,7 +113,7 @@ class _SessionTicketPoolManager(PoolManager):
 
 
 class _SessionTicketProxyManager(ProxyManager):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.pool_classes_by_scheme = {
             "http": HTTPConnectionPool,
@@ -127,11 +127,11 @@ class SessionTicketAdapter(HTTPAdapter):
 
     def init_poolmanager(
         self,
-        connections=DEFAULT_POOLSIZE,
-        maxsize=DEFAULT_POOLSIZE,
-        block=DEFAULT_POOLBLOCK,
-        **kwargs,
-    ):
+        connections: int = DEFAULT_POOLSIZE,
+        maxsize: int = DEFAULT_POOLSIZE,
+        block: bool = DEFAULT_POOLBLOCK,
+        **kwargs: Any,
+    ) -> None:
         kwargs["ca_certs"] = certifi.where()
         self.poolmanager = _SessionTicketPoolManager(
             num_pools=connections,
@@ -140,7 +140,7 @@ class SessionTicketAdapter(HTTPAdapter):
             **kwargs,
         )
 
-    def proxy_manager_for(self, proxy, **kwargs):
+    def proxy_manager_for(self, proxy: str, **kwargs: Any) -> Any:
         if proxy in self.proxy_manager:
             return self.proxy_manager[proxy]
         if proxy.lower().startswith("socks"):
@@ -148,26 +148,30 @@ class SessionTicketAdapter(HTTPAdapter):
         manager = self.proxy_manager[proxy] = _SessionTicketProxyManager(
             proxy,
             proxy_headers=self.proxy_headers(proxy),
-            num_pools=self._pool_connections,
-            maxsize=self._pool_maxsize,
-            block=self._pool_block,
+            num_pools=DEFAULT_POOLSIZE,
+            maxsize=DEFAULT_POOLSIZE,
+            block=DEFAULT_POOLBLOCK,
             **kwargs,
         )
         return manager
 
 
 class RetrySession(ApiImplSession):
-    def __init__(self, max_retries=3, delay=2, backoff=2):
+    def __init__(self, max_retries: int = 3, delay: int = 2, backoff: int = 2) -> None:
         super().__init__()
         self.mount("https://", SessionTicketAdapter())
         self.max_retries = max_retries
         self.delay = delay
         self.backoff = backoff
 
-    def post(self, url, **kwargs):
-        return self._request_with_retry("POST", url, **kwargs)
+    def post(
+        self, url: str | bytes, data: Any = None, json: Any = None, **kwargs: Any
+    ) -> requests.Response:
+        return self._request_with_retry("POST", url, data=data, json=json, **kwargs)
 
-    def _request_with_retry(self, method, url, **kwargs):
+    def _request_with_retry(
+        self, method: str, url: str | bytes, **kwargs: Any
+    ) -> requests.Response:
         attempt = 0
         current_delay = self.delay
 
@@ -233,7 +237,7 @@ class KiaUvoApiCA(ApiImpl):
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
         }
-        self._sessions = None
+        self._sessions: RetrySession | None = None
         # Cached device_id. Seeded from the persisted Token by refresh_access_token
         # (so re-login reuses it), or computed once from MAC+hostname on first login.
         self._device_id: str | None = None
@@ -255,7 +259,7 @@ class KiaUvoApiCA(ApiImpl):
         return self._device_id
 
     @property
-    def sessions(self):
+    def sessions(self) -> RetrySession:
         if not self._sessions:
             self._sessions = RetrySession(max_retries=4, delay=2, backoff=2)
         return self._sessions
@@ -401,7 +405,7 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
-            device_id=self._device_id,
+            device_id=self._get_device_id(),
             valid_until=valid_until,
             pin=pin,
         )
@@ -439,7 +443,7 @@ class KiaUvoApiCA(ApiImpl):
                         password=token.password,
                         access_token=response_data["accessToken"],
                         refresh_token=response_data["refreshToken"],
-                        device_id=self._device_id,
+                        device_id=self._get_device_id(),
                         valid_until=valid_until,
                         pin=token.pin,
                     )
@@ -559,7 +563,7 @@ class KiaUvoApiCA(ApiImpl):
             password=password,
             access_token=access_token,
             refresh_token=refresh_token,
-            device_id=self._device_id,
+            device_id=self._get_device_id(),
             valid_until=valid_until,
             pin=pin,
         )
@@ -667,8 +671,12 @@ class KiaUvoApiCA(ApiImpl):
             get_child_value(state, "status.lastStatusDate"), dt.UTC
         )
         ref_date = dt.datetime.now(tz=dt.UTC)
-        raw_delta_seconds = (ref_date - last_updated_at).total_seconds()
-        if abs(raw_delta_seconds) < 20 * 60:
+        if last_updated_at is None:
+            _LOGGER.debug(f"{DOMAIN} - no lastStatusDate; skipping timezone guess")
+        elif (
+            abs(raw_delta_seconds := (ref_date - last_updated_at).total_seconds())
+            < 20 * 60
+        ):
             # Timestamp is already in UTC (e.g. fresh forced-refresh response);
             # reinterpreting it as a Canadian local time would always fail — skip silently.
             _LOGGER.debug(
@@ -783,11 +791,15 @@ class KiaUvoApiCA(ApiImpl):
             and get_child_value(state, "status.airTemp.value") != "OFF"
             and get_child_value(state, "status.airTemp.value")[-1] == "H"
         ):
-            tempIndex = get_hex_temp_into_index(
-                get_child_value(state, "status.airTemp.value")
+            tempIndex = cast(
+                int,
+                get_hex_temp_into_index(get_child_value(state, "status.airTemp.value")),
             )
             if get_child_value(state, "status.airTemp.unit") == 0:
-                if vehicle.year >= self.temperature_range_model_year:
+                if (
+                    vehicle.year is not None
+                    and vehicle.year >= self.temperature_range_model_year
+                ):
                     state["status"]["airTemp"]["value"] = self.temperature_range_c_new[
                         tempIndex
                     ]
@@ -1025,10 +1037,12 @@ class KiaUvoApiCA(ApiImpl):
             DISTANCE_UNITS[get_child_value(state, "msopServiceOdometerUnit")],
         )
 
+        if vehicle.data is None:
+            vehicle.data = {}
         vehicle.data["service"] = state
 
     def _update_vehicle_properties_location(
-        self, vehicle: Vehicle, state: dict[str, Any]
+        self, vehicle: Vehicle, state: dict[str, Any] | None
     ) -> None:
         if get_child_value(state, "coord.lat"):
             vehicle.location = (
@@ -1036,9 +1050,13 @@ class KiaUvoApiCA(ApiImpl):
                 get_child_value(state, "coord.lon"),
                 parse_datetime(get_child_value(state, "time"), self.data_timezone),
             )
+        if vehicle.data is None:
+            vehicle.data = {}
         vehicle.data["vehicleLocation"] = state
 
-    def _update_vehicle_properties_trip_details(self, token: Token, vehicle: Vehicle):
+    def _update_vehicle_properties_trip_details(
+        self, token: Token, vehicle: Vehicle
+    ) -> None:
         url = self.API_URL + "alerts/maintenance/evTripDetails"
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
@@ -1172,7 +1190,9 @@ class KiaUvoApiCA(ApiImpl):
         result = response.json()["result"]
         return cast(str, result["pAuth"])
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
         if action == VEHICLE_LOCK_ACTION.LOCK:
             url = self.API_URL + "drlck"
@@ -1192,7 +1212,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -1225,7 +1245,10 @@ class KiaUvoApiCA(ApiImpl):
         if options.rear_right_seat is None:
             options.rear_right_seat = 0
 
-        if vehicle.year >= self.temperature_range_model_year:
+        if (
+            vehicle.year is not None
+            and vehicle.year >= self.temperature_range_model_year
+        ):
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_new.index(options.set_temp)
             )
@@ -1234,7 +1257,7 @@ class KiaUvoApiCA(ApiImpl):
                 self.temperature_range_c_old.index(options.set_temp)
             )
         if vehicle.engine_type == ENGINE_TYPES.EV:
-            payload = {
+            payload: dict[str, Any] = {
                 "pin": token.pin,
             }
             climate_settings = {
@@ -1328,7 +1351,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -1347,7 +1370,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def check_action_status(
         self,
@@ -1421,7 +1444,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         url = self.API_URL + "evc/rcstp"
@@ -1437,7 +1460,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def _update_vehicle_properties_charge(
         self, vehicle: Vehicle, state: list[dict[str, Any]]
@@ -1505,7 +1528,7 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
-        return cast(str, response_headers["transactionId"])
+        return response_headers["transactionId"]
 
     def _mask_sensitive_data(self, data: dict[str, Any] | str) -> dict[str, Any] | str:
         """Create a copy of data with sensitive fields masked for logging."""
