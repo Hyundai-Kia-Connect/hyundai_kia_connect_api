@@ -396,7 +396,7 @@ class KiaUvoApiUSA(ApiImpl):
             "userCredential": {"userId": username, "password": password},
             "tncFlag": 1,
         }
-        if token and getattr(token, "device_id", None):
+        if token and token.device_id:
             self.device_id = token.device_id
         headers = self.api_headers()
         if token and token.refresh_token:
