@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.exceptions import APIError, AuthenticationError
 from hyundai_kia_connect_api.GspaApiEU import _parse_gspa_svm_timestamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
@@ -45,6 +45,157 @@ def test_parse_gspa_svm_timestamp_millis_variant():
     assert _parse_gspa_svm_timestamp("2026102722.291") is None
     # right shape, invalid date — the strptime error arm stays covered
     assert _parse_gspa_svm_timestamp("20261999009999.291") is None
+
+
+LOCATION_STATUS_PAYLOAD = {
+    "coord": {"lat": 0.0, "lon": 0.0, "type": 0, "alt": 0.0},
+    "head": 0,
+    "speed": {"value": 0, "unit": 0},
+    "time": "20261027220812.291",
+}
+
+
+def test_kia_cached_state_follows_location_on_next_update():
+    """Two cached updates on a vehicle with no Location node in the
+    status tree (PV5): the second update reads the server position
+    again (follow-car, live-verified by fellek, #1331 review)."""
+    api = KiaCciApiEU(9, 1, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    status = {"state": {"Vehicle": {"Drivetrain": {"Odometer": 12345}}}}
+    first = LOCATION_STATUS_PAYLOAD | {
+        "coord": {"lat": 52.0, "lon": 13.0, "type": 0, "alt": 0.0},
+        "time": "20261029140000.000",
+    }
+    second = LOCATION_STATUS_PAYLOAD | {
+        "coord": {"lat": 52.1, "lon": 13.1, "type": 0, "alt": 0.0},
+        "time": "20261029134000.000",
+    }
+
+    with (
+        patch.object(api, "get_stored_status", return_value=status),
+        patch.object(
+            api, "_get_location_stored_status", side_effect=[first, second]
+        ) as mock_read,
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    assert mock_read.call_count == 2
+    assert vehicle.location_latitude == 52.1
+    assert vehicle.location_longitude == 13.1
+
+
+def test_hyundai_cached_state_skips_location_read_when_tree_has_location():
+    """A status tree carrying a Location node means no extra read at the
+    cached-update level."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+    status = {
+        "state": {
+            "Vehicle": {
+                "Location": {
+                    "GeoCoord": {"Latitude": 52.0, "Longitude": 20.0},
+                    "TimeStamp": {
+                        "Year": 2026,
+                        "Mon": 10,
+                        "Day": 29,
+                        "Hour": 13,
+                        "Min": 0,
+                        "Sec": 0,
+                    },
+                }
+            }
+        }
+    }
+
+    with (
+        patch.object(api, "get_stored_status", return_value=status),
+        patch.object(api, "_get_location_stored_status") as mock_read,
+        patch.object(api, "_update_vehicle_extras"),
+    ):
+        api.update_vehicle_with_cached_state(token, vehicle)
+
+    mock_read.assert_not_called()
+    assert vehicle.location_latitude == 52.0
+
+
+def test_update_vehicle_gspa_location_sets_location():
+    """No Location node in the status tree (PV5): the fallback read sets
+    vehicle.location from the server-cached position with its UTC time."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(
+        api, "_get_location_stored_status", return_value=LOCATION_STATUS_PAYLOAD
+    ) as mock_read:
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    mock_read.assert_called_once()
+    assert vehicle.location_latitude == 0.0
+    assert vehicle.location_longitude == 0.0
+    assert vehicle.location_last_updated_at == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+
+
+def test_update_vehicle_gspa_location_unusable_payload_stays_unknown():
+    """Missing coord or unparsable time leaves the location unset (HA
+    convention: unknown, not masked)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    for payload in (None, {}, {"coord": {"lat": 1.0}}, {"time": "2026102722.291"}):
+        with patch.object(api, "_get_location_stored_status", return_value=payload):
+            api._update_vehicle_gspa_location(token, vehicle)
+        assert vehicle.location_latitude is None
+        assert vehicle.location_last_updated_at is None
+
+
+def test_update_vehicle_gspa_location_read_failure_stays_unknown():
+    """A failing location read leaves the location unset, never stale."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch.object(api, "_get_location_stored_status", side_effect=APIError("boom")):
+        api._update_vehicle_gspa_location(token, vehicle)
+
+    assert vehicle.location_latitude is None
+    assert vehicle.location_last_updated_at is None
+
+
+def test_get_location_stored_status_swallows_transport_error():
+    """A non-auth failure on the location read returns None (fields stay
+    unknown, no crash in the cached-update path)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api._get_location_stored_status(token, vehicle) is None
+
+
+def test_get_location_stored_status_reraises_auth_error():
+    """An expired token propagates (the caller refreshes and retries)."""
+    api = HyundaiCciApiEU(9, 2, "en")
+    token = _make_base_token()
+    vehicle = _make_base_vehicle()
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.get",
+            side_effect=AuthenticationError("expired"),
+        ),
+        pytest.raises(AuthenticationError),
+    ):
+        api._get_location_stored_status(token, vehicle)
 
 
 def test_hyundai_device_id_header():

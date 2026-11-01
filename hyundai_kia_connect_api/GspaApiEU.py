@@ -1476,11 +1476,62 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
-    def _apply_stored_status(self, vehicle: Vehicle, data: dict[str, Any]) -> None:
+    def _apply_stored_status(
+        self, token: Token, vehicle: Vehicle, data: dict[str, Any]
+    ) -> None:
         state = data.get("state", {})
         if isinstance(state, dict) and "Vehicle" in state:
             state = state["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
+        # Status tree without a Location node (PV5): the location
+        # stored-status endpoint is the only location source (#1331).
+        if get_child_value(state, "Location.GeoCoord.Latitude") is None:
+            self._update_vehicle_gspa_location(token, vehicle)
+
+    def _get_location_stored_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get cached location + vehicle status from GSPA (read-only)."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "location/vehicles/{carId}/stored-status"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
+            return None
+
+    def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate vehicle.location from the GSPA location stored-status.
+
+        Some status trees carry no Location node (confirmed on a PV5,
+        2026-10-27), leaving vehicle.location unset. The endpoint serves
+        the server-cached position {"data": {"coord": {lat, lon, type,
+        alt}, "head", "speed", "time"}} with a UTC ``time`` (wire shape
+        identical to the SVM ``gpsDetail`` block). Read-only — unlike
+        location ``update-status``, which long-polls the car (wake) and
+        reports the car's clock time.
+        """
+        try:
+            data = self._get_location_stored_status(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location fallback read failed")
+            return
+        # _gspa_get already lifts the {"data": ..., "metaInfo": ...} envelope.
+        if not isinstance(data, dict):
+            return
+        coord = data.get("coord")
+        if not isinstance(coord, dict):
+            return
+        latitude = float_or_none(coord.get("lat"))
+        longitude = float_or_none(coord.get("lon"))
+        location_time = _parse_gspa_svm_timestamp(data.get("time"))
+        if latitude is None or longitude is None or location_time is None:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status: no usable position")
+            return
+        vehicle.location = (latitude, longitude, location_time)
 
     # ------------------------------------------------------------------
     # Force refresh
@@ -1532,7 +1583,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             f"{DOMAIN} - new stored-status "
             f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
         )
-        self._apply_stored_status(vehicle, data)
+        self._apply_stored_status(token, vehicle, data)
 
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)

@@ -1,0 +1,31 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia PV5",
+        "year": 2026,
+        "region": "EU",
+        "brand": "Kia",
+        "api_class": "GspaApiEU",
+        "endpoint": "gspa location/vehicles/{carId}/stored-status",
+        "description": "Location stored-status captured live on a Kia PV5 (2026-10-27) by the reporter of lib PR #1331 and shared with coordinates replaced by 0.0 before sharing; structure and key names unchanged. Captured right after a location update-status request (which woke the car and made the server store the fresh position) returned the new location. The main stored-status tree carries no Location node, so this endpoint is the only location source for such vehicles. 'time' is UTC.",
+        "not_captured": [
+            "metaInfo with retCode 'F' / error resCode variants — response error paths are unit-tested, not captured"
+        ],
+        "expected": {
+            "location_latitude": 0.0,
+            "location_longitude": 0.0,
+            "location_last_updated_at": "2026-10-27T22:08:12.291000+00:00"
+        }
+    },
+    "coord": {
+        "lat": 0.0,
+        "lon": 0.0,
+        "type": 0,
+        "alt": 0.0
+    },
+    "head": 0,
+    "speed": {
+        "value": 0,
+        "unit": 0
+    },
+    "time": "20261027220812.291"
+}
