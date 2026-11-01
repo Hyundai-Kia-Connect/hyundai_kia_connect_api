@@ -88,7 +88,7 @@ class VehicleManager:
 
         self.token: Token = token
         self.vehicles: dict[str, Vehicle] = {}
-        self.otp_request: OTPRequest = None
+        self.otp_request: OTPRequest | None = None
 
     def login(self) -> bool | OTPRequest:
         """Return True on success, an OTPRequest if OTP is required, else False."""
@@ -106,15 +106,20 @@ class VehicleManager:
             return result
         return False
 
+    def _pending_otp_request(self) -> OTPRequest:
+        if self.otp_request is None:
+            raise AuthenticationError("No OTP request pending; call login() first")
+        return self.otp_request
+
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
-        self.api.send_otp(self.otp_request, notify_type)
+        self.api.send_otp(self._pending_otp_request(), notify_type)
 
     def verify_otp_and_complete_login(self, otp_code: str) -> None:
         self.token = self.api.verify_otp_and_complete_login(
             username=self.username,
             password=self.password,
             otp_code=otp_code,
-            otp_request=self.otp_request,
+            otp_request=self._pending_otp_request(),
             pin=self.pin,
         )
         self.initialize_vehicles()

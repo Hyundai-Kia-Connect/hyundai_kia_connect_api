@@ -1,6 +1,10 @@
 import datetime as dt
 
+import pytest
+
 from hyundai_kia_connect_api.ApiImpl import ApiImpl
+from hyundai_kia_connect_api.const import OTP_NOTIFY_TYPE
+from hyundai_kia_connect_api.exceptions import AuthenticationError
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
@@ -59,3 +63,21 @@ def test_login_returns_false_without_token_or_otp(monkeypatch):
         region=3, brand=1, username="user", password="pass", pin="1234"
     )
     assert manager.login() is False
+
+
+def test_otp_steps_before_login_raise_authentication_error(monkeypatch):
+    """send_otp / verify_otp_and_complete_login without a pending OTP
+    request raise AuthenticationError instead of passing None on."""
+    dummy_api = DummyApi()
+    monkeypatch.setattr(
+        VehicleManager,
+        "get_implementation_by_region_brand",
+        lambda *args, **kwargs: dummy_api,
+    )
+    manager = VehicleManager(
+        region=3, brand=1, username="user", password="pass", pin="1234"
+    )
+    with pytest.raises(AuthenticationError):
+        manager.send_otp(OTP_NOTIFY_TYPE.EMAIL)
+    with pytest.raises(AuthenticationError):
+        manager.verify_otp_and_complete_login("123456")
