@@ -269,10 +269,12 @@ class VehicleManager:
             self.initialize_vehicles()
         return False
 
-    def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
+    def start_climate(
+        self, vehicle_id: str, options: ClimateRequestOptions
+    ) -> str | None:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
 
-    def stop_climate(self, vehicle_id: str) -> str:
+    def stop_climate(self, vehicle_id: str) -> str | None:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
     def start_pet_care(
@@ -295,28 +297,28 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id)
         )
 
-    def lock(self, vehicle_id: str) -> str:
+    def lock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
             self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
         )
 
-    def unlock(self, vehicle_id: str) -> str:
+    def unlock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
             self.token,
             self.get_vehicle(vehicle_id),
             VEHICLE_LOCK_ACTION.UNLOCK,
         )
 
-    def start_charge(self, vehicle_id: str) -> str:
+    def start_charge(self, vehicle_id: str) -> str | None:
         return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def stop_charge(self, vehicle_id: str) -> str:
+    def stop_charge(self, vehicle_id: str) -> str | None:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def start_hazard_lights(self, vehicle_id: str) -> str:
+    def start_hazard_lights(self, vehicle_id: str) -> str | None:
         return self.api.start_hazard_lights(self.token, self.get_vehicle(vehicle_id))
 
-    def start_hazard_lights_and_horn(self, vehicle_id: str) -> str:
+    def start_hazard_lights_and_horn(self, vehicle_id: str) -> str | None:
         return self.api.start_hazard_lights_and_horn(
             self.token, self.get_vehicle(vehicle_id)
         )
@@ -340,7 +342,7 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), enabled
         )
 
-    def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
+    def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str | None:
         return self.api.set_charge_limits(
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )

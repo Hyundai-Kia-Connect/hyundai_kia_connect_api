@@ -604,17 +604,17 @@ class ApiImpl:
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
+    ) -> str | None:
         """Lock or unlocks a vehicle.  Returns the tracking ID"""
         raise NotImplementedError("lock_action is not implemented for this region")
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> str:
+    ) -> str | None:
         """Starts climate or remote start.  Returns the tracking ID"""
         raise NotImplementedError("start_climate is not implemented for this region")
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str | None:
         """Stops climate or remote start.  Returns the tracking ID"""
         raise NotImplementedError("stop_climate is not implemented for this region")
 
@@ -639,17 +639,17 @@ class ApiImpl:
             "stop_battery_conditioning is not implemented for this region"
         )
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         """Starts charge. Returns the tracking ID"""
         raise NotImplementedError("start_charge is not implemented for this region")
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         """Stops charge. Returns the tracking ID"""
         raise NotImplementedError("stop_charge is not implemented for this region")
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    ) -> str:
+    ) -> str | None:
         """Sets charge limits. Returns the tracking ID"""
         raise NotImplementedError(
             "set_charge_limits is not implemented for this region"
@@ -774,13 +774,15 @@ class ApiImpl:
             "schedule_reservation_engine is not implemented for this region"
         )
 
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str | None:
         """Turns on the hazard lights for 30 seconds"""
         raise NotImplementedError(
             "start_hazard_lights is not implemented for this region"
         )
 
-    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+    def start_hazard_lights_and_horn(
+        self, token: Token, vehicle: Vehicle
+    ) -> str | None:
         """Turns on the hazard lights and horn for 30 seconds"""
         raise NotImplementedError(
             "start_hazard_lights_and_horn is not implemented for this region"
