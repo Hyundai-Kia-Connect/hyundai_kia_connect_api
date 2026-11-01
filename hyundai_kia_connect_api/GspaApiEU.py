@@ -172,6 +172,22 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     return None
 
 
+def _parse_valet_mode(value: Any) -> bool | None:
+    """Map the app's ValetMode enum to the active flag.
+
+    myHyundai 1.4.0 (CCS SDK lib-domain) defines ACTIVE(0), IGN_OFF(1),
+    INACTIVE(2), INVALID(-1); live on a Santa Fe HEV the idle car reads
+    INACTIVE(2). Anything else stays unknown.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value in (0, 1):
+        return True
+    if value == 2:
+        return False
+    return None
+
+
 def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     """Parse a GSPA SVM ``scsDetail`` object into SVMDetails.
 
@@ -3124,4 +3140,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             raise
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA software-version GET failed")
+            return None
+
+    def _get_valet_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get valet mode status from GSPA; None on failure.
+
+        Wire shape: {"valetMode": <int>} when idle (live, Santa Fe HEV
+        2026-11-01); the app's ValetStatus model adds startDate/endDateTime/
+        runTime/currentLocation blocks while valet is engaged.
+        """
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "valet/vehicles/{carId}/status")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA valet status failed")
             return None

@@ -478,6 +478,15 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "GET /gspa/v1/valet/vehicles/VEHICLE-1/status": {
+            "body": {
+                "data": "$fixture:eu_hyundai_gspa_valet_status.json",
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000"
+                }
+            }
         }
     }
 }
