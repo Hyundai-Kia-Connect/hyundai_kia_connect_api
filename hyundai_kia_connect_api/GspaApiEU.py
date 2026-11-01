@@ -1195,7 +1195,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         data = self._gspa_post_for_data(
             token, vehicle, endpoint, body, path_prefix=path_prefix
         )
-        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        raw_data = data.get("data")
+        data_payload = raw_data if isinstance(raw_data, dict) else {}
         rs = data.get("rs")
         rs_payload = rs if isinstance(rs, dict) else {}
         # SID is the primary polling handle; svcSID the alternate (some
@@ -1570,10 +1571,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 air_temp,
                 TEMPERATURE_UNITS.get(air_temp_unit, TEMPERATURE_UNITS[0]),
             )
-        elif TEMPERATURE_UNITS.get(air_temp_unit):
+        elif off_unit := TEMPERATURE_UNITS.get(air_temp_unit):
             # With climate off the setpoint is "OFF" but the unit is still
             # reported; keep it so consumers know the car's unit.
-            vehicle._air_temperature_unit = TEMPERATURE_UNITS[air_temp_unit]
+            vehicle._air_temperature_unit = off_unit
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
