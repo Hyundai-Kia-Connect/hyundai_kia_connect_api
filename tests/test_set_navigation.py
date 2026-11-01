@@ -37,7 +37,7 @@ def _make_vehicle():
 
 
 def _make_token():
-    t = MagicMock(spec=Token)
+    t = MagicMock(spec=Token(username="test-user", password="test-pass"))
     t.device_id = "test-device-id"
     t.access_token = "Bearer test-access"
     return t
@@ -247,7 +247,7 @@ class TestSetNavigationNotImplemented:
         from hyundai_kia_connect_api.ApiImpl import ApiImpl
 
         api = ApiImpl()
-        token = MagicMock(spec=Token)
+        token = MagicMock(spec=Token(username="test-user", password="test-pass"))
         vehicle = _make_vehicle()
         poi = POIInfo(coord=POICoord(lat=0, lon=0))
 

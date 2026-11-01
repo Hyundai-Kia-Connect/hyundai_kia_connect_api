@@ -136,7 +136,7 @@ class TestCheckActionStatus:
 
     @pytest.fixture
     def token(self) -> MagicMock:
-        return MagicMock(spec=Token)
+        return MagicMock(spec=Token(username="test-user", password="test-pass"))
 
     @pytest.fixture
     def vehicle(self) -> Vehicle:

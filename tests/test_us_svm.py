@@ -179,7 +179,7 @@ def _make_api():
 
 
 def _make_token():
-    token = MagicMock(spec=Token)
+    token = MagicMock(spec=Token(username="test-user", password="test-pass"))
     token.username = "test-user"
     token.access_token = "test-token"
     token.pin = "1234"

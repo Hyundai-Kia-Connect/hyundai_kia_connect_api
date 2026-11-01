@@ -25,6 +25,8 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 def _make_token():
     return Token(
+        username="test-user",
+        password="test-pass",
         access_token="Bearer test-token",
         refresh_token="test-refresh",
         device_id="test-device",

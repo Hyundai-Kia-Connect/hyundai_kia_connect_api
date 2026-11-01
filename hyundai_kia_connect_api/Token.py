@@ -9,8 +9,8 @@ from typing import Any
 class Token:
     """Token"""
 
-    username: str = None
-    password: str = None
+    username: str
+    password: str
     access_token: str | None = None
     refresh_token: str | None = None
     device_id: str | None = None
@@ -53,8 +53,8 @@ class Token:
             valid_until = dt.datetime.fromisoformat(valid_until)
 
         return cls(
-            username=data.get("username"),
-            password=data.get("password"),
+            username=data["username"],
+            password=data["password"],
             access_token=data.get("access_token"),
             refresh_token=data.get("refresh_token"),
             device_id=data.get("device_id"),

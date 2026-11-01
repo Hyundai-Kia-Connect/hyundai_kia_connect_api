@@ -33,7 +33,12 @@ class TestDeviceIdThreadSafety:
             def _get_stamp(self):
                 return "stamp"
 
-        token = Token(access_token="at", device_id="initial")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="initial",
+        )
         api = MockApi()
 
         def worker():
@@ -67,7 +72,12 @@ class TestDeviceIdThreadSafety:
             call_count += 1
             return "ok"
 
-        token = Token(access_token="at", device_id="initial")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="initial",
+        )
         mock_self = type(
             "MockApi",
             (),

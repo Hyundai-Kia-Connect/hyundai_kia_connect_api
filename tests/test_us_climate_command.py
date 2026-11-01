@@ -39,7 +39,7 @@ def _make_vehicle():
 
 
 def _make_token():
-    return MagicMock(spec=Token)
+    return MagicMock(spec=Token(username="test-user", password="test-pass"))
 
 
 def _make_api():

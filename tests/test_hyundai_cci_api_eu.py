@@ -743,7 +743,7 @@ def test_prewakeup_sends_action_body():
     """The app's prewakeup call carries {"action": "prewakeup"}
     (PreWakeupApiRequest, Moshi default "prewakeup") — mirror it."""
     api = _make_hyundai_api()
-    token = Token()
+    token = Token(username="test-user", password="test-pass")
     token.access_token = "ccs-token"
     token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
     vehicle = Vehicle(id="test-id")
@@ -765,7 +765,7 @@ def test_prewakeup_sends_action_body():
 def test_prewakeup_failure_returns_none():
     """prewakeup is best-effort: any failure is swallowed to None."""
     api = _make_hyundai_api()
-    token = Token()
+    token = Token(username="test-user", password="test-pass")
     token.access_token = "ccs-token"
     token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
     with (

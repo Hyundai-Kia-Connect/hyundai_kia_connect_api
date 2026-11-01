@@ -89,7 +89,12 @@ def _vehicle(engine_type=ENGINE_TYPES.ICE) -> Vehicle:
 
 
 def _token() -> Token:
-    return Token(access_token="Bearer atk", device_id="dev")
+    return Token(
+        username="test-user",
+        password="test-pass",
+        access_token="Bearer atk",
+        device_id="dev",
+    )
 
 
 def _route_posts(api: KiaUvoApiIN, detail_hard_braking: int = 0) -> MagicMock:

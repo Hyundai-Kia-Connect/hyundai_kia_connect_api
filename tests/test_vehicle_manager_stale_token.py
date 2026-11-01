@@ -55,7 +55,9 @@ def make_manager(api, password):
         pin="1234",
         geocode_api_enable=False,
     )
-    manager.token = Token(password=LEGACY_TOKEN, valid_until=dt.datetime.min)
+    manager.token = Token(
+        username="test-user", password=LEGACY_TOKEN, valid_until=dt.datetime.min
+    )
     return manager
 
 
@@ -95,7 +97,9 @@ def test_no_retry_when_manager_password_is_also_a_refresh_token(api):
 def test_plain_password_failure_does_not_double_hit(api):
     """A non-wedge auth failure must not produce a second credential POST."""
     manager = make_manager(api, password="RealPassword")
-    manager.token = Token(password="RealPassword", valid_until=dt.datetime.min)
+    manager.token = Token(
+        username="test-user", password="RealPassword", valid_until=dt.datetime.min
+    )
     with pytest.raises(AuthenticationError):
         manager.check_and_refresh_token()
     assert api.login_passwords == []

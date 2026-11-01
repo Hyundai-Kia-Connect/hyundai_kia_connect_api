@@ -274,7 +274,12 @@ class TestDeviceIdRegistration:
         ]
         br_api._get_device_id = MagicMock(return_value="srv-2")
 
-        token = Token(access_token="at", device_id="stale-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="stale-id",
+        )
         vehicles = br_api.get_vehicles(token)
 
         assert [v.id for v in vehicles] == ["v1"]
@@ -344,7 +349,13 @@ class TestControlToken:
     every other region uses, so it survives Token.to_dict/from_dict."""
 
     def _token(self) -> Token:
-        return Token(access_token="at1", device_id="srv-1", pin="1234")
+        return Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at1",
+            device_id="srv-1",
+            pin="1234",
+        )
 
     def test_fetches_once_and_reuses_after_round_trip(self, br_api):
         br_api.session = MagicMock()
