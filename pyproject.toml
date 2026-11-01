@@ -26,3 +26,8 @@ module = [
     "hyundai_kia_connect_api.VehicleManager",
 ]
 ignore_errors = true
+
+# geopy (the "google" extra) ships no type hints and has no stub package.
+[[tool.mypy.overrides]]
+module = ["geopy.*"]
+ignore_missing_imports = true

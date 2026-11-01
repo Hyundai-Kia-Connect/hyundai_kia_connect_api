@@ -61,14 +61,16 @@ repos:
       rev: v2.4.0
       hooks:
           - id: mypy
-            args: [--strict, --ignore-missing-imports]
+            args: [--strict]
             files: ^hyundai_kia_connect_api/.+\.py$
-            # Keep in sync with requirements.txt. types-requests is needed
-            # because requests ships no type hints.
+            # Keep in sync with requirements.txt and the setup.py extras.
+            # types-requests is needed because requests ships no type hints.
             additional_dependencies:
                 - beautifulsoup4>=4.15.0
                 - requests
                 - types-requests
+                - Pillow>=10.0.0
+                - numpy>=1.26.0
                 - certifi>=2026.10.23
                 - tzdata>=2026.5
                 - pycryptodome>=3.24.1,<4
