@@ -86,6 +86,16 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
+    # Service Hub registration + the receive-only MQTT broker
+    mqtt_push: bool | None = None
+    # device.closeremote.precondition protocol (push metadata hu entry)
+    hvac_close_remote: bool | None = None
+    # device.closeremote.media.vehiclestatus protocol
+    media_close_remote: bool | None = None
+    # vehicle.ota.otaprogress protocol
+    ota_progress: bool | None = None
+    # vehicle.ota.scheduleupdate protocol
+    schedule_update: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -205,6 +215,11 @@ class Vehicle:
     # is in flight or after a failure, reset to False on success.
     _ota_checked: bool = False
     _valet_failed: bool = False
+
+    # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
+    # distinct from Token.mqtt_client_id (the device-level registration id).
+    mqtt_vehicle_id: str | None = None
+    hu_client_id: str | None = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool | None = None

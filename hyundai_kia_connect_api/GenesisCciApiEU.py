@@ -9,9 +9,11 @@ live verification with a vehicle attached to the account.
 """
 
 from .GspaApiEU import GspaApiEU
+from .mqtt_service_hub_eu import MqttServiceHubMixin
+from .Token import Token
 
 
-class GenesisCciApiEU(GspaApiEU):
+class GenesisCciApiEU(MqttServiceHubMixin, GspaApiEU):
     """Genesis EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 50e3b8b0) confirmed on
@@ -31,3 +33,10 @@ class GenesisCciApiEU(GspaApiEU):
     CIPHER_BRAND = "genesis"
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Device-Id"
+    SERVICE_HUB_BASE = "egw-svchub-ccs-g-eu.eu-central.hmgmobility.com:31010"
+    CCSP_CLIENT_SERVICE_ID = "50e3b8b0-ced5-43b7-8a42-f86ac92fe50e"
+    PUSH_PROVIDER_ID = "c1d0a320-600b-4f19-801a-e61babcc2c23"
+
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        """The Genesis broker serves the delivery ACL at subscribe time."""
+        return None

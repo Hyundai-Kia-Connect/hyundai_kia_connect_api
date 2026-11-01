@@ -3,6 +3,7 @@
 import datetime as dt
 import logging
 import re
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
@@ -22,6 +23,7 @@ from .const import (
     CHARGE_PORT_ACTION,
     DOMAIN,
     LAMP_MODE,
+    MQTT_PUSH_CONNECTION_STATE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -49,6 +51,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
+from .mqtt_service_hub_eu import MqttPushSession
 from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
@@ -89,6 +92,10 @@ class VehicleManager:
         self.token: Token = token
         self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
+        # Connection-scoped state; vehicle push identity lives on Vehicle.
+        self._push_session: MqttPushSession | None = None
+        self._push_status_callback: Callable[[str, str], None] | None = None
+        self._push_connection_change_callback: Callable[[bool], None] | None = None
 
     def login(self) -> bool | OTPRequest:
         """Return True on success, an OTPRequest if OTP is required, else False."""
@@ -465,6 +472,72 @@ class VehicleManager:
         return self.api.set_navigation(
             self.token, self.get_vehicle(vehicle_id), poi_list
         )
+
+    # Push glue — the VehicleManager stays the surface; the transport
+    # lifecycle (broker registration, subscriptions, callbacks, reconnect)
+    # lives in MqttPushSession (mqtt_service_hub_eu).
+
+    def _ensure_push_session(self) -> None:
+        """Create the push session, wiring manager accessors into it."""
+        if self._push_session is None:
+            self._push_session = MqttPushSession(
+                api=self.api,
+                token_fn=lambda: self.token,
+                refresh_fn=self.check_and_refresh_token,
+                get_vehicle=self.get_vehicle,
+                vehicles=lambda: self.vehicles,
+            )
+            self._push_session.set_status_callback(self._push_status_callback)
+            session = self._push_session
+            if self._push_connection_change_callback:
+                session.set_connection_change_callback(
+                    self._push_connection_change_callback
+                )
+
+    def start_push(self, vehicle_id: str) -> bool:
+        """Connect to the push broker and subscribe the vehicle's topics.
+
+        Returns False when push is unavailable (unsupported region, no
+        broker info, rejected registration); ``APIError`` propagates.
+        """
+        vehicle = self.vehicles.get(vehicle_id)
+        # False skips outright; None attempts (the flow's metadata refines it).
+        if vehicle is None or vehicle.supports.mqtt_push is False:
+            _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
+            return False
+        self._ensure_push_session()
+        assert self._push_session is not None
+        return self._push_session.ensure_started(vehicle_id)
+
+    def stop_push(self) -> None:
+        """Disconnect push and reset orchestration state."""
+        if self._push_session is not None:
+            self._push_session.stop()
+
+    @property
+    def is_push_connected(self) -> bool:
+        """Whether the push transport is connected."""
+        return self._push_session is not None and self._push_session.is_connected
+
+    def set_push_status_callback(
+        self, callback: Callable[[str, str], None] | None = None
+    ) -> None:
+        """Register a callback for status pushes: (vehicle_id, topic_type)."""
+        self._push_status_callback = callback
+        if self._push_session is not None:
+            self._push_session.set_status_callback(callback)
+
+    def set_push_connection_change_callback(
+        self, callback: Callable[[bool], None] | None = None
+    ) -> None:
+        """Register a callback for push connection changes: (connected: bool)."""
+        self._push_connection_change_callback = callback
+        if self._push_session is not None:
+            self._push_session.set_connection_change_callback(callback)
+
+    def get_push_connection_state(self) -> MQTT_PUSH_CONNECTION_STATE | None:
+        """Push connection state through the region API (delegator)."""
+        return self.api.get_push_connection_state(self.token)
 
     @staticmethod
     def get_implementation_by_region_brand(

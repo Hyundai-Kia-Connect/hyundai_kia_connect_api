@@ -104,6 +104,25 @@ If geolocation is required you can also allow this by running::
 
 This will populate the address of the vehicle in the vehicle instance.
 
+MQTT push (Europe CCI/GSPA)
+---------------------------
+
+For Europe CCI/GSPA accounts the vehicle manager can receive server pushes over MQTT instead of polling. Push is receive-only: it never sends vehicle commands.
+
+::
+
+    vm = VehicleManager(region=9, brand=1, username="...", password="...", pin="...")
+    vm.check_and_refresh_token()
+    vm.initialize_vehicles()
+    vm.set_push_connection_change_callback(lambda connected: print("push connected:", connected))
+    vm.set_push_status_callback(lambda vehicle_id, topic_type: print(vm.get_vehicle(vehicle_id)))
+    vm.start_push(vm.vehicles[vehicle_id].id)
+
+- ``start_push`` returns False when push is unavailable (unsupported region or account); connection problems surface in the connection-change callback and the manager reconnects with capped backoff.
+- The status callback fires per status push with ``(vehicle_id, topic_type)``.
+- ``stop_push`` disconnects; the callbacks stay registered unless replaced.
+
+
 The Bluelink App is reset to English for users who have set another language in the Bluelink App in Europe when using hyundai_kia_connect_api.
 To avoid this, you can pass the optional parameter language (default is "en") to the constructor of VehicleManager, e.g. for Dutch::
 
