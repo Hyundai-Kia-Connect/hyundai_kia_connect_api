@@ -2,6 +2,7 @@
 
 import datetime as dt
 from dataclasses import asdict, dataclass
+from typing import Any
 
 
 @dataclass
@@ -34,7 +35,7 @@ class Token:
     # User ID for GSPA X-Stamp (uid claim from CCS JWT).
     user_id: str | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert Token to a JSON‑serializable dict."""
         data = asdict(self)
 
@@ -44,7 +45,7 @@ class Token:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Token":
+    def from_dict(cls, data: dict[str, Any]) -> "Token":
         """Create a Token instance from a dict."""
         # Parse datetimes from ISO strings
         valid_until = data.get("valid_until")

@@ -92,11 +92,11 @@ def _deprecated_supports_alias(alias: str, item: str) -> property:
     """Map a legacy flat ``vehicle.<alias>`` attribute onto ``vehicle.supports``."""
     message = f"Vehicle.{alias} is deprecated; use Vehicle.supports.{item} instead"
 
-    def getter(self):
+    def getter(self: "Vehicle") -> Any:
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         return getattr(self.supports, item)
 
-    def setter(self, value):
+    def setter(self: "Vehicle", value: Any) -> None:
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         setattr(self.supports, item, value)
 
@@ -158,9 +158,9 @@ class Vehicle:
     _outside_temperature_unit: str | None = None
 
     # Climate
-    _air_temperature: float = None
-    _air_temperature_value: float = None
-    _air_temperature_unit: str = None
+    _air_temperature: float | None = None
+    _air_temperature_value: float | None = None
+    _air_temperature_unit: str | None = None
 
     air_control_is_on: bool | None = None
     defrost_is_on: bool | None = None
@@ -660,7 +660,7 @@ class Vehicle:
             self._outside_temperature_unit = value[1]
 
     @property
-    def air_temperature(self) -> float:
+    def air_temperature(self) -> float | None:
         return self._air_temperature
 
     @air_temperature.setter

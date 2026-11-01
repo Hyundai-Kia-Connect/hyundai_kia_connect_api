@@ -80,7 +80,7 @@ class VehicleManager:
         self.geocode_provider: int = geocode_provider
         self.pin: str = pin
         self.language: str = language
-        self.geocode_api_key: str = geocode_api_key
+        self.geocode_api_key: str | None = geocode_api_key
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
@@ -119,7 +119,7 @@ class VehicleManager:
         )
         self.initialize_vehicles()
 
-    def initialize_vehicles(self):
+    def initialize_vehicles(self) -> None:
         if len(self.vehicles) > 0:
             _LOGGER.warning(
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
