@@ -216,7 +216,7 @@ class KiaUvoApiCA(ApiImpl):
             self.BASE_URL = "genesisconnect.ca"
 
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
-        self.API_HEADERS = {
+        self.API_HEADERS: dict[str, str | None] = {
             "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",

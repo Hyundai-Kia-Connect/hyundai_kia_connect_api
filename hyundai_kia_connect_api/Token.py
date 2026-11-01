@@ -11,12 +11,12 @@ class Token:
 
     username: str = None
     password: str = None
-    access_token: str = None
-    refresh_token: str = None
-    device_id: str = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    device_id: str | None = None
     # Access Token expiry:
     valid_until: dt.datetime = dt.datetime.min
-    stamp: str = None
+    stamp: str | None = None
     pin: str | None = None
     # Control token (EU/AU/IN PIN verification) — cached with expiry:
     control_token: str | None = None
@@ -48,7 +48,7 @@ class Token:
     def from_dict(cls, data: dict[str, Any]) -> "Token":
         """Create a Token instance from a dict."""
         # Parse datetimes from ISO strings
-        valid_until = data.get("valid_until")
+        valid_until = data.get("valid_until", dt.datetime.min)
         if isinstance(valid_until, str):
             valid_until = dt.datetime.fromisoformat(valid_until)
 
