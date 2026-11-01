@@ -41,7 +41,9 @@ def _au_api_with_mock_session() -> KiaUvoApiAU:
 def test_au_refresh_sends_stamp() -> None:
     """AU refresh_token grant must include the Stamp header."""
     api = _au_api_with_mock_session()
-    api.refresh_access_token(Token(refresh_token="old-rtk"))
+    api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     sent_headers = api.session.post.call_args.kwargs["headers"]
     assert sent_headers.get("Stamp") == "STAMP-FAKE"
 
@@ -49,7 +51,9 @@ def test_au_refresh_sends_stamp() -> None:
 def test_au_refresh_grant_type_and_url() -> None:
     """AU refresh uses grant_type=refresh_token to the oauth2/token endpoint."""
     api = _au_api_with_mock_session()
-    api.refresh_access_token(Token(refresh_token="old-rtk"))
+    api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     call = api.session.post.call_args
     assert call.args[0] == api.USER_API_URL + "oauth2/token"
     assert "grant_type=refresh_token" in call.kwargs["data"]
@@ -64,6 +68,8 @@ def test_au_refresh_falls_back_to_login_on_error() -> None:
         side_effect=DeviceIDError("4002 Invalid parameters")
     )
     api.login = MagicMock(return_value="FELLBACK")  # type: ignore[assignment]
-    result = api.refresh_access_token(Token(refresh_token="old-rtk"))
+    result = api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     assert result == "FELLBACK"
     api.login.assert_called_once()

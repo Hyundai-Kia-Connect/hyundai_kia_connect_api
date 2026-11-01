@@ -21,7 +21,12 @@ SHARED = (
 
 
 def _token() -> Token:
-    return Token(access_token="Bearer abc", device_id="dev-1")
+    return Token(
+        username="test-user",
+        password="test-pass",
+        access_token="Bearer abc",
+        device_id="dev-1",
+    )
 
 
 def _vehicle() -> Vehicle:

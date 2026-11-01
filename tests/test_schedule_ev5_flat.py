@@ -100,7 +100,11 @@ class TestEV5Dispatch:
     def test_ccs2_ev_uses_flat_endpoints(self, api):
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/ccs2/reservation/charge") for u in urls)
         assert any(u.endswith("/ccs2/reservation/hvac") for u in urls)
@@ -109,7 +113,11 @@ class TestEV5Dispatch:
     def test_ccsp_ev_uses_combined(self, api):
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=0, engine_type=ENGINE_TYPES.EV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/reservation/chargehvac") for u in urls)
         assert not any(u.endswith("/reservation/charge") for u in urls)
@@ -118,7 +126,11 @@ class TestEV5Dispatch:
     def test_ccs2_phev_uses_combined(self, api):
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.PHEV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/reservation/chargehvac") for u in urls)
         assert not any(u.endswith("/ccs2/reservation/charge") for u in urls)
@@ -126,7 +138,11 @@ class TestEV5Dispatch:
     def test_ccs2_hev_uses_combined(self, api):
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.HEV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/reservation/chargehvac") for u in urls)
 
@@ -143,7 +159,11 @@ class TestCCSPCombinedPayload:
     def _combined(self, api, **opts) -> dict:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=0, engine_type=ENGINE_TYPES.EV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options(**opts))
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(**opts),
+        )
         # exactly one POST to the combined endpoint
         return next(c["json"] for c in calls if c["url"].endswith("/chargehvac"))
 
@@ -175,7 +195,11 @@ class TestEV5FlatChargePayload:
     def test_charge_payload_keys_and_lowercase_flag(self, api):
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
         assert set(charge.keys()) == {
             "reservFlag",
@@ -191,7 +215,9 @@ class TestEV5FlatChargePayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _options(off_peak_charge_only_enabled=True)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(off_peak_charge_only_enabled=True),
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
         assert charge["offpeakPowerFlag"] == 1
@@ -201,7 +227,9 @@ class TestEV5FlatChargePayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _options(off_peak_charge_only_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(off_peak_charge_only_enabled=False),
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
         assert charge["offpeakPowerFlag"] == 2
@@ -210,7 +238,9 @@ class TestEV5FlatChargePayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _options(charging_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(charging_enabled=False),
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
         assert charge["reservFlag"] == 0
@@ -219,7 +249,7 @@ class TestEV5FlatChargePayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token),
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
             v,
             _options(
                 off_peak_start_time=dt.time(22, 30),  # PM -> "1030", section 1
@@ -236,7 +266,7 @@ class TestEV5FlatHvacPayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token),
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
             v,
             _options(
                 climate_enabled=True,
@@ -264,7 +294,9 @@ class TestEV5FlatHvacPayload:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _options(first_departure_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(first_departure_enabled=False),
         )
         hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
         assert hvac["reservedHVACInfo1"]["reservHVACflag"] == 0
@@ -290,7 +322,9 @@ class TestEV5FlatHvacPayload:
                 defrost=True,
             ),
         )
-        api.schedule_charging_and_climate(MagicMock(spec=Token), v, opts)
+        api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")), v, opts
+        )
         hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
         set1 = hvac["reservedHVACInfo1"]["reservHVACSet"]
         set2 = hvac["reservedHVACInfo2"]["reservHVACSet"]
@@ -306,7 +340,11 @@ class TestEV5Return:
     def test_returns_charge_msgid(self, api):
         _mock_post(api, charge_id="charge-xyz")
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
-        msg_id = api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+        msg_id = api.schedule_charging_and_climate(
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _options(),
+        )
         assert msg_id == "charge-xyz"
 
 
@@ -319,7 +357,7 @@ class TestEV5TwoScopeSequencing:
     def test_two_scope_polls_charge_record_before_hvac(self, api):
         calls = _mock_post(api, charge_id="charge-seq")
         api.check_action_status = MagicMock(return_value=ORDER_STATUS.SUCCESS)
-        token = MagicMock(spec=Token)
+        token = MagicMock(spec=Token(username="test-user", password="test-pass"))
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(token, v, _options())
         api.check_action_status.assert_called_once_with(
@@ -340,7 +378,9 @@ class TestEV5TwoScopeSequencing:
         v.ev_off_peak_end_time = dt.time(5, 0)
         v.ev_off_peak_charge_only_enabled = True
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(charging_enabled=False),
         )
         api.check_action_status.assert_not_called()
 
@@ -350,7 +390,9 @@ class TestEV5TwoScopeSequencing:
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         v.ev_first_departure_climate_temperature = (21.0, "°C")
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(climate_enabled=True),
         )
         api.check_action_status.assert_not_called()
 
@@ -359,21 +401,33 @@ class TestEV5TwoScopeSequencing:
         api.check_action_status = MagicMock(return_value=ORDER_STATUS.TIMEOUT)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(DuplicateRequestError, match="charge-still-busy"):
-            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _options(),
+            )
 
     def test_poll_timeout_message_says_charge_applied(self, api):
         _mock_post(api)
         api.check_action_status = MagicMock(return_value=ORDER_STATUS.TIMEOUT)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(DuplicateRequestError, match="applied"):
-            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _options(),
+            )
 
     def test_charge_record_failed_raises_not_duplicate(self, api):
         _mock_post(api)
         api.check_action_status = MagicMock(return_value=ORDER_STATUS.FAILED)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(APIError, match="failed"):
-            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _options(),
+            )
 
     def test_hvac_4004_after_poll_keeps_charge_context(self, api):
         _mock_post(api)
@@ -398,7 +452,11 @@ class TestEV5TwoScopeSequencing:
         api.session.post.side_effect = _post
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(DuplicateRequestError, match="charge-ctx"):
-            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _options())
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _options(),
+            )
 
 
 def _raw_options(**kw) -> ScheduleChargingClimateRequestOptions:
@@ -427,7 +485,9 @@ class TestEV5ScopeSkip:
         v.ev_off_peak_end_time = dt.time(5, 0)
         v.ev_off_peak_charge_only_enabled = True
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(charging_enabled=False),
         )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/reservation/charge") for u in urls)
@@ -443,7 +503,9 @@ class TestEV5ScopeSkip:
         v.ev_first_departure_climate_temperature = (21.0, "°C")
         v.ev_first_departure_climate_defrost = False
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(temperature=24.0)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(temperature=24.0),
         )
         urls = [c["url"] for c in calls]
         assert any(u.endswith("/reservation/hvac") for u in urls)
@@ -455,7 +517,7 @@ class TestEV5ScopeSkip:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token),
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
             v,
             _raw_options(charging_enabled=True, temperature=21.0),
         )
@@ -467,7 +529,11 @@ class TestEV5ScopeSkip:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(ValueError, match="no schedule changes requested"):
-            api.schedule_charging_and_climate(MagicMock(spec=Token), v, _raw_options())
+            api.schedule_charging_and_climate(
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _raw_options(),
+            )
         assert calls == []
 
     def test_explicit_off_still_posts_both(self, api):
@@ -477,7 +543,7 @@ class TestEV5ScopeSkip:
         v.ev_schedule_charge_enabled = True
         v.ev_first_departure_climate_temperature = (21.0, "°C")
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token),
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
             v,
             _raw_options(charging_enabled=False, climate_enabled=False),
         )
@@ -495,7 +561,9 @@ class TestEV5AutoFill:
         v.ev_off_peak_end_time = dt.time(1, 30)
         v.ev_off_peak_charge_only_enabled = True
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(charging_enabled=False),
         )
         charge = next(c["json"] for c in calls if c["url"].endswith("/charge"))
         assert charge["reservFlag"] == 0  # explicit
@@ -513,7 +581,9 @@ class TestEV5AutoFill:
         v.ev_first_departure_climate_temperature = (21.5, "°C")
         v.ev_first_departure_climate_defrost = False
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(climate_enabled=True),
         )
         hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
         assert hvac["reservedHVACInfo1"]["reservHVACflag"] == 1
@@ -542,7 +612,9 @@ class TestCombinedAutoFill:
         v.ev_first_departure_climate_temperature = (21.0, "°C")
         v.ev_first_departure_climate_defrost = False
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(charging_enabled=False)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(charging_enabled=False),
         )
         payload = next(c["json"] for c in calls if c["url"].endswith("/chargehvac"))
         assert payload["reservFlag"] == 0  # explicit write
@@ -563,7 +635,9 @@ class TestCCS2TemperatureGuard:
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         with pytest.raises(ValueError, match="departure climate temperature"):
             api.schedule_charging_and_climate(
-                MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+                MagicMock(spec=Token(username="test-user", password="test-pass")),
+                v,
+                _raw_options(climate_enabled=True),
             )
         assert calls == []
 
@@ -571,7 +645,7 @@ class TestCCS2TemperatureGuard:
         calls = _mock_post(api)
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token),
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
             v,
             _raw_options(climate_enabled=True, temperature=24.0),
         )
@@ -585,7 +659,9 @@ class TestCCS2TemperatureGuard:
         v = _make_vehicle(ccs2=1, engine_type=ENGINE_TYPES.EV)
         v.ev_first_departure_climate_temperature = (21.5, "°C")
         api.schedule_charging_and_climate(
-            MagicMock(spec=Token), v, _raw_options(climate_enabled=True)
+            MagicMock(spec=Token(username="test-user", password="test-pass")),
+            v,
+            _raw_options(climate_enabled=True),
         )
         hvac = next(c["json"] for c in calls if c["url"].endswith("/hvac"))
         assert hvac["reservedHVACInfo1"]["reservHVACSet"]["airTemp"]["unit"] == 0

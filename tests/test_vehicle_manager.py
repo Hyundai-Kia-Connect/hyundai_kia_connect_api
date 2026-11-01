@@ -40,7 +40,9 @@ def test_check_and_refresh_token_handles_min_datetime(monkeypatch):
         pin="1234",
         geocode_api_enable=False,
     )
-    manager.token = Token(valid_until=dt.datetime.min)
+    manager.token = Token(
+        username="test-user", password="test-pass", valid_until=dt.datetime.min
+    )
     assert manager.check_and_refresh_token() is True
     assert dummy_api.login_calls == 1
 

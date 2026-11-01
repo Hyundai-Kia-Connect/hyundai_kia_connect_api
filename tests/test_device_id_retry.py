@@ -23,7 +23,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             return "success"
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         # Simulate calling as unbound method with mock self
         mock_self = type(
             "MockApi",
@@ -51,7 +56,12 @@ class TestRetryOnDeviceIdError:
                 raise DeviceIDError("Invalid deviceId")
             return "success_after_retry"
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -76,7 +86,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             raise DeviceIDError("Still invalid")
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -99,7 +114,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             raise ValueError("some other error")
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -144,7 +164,12 @@ class TestCheckActionStatusDecorator:
         ]
         api.session.get = lambda url, headers=None: responses.pop(0)
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
 
         result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
@@ -170,7 +195,12 @@ class TestCheckActionStatusDecorator:
             }
         )
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
 
         result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
@@ -209,7 +239,12 @@ class TestGetDrivingInfoDecorator:
         ]
         api.session.post = lambda url, json=None, headers=None: responses.pop(0)
 
-        token = Token(access_token="access-token", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="access-token",
+            device_id="old-device-id",
+        )
         vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
 
         result = api._get_driving_info(token, vehicle)

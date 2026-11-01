@@ -37,7 +37,7 @@ def _make_vehicle():
 
 
 def _make_token():
-    token = MagicMock(spec=Token)
+    token = MagicMock(spec=Token(username="test-user", password="test-pass"))
     token.username = "test-user"
     return token
 

@@ -29,7 +29,7 @@ def test_update_vehicle_with_cached_state_no_ccs_token(
     """A token without CCS credentials raises APIError before any call."""
     from hyundai_kia_connect_api.exceptions import APIError
 
-    token = Token()
+    token = Token(username="test-user", password="test-pass")
     with (
         patch.object(KiaCciApiEU, "get_stored_status") as get_status,
         pytest.raises(APIError),
@@ -45,7 +45,7 @@ def test_update_vehicle_with_cached_state_no_data(
     from hyundai_kia_connect_api.exceptions import APIError
 
     with patch.object(KiaCciApiEU, "get_stored_status", return_value=None):
-        token = Token()
+        token = Token(username="test-user", password="test-pass")
         token.access_token = "ccs-token"
         with pytest.raises(APIError):
             api.update_vehicle_with_cached_state(token, vehicle)
