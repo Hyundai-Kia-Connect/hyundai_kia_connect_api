@@ -3,6 +3,7 @@
 import datetime
 import logging
 import re
+from collections.abc import Sequence
 from enum import IntEnum
 from typing import Any
 
@@ -266,8 +267,8 @@ def get_safe_local_datetime(
 def detect_timezone_for_date(
     date: datetime.datetime,
     ref_date: datetime.datetime,
-    timezones: list[datetime.timezone],
-) -> datetime.timezone | None:
+    timezones: Sequence[datetime.tzinfo],
+) -> datetime.tzinfo | None:
     """
     Guess an appropriate timezone given a date with an unknown timezone and a
     nearby reference time in any valid timezone.
