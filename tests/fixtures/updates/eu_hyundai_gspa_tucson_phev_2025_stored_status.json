@@ -478,6 +478,16 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "GET /gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns": {
+            "body": {
+                "data": "$fixture:eu_kia_gspa_breakdowns_empty.json",
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000",
+                    "message": "Success"
+                }
+            }
         }
     }
 }
