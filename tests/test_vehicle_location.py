@@ -18,7 +18,7 @@ WHEN = dt.datetime(2026, 1, 2, 3, 4, 5, tzinfo=dt.UTC)
     ],
 )
 def test_location_is_stored_as_float(lat, lon, expected) -> None:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.location = (lat, lon, WHEN)
     assert (vehicle.location_latitude, vehicle.location_longitude) == expected
     for value in (vehicle.location_latitude, vehicle.location_longitude):

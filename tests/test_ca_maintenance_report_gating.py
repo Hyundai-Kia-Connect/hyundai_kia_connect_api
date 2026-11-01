@@ -29,7 +29,7 @@ def _make_api() -> KiaUvoApiCA:
 
 
 def _vehicle(**kwargs) -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "v1"
     return v
 

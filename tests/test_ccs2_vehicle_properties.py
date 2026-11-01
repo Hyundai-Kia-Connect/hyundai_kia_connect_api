@@ -31,7 +31,7 @@ def ccs2_api() -> ApiImplType1:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 def _window_state(open_front_left=0, open_level_front_left=0, **levels) -> dict:

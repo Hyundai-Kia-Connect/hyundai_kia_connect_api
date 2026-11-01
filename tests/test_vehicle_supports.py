@@ -40,7 +40,7 @@ def _cci_vehicle(api_cls: Any) -> Vehicle:
 
 
 def test_vehicle_supports_defaults_to_undetermined():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     assert vehicle.supports == VehicleSupports()
     assert all(
         getattr(vehicle.supports, f.name) is None
@@ -49,7 +49,7 @@ def test_vehicle_supports_defaults_to_undetermined():
 
 
 def test_vehicle_supports_not_shared_between_vehicles():
-    first, second = Vehicle(), Vehicle()
+    first, second = Vehicle(id="test-id"), Vehicle(id="test-id")
     first.supports.svm = True
     assert second.supports.svm is None
 
@@ -118,7 +118,7 @@ def test_api_holds_no_supports_attributes():
     ],
 )
 def test_deprecated_flat_alias_reads_and_writes_supports(alias, item):
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     supports = vehicle.supports
     with pytest.deprecated_call():
         setattr(vehicle, alias, True)

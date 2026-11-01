@@ -27,7 +27,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 @pytest.fixture
 def vehicle():
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "test-vehicle-id"
     return v
 

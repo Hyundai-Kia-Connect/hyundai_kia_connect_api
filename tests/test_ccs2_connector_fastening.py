@@ -41,7 +41,7 @@ def state():
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 def test_reported_state_populates_enum_plug_unknown(parser_api, state, vehicle):

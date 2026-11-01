@@ -21,7 +21,7 @@ def bluelink_api() -> HyundaiBlueLinkApiUSA:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ def test_bluelink_dc_charging_power_reads_real_time_power(bluelink_api):
     asserts 10.9 (the vehicle's AC ceiling) instead of 58.7, which is the
     signature of the bug rather than a rounding difference.
     """
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "vehicleStatus": {
             "evStatus": {
@@ -73,7 +73,7 @@ def test_bluelink_charging_power_none_when_real_time_power_absent(bluelink_api):
     the field is missing, rather than substituting the stale AC rate carried by
     `batteryStndChrgPower`.
     """
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "vehicleStatus": {
             "evStatus": {
@@ -100,7 +100,7 @@ def test_bluelink_air_temp_off_yields_none(
     the conformance fixes is that the setter is not called at all — so the
     raw value slot (_air_temperature_value) stays None instead of holding
     the string "OFF". Assert on that side effect as the real TDD gate."""
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     bluelink_api._update_vehicle_properties(vehicle, bluelink_status_with_air_temp_off)
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value is None
@@ -126,7 +126,7 @@ def test_bluelink_odometer_uses_highest_valid_value(
         "vehicleStatus": {"odometer": status_odometer},
     }
 
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     bluelink_api._update_vehicle_properties(vehicle, state)
 
     assert vehicle.odometer == expected

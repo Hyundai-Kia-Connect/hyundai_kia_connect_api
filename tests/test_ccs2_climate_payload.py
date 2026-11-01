@@ -37,7 +37,7 @@ def _make_api():
 
 
 def _make_vehicle(ccs2: bool = True) -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "test-vehicle-id"
     v.name = "Kona EV"
     v.ccu_ccs2_protocol_support = ccs2

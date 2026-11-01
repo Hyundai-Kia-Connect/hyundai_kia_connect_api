@@ -25,14 +25,14 @@ def test_type1_keeps_unit_when_setpoint_off() -> None:
         "Value": "OFF",
         "Unit": 0,
     }
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     _type1_api()._update_vehicle_properties_ccs2(vehicle, state)
     assert vehicle._air_temperature_unit == TEMPERATURE_C
     assert vehicle.air_temperature is None
 
 
 def test_type1_off_keeps_last_setpoint() -> None:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = (22.0, TEMPERATURE_C)
     _type1_api()._update_vehicle_properties_ccs2(
         vehicle, load_fixture("eu_kia_ev3_2025_ccs2.json")
@@ -43,7 +43,7 @@ def test_type1_off_keeps_last_setpoint() -> None:
 def test_gspa_keeps_unit_when_setpoint_off() -> None:
     state = load_fixture("eu_kia_gspa_pv5_2026_stored_status.json")
     assert state["Cabin"]["HVAC"]["Row1"]["Driver"]["Temperature"]["Value"] == "OFF"
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     KiaCciApiEU(9, 2, "en")._update_vehicle_properties_ccs2(vehicle, state)
     assert vehicle._air_temperature_unit == TEMPERATURE_C
     assert vehicle.air_temperature is None

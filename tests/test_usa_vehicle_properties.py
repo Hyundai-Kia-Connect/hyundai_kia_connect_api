@@ -37,7 +37,7 @@ def test_usa_air_temperature_string_becomes_float(us_kia_status_with_air_temp):
     api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
     api.data_timezone = None
     api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp)
     assert vehicle.air_temperature is not None
     assert isinstance(vehicle.air_temperature, float)
@@ -74,7 +74,7 @@ def test_usa_air_temperature_off_yields_none(us_kia_status_with_air_temp_off):
     api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
     api.data_timezone = None
     api.temperature_range = [62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82]
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     api._update_vehicle_properties(vehicle, us_kia_status_with_air_temp_off)
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value is None

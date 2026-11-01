@@ -24,7 +24,6 @@ ignore = [
 [[tool.mypy.overrides]]
 module = [
     "hyundai_kia_connect_api.Token",
-    "hyundai_kia_connect_api.Vehicle",
     "hyundai_kia_connect_api.VehicleManager",
 ]
 ignore_errors = true

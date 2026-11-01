@@ -640,7 +640,7 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
     supports_valet_mode)."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     vehicle.engine_type = ENGINE_TYPES.EV
 
@@ -730,7 +730,7 @@ def test_fob_low_battery_bool_or_none(low_battery, expected):
     """Electronics.FOB.LowBattery uses bool_or_none: an absent/unset
     value maps to None (unknown), not False (C3 review finding)."""
     api = _make_hyundai_api()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "Drivetrain": {"FuelSystem": {"DTE": {"Unit": 1}}},
         "Electronics": {"FOB": {"LowBattery": low_battery}},
@@ -746,7 +746,7 @@ def test_prewakeup_sends_action_body():
     token = Token()
     token.access_token = "ccs-token"
     token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     resp = MagicMock(status_code=200)
     resp.json.return_value = {"rc": "0000", "rs": {}}
@@ -775,7 +775,7 @@ def test_prewakeup_failure_returns_none():
             side_effect=OSError("offline"),
         ),
     ):
-        assert api.prewakeup(token, Vehicle()) is None
+        assert api.prewakeup(token, Vehicle(id="test-id")) is None
 
 
 def test_refresh_4111_logs_info_not_warning(caplog):
@@ -840,7 +840,7 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
     on the cached-update path."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     with (
         patch.object(
@@ -862,7 +862,7 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
     (None), not stale."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     with (
         patch.object(api, "get_software_version", side_effect=APIError("boom")),
@@ -878,7 +878,7 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
 
 def test_force_refresh_resets_flags_and_loads_extras():
     api = _make_hyundai_api()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle._ota_checked = True
     vehicle._valet_failed = True
     with (
@@ -895,7 +895,7 @@ def test_force_refresh_resets_flags_and_loads_extras():
 def test_force_refresh_failure_skips_extras():
     """A failed shared refresh propagates; flags and extras stay untouched."""
     api = _make_hyundai_api()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle._ota_checked = True
     with (
         patch.object(
