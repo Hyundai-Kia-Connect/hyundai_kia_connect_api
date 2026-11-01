@@ -21,7 +21,7 @@ def eu_api() -> KiaUvoApiEU:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 def test_battery_soh_is_read(eu_api, vehicle):

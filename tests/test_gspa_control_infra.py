@@ -40,7 +40,7 @@ def _make_token() -> Token:
 
 
 def _make_vehicle(ccs2: int = 1) -> Vehicle:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
     return vehicle

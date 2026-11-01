@@ -3,7 +3,7 @@
 Each implementation with a real vehicle-list capture in
 ``tests/fixtures/vehicle_lists`` reads it through a fake HTTP transport. The requests
 sent and the fields each parsed Vehicle sets are compared to a syrupy
-snapshot. Fields left at their Vehicle() default are omitted.
+snapshot. Fields left at their Vehicle(id="test-id") default are omitted.
 
 To update snapshots after an intentional change::
 
@@ -53,7 +53,7 @@ IMPLEMENTATIONS = {
     "cn_kia": (REGION_CHINA, BRAND_KIA),
 }
 
-_DEFAULTS = vehicle_to_dict(Vehicle())
+_DEFAULTS = vehicle_to_dict(Vehicle(id="test-id"))
 
 
 def _key(mapping: dict[int, str], value: str) -> int:

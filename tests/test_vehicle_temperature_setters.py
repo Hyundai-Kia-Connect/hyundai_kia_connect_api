@@ -4,21 +4,21 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
 def test_air_temperature_numeric_string_becomes_float():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = ("72", "°F")
     assert vehicle.air_temperature == 72.0
     assert isinstance(vehicle.air_temperature, float)
 
 
 def test_air_temperature_value_backing_stays_raw():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = ("72", "°F")
     assert vehicle._air_temperature_value == "72"
     assert vehicle._air_temperature_unit == "°F"
 
 
 def test_air_temperature_off_becomes_none():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = ("OFF", "°C")
     assert vehicle.air_temperature is None
     # raw diagnostic value is preserved
@@ -26,41 +26,41 @@ def test_air_temperature_off_becomes_none():
 
 
 def test_air_temperature_non_numeric_becomes_none():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = ("abc", "°C")
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value == "abc"
 
 
 def test_air_temperature_none_becomes_none():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.air_temperature = (None, "°C")
     assert vehicle.air_temperature is None
 
 
 def test_outside_temperature_numeric_string_becomes_float():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.outside_temperature = ("21", "°C")
     assert vehicle.outside_temperature == 21.0
     assert isinstance(vehicle.outside_temperature, float)
 
 
 def test_outside_temperature_value_backing_stays_raw():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.outside_temperature = ("21", "°C")
     assert vehicle._outside_temperature_value == "21"
     assert vehicle._outside_temperature_unit == "°C"
 
 
 def test_outside_temperature_non_numeric_becomes_none():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.outside_temperature = ("n/a", "°C")
     assert vehicle.outside_temperature is None
     assert vehicle._outside_temperature_value == "n/a"
 
 
 def test_departure_climate_temperature_accepts_scalar_or_tuple():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     # tuple assignment
     vehicle.ev_first_departure_climate_temperature = (21.5, "°C")
     assert vehicle.ev_first_departure_climate_temperature == 21.5
@@ -82,7 +82,7 @@ def test_departure_climate_temperature_accepts_scalar_or_tuple():
 
 
 def test_departure_climate_temperature_off_or_non_numeric_becomes_none():
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.ev_first_departure_climate_temperature = ("OFF", "°C")
     assert vehicle.ev_first_departure_climate_temperature is None
     assert vehicle._ev_first_departure_climate_temperature_value == "OFF"

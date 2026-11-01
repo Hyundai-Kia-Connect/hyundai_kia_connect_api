@@ -49,7 +49,7 @@ def ca_api() -> KiaUvoApiCA:
 
 
 def _vehicle(odometer: float, with_location: bool) -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "vid-1"
     v.engine_type = ENGINE_TYPES.PHEV
     v._odometer = odometer

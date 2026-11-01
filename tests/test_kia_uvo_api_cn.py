@@ -42,7 +42,7 @@ def api() -> KiaUvoApiCN:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 # ---------------------------------------------------------------------------

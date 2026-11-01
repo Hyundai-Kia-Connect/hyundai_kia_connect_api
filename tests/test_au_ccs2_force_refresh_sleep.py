@@ -24,7 +24,7 @@ def au_api() -> KiaUvoApiAU:
 
 @pytest.fixture
 def ccs2_vehicle() -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "vid-123"
     v.ccu_ccs2_protocol_support = 1
     return v

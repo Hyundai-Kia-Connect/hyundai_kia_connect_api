@@ -34,7 +34,7 @@ def api() -> ApiImplType1:
 
 
 def _make_vehicle(ccs2: int, engine_type: ENGINE_TYPES) -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "vid-123"
     v.ccu_ccs2_protocol_support = ccs2
     v.engine_type = engine_type

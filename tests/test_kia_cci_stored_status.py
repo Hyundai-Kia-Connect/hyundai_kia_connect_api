@@ -20,7 +20,7 @@ def api() -> KiaCciApiEU:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 def test_update_vehicle_with_cached_state_no_ccs_token(

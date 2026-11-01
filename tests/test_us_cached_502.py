@@ -30,7 +30,7 @@ def _make_token():
 
 
 def _make_vehicle():
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "test-vehicle-id"
     v.name = "Test Genesis"
     v.enabled = True

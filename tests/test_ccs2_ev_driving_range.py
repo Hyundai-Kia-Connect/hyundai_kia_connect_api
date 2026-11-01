@@ -31,7 +31,7 @@ def ccs2_api() -> ApiImplType1:
 
 
 def _parse(api, engine_type) -> Vehicle:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.engine_type = engine_type
     state = load_fixture(SPORTAGE_PHEV_FIXTURE)
     api._update_vehicle_properties_ccs2(vehicle, state)

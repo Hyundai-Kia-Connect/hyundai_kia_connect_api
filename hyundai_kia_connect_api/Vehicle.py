@@ -105,7 +105,7 @@ def _deprecated_supports_alias(alias: str, item: str) -> property:
 
 @dataclass
 class Vehicle:
-    id: str = None
+    id: str
     name: str | None = None
     model: str | None = None
     registration_date: str | None = None

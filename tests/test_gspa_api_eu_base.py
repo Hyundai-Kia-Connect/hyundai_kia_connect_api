@@ -28,7 +28,7 @@ def _make_base_token() -> Token:
 
 
 def _make_base_vehicle() -> Vehicle:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     return vehicle
 
