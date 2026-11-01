@@ -503,7 +503,7 @@ class ApiImpl:
         """Return all Vehicle instances for a given Token"""
         raise NotImplementedError("get_vehicles is not implemented for this region")
 
-    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle]) -> None:
+    def refresh_vehicles(self, token: Token, vehicles: dict[str, Vehicle]) -> None:
         """Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific"""
         return

@@ -494,7 +494,9 @@ class KiaUvoApiUSA(ApiImpl):
         return None
 
     @_retry_on_auth_error
-    def refresh_vehicles(self, token: Token, vehicles: list[Vehicle] | Vehicle) -> None:
+    def refresh_vehicles(
+        self, token: Token, vehicles: dict[str, Vehicle] | Vehicle
+    ) -> None:
         """
         Refresh the vehicle data provided in get_vehicles.
         Required for Kia USA as key is session specific
@@ -526,7 +528,7 @@ class KiaUvoApiUSA(ApiImpl):
                     vehicles[vid] = vehicle
         else:
             # For readability work with vehicle without s
-            single = cast(Vehicle, vehicles)
+            single = vehicles
             for entry in summary:
                 if single.id == entry["vehicleIdentifier"]:
                     single.name = entry["nickName"]
