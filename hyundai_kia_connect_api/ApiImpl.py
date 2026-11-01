@@ -858,6 +858,11 @@ class ApiImpl:
             "set_vehicle_to_load_discharge_limit is not implemented for this region"
         )
 
+    def start_ota_update(
+        self, token: Token, vehicle: Vehicle, start: bool
+    ) -> dict[str, Any]:
+        raise NotImplementedError("start_ota_update is not implemented for this region")
+
     def set_navigation(
         self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
     ) -> str:

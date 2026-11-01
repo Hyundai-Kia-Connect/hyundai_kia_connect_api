@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from hyundai_kia_connect_api.exceptions import APIError
+from hyundai_kia_connect_api.GspaApiEU import _parse_gspa_svm_timestamp
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
@@ -30,6 +31,20 @@ def _make_base_vehicle() -> Vehicle:
     vehicle = Vehicle()
     vehicle.id = "test123"
     return vehicle
+
+
+def test_parse_gspa_svm_timestamp_millis_variant():
+    """Location stored-status appends .mmm milliseconds (live PV5,
+    2026-10-27); the 14-digit and unparsable shapes behave as before."""
+    assert _parse_gspa_svm_timestamp("20261027220812.291") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, 291000, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("20261027220812") == dt.datetime(
+        2026, 10, 27, 22, 8, 12, tzinfo=dt.UTC
+    )
+    assert _parse_gspa_svm_timestamp("2026102722.291") is None
+    # right shape, invalid date — the strptime error arm stays covered
+    assert _parse_gspa_svm_timestamp("20261999009999.291") is None
 
 
 def test_hyundai_device_id_header():
