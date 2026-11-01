@@ -137,6 +137,10 @@ class CHARGE_PORT_ACTION(Enum):
     OPEN = "open"
 
 
+class LAMP_MODE(Enum):
+    ALL_OFF = "all-off"
+
+
 class ORDER_STATUS(Enum):
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"

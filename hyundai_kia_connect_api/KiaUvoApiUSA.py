@@ -477,6 +477,9 @@ class KiaUvoApiUSA(ApiImpl):
                 engine_type=self._engine_type_from_fuel_type(entry.get("fuelType")),
                 timezone=self.data_timezone,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            vehicle.supports.svm = False
             result.append(vehicle)
         return result
 
@@ -517,6 +520,9 @@ class KiaUvoApiUSA(ApiImpl):
                         key=entry.get("vehicleKey"),
                         timezone=self.data_timezone,
                     )
+                    vehicle.supports.window_control = False
+                    vehicle.supports.valet_mode = False
+                    vehicle.supports.svm = False
                     vehicles[vid] = vehicle
         else:
             # For readability work with vehicle without s

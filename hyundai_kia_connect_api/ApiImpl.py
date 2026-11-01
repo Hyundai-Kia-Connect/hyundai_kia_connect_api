@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     GEO_LOCATION_PROVIDERS,
     GOOGLE,
+    LAMP_MODE,
     OPENSTREETMAP,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
@@ -468,9 +469,6 @@ class ApiImpl:
     temperature_range: Sequence[float] | None = None
     previous_latitude: float | None = None
     previous_longitude: float | None = None
-    supports_window_control: bool = False
-    supports_valet_mode: bool = False
-    supports_svm: bool = False
 
     def __init__(self) -> None:
         """Initialize."""
@@ -620,6 +618,27 @@ class ApiImpl:
         """Stops climate or remote start.  Returns the tracking ID"""
         raise NotImplementedError("stop_climate is not implemented for this region")
 
+    def start_pet_care(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ClimateRequestOptions | None = None,
+    ) -> str:
+        raise NotImplementedError("start_pet_care is not implemented for this region")
+
+    def stop_pet_care(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("stop_pet_care is not implemented for this region")
+
+    def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "start_battery_conditioning is not implemented for this region"
+        )
+
+    def stop_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "stop_battery_conditioning is not implemented for this region"
+        )
+
     def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         """Starts charge. Returns the tracking ID"""
         raise NotImplementedError("start_charge is not implemented for this region")
@@ -767,6 +786,25 @@ class ApiImpl:
             "start_hazard_lights_and_horn is not implemented for this region"
         )
 
+    def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("door_power_off is not implemented for this region")
+
+    def open_frunk(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("open_frunk is not implemented for this region")
+
+    def turn_off_lamp(
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
+    ) -> str:
+        raise NotImplementedError("turn_off_lamp is not implemented for this region")
+
+    def stop_rear_seat_alarm(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "stop_rear_seat_alarm is not implemented for this region"
+        )
+
+    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+        raise NotImplementedError("set_charge_alarm is not implemented for this region")
+
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:
@@ -788,6 +826,11 @@ class ApiImpl:
         raise NotImplementedError(
             "set_vehicle_to_load_discharge_limit is not implemented for this region"
         )
+
+    def start_ota_update(
+        self, token: Token, vehicle: Vehicle, start: bool
+    ) -> dict[str, Any]:
+        raise NotImplementedError("start_ota_update is not implemented for this region")
 
     def set_navigation(
         self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]

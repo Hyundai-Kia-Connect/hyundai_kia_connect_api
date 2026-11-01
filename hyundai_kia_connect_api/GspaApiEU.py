@@ -17,6 +17,7 @@ import json
 import logging
 import re
 import uuid
+from time import sleep, time
 from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
@@ -46,6 +47,7 @@ from .const import (
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LAMP_MODE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -126,8 +128,9 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     """Parse a GSPA SVM timestamp (media-set ``date`` or ``gpsDetail.time``).
 
     Shapes seen in the EU response: 14-digit ``yyyyMMddHHmmss`` strings
-    (assumed UTC) and epoch-millisecond numbers. ISO 8601 strings are
-    accepted as a fallback. Returns None for anything unparsable.
+    (assumed UTC) and epoch-millisecond numbers. The location endpoints
+    append ``.mmm`` milliseconds — ``yyyyMMddHHmmss.mmm``. ISO 8601 strings
+    are accepted as a fallback. Returns None for anything unparsable.
     """
     if value is None:
         return None
@@ -146,6 +149,18 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
         if len(value) == 14 and value.isdigit():
             try:
                 return dt.datetime.strptime(value, "%Y%m%d%H%M%S").replace(
+                    tzinfo=dt.UTC
+                )
+            except ValueError:
+                return None
+        if (
+            len(value) == 18
+            and value[:14].isdigit()
+            and value[14] == "."
+            and value[15:].isdigit()
+        ):
+            try:
+                return dt.datetime.strptime(value, "%Y%m%d%H%M%S.%f").replace(
                     tzinfo=dt.UTC
                 )
             except ValueError:
@@ -209,7 +224,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     and the GSPA secure-request layer."""
 
     data_timezone = dt.UTC
-    supports_valet_mode = True
 
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
@@ -568,20 +582,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             else:
                 entry_engine_type = ENGINE_TYPES.ICE
 
-            vehicles.append(
-                Vehicle(
-                    id=vehicle_id,
-                    name=entry.get(
-                        "vehicleNameView",
-                        entry.get("nickname", entry.get("vehicleName", "")),
-                    ),
-                    model=entry.get("vehicleModelName", entry.get("modelName", "")),
-                    VIN=entry.get("vin", ""),
-                    timezone=self.data_timezone,
-                    engine_type=entry_engine_type,
-                    ccu_ccs2_protocol_support=ccs2_support,
-                )
+            vehicle = Vehicle(
+                id=vehicle_id,
+                name=entry.get(
+                    "vehicleNameView",
+                    entry.get("nickname", entry.get("vehicleName", "")),
+                ),
+                model=entry.get("vehicleModelName", entry.get("modelName", "")),
+                VIN=entry.get("vin", ""),
+                timezone=self.data_timezone,
+                engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=ccs2_support,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = True
+            vehicle.supports.svm = False
+            vehicles.append(vehicle)
 
         return vehicles
 
@@ -1060,10 +1076,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             response = requests.post(
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
             )
+        if response.status_code == 401:
+            raise AuthenticationTokenExpiredError(
+                "CCI PIN endpoint rejected the access token "
+                f"(HTTP 401: {response.text[:200]}) - token refresh required"
+            )
         try:
             resp: dict[str, Any] = response.json()
         except ValueError as e:
             raise APIError("CCI PIN endpoint returned a non-JSON body") from e
+        if "isMatched" not in resp:
+            # No PIN result in the body: the request failed before the PIN
+            # was checked.
+            raise APIError(
+                f"CCI PIN endpoint error: HTTP {response.status_code} - "
+                f"{response.text[:200]}"
+            )
         if resp.get("isMatched") is not True:
             # 2xx business error (live-probed 2026-09-04: HTTP 200 with
             # isMatched false and controlTokenInfo null). After 5 failed
@@ -1167,7 +1195,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         data = self._gspa_post_for_data(
             token, vehicle, endpoint, body, path_prefix=path_prefix
         )
-        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        raw_data = data.get("data")
+        data_payload = raw_data if isinstance(raw_data, dict) else {}
         rs = data.get("rs")
         rs_payload = rs if isinstance(rs, dict) else {}
         # SID is the primary polling handle; svcSID the alternate (some
@@ -1447,6 +1476,64 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
+    def _apply_stored_status(self, vehicle: Vehicle, data: dict[str, Any]) -> None:
+        state = data.get("state", {})
+        if isinstance(state, dict) and "Vehicle" in state:
+            state = state["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
+
+    # ------------------------------------------------------------------
+    # Force refresh
+    # ------------------------------------------------------------------
+
+    # 140 s matches the app's read timeout for a wake (#1184).
+    FORCE_REFRESH_TIMEOUT = 140
+    FORCE_REFRESH_INITIAL_DELAY = 5
+    FORCE_REFRESH_POLL_INTERVAL = 5
+    # lastUpdateTime is server time; tolerate a local clock running ahead.
+    FORCE_REFRESH_CLOCK_TOLERANCE_MS = 5000
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wake the vehicle and apply the first stored-status reported after it.
+
+        Raises APIError if the wake fails or no newer status arrives within
+        FORCE_REFRESH_TIMEOUT; the vehicle is left untouched in that case,
+        since its state is unknown.
+        """
+        requested_at = int(time() * 1000)
+        if self.prewakeup(token, vehicle) is None:
+            raise APIError("GSPA prewakeup failed")
+        attempts = 1 + int(
+            (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
+            // self.FORCE_REFRESH_POLL_INTERVAL
+        )
+        oldest = requested_at - self.FORCE_REFRESH_CLOCK_TOLERANCE_MS
+        sleep(self.FORCE_REFRESH_INITIAL_DELAY)
+        for attempt in range(attempts):
+            if attempt:
+                sleep(self.FORCE_REFRESH_POLL_INTERVAL)
+            data = self.get_stored_status(token, vehicle) or {}
+            # The wire sends epoch ms as a string ("1789000000000").
+            updated = int_or_none(data.get("lastUpdateTime"))
+            if updated is not None and updated >= oldest:
+                break
+        else:
+            last = (
+                dt.datetime.fromtimestamp(updated / 1000, dt.UTC).isoformat()
+                if updated is not None
+                else "unknown"
+            )
+            raise APIError(
+                f"Vehicle did not report a new status within "
+                f"{self.FORCE_REFRESH_TIMEOUT} s after prewakeup; "
+                f"last status from {last}"
+            )
+        _LOGGER.debug(
+            f"{DOMAIN} - new stored-status "
+            f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
+        )
+        self._apply_stored_status(vehicle, data)
+
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)
     # ------------------------------------------------------------------
@@ -1484,10 +1571,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 air_temp,
                 TEMPERATURE_UNITS.get(air_temp_unit, TEMPERATURE_UNITS[0]),
             )
-        elif TEMPERATURE_UNITS.get(air_temp_unit):
+        elif off_unit := TEMPERATURE_UNITS.get(air_temp_unit):
             # With climate off the setpoint is "OFF" but the unit is still
             # reported; keep it so consumers know the car's unit.
-            vehicle._air_temperature_unit = TEMPERATURE_UNITS[air_temp_unit]
+            vehicle._air_temperature_unit = off_unit
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
@@ -2316,9 +2403,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         )
 
     def turn_off_lamp(
-        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
-        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+        return self._gspa_control_command(
+            token, vehicle, "lamp", {"command": mode.value}
+        )
 
     def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -2501,7 +2590,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         GSPA supports scope commands only (all windows or front windows);
         a mixed per-window request raises UnsupportedControlError.
         """
-        if not self.supports_window_control:
+        if not vehicle.supports.window_control:
             raise APIError("Window control not supported")
         drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
         front = (options.front_left, options.front_right)
@@ -2983,7 +3072,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             path_prefix="mru/vehicles",
         )
 
-    def set_ota_update(
+    def start_ota_update(
         self, token: Token, vehicle: Vehicle, start: bool
     ) -> dict[str, Any]:
         """Start or cancel a CCU OTA update via GSPA.

@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 import re
 from datetime import timedelta
+from typing import Any
 
 from .ApiImpl import (
     ApiImpl,
@@ -20,6 +21,7 @@ from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
+    LAMP_MODE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -124,9 +126,6 @@ class VehicleManager:
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            vehicle.supports_window_control = self.api.supports_window_control
-            vehicle.supports_valet_mode = self.api.supports_valet_mode
-            vehicle.supports_svm = self.api.supports_svm
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -276,6 +275,26 @@ class VehicleManager:
     def stop_climate(self, vehicle_id: str) -> str:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
+    def start_pet_care(
+        self, vehicle_id: str, options: ClimateRequestOptions | None = None
+    ) -> str:
+        return self.api.start_pet_care(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def stop_pet_care(self, vehicle_id: str) -> str:
+        return self.api.stop_pet_care(self.token, self.get_vehicle(vehicle_id))
+
+    def start_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.start_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def stop_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.stop_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
     def lock(self, vehicle_id: str) -> str:
         return self.api.lock_action(
             self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
@@ -300,6 +319,25 @@ class VehicleManager:
     def start_hazard_lights_and_horn(self, vehicle_id: str) -> str:
         return self.api.start_hazard_lights_and_horn(
             self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def door_power_off(self, vehicle_id: str) -> str:
+        return self.api.door_power_off(self.token, self.get_vehicle(vehicle_id))
+
+    def open_frunk(self, vehicle_id: str) -> str:
+        return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
+
+    def turn_off_lamp(
+        self, vehicle_id: str, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
+    ) -> str:
+        return self.api.turn_off_lamp(self.token, self.get_vehicle(vehicle_id), mode)
+
+    def stop_rear_seat_alarm(self, vehicle_id: str) -> str:
+        return self.api.stop_rear_seat_alarm(self.token, self.get_vehicle(vehicle_id))
+
+    def set_charge_alarm(self, vehicle_id: str, enabled: bool) -> str:
+        return self.api.set_charge_alarm(
+            self.token, self.get_vehicle(vehicle_id), enabled
         )
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
@@ -437,6 +475,11 @@ class VehicleManager:
     def set_vehicle_to_load_discharge_limit(self, vehicle_id: str, limit: int) -> str:
         return self.api.set_vehicle_to_load_discharge_limit(
             self.token, self.get_vehicle(vehicle_id), limit
+        )
+
+    def start_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
+        return self.api.start_ota_update(
+            self.token, self.get_vehicle(vehicle_id), start
         )
 
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:

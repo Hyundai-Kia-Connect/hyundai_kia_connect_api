@@ -53,6 +53,7 @@ def _make_vehicle(ccs2: int = 1) -> Vehicle:
     vehicle = Vehicle()
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
+    vehicle.supports.window_control = True
     return vehicle
 
 
@@ -476,6 +477,14 @@ def test_windows_front_open_scope():
     assert body["rrSeatWindow"] is None
 
 
+def test_windows_raise_when_vehicle_lacks_window_control():
+    options = WindowRequestOptions(front_left=WINDOW_STATE.OPEN)
+    vehicle = _make_vehicle()
+    vehicle.supports.window_control = False
+    with pytest.raises(APIError, match="Window control not supported"):
+        _make_api().set_windows_state(_make_token(), vehicle, options)
+
+
 def test_windows_mixed_state_raises():
     options = WindowRequestOptions(
         front_left=WINDOW_STATE.OPEN,
@@ -864,19 +873,19 @@ def test_schedule_reservation_charge_na_utc_day_shift():
     assert body["reservInfo"] == {"day": [6], "time": "22:30:00Z"}
 
 
-def test_set_ota_update_start():
-    """set_ota_update(start=True) POSTs {updateStart: 1} to the mru
+def test_start_ota_update_start():
+    """start_ota_update(start=True) POSTs {updateStart: 1} to the mru
     ota-updates path (1 = start). The response has no polling SID, so
     the parsed body is returned."""
-    result, call = _run_command(HyundaiCciApiEU.set_ota_update, True)
+    result, call = _run_command(HyundaiCciApiEU.start_ota_update, True)
     assert isinstance(result, dict)
     assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
     assert call.kwargs["json"] == {"updateStart": 1}
 
 
-def test_set_ota_update_cancel():
-    """set_ota_update(start=False) POSTs {updateStart: 2} (cancel)."""
-    result, call = _run_command(HyundaiCciApiEU.set_ota_update, False)
+def test_start_ota_update_cancel():
+    """start_ota_update(start=False) POSTs {updateStart: 2} (cancel)."""
+    result, call = _run_command(HyundaiCciApiEU.start_ota_update, False)
     assert isinstance(result, dict)
     assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
     assert call.kwargs["json"] == {"updateStart": 2}
@@ -898,7 +907,7 @@ def test_set_ota_reservation_passthrough():
     assert call.kwargs["json"] == settings
 
 
-def test_set_ota_update_uses_bearer_headers():
+def test_start_ota_update_uses_bearer_headers():
     """OTA commands authenticate with the standard GSPA headers — the
     PIN-derived control token path is not used."""
     api = _make_api()
@@ -909,7 +918,7 @@ def test_set_ota_update_uses_bearer_headers():
         patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
     ):
         post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
-        HyundaiCciApiEU.set_ota_update(api, token, vehicle, True)
+        HyundaiCciApiEU.start_ota_update(api, token, vehicle, True)
     get_ct.assert_not_called()
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 

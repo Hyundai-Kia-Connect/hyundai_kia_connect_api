@@ -177,8 +177,6 @@ def _filled[T](value: T | None) -> T:
 class ApiImplType1(ApiImpl):
     """ApiImplType1"""
 
-    supports_window_control: bool = True
-    supports_valet_mode: bool = True
     # resMsg key holding the all-time entry of the drvhistory response.
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfo"
     # Set by each region's __init__.
@@ -213,7 +211,7 @@ class ApiImplType1(ApiImpl):
         ]
 
     def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
-        return Vehicle(
+        vehicle = Vehicle(
             id=entry["vehicleId"],
             name=entry["nickname"],
             model=entry["vehicleName"],
@@ -225,6 +223,10 @@ class ApiImplType1(ApiImpl):
             # those vehicles on the legacy status path.
             ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
         )
+        vehicle.supports.window_control = True
+        vehicle.supports.valet_mode = True
+        vehicle.supports.svm = False
+        return vehicle
 
     def _get_time_from_string(self, value: Any, timesection: Any) -> dt.time | None:
         if value is None:
