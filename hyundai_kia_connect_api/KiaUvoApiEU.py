@@ -329,10 +329,17 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     "once to accept the terms, then retry."
                 )
             if "authorize" in location:
-                raise AuthenticationRedirectError(
-                    "Authentication failed — returned to login page. "
-                    "Check username and password."
-                )
+                message = "Authentication failed — returned to login page. "
+                if len(password) > 20:
+                    # Some EU accounts hold only the first 20 characters:
+                    # the app truncates longer passwords when saving (#1979).
+                    message += (
+                        "If your password is longer than 20 characters, the "
+                        "account may only accept the first 20 of them. Try "
+                        "the first 20 characters. "
+                    )
+                message += "Check username and password."
+                raise AuthenticationRedirectError(message)
             raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
