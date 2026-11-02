@@ -176,6 +176,53 @@ def test_login_with_password_signin_redirect_to_login_page():
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
+def test_login_with_password_redirect_hint_on_21char_password():
+    """A >20-char password on the login-page redirect gets the #1979 hint."""
+    api = _make_eu_api(brand=1)
+    password = "x" * 24
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+                    ),
+                ),
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        with pytest.raises(
+            AuthenticationRedirectError,
+            match="the account may only accept the first 20 of them",
+        ):
+            api._login_with_password_cci("user@test.com", password, "device-1")
+
+
+def test_login_with_password_redirect_no_hint_on_short_password():
+    """The #1979 hint must not run below the 20-char boundary."""
+    api = _make_eu_api(brand=1)
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+                    ),
+                ),
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        with pytest.raises(AuthenticationRedirectError) as exc_info:
+            api._login_with_password_cci("user@test.com", "password", "device-1")
+    assert "the account may only accept" not in str(exc_info.value)
+
+
 def test_login_with_password_signin_consent_spa_redirect():
     """Signin redirects to /web/v1/user/authorization SPA (consent page)."""
     api = _make_eu_api(brand=1)
