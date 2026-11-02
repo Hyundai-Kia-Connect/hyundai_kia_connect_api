@@ -72,6 +72,7 @@ IMPLEMENTATIONS = {
     "usa_hyundai": (REGION_USA, BRAND_HYUNDAI, 0),
     "cn_kia": (REGION_CHINA, BRAND_KIA, 0),
     "au_hyundai": (REGION_AUSTRALIA, BRAND_HYUNDAI, 0),
+    "au_kia_ice_ccs2": (REGION_AUSTRALIA, BRAND_KIA, 1, ENGINE_TYPES.ICE),
     "in_hyundai": (REGION_INDIA, BRAND_HYUNDAI, 0),
     "br_hyundai": (REGION_BRAZIL, BRAND_HYUNDAI, 0),
 }
@@ -138,7 +139,8 @@ def test_vehicle_command(
     sent_requests: list[dict[str, Any]],
     snapshot: SnapshotAssertion,
 ) -> None:
-    region, brand, ccs2 = IMPLEMENTATIONS[impl]
+    region, brand, ccs2, *rest = IMPLEMENTATIONS[impl]
+    engine_type = rest[0] if rest else ENGINE_TYPES.EV
     api = VehicleManager.get_implementation_by_region_brand(
         _key(REGIONS, region), _key(BRANDS, brand), "en"
     )
@@ -155,7 +157,7 @@ def test_vehicle_command(
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
         year=2024,
-        engine_type=ENGINE_TYPES.EV,
+        engine_type=engine_type,
         ccu_ccs2_protocol_support=ccs2,
     )
 
