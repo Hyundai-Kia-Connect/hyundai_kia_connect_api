@@ -234,6 +234,7 @@ def test_kia_remote_control_gated_not_implemented():
             "discharge-limit",
             "charge-alarm",
             "reservation-charge",
+            "reservation-hvac",
         }
     )
 
@@ -294,6 +295,60 @@ def test_kia_reservation_charge_uses_the_flat_offpeak_body():
         "offpeakPowerFlag": 1,
         "reservStartTime": {"time": "1200", "timeSection": 1},
         "reservEndTime": {"time": "0100", "timeSection": 1},
+        "command": "set",
+    }
+
+
+def test_kia_reservation_hvac_uses_the_library_body():
+    """Kia GSPA reservation-hvac: reservHVACInfo1/2 with the app-form
+    reservInfo (day list + time object), climate in reservHVACSet —
+    live-proven on a PV5 (2026-10-31, library 4.44.0 body): 202-000 and
+    all 22 checked Reservation.Departure fields following (Schedule1
+    7:40 Mon/Wed/Fri, Schedule2 17:30 Sat, temperatures 22.5)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.temperature = 22.5
+    options.temperature_unit = 0
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.first_departure.days = [1, 3, 5]
+    options.first_departure.time = dt.time(7, 40)
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.second_departure.enabled = True
+    options.second_departure.days = [6]
+    options.second_departure.time = dt.time(17, 30)
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.schedule_reservation_hvac, options)
+    assert call.args[0].endswith("/reservation-hvac")
+    body = call.kwargs["json"]
+    assert body == {
+        "reservedHVACInfo1": {
+            "reservHVACflag": 1,
+            "reservInfo": {
+                "day": [1, 3, 5],
+                "time": {"time": "0740", "timeSection": 0},
+            },
+            "reservHVACSet": {
+                "airCtrl": 0,
+                "defrost": False,
+                "airTemp": {"value": "22.5", "hvacTempType": 1, "unit": 0},
+                "heating1": 0,
+                "airPurifierControl": 0,
+            },
+        },
+        "reservedHVACInfo2": {
+            "reservHVACflag": 1,
+            "reservInfo": {
+                "day": [6],
+                "time": {"time": "0530", "timeSection": 1},
+            },
+            "reservHVACSet": {
+                "airCtrl": 0,
+                "defrost": False,
+                "airTemp": {"value": "22.5", "hvacTempType": 1, "unit": 0},
+                "heating1": 0,
+                "airPurifierControl": 0,
+            },
+        },
         "command": "set",
     }
 

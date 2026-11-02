@@ -73,6 +73,10 @@ class KiaCciApiEU(GspaApiEU):
     # fields following (VehicleToLoad.DischargeLimitation.SoC 20 -> 30,
     # Setting.CompleteAlarm flags, Reservation.OffPeakTime 12:00-12:30 ->
     # 12:00-13:00). Bearer-only as well.
+    # Scheduled HVAC reservation live-proven on the same PV5 with the
+    # library body (2026-10-31): 202-000 and all 22 checked
+    # Reservation.Departure fields following (Schedule1/2 Hour/Min, day
+    # flags, Climate.Temperature).
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -89,6 +93,7 @@ class KiaCciApiEU(GspaApiEU):
             "discharge-limit",
             "charge-alarm",
             "reservation-charge",
+            "reservation-hvac",
         }
     )
 
