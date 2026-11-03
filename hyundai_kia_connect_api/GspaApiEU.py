@@ -241,8 +241,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
-    # Push (Service Hub) REST base — subclasses that declare
-    # supports_mqtt_push MUST override it.
+    # Push (Service Hub) REST base — required on push-capable brand classes.
     SERVICE_HUB_BASE: str = ""
 
     LOGIN_FORM_HOST: str = ""

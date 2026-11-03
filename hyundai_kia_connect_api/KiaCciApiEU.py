@@ -97,7 +97,6 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
         vehicles = super()._parse_vehicles_from_cci(data)
         for vehicle in vehicles:
             vehicle.supports.window_control = True
-            vehicle.supports.mqtt_push = True
         return vehicles
 
     # Action-status polling on the EU CCI backend returned PENDING for

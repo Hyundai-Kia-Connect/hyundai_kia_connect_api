@@ -68,7 +68,6 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
             vehicle.supports.window_control = True
             vehicle.supports.svm = True
             # MQTT push registered per broker on the Service Hub.
-            vehicle.supports.mqtt_push = True
         return vehicles
 
     # ------------------------------------------------------------------
