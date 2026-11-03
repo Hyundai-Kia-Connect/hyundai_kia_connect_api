@@ -198,6 +198,13 @@ class RetrySession(ApiImplSession):
         raise last_exception
 
 
+def _offset_from_tz(now: dt.datetime | None = None) -> str:
+    """Whole-hour UTC offset, matching the CA app's offset/3600000 integer division."""
+    moment = now or dt.datetime.now().astimezone()
+    off = moment.utcoffset()
+    return str(int(off.total_seconds() / 3600)) if off else "0"
+
+
 class KiaUvoApiCA(ApiImpl):
     """KiaUvoApiCA"""
 
