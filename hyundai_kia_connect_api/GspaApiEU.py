@@ -2810,7 +2810,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
 
         reservInfo carries the app DTO: day list + time object only;
         the schedule on/off is reservHVACflag and climate options live
-        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22)."""
+        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22; library
+        body end-to-end 2026-10-31)."""
         if options.first_departure is None:
             options.first_departure = (
                 ScheduleChargingClimateRequestOptions.DepartureOptions()
