@@ -299,13 +299,6 @@ class KiaUvoApiAU(ApiImplType1):
         _check_response_for_errors(response)
         return cast(str, response["msgId"])
 
-    def _uses_engine_endpoint(self, vehicle: Vehicle) -> bool:
-        # The AU app starts CCS2 ICE vehicles via /ccs2/control/engine; the
-        # temperature endpoint rejects them with resCode 4005.
-        return vehicle.engine_type == ENGINE_TYPES.ICE and bool(
-            vehicle.ccu_ccs2_protocol_support
-        )
-
     @_retry_on_device_id_error
     def _post_engine_command(
         self, token: Token, vehicle: Vehicle, payload: dict[str, Any]
@@ -322,7 +315,12 @@ class KiaUvoApiAU(ApiImplType1):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
-        if not self._uses_engine_endpoint(vehicle):
+        # CCS2 ICE vehicles use /ccs2/control/engine; the temperature endpoint
+        # rejects them with resCode 4005.
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
             return super().start_climate(token, vehicle, options)
         return self._post_engine_command(
             token,
@@ -337,7 +335,10 @@ class KiaUvoApiAU(ApiImplType1):
         )
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        if not self._uses_engine_endpoint(vehicle):
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
             return super().stop_climate(token, vehicle)
         return self._post_engine_command(token, vehicle, {"command": "stop"})
 
