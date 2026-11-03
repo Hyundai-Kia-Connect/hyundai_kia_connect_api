@@ -20,13 +20,15 @@ def test_capabilities_live_on_vehicle_supports():
         lambda impl: impl.get_push_broker_info(Token(username="u", password="p")),
         lambda impl: impl.register_push_client(Token(username="u", password="p")),
         lambda impl: impl.register_push_vehicle(
-            Token(username="u", password="p"), Vehicle()
+            Token(username="u", password="p"), Vehicle(id="v1")
         ),
         lambda impl: impl.get_push_vehicle_identity(
-            Token(username="u", password="p"), Vehicle()
+            Token(username="u", password="p"), Vehicle(id="v1")
         ),
         lambda impl: impl.get_push_connection_state(Token(username="u", password="p")),
-        lambda impl: impl.get_push_topics(Token(username="u", password="p"), Vehicle()),
+        lambda impl: impl.get_push_topics(
+            Token(username="u", password="p"), Vehicle(id="v1")
+        ),
         lambda impl: impl.parse_push_message("topic", b"payload"),
     ],
 )

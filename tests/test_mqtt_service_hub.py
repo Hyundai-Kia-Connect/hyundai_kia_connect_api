@@ -86,13 +86,13 @@ class TestBuildDeviceRemoteTopics:
 
 class TestBuildOtaTopics:
     def test_unknown_capability_no_topics(self):
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="v1")
         vehicle.mqtt_vehicle_id = "v1"
         vehicle.supports.ota_progress = None  # unknown → not subscribed
         assert build_ota_topics(vehicle) == []
 
     def test_explicit_true_topics(self):
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="v1")
         vehicle.mqtt_vehicle_id = "v1"
         vehicle.supports.ota_progress = True
         vehicle.supports.schedule_update = True
@@ -157,7 +157,7 @@ def _kia_api() -> KiaCciApiEU:
 
 
 def _vehicle() -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="v1")
     v.id = "careu1"
     return v
 
@@ -423,7 +423,7 @@ def test_cci_classes_implement_contract():
 
 
 def test_vehicle_push_identity_fields():
-    v = Vehicle()
+    v = Vehicle(id="v1")
     assert v.mqtt_vehicle_id is None
     assert v.hu_client_id is None
     assert not hasattr(v, "mqtt_client_id")  # renamed → mqtt_vehicle_id
@@ -768,7 +768,7 @@ def test_capabilities_fallback_skips_non_dict_entries():
 
 
 def test_build_ota_topics_without_vehicle_id():
-    assert build_ota_topics(Vehicle()) == []
+    assert build_ota_topics(Vehicle(id="v1")) == []
 
 
 def test_classify_device_topic_suffix_variants():

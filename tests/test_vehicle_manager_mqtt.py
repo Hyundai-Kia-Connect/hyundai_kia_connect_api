@@ -83,7 +83,7 @@ def _make_vm() -> VehicleManager:
     )
     vm.api = FakePushApi()  # type: ignore[assignment]
     vm.token = Token(username="u", password="p")
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="v1")
     vehicle.id = "careu1"
     vehicle.supports.mqtt_push = True
     vm.vehicles = {"careu1": vehicle}
@@ -200,7 +200,7 @@ def test_start_push_false_when_broker_info_missing():
 def test_start_push_second_vehicle_reuses_client(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-    vm.vehicles["careu2"] = Vehicle()
+    vm.vehicles["careu2"] = Vehicle(id="v1")
     vm.vehicles["careu2"].id = "careu2"
     vm.vehicles["careu2"].supports.mqtt_push = True
     assert vm.start_push("careu1") is True
@@ -389,7 +389,7 @@ def test_start_push_false_when_client_registration_rejected():
 def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-    vm.vehicles["careu2"] = Vehicle()
+    vm.vehicles["careu2"] = Vehicle(id="v1")
     vm.vehicles["careu2"].id = "careu2"
     assert vm.start_push("careu1") is True
     vm.api.register_result = None  # type: ignore[attr-defined]
