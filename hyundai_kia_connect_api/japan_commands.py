@@ -1,4 +1,4 @@
-"""Japan command contracts observed in Bluelink Android 1.0.17.
+"""Japan command contracts observed in Bluelink Android 1.0.17/1.0.18.
 
 Commands require an explicit PIN and an acknowledged MQTT subscription. HTTP
 acceptance alone never establishes that a vehicle command completed.
@@ -21,6 +21,7 @@ from .const import (
 from .exceptions import (
     AuthenticationError,
     InvalidAPIResponseError,
+    RequestTimeoutError,
     UnsupportedControlError,
 )
 
@@ -102,33 +103,36 @@ class JapanCommandsMixin:
         headers["Authorization"] = token.control_token
         return headers
 
-    def _remember_japan_action(self, action_id, vehicle_id, helper=None):
+    def _remember_japan_action(
+        self, action_id, vehicle_id, children=None, *, status=None
+    ):
+        """Keep bounded local receipts; the adapter owns telemetry sessions."""
         if not hasattr(self, "_japan_actions"):
             self._japan_actions = {}
         if action_id not in self._japan_actions and len(self._japan_actions) >= 128:
-            evicted = self._japan_actions.pop(next(iter(self._japan_actions)))
-            if (
-                evicted[1] is not None
-                and not isinstance(evicted[1], tuple)
-                and not any(
-                    entry[1] is evicted[1] and entry[2] is None
-                    for entry in self._japan_actions.values()
-                )
-            ):
-                evicted[1].close()
-        self._japan_actions[action_id] = (vehicle_id, helper, None)
+            self._japan_actions.pop(next(iter(self._japan_actions)))
+        if status is None and children is None:
+            status = ORDER_STATUS.SUCCESS
+        self._japan_actions[action_id] = (vehicle_id, children, status)
 
     def _record_japan_command_failure(self, error):
         category = "other"
         if isinstance(error, AuthenticationError):
             category = "authentication"
+        elif isinstance(error, RequestTimeoutError):
+            category = "timeout"
         elif isinstance(error, InvalidAPIResponseError):
             category = "invalid_response"
         elif isinstance(error, ValueError):
             category = "invalid_input"
         diagnostic = getattr(self, "_japan_command_diagnostics", {})
         diagnostic["failed_stage"] = diagnostic.get("stage", "unknown")
-        diagnostic["stage"] = "failed"
+        diagnostic["stage"] = (
+            "submission_unknown"
+            if isinstance(error, RequestTimeoutError)
+            and diagnostic["failed_stage"] == "http_submitting"
+            else "failed"
+        )
         diagnostic["failure_category"] = category
         self._japan_command_diagnostics = diagnostic
 
@@ -154,6 +158,7 @@ class JapanCommandsMixin:
         self._japan_command_diagnostics = {
             "endpoint": endpoints.get(endpoint, "other"),
             "stage": "pin_validation",
+            "vehicle_execution_confirmed": False,
         }
         command = payload.get("command") if isinstance(payload, dict) else None
         if isinstance(command, str) and command in {
@@ -189,132 +194,66 @@ class JapanCommandsMixin:
                 + endpoint,
                 headers=headers,
                 json=payload,
+                timeout=(10, 140),
             )
             self._japan_command_diagnostics["stage"] = "http_submitted"
+            if not isinstance(result, dict):
+                raise InvalidAPIResponseError("Japan command response is invalid")
             action_id = result.get("msgId")
             if not isinstance(action_id, str) or not action_id:
-                raise InvalidAPIResponseError(
-                    "Japan command tracking identifier is missing"
-                )
-            helper.track(action_id)
+                action_id = str(uuid.uuid4())
             self._japan_diagnostic_action_id = action_id
-            self._japan_command_diagnostics["stage"] = "waiting"
+            self._japan_command_diagnostics.update(
+                stage="accepted",
+                confirmation_source="http",
+                vehicle_execution_confirmed=False,
+            )
         except Exception as error:
             self._record_japan_command_failure(error)
-            helper.close()
+            # A request timeout does not prove that the car did not execute it.
+            # Keep the adapter-owned telemetry session available; never retry.
             raise
-        self._remember_japan_action(action_id, vehicle_id, helper)
+        self._remember_japan_action(action_id, vehicle_id, status=ORDER_STATUS.ACCEPTED)
         return action_id
 
     def check_action_status(
         self, token, vehicle, action_id, synchronous=False, timeout=0
     ):
-        """Match a tracked HTTP message ID to its MQTT SID completion response."""
+        """Return a local service receipt, never fabricate vehicle execution."""
         vehicle_id = self._command_vehicle_id(vehicle)
         tracked = getattr(self, "_japan_actions", {}).get(action_id)
         if tracked is None or tracked[0] != vehicle_id:
             return ORDER_STATUS.UNKNOWN
-        helper = tracked[1]
-        if tracked[2] is not None:
-            return tracked[2]
-        if helper is None:
-            # Stored charge settings have completed at the authenticated HTTP layer.
-            return ORDER_STATUS.SUCCESS
-        if synchronous and (
-            isinstance(timeout, bool)
-            or not isinstance(timeout, (int, float))
-            or not math.isfinite(timeout)
-            or timeout <= 0
-        ):
-            raise ValueError("Japan synchronous status requires a positive timeout")
-        if isinstance(helper, tuple):
-            deadline = time.monotonic() + min(timeout, 120) if synchronous else None
-            statuses = []
-            for child in helper:
-                remaining = max(0, deadline - time.monotonic()) if synchronous else 0
-                statuses.append(
-                    self.check_action_status(
-                        token, vehicle, child, synchronous and remaining > 0, remaining
-                    )
-                )
-            if ORDER_STATUS.FAILED in statuses:
-                status = ORDER_STATUS.FAILED
-            elif ORDER_STATUS.TIMEOUT in statuses:
-                status = ORDER_STATUS.TIMEOUT
-            elif all(value == ORDER_STATUS.SUCCESS for value in statuses):
-                status = ORDER_STATUS.SUCCESS
-            elif synchronous and time.monotonic() >= deadline:
-                status = ORDER_STATUS.TIMEOUT
-            else:
-                return ORDER_STATUS.PENDING
-            self._japan_actions[action_id] = (vehicle_id, helper, status)
-            if status in (ORDER_STATUS.TIMEOUT, ORDER_STATUS.FAILED):
-                # A terminal aggregate result will not poll its children again.
-                # Retire unresolved children so they cannot retain a shared
-                # broker session forever; unrelated pending actions still own it.
-                unresolved_status = (
-                    ORDER_STATUS.TIMEOUT
-                    if status == ORDER_STATUS.TIMEOUT
-                    else ORDER_STATUS.UNKNOWN
-                )
-                retired_helpers = {}
-                for child, child_status in zip(helper, statuses, strict=True):
-                    if child_status not in (ORDER_STATUS.PENDING, ORDER_STATUS.UNKNOWN):
-                        continue
-                    entry = self._japan_actions.get(child)
-                    if (
-                        entry is None
-                        or entry[0] != vehicle_id
-                        or entry[2] is not None
-                        or entry[1] is None
-                        or isinstance(entry[1], tuple)
-                    ):
-                        continue
-                    self._japan_actions[child] = (
-                        vehicle_id,
-                        entry[1],
-                        unresolved_status,
-                    )
-                    retired_helpers[id(entry[1])] = entry[1]
-                    if child == getattr(self, "_japan_diagnostic_action_id", None):
-                        self._japan_command_diagnostics["stage"] = (
-                            "timeout"
-                            if status == ORDER_STATUS.TIMEOUT
-                            else "unconfirmed"
-                        )
-                for session in retired_helpers.values():
-                    if not any(
-                        entry[1] is session and entry[2] is None
-                        for entry in self._japan_actions.values()
-                    ):
-                        session.close()
+        children, status = tracked[1:]
+        if status is not None:
             return status
-        try:
-            status = helper.status(
-                action_id, timeout=min(timeout, 120) if synchronous else 0
-            )
-        except Exception as error:
-            if action_id == getattr(self, "_japan_diagnostic_action_id", None):
-                self._record_japan_command_failure(error)
-            helper.close()
-            raise
-        stages = {
-            ORDER_STATUS.SUCCESS: "success",
-            ORDER_STATUS.FAILED: "failed",
-            ORDER_STATUS.TIMEOUT: "timeout",
-            ORDER_STATUS.PENDING: "waiting",
-        }
-        if status in stages and action_id == getattr(
-            self, "_japan_diagnostic_action_id", None
+        if children is None:
+            return ORDER_STATUS.SUCCESS
+        if not isinstance(children, tuple) or not children:
+            return ORDER_STATUS.UNKNOWN
+        statuses = [
+            self.check_action_status(token, vehicle, child)
+            if child != action_id
+            else ORDER_STATUS.UNKNOWN
+            for child in children
+        ]
+        if ORDER_STATUS.FAILED in statuses:
+            status = ORDER_STATUS.FAILED
+        elif ORDER_STATUS.TIMEOUT in statuses:
+            status = ORDER_STATUS.TIMEOUT
+        elif all(
+            value in (ORDER_STATUS.SUCCESS, ORDER_STATUS.ACCEPTED) for value in statuses
         ):
-            self._japan_command_diagnostics["stage"] = stages[status]
-        if status in (ORDER_STATUS.SUCCESS, ORDER_STATUS.FAILED, ORDER_STATUS.TIMEOUT):
-            self._japan_actions[action_id] = (vehicle_id, helper, status)
-            if not any(
-                other_id != action_id and entry[1] is helper and entry[2] is None
-                for other_id, entry in self._japan_actions.items()
-            ):
-                helper.close()
+            status = (
+                ORDER_STATUS.ACCEPTED
+                if ORDER_STATUS.ACCEPTED in statuses
+                else ORDER_STATUS.SUCCESS
+            )
+        elif ORDER_STATUS.PENDING in statuses:
+            return ORDER_STATUS.PENDING
+        else:
+            return ORDER_STATUS.UNKNOWN
+        self._japan_actions[action_id] = (vehicle_id, children, status)
         return status
 
     def valet_mode_action(self, token, vehicle, action):
@@ -720,6 +659,7 @@ class JapanCommandsMixin:
             return actions[0]
         action_id = str(uuid.uuid4())
         self._remember_japan_action(action_id, vehicle_id, tuple(actions))
+        self.check_action_status(token, vehicle, action_id)
         return action_id
 
     @staticmethod

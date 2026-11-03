@@ -132,6 +132,8 @@ class CHARGE_PORT_ACTION(Enum):
 
 
 class ORDER_STATUS(Enum):
+    # Service accepted the request; physical vehicle execution is unconfirmed.
+    ACCEPTED = "ACCEPTED"
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"
     # order executed by vehicle and response returned

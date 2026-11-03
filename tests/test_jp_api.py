@@ -46,7 +46,7 @@ def test_factory_and_capabilities():
     api = VehicleManager.get_implementation_by_region_brand(10, 2, "en")
     assert isinstance(api, HyundaiBlueLinkApiJP)
     assert api.supports_force_refresh is True
-    assert api.requires_command_confirmation is True
+    assert api.requires_command_confirmation is False
     assert "schedule_charging_and_climate" in api.supported_commands
     for brand in (1, 3):
         with pytest.raises(APIError):
@@ -701,7 +701,11 @@ def test_force_refresh_requires_correlated_completion_and_newer_state(api, monke
 
 @pytest.mark.parametrize(
     "status,error",
-    [(ORDER_STATUS.UNKNOWN, RequestTimeoutError), (ORDER_STATUS.FAILED, APIError)],
+    [
+        (ORDER_STATUS.UNKNOWN, RequestTimeoutError),
+        (ORDER_STATUS.ACCEPTED, RequestTimeoutError),
+        (ORDER_STATUS.FAILED, APIError),
+    ],
 )
 def test_force_refresh_ack_does_not_mean_success(api, monkeypatch, status, error):
     helper = Mock()
@@ -1154,3 +1158,27 @@ def test_force_refresh_renews_control_grant_after_slow_connection(api, monkeypat
     assert refresh.args == ("GET", "/api/v2/spa/vehicles/synthetic/ccs2/carstatus")
     assert refresh.kwargs["headers"]["Authorization"] == "Bearer synthetic-fresh-grant"
     helper.close.assert_called_once()
+
+
+def test_disconnected_persistent_telemetry_session_is_replaced_before_next_command(
+    api, monkeypatch
+):
+    token = Token(
+        access_token="Bearer synthetic-access",
+        device_id="synthetic-device",
+        mqtt_registration_uuid="synthetic-registration",
+    )
+    vehicle = Vehicle(id="synthetic-car")
+    failed = Mock(closed=False, failed=True)
+    api._mqtt_sessions[vehicle.id] = (
+        (token.access_token, token.device_id, token.mqtt_registration_uuid),
+        failed,
+    )
+    replacement = Mock()
+    factory = Mock(return_value=replacement)
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.HyundaiBlueLinkApiJP.JapanMqttSession", factory
+    )
+    assert api._mqtt_for_vehicle(token, vehicle) is replacement
+    failed.close.assert_called_once()
+    factory.assert_called_once()

@@ -40,7 +40,7 @@ class Adapter(JapanCommandsMixin):
         self._request = Mock(
             side_effect=[
                 {"controlToken": "synthetic-control", "expiresTime": 60},
-                {"msgId": "synthetic-action"},
+                {"retCode": "S", "resCode": "0000", "msgId": "synthetic-action"},
             ]
         )
         self.helper = Mock()
@@ -104,10 +104,13 @@ def test_exact_command_payload_and_pin_headers(method, args, endpoint, command):
     assert request.kwargs["json"] == {"command": command}
     assert request.kwargs["headers"]["Authorization"] == "Bearer synthetic-control"
     api.helper.prepare.assert_called_once()
-    api.helper.track.assert_called_once_with("synthetic-action")
+    api.helper.track.assert_not_called()
+    api.helper.status.assert_not_called()
+    api.helper.close.assert_not_called()
+    assert request.kwargs["timeout"] == (10, 140)
     assert (
         api.check_action_status(token, vehicle, "synthetic-action")
-        == ORDER_STATUS.PENDING
+        == ORDER_STATUS.ACCEPTED
     )
 
 
@@ -171,9 +174,9 @@ def test_unknown_or_other_vehicle_request_never_reports_success():
     )
     assert (
         api.check_action_status(token, vehicle, "synthetic-action", True, 500)
-        == ORDER_STATUS.PENDING
+        == ORDER_STATUS.ACCEPTED
     )
-    api.helper.status.assert_called_with("synthetic-action", timeout=120)
+    api.helper.status.assert_not_called()
 
 
 def test_cloud_charge_target_success_does_not_require_control_pin_or_mqtt():
@@ -218,30 +221,34 @@ def test_climate_numeric_celsius_envelope_and_unsupported_options():
     api._request.assert_not_called()
 
 
-def test_incomplete_command_ack_never_creates_success_tracking():
+def test_optional_command_msg_id_uses_local_acceptance_handle():
     api, token, vehicle = setup()
     api._request.side_effect = [
         {"controlToken": "synthetic-control", "expiresTime": 60},
-        {},
+        {"retCode": "S", "resCode": "0000"},
     ]
-    with pytest.raises(InvalidAPIResponseError):
-        api.start_charge(token, vehicle)
+    action = api.start_charge(token, vehicle)
+    assert isinstance(action, str) and action
+    assert api.check_action_status(token, vehicle, action) == ORDER_STATUS.ACCEPTED
+    assert api.check_action_status(token, vehicle, action) != ORDER_STATUS.SUCCESS
     api.helper.track.assert_not_called()
-    api.helper.close.assert_called_once()
-
-
-@pytest.mark.parametrize(
-    "status", [ORDER_STATUS.SUCCESS, ORDER_STATUS.FAILED, ORDER_STATUS.TIMEOUT]
-)
-def test_terminal_status_survives_helper_cleanup(status):
-    api, token, vehicle = setup()
-    api.start_charge(token, vehicle)
-    api.helper.status.return_value = status
-    assert api.check_action_status(token, vehicle, "synthetic-action") == status
-    api.helper.close.assert_called_once()
-    api.helper.status.reset_mock()
-    assert api.check_action_status(token, vehicle, "synthetic-action") == status
     api.helper.status.assert_not_called()
+    api.helper.close.assert_not_called()
+
+
+@pytest.mark.parametrize("broker_status", list(ORDER_STATUS))
+def test_broker_outcome_never_relabels_an_http_acceptance(broker_status):
+    api, token, vehicle = setup()
+    action = api.start_charge(token, vehicle)
+    api.helper.status.return_value = broker_status
+    assert (
+        api.check_action_status(token, vehicle, action, True, 60)
+        == ORDER_STATUS.ACCEPTED
+    )
+    assert api.check_action_status(token, vehicle, action) != ORDER_STATUS.SUCCESS
+    api.helper.track.assert_not_called()
+    api.helper.status.assert_not_called()
+    api.helper.close.assert_not_called()
 
 
 def test_default_temperature_and_rhd_seat_capability_mapping():
@@ -331,7 +338,7 @@ def test_evidenced_charge_setting_commands(method, args, field, value):
     assert api._request.call_args.kwargs["json"] == {field: value}
     assert (
         api.check_action_status(token, vehicle, "synthetic-action")
-        == ORDER_STATUS.PENDING
+        == ORDER_STATUS.ACCEPTED
     )
 
 
@@ -382,7 +389,7 @@ def test_schedule_cloud_snapshot_preserves_unspecified_fields_and_input():
     api._request.side_effect = [
         {"controlToken": "synthetic-control", "expiresTime": 60},
         {"resMsg": current},
-        {"msgId": "synthetic-action"},
+        {"retCode": "S", "resCode": "0000", "msgId": "synthetic-action"},
     ]
     api.schedule_charging_and_climate(
         token, vehicle, ScheduleChargingClimateRequestOptions(charging_enabled=False)
@@ -475,35 +482,26 @@ def test_nullable_rhd_independent_window_and_vent_fields():
     assert api._request.call_args.args[1].endswith("/control/windowcurtain")
 
 
-def test_aggregate_keeps_shared_real_mqtt_results_until_both_children_complete():
+def test_aggregate_acceptance_keeps_api_owned_telemetry_session_open():
     api, token, vehicle = setup()
     token.access_token = "Bearer synthetic-access"
     helper = JapanMqttSession(token, vehicle.id, "synthetic-uuid", dict)
     helper._ready = True
-    helper._topics = ("synthetic-vss", "synthetic-res", "synthetic-connection")
     helper.prepare = Mock()
     api._mqtt_for_vehicle.return_value = helper
     api._request.side_effect = [
         {"controlToken": "synthetic-control", "expiresTime": 60},
-        {"msgId": "child-one"},
-        {"msgId": "child-two"},
+        {"retCode": "S", "msgId": "child-one"},
+        {"retCode": "S", "msgId": "child-two"},
     ]
     api._japan_command(token, vehicle, "reservation/charge", {})
     api._japan_command(token, vehicle, "reservation/hvac", {})
     api._remember_japan_action("aggregate", vehicle.id, ("child-one", "child-two"))
-    for child in ("child-one", "child-two"):
-        helper._on_message(
-            None,
-            None,
-            SimpleNamespace(
-                retain=False,
-                topic="synthetic-res",
-                payload=json.dumps({"sid": child, "res-msg": "S"}).encode(),
-            ),
-        )
-    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.SUCCESS
-    assert helper.closed
-    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.SUCCESS
+    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.ACCEPTED
+    assert helper.closed is False
+    assert helper._tracked == set()
+    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.ACCEPTED
+    helper.close()
 
 
 def test_ev5_flat_schedule_uses_root_app_mode_and_scope_specific_wire_contracts():
@@ -630,26 +628,17 @@ def test_command_values_match_independent_dex_constructor_facts():
         assert api._request.call_args.kwargs["json"] == {"command": facts[enum_name]}
 
 
-@pytest.mark.parametrize(
-    "status,stage",
-    [
-        (ORDER_STATUS.PENDING, "waiting"),
-        (ORDER_STATUS.SUCCESS, "success"),
-        (ORDER_STATUS.FAILED, "failed"),
-        (ORDER_STATUS.TIMEOUT, "timeout"),
-    ],
-)
-def test_command_diagnostics_track_completion_without_identifiers(status, stage):
+def test_command_diagnostics_describe_acceptance_without_identifiers():
     api, token, vehicle = setup()
     action = api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.UNLOCK)
     assert api._japan_command_diagnostics == {
         "endpoint": "door",
         "command": "open",
-        "stage": "waiting",
+        "stage": "accepted",
+        "confirmation_source": "http",
+        "vehicle_execution_confirmed": False,
     }
-    api.helper.status.return_value = status
-    api.check_action_status(token, vehicle, action)
-    assert api._japan_command_diagnostics["stage"] == stage
+    assert api.check_action_status(token, vehicle, action) == ORDER_STATUS.ACCEPTED
     serialized = json.dumps(api._japan_command_diagnostics)
     for secret in (
         vehicle.id,
@@ -669,7 +658,6 @@ def test_command_diagnostics_track_completion_without_identifiers(status, stage)
         ("pin", "pin_validation"),
         ("mqtt", "mqtt_setup"),
         ("http", "http_submitting"),
-        ("status", "waiting"),
     ],
 )
 def test_command_diagnostics_preserve_sanitized_failure_stage(failure_at, expected):
@@ -701,7 +689,12 @@ def test_command_diagnostics_do_not_copy_unknown_endpoint_or_payload():
     api._japan_command(
         token, vehicle, "private-location-token", {"command": "private-secret"}
     )
-    assert api._japan_command_diagnostics == {"endpoint": "other", "stage": "waiting"}
+    assert api._japan_command_diagnostics == {
+        "endpoint": "other",
+        "stage": "accepted",
+        "confirmation_source": "http",
+        "vehicle_execution_confirmed": False,
+    }
 
 
 def test_expired_control_grant_is_renewed_after_slow_mqtt_setup(monkeypatch):
@@ -731,10 +724,12 @@ def test_malformed_cached_grant_expiry_is_renewed(expiry):
 
 def test_action_eviction_keeps_shared_pending_mqtt_session():
     api, _, vehicle = setup()
-    api._remember_japan_action("oldest", vehicle.id, api.helper)
+    api._remember_japan_action("oldest", vehicle.id, status=ORDER_STATUS.ACCEPTED)
     for index in range(127):
-        api._remember_japan_action(f"pending-{index}", vehicle.id, api.helper)
-    api._remember_japan_action("newest", vehicle.id, api.helper)
+        api._remember_japan_action(
+            f"pending-{index}", vehicle.id, status=ORDER_STATUS.ACCEPTED
+        )
+    api._remember_japan_action("newest", vehicle.id, status=ORDER_STATUS.ACCEPTED)
     api.helper.close.assert_not_called()
     assert len(api._japan_actions) == 128
     assert "oldest" not in api._japan_actions
@@ -743,48 +738,13 @@ def test_action_eviction_keeps_shared_pending_mqtt_session():
 def test_replacing_tracked_action_does_not_evict_unrelated_action():
     api, _, vehicle = setup()
     for index in range(128):
-        api._remember_japan_action(f"action-{index}", vehicle.id, api.helper)
-    api._remember_japan_action("action-127", vehicle.id, api.helper)
+        api._remember_japan_action(
+            f"action-{index}", vehicle.id, status=ORDER_STATUS.ACCEPTED
+        )
+    api._remember_japan_action("action-127", vehicle.id, status=ORDER_STATUS.ACCEPTED)
     assert len(api._japan_actions) == 128
     assert "action-0" in api._japan_actions
     api.helper.close.assert_not_called()
-
-
-def test_composite_completion_shares_one_wait_budget(monkeypatch):
-    api, token, vehicle = setup()
-    clock = [0.0]
-    monkeypatch.setattr(
-        "hyundai_kia_connect_api.japan_commands.time.monotonic", lambda: clock[0]
-    )
-    api._remember_japan_action("first", vehicle.id, api.helper)
-    api._remember_japan_action("second", vehicle.id, api.helper)
-    api._remember_japan_action("aggregate", vehicle.id, ("first", "second"))
-
-    def status(action_id, timeout):
-        if action_id == "first":
-            clock[0] += 40
-            return ORDER_STATUS.SUCCESS
-        assert timeout == 20
-        clock[0] += timeout
-        return ORDER_STATUS.TIMEOUT
-
-    api.helper.status.side_effect = status
-    assert (
-        api.check_action_status(token, vehicle, "aggregate", True, 60)
-        == ORDER_STATUS.TIMEOUT
-    )
-    assert clock[0] == 60
-    api.helper.close.assert_called_once()
-
-
-@pytest.mark.parametrize("timeout", [0, -1, True, None, float("nan")])
-def test_composite_rejects_invalid_wait_before_polling(timeout):
-    api, token, vehicle = setup()
-    api._remember_japan_action("first", vehicle.id, api.helper)
-    api._remember_japan_action("aggregate", vehicle.id, ("first",))
-    with pytest.raises(ValueError, match="positive timeout"):
-        api.check_action_status(token, vehicle, "aggregate", True, timeout)
-    api.helper.status.assert_not_called()
 
 
 @pytest.mark.parametrize("missing", ["defrost", "reservChargeSet"])
@@ -832,66 +792,3 @@ def test_flat_schedule_validates_both_envelopes_before_either_write(missing):
         )
     api._japan_command.assert_not_called()
     assert [call.args[0] for call in api._request.call_args_list] == ["PUT", "GET"]
-
-
-@pytest.mark.parametrize("unrelated_pending", [False, True])
-def test_composite_budget_exhaustion_retires_unpolled_children(
-    monkeypatch, unrelated_pending
-):
-    api, token, vehicle = setup()
-    clock = [0.0]
-    monkeypatch.setattr(
-        "hyundai_kia_connect_api.japan_commands.time.monotonic", lambda: clock[0]
-    )
-    api._remember_japan_action("first", vehicle.id, api.helper)
-    api._remember_japan_action("second", vehicle.id, api.helper)
-    api._remember_japan_action("aggregate", vehicle.id, ("first", "second"))
-    if unrelated_pending:
-        api._remember_japan_action("unrelated", vehicle.id, api.helper)
-
-    def status(action_id, timeout):
-        if action_id == "first":
-            clock[0] += timeout
-            return ORDER_STATUS.TIMEOUT
-        assert action_id == "second"
-        assert timeout == 0
-        return ORDER_STATUS.PENDING
-
-    api.helper.status.side_effect = status
-    assert (
-        api.check_action_status(token, vehicle, "aggregate", True, 60)
-        == ORDER_STATUS.TIMEOUT
-    )
-    assert api._japan_actions["second"][2] == ORDER_STATUS.TIMEOUT
-    assert api.check_action_status(token, vehicle, "second") == ORDER_STATUS.TIMEOUT
-    assert api.helper.status.call_count == 2
-    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.TIMEOUT
-    if unrelated_pending:
-        api.helper.close.assert_not_called()
-        assert api._japan_actions["unrelated"][2] is None
-    else:
-        api.helper.close.assert_called_once()
-
-
-@pytest.mark.parametrize("unrelated_pending", [False, True])
-def test_failed_composite_retires_unconfirmed_children_without_claiming_failure(
-    unrelated_pending,
-):
-    api, token, vehicle = setup()
-    api._remember_japan_action("first", vehicle.id, api.helper)
-    api._remember_japan_action("second", vehicle.id, api.helper)
-    api._remember_japan_action("aggregate", vehicle.id, ("first", "second"))
-    api._japan_diagnostic_action_id = "second"
-    api._japan_command_diagnostics = {"stage": "waiting"}
-    if unrelated_pending:
-        api._remember_japan_action("unrelated", vehicle.id, api.helper)
-    api.helper.status.side_effect = [ORDER_STATUS.FAILED, ORDER_STATUS.PENDING]
-    assert api.check_action_status(token, vehicle, "aggregate") == ORDER_STATUS.FAILED
-    assert api.check_action_status(token, vehicle, "second") == ORDER_STATUS.UNKNOWN
-    assert api._japan_command_diagnostics["stage"] == "unconfirmed"
-    assert api.helper.status.call_count == 2
-    if unrelated_pending:
-        api.helper.close.assert_not_called()
-        assert api._japan_actions["unrelated"][2] is None
-    else:
-        api.helper.close.assert_called_once()

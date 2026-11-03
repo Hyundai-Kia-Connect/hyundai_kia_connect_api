@@ -60,12 +60,18 @@ request contracts are based on the Japan Bluelink Android app 1.0.17 and public
 login page. Supported controls include door locks, charging, model-dependent
 climate/windows/charge-port features, schedules, navigation and manual SVM capture.
 
-Japan commands require the actual account PIN and correlated MQTT completion;
-HTTP acceptance alone does not establish vehicle success. Consumers of the Japan
-adapter must require ORDER_STATUS.SUCCESS when requires_command_confirmation is
-true. The supported_commands set and profile capabilities identify available
-controls. Optional vehicle metadata supplies supported window positions and
-climate temperature bounds. Existing regional adapters are not modified.
+Japan commands require the actual account PIN and a prepared MQTT context.
+Ordinary controls follow the app's validated HTTP service-result contract and
+return ORDER_STATUS.ACCEPTED. This means the service accepted the request; it
+does not independently prove physical execution. Vehicle state is read separately.
+Unknown action handles remain UNKNOWN, and HTTP/vendor failures are not accepted.
+No command is automatically repeated after a request timeout.
+
+Fresh-status requests are different: they still require the matching MQTT result
+and newer telemetry. SVM capture still polls its own correlated image request.
+The supported_commands set and profile capabilities identify available controls.
+Optional vehicle metadata supplies supported window positions and climate bounds.
+Existing regional adapters and their command-result semantics are not modified.
 
 Japan SVM reads return only manually captured images cached in the current
 session; no camera request is made by passive reads. A new capture is needed
@@ -75,8 +81,10 @@ identifiers, account secrets, GPS or image contents.
 
 Authentication, token renewal, cached telemetry and charge-limit settings have
 been observed working on one Japan vehicle. The user also confirmed a physical
-lock action while HA completion was unconfirmed. Other controls and confirmed
-completion remain under validation. A report of unexpected liftgate movement is
+lock action and climate-stop action while HA incorrectly timed out waiting for
+an additional MQTT response. The corrected ordinary-control acceptance path is
+verified offline against the app contracts; other physical controls remain under
+validation. A report of unexpected liftgate movement is
 unresolved; offline contract tests do not establish physical vehicle behavior.
 Vehicle-command testing remains paused pending a controlled test plan.
 

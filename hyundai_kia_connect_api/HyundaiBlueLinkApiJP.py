@@ -1,7 +1,7 @@
 """Hyundai Japan Bluelink adapter.
 
-Contracts are based on the Japan app and its public login page. Vehicle
-Vehicle controls use request-correlated MQTT completion rather than HTTP ACKs.
+Ordinary controls report HTTP service acceptance without claiming physical
+execution. Fresh-status requests retain correlated MQTT completion checks.
 """
 
 import base64
@@ -40,12 +40,13 @@ from .Vehicle import DailyDrivingStats, Vehicle
 
 
 class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
-    """Japan status, profile-aware features, and correlated vehicle controls."""
+    """Japan telemetry, profile-aware controls and explicit acceptance receipts."""
 
     data_timezone = ZoneInfo("Asia/Tokyo")
     supports_remote_commands = True
     supports_force_refresh = True
-    requires_command_confirmation = True
+    # Ordinary control success is service acceptance; fresh refresh is separate.
+    requires_command_confirmation = False
     FORCE_REFRESH_TIMEOUT = 120
     supported_commands = frozenset(
         {
@@ -109,7 +110,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
         existing = self._mqtt_sessions.get(vehicle.id)
         if existing is not None and (
-            existing[0] != identity or existing[1].closed is True
+            existing[0] != identity
+            or existing[1].closed is True
+            or getattr(existing[1], "failed", False) is True
         ):
             existing[1].close()
             existing = None
@@ -412,8 +415,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         known = cls._KNOWN_ERRORS.get(code)
         if known is not None:
             raise known[0]("Japan API rejected the request" + diagnostic)
+        failure_marker = result.get("retCode", result.get("resultType"))
         if (
-            result.get("retCode", result.get("resultType")) == "F"
+            (isinstance(failure_marker, str) and failure_marker.upper() == "F")
             or (code and code != "0000")
             or result.get("error")
         ):
