@@ -243,7 +243,29 @@ class KiaUvoApiCA(ApiImpl):
 
     @property
     def API_HEADERS(self) -> dict[str, str | None]:
-        """Fresh profile per request; offset recomputed like the app does (kia_uvo#2054)."""
+        """Hyundai app profile with a fresh offset (kia_uvo#2054); other brands keep the proven web-portal shape."""
+        if BRANDS[self.brand] != BRAND_HYUNDAI:
+            return {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Content-Type": "application/json;charset=UTF-8",
+                "from": "CWP",
+                "offset": "-5",
+                "language": "0",
+                "Origin": f"https://{self.BASE_URL}",
+                "Connection": "keep-alive",
+                "Referer": f"https://{self.BASE_URL}/login",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "Priority": "u=0",
+                "Pragma": "no-cache",
+                "Cache-Control": "no-cache",
+                "client_id": "HATAHSPACA0232141ED9722C67715A0B",
+                "client_secret": "CLISCR01AHSPA",
+            }
         headers = dict(_CA_APP_HEADERS)
         headers["offset"] = _offset_from_tz()
         return headers
@@ -417,17 +439,24 @@ class KiaUvoApiCA(ApiImpl):
         )
 
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
-        """Refresh the token via the gtothbyrftkn endpoint.
+        """Refresh via gtothbyrftkn (Hyundai; SPA host) or re-login (Kia/Genesis, the proven pre-#1496 path).
 
-        The CA mobile apps refresh with POST gtothbyrftkn: the refresh token
+        The Hyundai app refreshes with POST gtothbyrftkn: the refresh token
         in the JSON body, the common request headers without accessToken, and
         the from: SPA header value (CWP is the web-portal path and carries the
-        7549 captcha challenge, Hyundai-Kia-Connect/kia_uvo#2025). Any failure falls back to
-        re-login, which carries forward the persisted device_id so the server
-        still recognizes the device (Hyundai-Kia-Connect/kia_uvo#1715).
+        7549 captcha challenge, Hyundai-Kia-Connect/kia_uvo#2025). Any failure
+        falls back to re-login, which carries forward the persisted device_id
+        so the server still recognizes the device (kia_uvo#1715). kiaconnect.ca
+        rejects SPA-shaped v2/login requests (7404), so Kia/Genesis mint
+        refresh tokens through a full login instead — the pre-#1496 behavior
+        that never showed the 7602 freeze.
         """
         if token.device_id:
             self._device_id = token.device_id
+        if BRANDS[self.brand] != BRAND_HYUNDAI:
+            return self.login(
+                username=token.username, password=token.password, pin=token.pin
+            )
         if token.refresh_token:
             url = self.API_URL + "gtothbyrftkn"
             data = {"refTokenData": token.refresh_token}
