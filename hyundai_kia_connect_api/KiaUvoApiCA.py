@@ -235,6 +235,7 @@ class KiaUvoApiCA(ApiImpl):
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
         }
+        self.API_HEADERS["offset"] = _offset_from_tz()
         self._sessions: RetrySession | None = None
         # Cached device_id. Seeded from the persisted Token by refresh_access_token
         # (so re-login reuses it), or computed once from MAC+hostname on first login.

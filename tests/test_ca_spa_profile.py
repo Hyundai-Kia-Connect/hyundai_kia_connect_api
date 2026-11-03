@@ -16,7 +16,6 @@ def _api(region: int = 2, brand: int = 1) -> KiaUvoApiCA:
 def test_api_headers_profile() -> None:
     h = _api().API_HEADERS
     assert h["from"] == "SPA"
-    assert h["offset"] == "-5"
     assert h["language"] == "0"
     assert h["client_id"] and h["client_secret"]
     assert h["User-Agent"].startswith("okhttp/")
@@ -34,6 +33,13 @@ def test_api_headers_profile() -> None:
         "brand",
     ):
         assert dropped not in h, dropped
+
+
+def test_offset_wired_from_tz(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.KiaUvoApiCA._offset_from_tz", lambda: "-8"
+    )
+    assert KiaUvoApiCA(2, 1, "en").API_HEADERS["offset"] == "-8"
 
 
 def test_offset_east_coast() -> None:
