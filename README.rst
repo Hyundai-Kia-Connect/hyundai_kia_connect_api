@@ -21,6 +21,8 @@ This package is designed to simplify the complexity of using multiple regions.  
 
 Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
+Japan supports Hyundai only (``region=10``, ``brand=2``). Use the PIN from your Japan Bluelink account. Available controls depend on the vehicle's equipment and service options.
+
 China (Hyundai Bluelink / Kia UVO CN)
 -------------------------------------
 
@@ -38,7 +40,7 @@ Python 3.12 or newer is required to use this package. Vehicle manager is the key
     brand: int,
     username: str
     password: str
-    pin: str (required for CA, and potentially USA, otherwise pass a blank string)
+    pin: str (required for CA and Japan, and potentially USA, otherwise pass a blank string)
 
     Optional parameters are::
     geocode_api_enable: bool
@@ -53,40 +55,6 @@ Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Co
 
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
-
-Japan (region 10, Hyundai brand 2)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The Japan adapter supports authentication, token renewal, vehicle discovery,
-cached telemetry and profile-aware remote controls. Kia and Genesis Japan
-accounts are not supported. Its request contracts follow Japan Bluelink Android
-app versions 1.0.17 and 1.0.18 and the public login page.
-
-Commands require the account PIN and a registered MQTT context. Ordinary controls
-return ``ORDER_STATUS.ACCEPTED`` after the service validates the request; this
-is separate from proof that the car executed it. Later telemetry supplies the
-observed vehicle state. ``apply_cached_mqtt_state(vehicle)`` consumes received
-MQTT deltas without authentication or network requests and rejects stale state.
-Commands are never automatically repeated after a timeout.
-
-Forced refresh requires the matching MQTT completion result and newer telemetry.
-SVM capture polls its own correlated image request. Passive SVM reads return only
-images captured manually during the current session; after restart a new capture
-is required. Local diagnostics expose fixed workflow stages and counters without
-raw messages, identifiers, account secrets, GPS or images.
-
-``Vehicle.supports`` and the reported profile options determine model-dependent
-features. Optional Japan metadata supplies climate bounds and window positions.
-Trip summaries and unproven 30-day metrics remain unavailable. Existing regional
-adapters and their command-result semantics are unchanged.
-
-One Japan IONIQ 5 owner has confirmed unlocking with Home Assistant state updates,
-locking, climate start/stop, charge-port opening, AC/DC charge limits, forced
-refresh and SVM capture with available images. Charging start/stop and the other
-profile-dependent commands are implemented but not yet verified on a vehicle.
-Offline tests validate request contracts and failure handling; they do not prove
-physical behavior on other models.
-
 
 Once this is done you can now make the following calls against the vehicle manager::
 
