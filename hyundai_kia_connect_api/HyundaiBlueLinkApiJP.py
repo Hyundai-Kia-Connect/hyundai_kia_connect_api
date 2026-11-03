@@ -96,6 +96,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         self._location_missing_at: dict[str, float] = {}
         self._charge_target_cache: dict[str, tuple[float, dict]] = {}
         self._mqtt_sessions: dict[str, tuple[tuple, JapanMqttSession]] = {}
+        self._passive_state_observed_at: dict[str, dt.datetime] = {}
 
     def _mqtt_for_vehicle(self, token: Token, vehicle: Vehicle) -> JapanMqttSession:
         """Reuse a subscribed Japan session only while its authentication is current."""
@@ -127,6 +128,179 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             return helper
         return existing[1]
 
+    @staticmethod
+    def _ccs2_observation_time(value: str) -> dt.datetime:
+        """Read Japan CCS2 UTC dates without discarding fractional seconds."""
+        if not isinstance(value, str):
+            raise TypeError("Invalid Japan telemetry timestamp")
+        if re.fullmatch(r"\d{14}(?:\.\d{1,6})?", value):
+            pattern = "%Y%m%d%H%M%S.%f" if "." in value else "%Y%m%d%H%M%S"
+            return dt.datetime.strptime(value, pattern).replace(tzinfo=dt.UTC)
+        if re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+            r"(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?",
+            value,
+        ):
+            timestamp = dt.datetime.fromisoformat(value)
+            return timestamp.replace(tzinfo=timestamp.tzinfo or dt.UTC).astimezone(
+                dt.UTC
+            )
+        return dt.datetime.strptime(value, "%a, %d %b %Y %H:%M:%S GMT").replace(
+            tzinfo=dt.UTC
+        )
+
+    @classmethod
+    def _merge_ccs2_observation(cls, baseline: dict, patch: dict) -> dict:
+        """Merge a telemetry delta without treating omitted fields as false."""
+        merged = copy.deepcopy(baseline)
+        for key, value in patch.items():
+            if not isinstance(key, str):
+                raise TypeError("Invalid Japan telemetry field")
+            existing = merged.get(key)
+            if isinstance(value, dict):
+                if existing is not None and not isinstance(existing, dict):
+                    raise ValueError("Invalid Japan telemetry object")
+                merged[key] = cls._merge_ccs2_observation(existing or {}, value)
+            elif isinstance(existing, dict):
+                raise TypeError("Invalid Japan telemetry object")
+            elif isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Invalid Japan telemetry value")
+            elif value is None or isinstance(value, (str, int, float, bool, list)):
+                merged[key] = copy.deepcopy(value)
+            else:
+                raise ValueError("Invalid Japan telemetry value")
+        return merged
+
+    def _record_passive_state_result(self, result: str) -> None:
+        counters = getattr(self, "_passive_state_diagnostics", None)
+        if counters is None:
+            counters = dict.fromkeys(("applied", "stale", "invalid", "missing"), 0)
+            self._passive_state_diagnostics = counters
+        counters[result] += 1
+        counters["last_result"] = result
+
+    def apply_cached_mqtt_state(self, vehicle: Vehicle) -> bool:
+        """Apply newer, already-received telemetry; never log in or make requests.
+
+        A valid stored CCS2 snapshot provides the lineage for a delta. Comparing
+        parser outputs preserves unrelated values obtained from optional APIs.
+        This observation updates state, not the acceptance/execution receipt.
+        """
+        if (
+            type(vehicle.ccu_ccs2_protocol_support) is not int
+            or vehicle.ccu_ccs2_protocol_support <= 0
+            or not isinstance(vehicle.id, str)
+        ):
+            self._record_passive_state_result("missing")
+            return False
+        entry = self._mqtt_sessions.get(vehicle.id)
+        if entry is None:
+            self._record_passive_state_result("missing")
+            return False
+        try:
+            drain = getattr(entry[1], "drain_state_updates", None)
+            observations = drain() if callable(drain) else None
+            if not isinstance(observations, list):
+                observations = [entry[1].latest_state]
+        except (AttributeError, IndexError, TypeError, RecursionError):
+            self._record_passive_state_result("invalid")
+            return False
+        if not observations:
+            self._record_passive_state_result("missing")
+            return False
+
+        def observation_time(observation):
+            try:
+                return self._ccs2_observation_time(observation.get("Date"))
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                return dt.datetime.max.replace(tzinfo=dt.UTC)
+
+        changed = False
+        for observation in sorted(observations, key=observation_time):
+            if self._apply_cached_mqtt_observation(vehicle, observation):
+                changed = True
+        return changed
+
+    def _apply_cached_mqtt_observation(self, vehicle: Vehicle, observation) -> bool:
+        """Apply one immutable snapshot from the bounded local receive queue."""
+        try:
+            if not isinstance(observation, dict) or not observation:
+                self._record_passive_state_result("missing")
+                return False
+            supported_roots = {
+                "Body",
+                "Cabin",
+                "Chassis",
+                "Drivetrain",
+                "DrivingReady",
+                "Electronics",
+                "Green",
+                "Location",
+                "RemoteControl",
+            }
+            if not any(key in supported_roots for key in observation):
+                raise ValueError("Japan telemetry contains no state observation")
+            timestamp = self._ccs2_observation_time(observation.get("Date"))
+            baseline = vehicle.data
+            if not isinstance(baseline, dict) or "status" in baseline:
+                raise ValueError("Japan telemetry has no CCS2 baseline")
+            previous = self._ccs2_observation_time(baseline.get("Date"))
+            if vehicle.last_updated_at is not None:
+                if vehicle.last_updated_at.tzinfo is None:
+                    raise ValueError("Japan telemetry baseline has no timezone")
+                previous = max(previous, vehicle.last_updated_at)
+            if timestamp <= previous:
+                self._record_passive_state_result("stale")
+                return False
+            for key in supported_roots - {"DrivingReady"}:
+                if key in observation and not isinstance(observation[key], dict):
+                    raise ValueError("Invalid Japan telemetry section")
+            if "DrivingReady" in observation:
+                ready = observation["DrivingReady"]
+                if ready is not None and (
+                    type(ready) not in (bool, int) or ready not in (0, 1)
+                ):
+                    raise ValueError("Invalid Japan ignition observation")
+            for path in (
+                "Cabin.Door.Row1.Driver.Lock",
+                "Cabin.Door.Row1.Passenger.Lock",
+                "Cabin.Door.Row2.Left.Lock",
+                "Cabin.Door.Row2.Right.Lock",
+            ):
+                raw_lock = get_child_value(observation, path)
+                if raw_lock is not None and (
+                    type(raw_lock) is not int or raw_lock not in (0, 1)
+                ):
+                    raise ValueError("Invalid Japan lock observation")
+            state = self._merge_ccs2_observation(baseline, observation)
+            reference, candidate = copy.deepcopy(vehicle), copy.deepcopy(vehicle)
+            self._update_vehicle_properties_ccs2(reference, copy.deepcopy(baseline))
+            self._update_vehicle_properties_ccs2(candidate, state)
+            candidate.last_updated_at = timestamp.astimezone(self.data_timezone)
+            updates = {
+                key: value
+                for key, value in candidate.__dict__.items()
+                if key not in ("data", "_last_updated_at")
+                and value != reference.__dict__.get(key)
+            }
+            updates["data"] = state
+            updates["_last_updated_at"] = candidate._last_updated_at
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            IndexError,
+            OverflowError,
+            RecursionError,
+        ):
+            self._record_passive_state_result("invalid")
+            return False
+        vehicle.__dict__.update(updates)
+        self._passive_state_observed_at[vehicle.id] = timestamp
+        self._record_passive_state_result("applied")
+        return True
+
     def get_local_diagnostics(self) -> dict:
         """Return bounded protocol counters without requests or private data."""
         sessions = list(self._mqtt_sessions.values())[:10]
@@ -135,6 +309,11 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             "svm_images_cached": len(getattr(self, "_japan_svm_cache", {})),
             "last_command": dict(getattr(self, "_japan_command_diagnostics", {})),
             "last_camera_capture": self.svm_diagnostics,
+            **(
+                {"passive_state": dict(self._passive_state_diagnostics)}
+                if hasattr(self, "_passive_state_diagnostics")
+                else {}
+            ),
         }
 
     def close(self) -> None:
@@ -142,6 +321,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         for _, helper in self._mqtt_sessions.values():
             helper.close()
         self._mqtt_sessions.clear()
+        self._passive_state_observed_at.clear()
         self.session.close()
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -657,8 +837,24 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
                     raise TypeError
                 if not state.get("Date"):
                     raise ValueError
-                parse_datetime(state["Date"], dt.UTC)
+                observed_at = self._ccs2_observation_time(state["Date"])
+                passive_at = self._passive_state_observed_at.get(vehicle.id)
+                retains_passive_state = (
+                    passive_at is not None
+                    and isinstance(vehicle.data, dict)
+                    and self._ccs2_observation_time(vehicle.data.get("Date"))
+                    >= passive_at
+                )
+                if (
+                    vehicle.last_updated_at is not None
+                    and observed_at < vehicle.last_updated_at
+                ) or (retains_passive_state and observed_at <= passive_at):
+                    self.apply_cached_mqtt_state(vehicle)
+                    return
                 self._update_vehicle_properties_ccs2(parsed_vehicle, state)
+                parsed_vehicle.last_updated_at = observed_at.astimezone(
+                    self.data_timezone
+                )
             else:
                 info = payload["vehicleStatusInfo"]
                 state = {
@@ -754,6 +950,10 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
                     self.update_vehicle_with_charge_targets(token, parsed_vehicle)
                 except (NoDataFound, InvalidAPIResponseError):
                     self._charge_target_cache[vehicle.id] = (time.monotonic(), {})
+        if protocol:
+            # MQTT may arrive during optional cached reads. Apply it to the
+            # candidate so those optional fields are retained without rollback.
+            self.apply_cached_mqtt_state(parsed_vehicle)
         vehicle.__dict__.update(parsed_vehicle.__dict__)
 
     def update_vehicle_with_charge_targets(
