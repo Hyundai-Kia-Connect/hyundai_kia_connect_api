@@ -198,6 +198,19 @@ class RetrySession(ApiImplSession):
         raise last_exception
 
 
+_CA_APP_HEADERS: dict[str, str | None] = {
+    # App-shaped profile, myHyundai CA 2.0.47 HACCRequestHeader (kia_uvo#2054)
+    "User-Agent": "okhttp/4.12.0",
+    "Accept-Encoding": "gzip, deflate",
+    "Content-Type": "application/json;charset=UTF-8",
+    "from": "SPA",
+    "offset": "-5",
+    "language": "0",
+    "client_id": "HATAHSPACA0232141ED9722C67715A0B",
+    "client_secret": "CLISCR01AHSPA",
+}
+
+
 def _offset_from_tz(now: dt.datetime | None = None) -> str:
     """Whole-hour UTC offset, matching the CA app's offset/3600000 integer division."""
     moment = now or dt.datetime.now().astimezone()
@@ -223,23 +236,17 @@ class KiaUvoApiCA(ApiImpl):
             self.BASE_URL = "genesisconnect.ca"
 
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
-        self.API_HEADERS: dict[str, str | None] = {
-            # App-shaped profile (myHyundai CA 2.0.47, HACCRequestHeader#430):
-            # OkHttp UA, SPA channel on every call, no browser-disguise headers.
-            "User-Agent": "okhttp/4.12.0",
-            "Accept-Encoding": "gzip, deflate",
-            "Content-Type": "application/json;charset=UTF-8",
-            "from": "SPA",
-            "offset": "-5",
-            "language": "0",
-            "client_id": "HATAHSPACA0232141ED9722C67715A0B",
-            "client_secret": "CLISCR01AHSPA",
-        }
-        self.API_HEADERS["offset"] = _offset_from_tz()
         self._sessions: RetrySession | None = None
         # Cached device_id. Seeded from the persisted Token by refresh_access_token
         # (so re-login reuses it), or computed once from MAC+hostname on first login.
         self._device_id: str | None = None
+
+    @property
+    def API_HEADERS(self) -> dict[str, str | None]:
+        """Fresh profile per request; offset recomputed like the app does (kia_uvo#2054)."""
+        headers = dict(_CA_APP_HEADERS)
+        headers["offset"] = _offset_from_tz()
+        return headers
 
     def _get_device_id(self) -> str:
         """Return a stable device ID, persisted across re-logins.
@@ -1164,7 +1171,6 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
             response = self.sessions.post(url, headers=headers, json={"pin": token.pin})

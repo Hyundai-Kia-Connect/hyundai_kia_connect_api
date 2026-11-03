@@ -129,7 +129,6 @@ class TestCheckActionStatus:
     def api(self) -> KiaUvoApiCA:
         api = KiaUvoApiCA.__new__(KiaUvoApiCA)
         api.API_URL = "https://example.com/"
-        api.API_HEADERS = {}
         api._sessions = MagicMock()
         api._get_pin_token = MagicMock(return_value="pin-token")
         return api
