@@ -125,6 +125,165 @@
     ]),
   })
 # ---
+# name: test_vehicle_command[au_kia_ice_ccs2-lock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'close',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/door',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-set_charge_limits]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'targetSOClist': list([
+            dict({
+              'plugType': 0,
+              'targetSOClevel': 90,
+            }),
+            dict({
+              'plugType': 1,
+              'targetSOClevel': 80,
+            }),
+          ]),
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/spa/vehicles/VEHICLE-ID/charge/target',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-start_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-start_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'start',
+          'drvSeatLoc': 'R',
+          'hvacCtrl': 1,
+          'ignitionDuration': 10,
+          'windshieldFrontDefogState': False,
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-stop_charge]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/charge',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-stop_climate]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'stop',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/engine',
+      }),
+    ]),
+  })
+# ---
+# name: test_vehicle_command[au_kia_ice_ccs2-unlock]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'deviceId': '0123456789abcdef0123456789abcdef',
+          'pin': '1234',
+        }),
+        'method': 'PUT',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v1/user/pin?token=',
+      }),
+      dict({
+        'body': dict({
+          'command': 'open',
+        }),
+        'method': 'POST',
+        'url': 'https://au-apigw.ccs.kia.com.au:8082/api/v2/spa/vehicles/VEHICLE-ID/ccs2/control/door',
+      }),
+    ]),
+  })
+# ---
 # name: test_vehicle_command[br_hyundai-lock]
   dict({
     'action_id': 'MSG-1',

@@ -7,11 +7,12 @@ from time import sleep
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-from .ApiImpl import ApiImplSession
+from .ApiImpl import ApiImplSession, ClimateRequestOptions
 from .ApiImplType1 import (
     USER_AGENT_OK_HTTP,
     ApiImplType1,
     _check_response_for_errors,
+    _retry_on_device_id_error,
 )
 from .const import (
     BRAND_GENESIS,
@@ -297,6 +298,49 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
         return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def _post_engine_command(
+        self, token: Token, vehicle: Vehicle, payload: dict[str, Any]
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/engine"
+        _LOGGER.debug(f"{DOMAIN} - Engine Action Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Engine Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        # CCS2 ICE vehicles use /ccs2/control/engine; the temperature endpoint
+        # rejects them with resCode 4005.
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
+            return super().start_climate(token, vehicle, options)
+        return self._post_engine_command(
+            token,
+            vehicle,
+            {
+                "command": "start",
+                "ignitionDuration": 5 if options.duration is None else options.duration,
+                "hvacCtrl": 0 if options.climate is False else 1,
+                "windshieldFrontDefogState": bool(options.defrost),
+                "drvSeatLoc": self._get_drv_seat_loc(vehicle),
+            },
+        )
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
+            return super().stop_climate(token, vehicle)
+        return self._post_engine_command(token, vehicle, {"command": "stop"})
 
     def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
