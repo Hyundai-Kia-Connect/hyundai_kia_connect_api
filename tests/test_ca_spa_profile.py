@@ -1,12 +1,39 @@
 import datetime as dt
 
-from hyundai_kia_connect_api.KiaUvoApiCA import _offset_from_tz
+from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA, _offset_from_tz
 
 
 def _at(minutes: int) -> dt.datetime:  # minutes east of UTC
     return dt.datetime(
         2026, 11, 3, 12, 0, tzinfo=dt.timezone(dt.timedelta(minutes=minutes))
     )
+
+
+def _api(region: int = 2, brand: int = 1) -> KiaUvoApiCA:
+    return KiaUvoApiCA(region, brand, "en")
+
+
+def test_api_headers_profile() -> None:
+    h = _api().API_HEADERS
+    assert h["from"] == "SPA"
+    assert h["offset"] == "-5"
+    assert h["language"] == "0"
+    assert h["client_id"] and h["client_secret"]
+    assert h["User-Agent"].startswith("okhttp/")
+    for dropped in (
+        "Origin",
+        "Referer",
+        "Sec-Fetch-Dest",
+        "Sec-Fetch-Mode",
+        "Sec-Fetch-Site",
+        "Priority",
+        "Pragma",
+        "Cache-Control",
+        "Accept",
+        "Accept-Language",
+        "brand",
+    ):
+        assert dropped not in h, dropped
 
 
 def test_offset_east_coast() -> None:

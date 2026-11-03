@@ -224,23 +224,14 @@ class KiaUvoApiCA(ApiImpl):
 
         self.API_URL: str = "https://" + self.BASE_URL + "/tods/api/"
         self.API_HEADERS: dict[str, str | None] = {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
+            # App-shaped profile (myHyundai CA 2.0.47, HACCRequestHeader#430):
+            # OkHttp UA, SPA channel on every call, no browser-disguise headers.
+            "User-Agent": "okhttp/4.12.0",
+            "Accept-Encoding": "gzip, deflate",
             "Content-Type": "application/json;charset=UTF-8",
-            "from": "CWP",
+            "from": "SPA",
             "offset": "-5",
             "language": "0",
-            "Origin": f"https://{self.BASE_URL}",
-            "Connection": "keep-alive",
-            "Referer": f"https://{self.BASE_URL}/login",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-origin",
-            "Priority": "u=0",
-            "Pragma": "no-cache",
-            "Cache-Control": "no-cache",
             "client_id": "HATAHSPACA0232141ED9722C67715A0B",
             "client_secret": "CLISCR01AHSPA",
         }
@@ -434,7 +425,6 @@ class KiaUvoApiCA(ApiImpl):
             data = {"refTokenData": token.refresh_token}
             headers = self.API_HEADERS.copy()
             headers.pop("accessToken", None)
-            headers["from"] = "SPA"
             headers["Deviceid"] = self._get_device_id()
             try:
                 response = self.sessions.post(url, json=data, headers=headers)
@@ -1173,7 +1163,6 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["from"] = "SPA"
         headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
@@ -1505,14 +1494,10 @@ class KiaUvoApiCA(ApiImpl):
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
     ) -> str:
         url = self.API_URL + "evc/setsoc"
-        headers = self.API_HEADERS
+        headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
-        headers["from"] = "SPA"
-        headers["offset"] = "-8"
-        headers["priority"] = "u=1, i"
-        headers["Referer"] = "https://kiaconnect.ca/remote/"
 
         payload = {
             "tsoc": [
