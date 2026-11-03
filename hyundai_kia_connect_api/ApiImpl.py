@@ -835,7 +835,14 @@ class ApiImpl:
             "stop_rear_seat_alarm is not implemented for this region"
         )
 
-    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
+    def set_charge_alarm(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        before_10min: bool,
+        before_20min: bool,
+        before_30min: bool,
+    ) -> str:
         raise NotImplementedError("set_charge_alarm is not implemented for this region")
 
     def valet_mode_action(
