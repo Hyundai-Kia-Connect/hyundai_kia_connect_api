@@ -1,0 +1,16 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/fndmcr",
+        "source": "Get Vehicle Location debug log in kia_uvo #906",
+        "description": "Real error response: vehicle not reachable."
+    },
+    "error": {
+        "errorCode": "6504",
+        "errorDesc": "We cannot process your request. Please check, as it appears your engine has not been started in recent days or your vehicle is in a poor network coverage area."
+    },
+    "responseHeader": {
+        "responseCode": 1,
+        "responseDesc": "Failure"
+    }
+}

@@ -3,7 +3,7 @@ ci:
     autoupdate_commit_msg: "chore: pre-commit autoupdate"
 repos:
     - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.17.0
+      rev: v0.17.3
       hooks:
           - id: ruff
             args:
@@ -14,7 +14,7 @@ repos:
       hooks:
           - id: codespell
             args:
-                - --ignore-words-list=fro,hass,fatc
+                - --ignore-words-list=fro,hass,fatc,inster
                 - --skip="./.*,*.csv,*.json,*.ambr"
                 - --quiet-level=2
             exclude_types: [csv, json]
@@ -58,8 +58,20 @@ repos:
                 - --keep-updates
             files: ^(/.+)?[^/]+\.py$
     - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v2.4.0
+      rev: v2.4.1
       hooks:
           - id: mypy
-            args: [--strict, --ignore-missing-imports]
-            files: ^(/.+)?[^/]+\.py$
+            args: [--strict]
+            files: ^hyundai_kia_connect_api/.+\.py$
+            # Keep in sync with requirements.txt and the setup.py extras.
+            # types-requests is needed because requests ships no type hints.
+            additional_dependencies:
+                - beautifulsoup4>=4.15.0
+                - requests
+                - types-requests
+                - Pillow>=10.0.0
+                - numpy>=1.26.0
+                - certifi>=2026.10.23
+                - tzdata>=2026.5
+                - pycryptodome>=3.24.1,<4
+                - paho-mqtt>=2.1,<3

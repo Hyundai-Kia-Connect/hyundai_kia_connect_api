@@ -1,19 +1,23 @@
 """HyundaiBlueLinkApiBR.py"""
 
-# pylint:disable=logging-fstring-interpolation,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring,line-too-long
-
 import datetime as dt
 import logging
 import random
-import typing as ty
 import uuid
 from datetime import timedelta
 from time import sleep
+from typing import Any, cast
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from requests import Response
 
-from .ApiImpl import ApiImplSession, ClimateRequestOptions, WindowRequestOptions
+from .ApiImpl import (
+    ApiImplSession,
+    ClimateRequestOptions,
+    POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
 from .ApiImplType1 import (
     ApiImplType1,
     _check_response_for_errors,
@@ -23,8 +27,8 @@ from .const import (
     BRAND_HYUNDAI,
     BRANDS,
     DOMAIN,
-    ENGINE_TYPES,
     ORDER_STATUS,
+    VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
@@ -63,10 +67,13 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
     endpoint selection and force-refresh flow.
     """
 
-    supports_window_control: bool = True
-    # BR does not implement valet mode; keep it off (ApiImplType1 defaults True).
-    supports_valet_mode: bool = False
     data_timezone = dt.timezone(dt.timedelta(hours=-3))  # Brazil (BRT/BRST)
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        vehicle = super()._vehicle_from_spa_entry(entry)
+        # BR does not implement valet mode (ApiImplType1 enables it).
+        vehicle.supports.valet_mode = False
+        return vehicle
 
     def __init__(self, region: int, brand: int, language: str = "pt-BR"):
         if BRANDS[brand] != BRAND_HYUNDAI:
@@ -112,8 +119,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         """Build API v2 URL from path."""
         return urljoin(self.api_v2_url, path.lstrip("/"))
 
-    def _get_stamp(self) -> None:
+    def _get_stamp(self) -> str:
         """BR does not use the Stamp header; required by the shared retry helper."""
+        return ""
 
     def _get_device_id(self, stamp: str | None = None) -> str:
         """Register a push device and return the server-issued device id.
@@ -146,14 +154,20 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         device_id = response_json["resMsg"]["deviceId"]
         self._registered_device_id = device_id
-        return device_id
+        return cast(str, device_id)
 
     def _ensure_device_id(self) -> str:
         """Return this session's registered device id, registering one if needed."""
         return self._registered_device_id or self._get_device_id()
 
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        """Get headers with authentication."""
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict[str, Any]:
+        """Get headers with authentication.
+
+        ``ccs2_support`` matches the ApiImplType1 signature; BR sends no
+        CCS2 protocol header, so it is ignored.
+        """
         headers = dict(self.api_headers)
         device_id = token.device_id or self._ensure_device_id()
         headers["ccsp-device-id"] = device_id
@@ -199,7 +213,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             f"(keys={sorted(data.keys())})"
         )
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         """Request cookies from the API for authentication."""
         params = {
             "response_type": "code",
@@ -213,10 +227,10 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         self._raise_auth_error(response, "cookie request")
         # The session cookie ('account') is set during the 302 redirect, so it
         # lives in the session cookie jar rather than on the final response.
-        return self.session.cookies.get_dict()
+        return cast(dict[str, Any], self.session.cookies.get_dict())
 
     def _get_authorization_code(
-        self, cookies: dict, username: str, password: str
+        self, cookies: dict[str, Any], username: str, password: str
     ) -> str:
         """Get authorization code from redirect URL."""
         url = self._build_api_url("/user/signin")
@@ -267,9 +281,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
             raise AuthenticationError(
                 "Brazilian Hyundai login failed: no authorization code in redirect URL."
             )
-        return code_list[0]
+        return cast(str, code_list[0])
 
-    def _get_auth_response(self, authorization_code: str) -> dict:
+    def _get_auth_response(self, authorization_code: str) -> dict[str, Any]:
         """Request access token from the API."""
         url = self._build_api_url("/user/oauth2/token")
         body = {
@@ -286,13 +300,12 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         response = self.session.post(url, data=body, headers=headers)
         self._raise_auth_error(response, "token request")
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def login(
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         """Login to Brazilian Hyundai API."""
@@ -371,7 +384,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         return self.login(token.username, token.password, pin=token.pin)
 
     @_retry_on_device_id_error
-    def get_vehicles(self, token: Token) -> list:
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         """Get list of vehicles."""
         url = self._build_api_url("/spa/vehicles")
         headers = self._get_authenticated_headers(token)
@@ -381,36 +394,14 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         _check_response_for_errors(response)
         if "resMsg" not in response or "vehicles" not in response.get("resMsg", {}):
             raise APIError("Missing resMsg or vehicles in response")
-        result = []
-        for entry in response["resMsg"]["vehicles"]:
-            # Map vehicle type to engine type
-            vehicle_type = entry["type"]
-            if vehicle_type == "GN":
-                entry_engine_type = ENGINE_TYPES.ICE
-            elif vehicle_type == "EV":
-                entry_engine_type = ENGINE_TYPES.EV
-            elif vehicle_type in ["PHEV", "PE"]:
-                entry_engine_type = ENGINE_TYPES.PHEV
-            elif vehicle_type == "HV":
-                entry_engine_type = ENGINE_TYPES.HEV
-            else:
-                entry_engine_type = ENGINE_TYPES.ICE
+        return [
+            self._vehicle_from_spa_entry(entry)
+            for entry in response["resMsg"]["vehicles"]
+        ]
 
-            vehicle = Vehicle(
-                id=entry["vehicleId"],
-                name=entry["nickname"],
-                model=entry["vehicleName"],
-                registration_date=entry["regDate"],
-                VIN=entry["vin"],
-                timezone=self.data_timezone,
-                engine_type=entry_engine_type,
-                ccu_ccs2_protocol_support=entry.get("ccuCCS2ProtocolSupport", 0),
-            )
-            result.append(vehicle)
-
-        return result
-
-    def _get_cached_vehicle_state(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_cached_vehicle_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
         """Return the server-cached CCS2 vehicle status (does not wake the car).
 
         BR vehicles report ``ccuCCS2ProtocolSupport: 0`` but the cached status
@@ -422,7 +413,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         headers = self._get_authenticated_headers(token)
         response = self.session.get(url, headers=headers).json()
         _check_response_for_errors(response)
-        return response["resMsg"]["state"]["Vehicle"]
+        return cast(dict[str, Any], response["resMsg"]["state"]["Vehicle"])
 
     @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -468,14 +459,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
     def _ensure_control_token(self, token: Token) -> str:
         """Ensure we have a valid control token for remote commands."""
-        control_token = getattr(token, "control_token", None)
-        expires_at = getattr(token, "control_token_expires_at", None)
-        if (
-            control_token
-            and expires_at
-            and expires_at - dt.timedelta(seconds=5) > dt.datetime.now(dt.UTC)
-        ):
-            return control_token
+        now = dt.datetime.now(dt.UTC).timestamp()
+        if token.control_token and token.control_token_expiry - 5 > now:
+            return token.control_token
 
         if not token.pin:
             raise APIError("PIN is required for remote commands.")
@@ -496,10 +482,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
 
         control_token = f"Bearer {data['controlToken']}"
         expires_in = data.get("expiresTime", 0)
-        expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=expires_in or 600)
 
         token.control_token = control_token
-        token.control_token_expires_at = expires_at
+        token.control_token_expiry = now + (expires_in or 600)
         return control_token
 
     def lock_action(
@@ -530,7 +515,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Lock action failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def check_action_status(
         self,
@@ -620,7 +605,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Window action failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         """Turn on hazard lights (lights only, no horn)."""
@@ -645,9 +630,9 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Hazard lights failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
-    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list:
+    def get_notification_history(self, token: Token, vehicle: Vehicle) -> list[Any]:
         """Get notification history (for debugging and tracking command results)."""
         url = self._build_api_url(f"/spa/notifications/{vehicle.id}/history")
         headers = self._get_authenticated_headers(token)
@@ -657,7 +642,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
         data = response.json()
         _LOGGER.debug(f"{DOMAIN} - Notification history response")
 
-        return data.get("resMsg", [])
+        return cast(list[Any], data.get("resMsg", []))
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
@@ -723,7 +708,7 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Start climate failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         """Stop climate control."""
@@ -751,7 +736,57 @@ class HyundaiBlueLinkApiBR(ApiImplType1):
                 f"Stop climate failed: {data.get('resCode')} {data.get('resMsg')}"
             )
 
-        return data.get("msgId")
+        return cast(str, data.get("msgId"))
+
+    # Commands below are inherited from ApiImplType1 but have no BR endpoint
+    # (the inherited versions build URLs from SPA_API_URL, which BR never
+    # sets), so they raise NotImplementedError like the ApiImpl base.
+
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("start_charge is not implemented for Brazil")
+
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError("stop_charge is not implemented for Brazil")
+
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
+        raise NotImplementedError("set_charging_current is not implemented for Brazil")
+
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
+        raise NotImplementedError("set_charge_limits is not implemented for Brazil")
+
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
+        raise NotImplementedError(
+            "set_vehicle_to_load_discharge_limit is not implemented for Brazil"
+        )
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        raise NotImplementedError(
+            "schedule_charging_and_climate is not implemented for Brazil"
+        )
+
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+        raise NotImplementedError(
+            "start_hazard_lights_and_horn is not implemented for Brazil"
+        )
+
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
+        raise NotImplementedError("set_navigation is not implemented for Brazil")
+
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
+        raise NotImplementedError("valet_mode_action is not implemented for Brazil")
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str

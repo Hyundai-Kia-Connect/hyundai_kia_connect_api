@@ -2,12 +2,21 @@
 
 import datetime as dt
 import logging
+import uuid
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.exceptions import AuthenticationError, ConsentRequiredError
+from hyundai_kia_connect_api.exceptions import (
+    AuthenticationBlockedError,
+    AuthenticationCciTokenExchangeError,
+    AuthenticationCertificateError,
+    AuthenticationError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
+    ConsentRequiredError,
+)
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Token import Token
 
@@ -80,7 +89,9 @@ def test_login_with_password_certs_endpoint_fails():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="failed to fetch RSA certs"):
+        with pytest.raises(
+            AuthenticationCertificateError, match="failed to fetch RSA certs"
+        ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -97,7 +108,7 @@ def test_login_with_password_signin_returns_non_302():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Signin failed"):
+        with pytest.raises(AuthenticationSigninError, match="Signin failed"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -117,7 +128,7 @@ def test_login_with_password_signin_no_code_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(
-            AuthenticationError, match="unexpected redirect after signin"
+            AuthenticationRedirectError, match="unexpected redirect after signin"
         ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
@@ -140,7 +151,7 @@ def test_login_with_password_signin_error_in_redirect():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Authentication rejected"):
+        with pytest.raises(AuthenticationSigninError, match="Authentication rejected"):
             api._login_with_password_cci("user@test.com", "wrong-password", "device-1")
 
 
@@ -161,8 +172,55 @@ def test_login_with_password_signin_redirect_to_login_page():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="returned to login page"):
+        with pytest.raises(AuthenticationRedirectError, match="returned to login page"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
+
+
+def test_login_with_password_redirect_hint_on_21char_password():
+    """A >20-char password on the login-page redirect gets the #1979 hint."""
+    api = _make_eu_api(brand=1)
+    password = "x" * 24
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+                    ),
+                ),
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        with pytest.raises(
+            AuthenticationRedirectError,
+            match="the account may only accept the first 20 of them",
+        ):
+            api._login_with_password_cci("user@test.com", password, "device-1")
+
+
+def test_login_with_password_redirect_no_hint_on_short_password():
+    """The #1979 hint must not run below the 20-char boundary."""
+    api = _make_eu_api(brand=1)
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "hyundai_kia_connect_api.KiaUvoApiEU.ApiImplSession",
+                return_value=_cci_session(
+                    _certs_response(),
+                    _signin_resp(
+                        "https://idpconnect-eu.kia.com/auth/api/v2/user/oauth2/authorize?state=ccsp"
+                    ),
+                ),
+            )
+        )
+        for p in _mock_crypto():
+            stack.enter_context(p)
+        with pytest.raises(AuthenticationRedirectError) as exc_info:
+            api._login_with_password_cci("user@test.com", "password", "device-1")
+    assert "the account may only accept" not in str(exc_info.value)
 
 
 def test_login_with_password_signin_consent_spa_redirect():
@@ -204,7 +262,7 @@ def test_login_with_password_waf_block_detected():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="abusing request"):
+        with pytest.raises(AuthenticationBlockedError, match="abusing request"):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
@@ -230,12 +288,24 @@ def test_login_with_password_cci_token_exchange_fails():
                 return_value=token_resp,
             )
         )
-        with pytest.raises(AuthenticationError, match="CCI token exchange failed"):
+        with pytest.raises(
+            AuthenticationCciTokenExchangeError, match="CCI token exchange failed"
+        ):
             api._login_with_password_cci("user@test.com", "password", "device-1")
 
 
-def test_login_with_password_success():
-    """Full CCI login flow returns access_token, refresh_token and CCI fields."""
+@pytest.mark.parametrize(
+    "expires_time",
+    [86400, 3600],
+    ids=["ttl-24h-older-captures", "ttl-1h-live-2026-10-30"],
+)
+def test_login_with_password_success(expires_time):
+    """Full CCI login flow returns access_token, refresh_token and CCI fields.
+
+    The CCS exchange answers expiresTime as a TTL in seconds. Both observed
+    server values are covered: 86400 (24h) from older captures and 3600 (1h)
+    from live runs on 2026-10-30.
+    """
     api = _make_eu_api(brand=2)  # Hyundai
     cci_token_resp = MagicMock(status_code=200)
     cci_token_resp.json.return_value = {
@@ -251,7 +321,7 @@ def test_login_with_password_success():
     exchange_resp = MagicMock(status_code=200)
     exchange_resp.json.return_value = {
         "accessToken": "ccs-token",
-        "expiresTime": 86400,
+        "expiresTime": expires_time,
     }
     with ExitStack() as stack:
         stack.enter_context(
@@ -282,20 +352,27 @@ def test_login_with_password_success():
     assert info["exchangeable_token"] == "exch-at"
     assert info["non_ccs_token"] == "nonccs"
     assert info["id_token"] == "id-tok"
-    # expiresTime is a TTL in seconds (86400 = 24h), so valid_until is ~24h
-    # from now — not an epoch in 1970.
+    # expiresTime is a TTL in seconds, so valid_until is ~TTL from now —
+    # not an epoch in 1970.
     now = dt.datetime.now(dt.UTC)
     assert info["valid_until"] > now
-    assert (info["valid_until"] - now).total_seconds() == pytest.approx(86400, abs=5)
+    assert (info["valid_until"] - now).total_seconds() == pytest.approx(
+        expires_time, abs=5
+    )
 
 
 # ── KiaUvoApiEU.login() flow routing ────────────────────────
 
 
-def test_login_refresh_token_flow():
-    """When password matches 48-char refresh_token, use _get_access_token()."""
+def test_login_48char_string_is_treated_as_password():
+    """Even a legacy-token-shaped password runs the normal password flow.
+
+    The 48-char refresh-token login is gone and CCI password login is the
+    only EU entry point, so a password that merely resembles the legacy token
+    still goes through _login_with_password like any other password.
+    """
     api = _make_eu_api(brand=1)  # Kia
-    refresh_token = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"
+    password = "NWIXYJNKZJMTZJE3MI01ZWI4LWI0NWETZJQ0NJI1OTFMOTC3"  # 48 chars
 
     with (
         patch.object(api, "_get_stamp", return_value="stamp"),
@@ -304,15 +381,19 @@ def test_login_refresh_token_flow():
         patch.object(api, "_set_session_language"),
         patch.object(
             api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer access-token", "auth-code", 86400),
-        ),
+            "_login_with_password",
+            return_value={
+                "access_token": "Bearer access-token",
+                "refresh_token": "REFRESHTOKEN123456789012345678901234567890",
+                "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
+            },
+        ) as login_with_password,
     ):
-        token = api.login("user@test.com", refresh_token, pin="1234")
+        token = api.login("user@test.com", password, pin="1234")
 
+    login_with_password.assert_called_once_with("user@test.com", password, "device-123")
     assert token.access_token == "Bearer access-token"
-    assert token.refresh_token == refresh_token
-    assert token.device_id == "device-123"
     assert token.pin == "1234"
 
 
@@ -332,6 +413,7 @@ def test_login_plaintext_password_calls_login_with_password():
                 "access_token": "Bearer headless-access-token",
                 "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ),
     ):
@@ -339,6 +421,47 @@ def test_login_plaintext_password_calls_login_with_password():
 
     assert token.access_token == "Bearer headless-access-token"
     assert token.refresh_token == "HEADLESSREFRESHTOKEN123456789012345678"
+
+
+def test_login_survives_legacy_register_failure(caplog):
+    """A failing legacy device register must not kill the full login:
+    fall back to a random device identity and continue (kia_uvo #1888)."""
+    api = _make_eu_api(brand=2)  # Hyundai
+
+    with (
+        patch.object(api, "_get_stamp", return_value="stamp"),
+        patch.object(
+            api,
+            "_get_device_id",
+            side_effect=AuthenticationError("Received unexpected statusCode"),
+        ),
+        patch.object(api, "_get_cookies", return_value={}),
+        patch.object(api, "_set_session_language"),
+        patch.object(
+            api,
+            "_login_with_password",
+            return_value={
+                "access_token": "Bearer headless-access-token",
+                "refresh_token": "HEADLESSREFRESHTOKEN123456789012345678",
+                "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
+            },
+        ) as login_with_password,
+        caplog.at_level(logging.DEBUG),
+    ):
+        token = api.login("user@test.com", "MyPassword123!", pin="1234")
+
+    device_id = login_with_password.call_args.args[2]
+    assert device_id and device_id != "None"
+    uuid.UUID(device_id)  # a valid random UUID, not a register-issued id
+    assert token.device_id == device_id
+    register_warnings = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "register" in r.message.lower()
+    ]
+    assert len(register_warnings) == 1
+    assert "unexpected statusCode" in register_warnings[0].message
     assert token.pin == "1234"
 
 
@@ -358,6 +481,7 @@ def test_login_plaintext_password_genesis_calls_login_with_password():
                 "access_token": "Bearer genesis-access-token",
                 "refresh_token": "GENESISREFRESHTOKEN12345678901234567",
                 "expires_in": 3600,
+                "valid_until": dt.datetime.now(dt.UTC) + dt.timedelta(hours=24),
             },
         ),
     ):
@@ -394,7 +518,7 @@ def test_genesis_uses_cci_login_constants():
     assert api.ONEAPP_REDIRECT_URI == "https://oneapp.genesis.com/redirect"
     assert api.CCI_API_URL == "https://cci-api-eu.genesis.com"
     assert api.CCI_DOMAIN_API_URL == "https://cci-api-eu.genesis.com/domain/api/"
-    assert api._cci_package_id == "com.genesis.oneapp.eu"
+    assert api.CCI_PACKAGE_ID == "com.genesis.oneapp.eu"
     assert api._cci_client_name == "genesis"
 
 
@@ -443,70 +567,22 @@ def _make_token(**overrides) -> Token:
     return Token(**defaults)
 
 
-def test_refresh_access_token_uses_stored_refresh_token():
-    """refresh_access_token calls _get_access_token with stored refresh_token."""
-    api = _make_eu_api(brand=1)  # Kia
+def test_refresh_access_token_without_cci_fields_falls_back_to_login():
+    """A stored token without CCI fields goes straight to full login.
 
-    mock_get_token = MagicMock(
-        return_value=("Bearer", "Bearer new-access-token", "new-rt", 86400)
-    )
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(api, "_get_access_token", mock_get_token),
-    ):
-        token = _make_token()
-        result = api.refresh_access_token(token)
-
-    assert result.access_token == "Bearer new-access-token"
-    assert result.refresh_token == "new-rt"
-    assert result.device_id == "device-123"
-    assert result.username == "user@test.com"
-    assert result.pin == "1234"
-    mock_get_token.assert_called_once_with("stamp", token.refresh_token)
-
-
-def test_refresh_access_token_preserves_device_id():
-    """refresh_access_token preserves device_id from original token."""
+    Tokens from pre-CCI installs carry only the old refresh_token grant
+    data. The legacy grant is gone, so the refresh self-migrates the
+    account to the CCI flow, same as the GspaApiEU lineage.
+    """
     api = _make_eu_api(brand=1)
 
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access-token", "rotated-rt", 3600),
-        ),
-    ):
-        token = _make_token(device_id="original-device-id")
-        result = api.refresh_access_token(token)
+    with patch.object(
+        api, "login", return_value=_make_token(access_token="Bearer from-login")
+    ) as mock_login:
+        result = api.refresh_access_token(_make_token())
 
-    assert result.device_id == "original-device-id"
-
-
-def test_refresh_access_token_genesis_keeps_old_refresh_token():
-    """When _get_access_token returns None for refresh_token, keep the original.
-
-    Some brands (Genesis, Hyundai EU) don't rotate refresh tokens,
-    so the API doesn't return a new one. The `or` fallback preserves
-    the original refresh_token.
-    """
-    api = _make_eu_api(brand=3)  # Genesis
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer gen-access", None, 3600),
-        ),
-    ):
-        token = _make_token(refresh_token="GENESISRT1234567890123456789012345")
-        result = api.refresh_access_token(token)
-
-    assert result.access_token == "Bearer gen-access"
-    # None from API → fallback to original refresh_token
-    assert result.refresh_token == "GENESISRT1234567890123456789012345"
-    assert result.device_id == "device-123"
+    mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
+    assert result.access_token == "Bearer from-login"
 
 
 def test_refresh_access_token_falls_back_on_missing_refresh_token():
@@ -536,28 +612,6 @@ def test_refresh_access_token_falls_back_on_none_refresh_token():
     mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
 
 
-def test_refresh_access_token_falls_back_on_exchange_failure():
-    """When _get_access_token raises, fall back to full login."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            side_effect=Exception("Network error"),
-        ),
-        patch.object(
-            api, "login", return_value=_make_token(access_token="Bearer from-login")
-        ) as mock_login,
-    ):
-        token = _make_token()
-        result = api.refresh_access_token(token)
-
-    mock_login.assert_called_once_with("user@test.com", "MyPassword123!", "1234")
-    assert result.access_token == "Bearer from-login"
-
-
 def test_refresh_cci_failure_warning_includes_response_reason(caplog):
     """A CCI refresh failure logs the server's reason — without it, a
     ~4h token wall has no visible cause in HA logs (#1338)."""
@@ -582,41 +636,3 @@ def test_refresh_cci_failure_warning_includes_response_reason(caplog):
     assert len(refresh_warnings) == 1
     assert "HTTP 400" in refresh_warnings[0].message
     assert "4121" in refresh_warnings[0].message
-
-
-def test_refresh_access_token_does_not_call_get_device_id():
-    """refresh_access_token should NOT call _get_device_id (no full re-login)."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access", "new-rt", 3600),
-        ),
-        patch.object(api, "_get_device_id") as mock_device_id,
-    ):
-        token = _make_token()
-        api.refresh_access_token(token)
-
-    mock_device_id.assert_not_called()
-
-
-def test_refresh_access_token_does_not_call_get_cookies():
-    """refresh_access_token should NOT call _get_cookies (no full re-login)."""
-    api = _make_eu_api(brand=1)
-
-    with (
-        patch.object(api, "_get_stamp", return_value="stamp"),
-        patch.object(
-            api,
-            "_get_access_token",
-            return_value=("Bearer", "Bearer new-access", "new-rt", 3600),
-        ),
-        patch.object(api, "_get_cookies") as mock_cookies,
-    ):
-        token = _make_token()
-        api.refresh_access_token(token)
-
-    mock_cookies.assert_not_called()

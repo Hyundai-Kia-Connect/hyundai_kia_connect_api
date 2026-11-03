@@ -1,0 +1,76 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "brand": "Hyundai",
+        "endpoint": "spa/vehicles",
+        "vehicles": "2022 IONIQ 5 x2 (EV, one shared), Kona (HEV, older response without protocolType/ccuCCS2ProtocolSupport/year/tmuNum)",
+        "source": "Get Vehicles Response debug logs in kia_uvo #1031 (IONIQ 5) and #475 (Kona)",
+        "description": "Real vehicle lists merged into one response. VINs, vehicle ids and msgId replaced."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "vehicles": [
+            {
+                "vin": "TESTVIN0000000001",
+                "vehicleId": "VEHICLE-1",
+                "vehicleName": "IONIQ 5",
+                "type": "EV",
+                "tmuNum": "-",
+                "nickname": "NO_Ioniq",
+                "year": "2022",
+                "master": true,
+                "carShare": 0,
+                "regDate": "2025-01-10 16:51:44.886",
+                "detailInfo": {
+                    "inColor": "NNB",
+                    "outColor": "M9U",
+                    "saleCarmdlCd": "GI",
+                    "bodyType": "2",
+                    "saleCarmdlEnNm": "IONIQ 5"
+                },
+                "protocolType": 0,
+                "ccuCCS2ProtocolSupport": 0
+            },
+            {
+                "vin": "TESTVIN0000000002",
+                "vehicleId": "VEHICLE-2",
+                "vehicleName": "IONIQ 5",
+                "type": "EV",
+                "tmuNum": "-",
+                "nickname": "IONIQ 5",
+                "year": "2022",
+                "master": true,
+                "carShare": 1,
+                "regDate": "2021-09-04 14:07:51.955",
+                "detailInfo": {
+                    "inColor": "NNB",
+                    "outColor": "MZH",
+                    "saleCarmdlCd": "GI",
+                    "bodyType": "2",
+                    "saleCarmdlEnNm": "IONIQ 5"
+                },
+                "protocolType": 0,
+                "ccuCCS2ProtocolSupport": 0
+            },
+            {
+                "vin": "TESTVIN0000000003",
+                "vehicleId": "VEHICLE-3",
+                "vehicleName": "KONA",
+                "type": "HV",
+                "nickname": "KONA",
+                "master": true,
+                "carShare": 1,
+                "regDate": "2022-12-02 19:21:05.307",
+                "detailInfo": {
+                    "inColor": "TRY",
+                    "outColor": "R3G",
+                    "saleCarmdlCd": "CZ",
+                    "bodyType": "2",
+                    "saleCarmdlEnNm": "KONA"
+                }
+            }
+        ]
+    },
+    "msgId": "MSG-1"
+}

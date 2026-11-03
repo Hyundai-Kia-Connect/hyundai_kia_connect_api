@@ -6,6 +6,10 @@ updates:
       # Check for updates once a week
       schedule:
           interval: "weekly"
+      ignore:
+          # 4.x breaks imports on HA installs that already ship 3.x (kia_uvo#2012).
+          - dependency-name: "pycryptodome"
+            versions: [">=4"]
     - package-ecosystem: "github-actions"
       directory: "/"
       # Check for updates once a week

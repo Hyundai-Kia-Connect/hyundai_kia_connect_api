@@ -1,15 +1,19 @@
 """HyundaiBlueLinkAPIUSA.py"""
 
-# pylint:disable=logging-fstring-interpolation,deprecated-method,invalid-name,broad-exception-caught,unused-argument,missing-function-docstring
-
 import base64
 import datetime as dt
 import logging
+import ssl
 import time
-from typing import ClassVar
+from collections.abc import Sequence
+from typing import Any, ClassVar, cast
 
 import certifi
-from requests.adapters import HTTPAdapter
+import requests
+from requests.adapters import DEFAULT_POOLBLOCK, DEFAULT_POOLSIZE, HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import (
@@ -30,6 +34,7 @@ from .const import (
     SEAT_STATUS,
     TEMPERATURE_UNITS,
     VEHICLE_LOCK_ACTION,
+    PressureUnit,
 )
 from .svm import (
     SVMDetails,
@@ -37,7 +42,6 @@ from .svm import (
     _parse_door_open,
     _parse_float_list,
     _parse_image_sizes,
-    _parse_int,
     redact_svm_metadata,
 )
 from .Token import Token
@@ -45,8 +49,10 @@ from .utils import (
     float_or_none,
     get_child_value,
     get_float,
+    int_or_none,
     normalize_battery_soc,
     parse_datetime,
+    pressure_or_none,
 )
 from .Vehicle import (
     DailyDrivingStats,
@@ -62,7 +68,7 @@ CIPHERS = "DEFAULT@SECLEVEL=1"
 _LOGGER = logging.getLogger(__name__)
 
 
-def _check_response_for_errors(response: dict) -> None:
+def _check_response_for_errors(response: dict[str, Any]) -> None:
     """
     Checks for errors in the API response.
     If an error is found, an exception is raised.
@@ -87,7 +93,9 @@ def _check_response_for_errors(response: dict) -> None:
         raise exc(f"API Error {code}{suffix}: {response['errorMessage']}")
 
 
-def _safe_parse_json(response, action_name: str):
+def _safe_parse_json(
+    response: requests.Response, action_name: str
+) -> dict[str, Any] | None:
     """
     Safely parse JSON response from Hyundai USA API.
 
@@ -120,10 +128,10 @@ def _safe_parse_json(response, action_name: str):
         )
         return None
 
-    return response.json()
+    return cast(dict[str, Any], response.json())
 
 
-def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
+def parse_svm_response(response: dict[str, Any], timezone: dt.tzinfo) -> SVMDetails:
     """Parse a getSVMDetails response into SVMDetails.
 
     Args:
@@ -163,7 +171,7 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
         captured_at_raw=captured_at_raw,
         latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
         longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
-        heading=_parse_int(get_child_value(detail, "gpsDetail.head")),
+        heading=int_or_none(get_child_value(detail, "gpsDetail.head")),
         speed=(speed_value, speed_unit),
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
@@ -174,26 +182,82 @@ def parse_svm_response(response: dict, timezone: dt.timezone) -> SVMDetails:
     )
 
 
+def create_cipher_context() -> ssl.SSLContext:
+    """An SSL context with the poor ciphers Hyundai USA requires."""
+    context = create_urllib3_context(ciphers=CIPHERS)
+    context.options |= 0x4
+    return context
+
+
+class _CipherConnection(HTTPSConnection):
+    """An HTTPSConnection that builds its SSL context fresh per connection.
+
+    urllib3 mutates context.verify_mode before every handshake. Environments
+    that inject pyOpenSSL >= 26.2 into urllib3 reject mutating a context that
+    already created a connection (urllib3 #5107), so a pool-shared context
+    fails on the second connection onwards.
+    """
+
+    def connect(self) -> None:
+        self.ssl_context = create_cipher_context()
+        super().connect()
+
+
+class _CipherConnectionPool(HTTPSConnectionPool):
+    ConnectionCls = _CipherConnection
+
+
+class _CipherPoolManager(PoolManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _CipherConnectionPool,
+        }
+
+
+class _CipherProxyManager(ProxyManager):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.pool_classes_by_scheme = {
+            "http": HTTPConnectionPool,
+            "https": _CipherConnectionPool,
+        }
+
+
 class cipherAdapter(HTTPAdapter):
-    """
-    A HTTPAdapter that re-enables poor ciphers required by Hyundai.
-    """
+    """An HTTPAdapter mounting pools whose connections use Hyundai USA's
+    legacy ciphers (see _CipherConnection for why)."""
 
-    def _setup_ssl_context(self):
-        context = create_urllib3_context(ciphers=CIPHERS)
-        context.options |= 0x4
-
-        return context
-
-    def init_poolmanager(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
+    def init_poolmanager(
+        self,
+        connections: int = DEFAULT_POOLSIZE,
+        maxsize: int = DEFAULT_POOLSIZE,
+        block: bool = DEFAULT_POOLBLOCK,
+        **kwargs: Any,
+    ) -> None:
         kwargs["ca_certs"] = certifi.where()
-        return super().init_poolmanager(*args, **kwargs)
+        self.poolmanager = _CipherPoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            **kwargs,
+        )
 
-    def proxy_manager_for(self, *args, **kwargs):
-        kwargs["ssl_context"] = self._setup_ssl_context()
-
-        return super().proxy_manager_for(*args, **kwargs)
+    def proxy_manager_for(self, proxy: str, **kwargs: Any) -> Any:
+        if proxy in self.proxy_manager:
+            return self.proxy_manager[proxy]
+        if proxy.lower().startswith("socks"):
+            return super().proxy_manager_for(proxy, **kwargs)
+        manager = self.proxy_manager[proxy] = _CipherProxyManager(
+            proxy,
+            proxy_headers=self.proxy_headers(proxy),
+            num_pools=DEFAULT_POOLSIZE,
+            maxsize=DEFAULT_POOLSIZE,
+            block=DEFAULT_POOLBLOCK,
+            **kwargs,
+        )
+        return manager
 
 
 class HyundaiBlueLinkApiUSA(ApiImpl):
@@ -207,11 +271,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _SVM_POLL_TIMEOUT_SECONDS = 120
     _SVM_INITIAL_WAIT_SECONDS = 15
 
-    # Hyundai BlueLink USA exposes SVM / Find My Car for supported vehicles.
-    # Capability is declared per-region (like supports_window_control); the
-    # actual image is fetched on demand via get_svm_details / request_svm_capture.
-    supports_svm: bool = True
-
     # Maps transaction IDs to service_type values for action status polling.
     # Horn/hazard commands need HORN_AND_LIGHTS or LIGHTS_ONLY instead of
     # the default REMOTE_POLL.
@@ -221,14 +280,14 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     # generation and model rarely change, so the response is cached for
     # the instance lifetime. get_vehicles force-refreshes (vehicle list
     # can change); _get_vehicle_details uses the cache.
-    _enrollment_details_cache: dict | None = None
+    _enrollment_details_cache: dict[str, Any] | None = None
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
         self.BASE_URL: str = "api.telematics.hyundaiusa.com"
         self.LOGIN_API: str = "https://" + self.BASE_URL + "/v2/ac/"
         self.API_URL: str = "https://" + self.BASE_URL + "/ac/v2/"
-        self.temperature_range = range(62, 82)
+        self.temperature_range: Sequence[float] = range(62, 82)
 
         ts = time.time()
         utc_offset = (
@@ -266,14 +325,14 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         _LOGGER.debug(f"{DOMAIN} - initial API headers: {self.API_HEADERS}")
 
-    def _get_authenticated_headers(self, token: Token) -> dict:
-        headers = dict(self.API_HEADERS)
+    def _get_authenticated_headers(self, token: Token) -> dict[str, Any]:
+        headers: dict[str, Any] = dict(self.API_HEADERS)
         headers["username"] = token.username
         headers["accessToken"] = token.access_token
         headers["blueLinkServicePin"] = token.pin
         return headers
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         headers = self._get_authenticated_headers(token)
         headers["registrationId"] = vehicle.id
         headers["gen"] = str(vehicle.generation)
@@ -375,7 +434,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def _get_enrollment_details(
         self, token: Token, force_refresh: bool = False
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Return enrollment details for the account, cached on the instance.
 
         Capabilities, seat configs, generation and model change rarely, so
@@ -394,18 +453,21 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if "enrolledVehicleDetails" not in response_json:
             raise AuthenticationError("Missing enrolledVehicleDetails in response")
         self._enrollment_details_cache = response_json
-        return response_json
+        return cast(dict[str, Any], response_json)
 
-    def _get_vehicle_details(self, token: Token, vehicle: Vehicle):
+    def _get_vehicle_details(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         response = self._get_enrollment_details(token)
         for entry in response["enrolledVehicleDetails"]:
             entry = entry["vehicleDetails"]
             if entry["regid"] == vehicle.id:
-                return entry
+                return cast(dict[str, Any], entry)
+        return None
 
     def _get_vehicle_status(
         self, token: Token, vehicle: Vehicle, refresh: bool
-    ) -> dict:
+    ) -> dict[str, Any]:
         # Vehicle Status Call
         url = self.API_URL + "rcs/rvs/vehicleStatus"
         headers = self._get_vehicle_headers(token, vehicle)
@@ -429,7 +491,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return status
 
-    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_ev_trip_details(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         if vehicle.engine_type != ENGINE_TYPES.EV:
             return {}
 
@@ -444,9 +506,11 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _check_response_for_errors(response)
         _LOGGER.debug(f"{DOMAIN} - get_ev_trip_details response {response}")
 
-        return response
+        return cast(dict[str, Any], response)
 
-    def _get_vehicle_location(self, token: Token, vehicle: Vehicle):
+    def _get_vehicle_location(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
         """
         Get the location of the vehicle
         This logic only checks odometer move in the update.
@@ -464,7 +528,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             _check_response_for_errors(response_json)
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response_json}")
             if response_json.get("coord") is not None:
-                return response_json
+                return cast(dict[str, Any], response_json)
             else:
                 if (
                     response_json.get("errorCode", 0) == 502
@@ -486,7 +550,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location result is None")
         return None
 
-    def _update_vehicle_properties(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         vehicle.last_updated_at = parse_datetime(
             get_child_value(state, "vehicleStatus.dateTime"), self.data_timezone
         )
@@ -597,6 +663,39 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             get_child_value(
                 state, "vehicleStatus.tirePressureLamp.tirePressureWarningLampAll"
             )
+        )
+        vehicle.tire_pressure_front_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_front_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureFrontRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_left = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearLeft"
+                )
+            )
+        )
+        vehicle.tire_pressure_rear_right = pressure_or_none(
+            float_or_none(
+                get_child_value(
+                    state, "vehicleStatus.tirePressure.tirePressureRearRight"
+                )
+            )
+        )
+        vehicle.tire_pressure_unit = (
+            PressureUnit.PSI
+            if get_child_value(state, "vehicleStatus.tirePressure") is not None
+            else None
         )
         vehicle.front_left_window_is_open = get_child_value(
             state, "vehicleStatus.windowOpen.frontLeft"
@@ -807,9 +906,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def update_month_trip_info(
         self,
-        token,
-        vehicle,
-        yyyymm_string,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymm_string: str,
     ) -> None:
         """
         feature only available for some regions.
@@ -828,39 +927,38 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         trips = vehicle.data["filled_trips"]
 
-        month_trip_info: MonthTripInfo = None
+        month_trip_info: MonthTripInfo | None = None
         month_trip_info_count = 0
 
         for trip in trips:
             date_str = trip.hhmmss
             yyyymm = date_str[0:4] + date_str[5:7]
             if yyyymm == yyyymm_string:
-                if month_trip_info_count == 0:
+                if month_trip_info is None:
+                    summary = TripInfo(
+                        drive_time=trip.drive_time,
+                        idle_time=trip.idle_time,
+                        distance=trip.distance,
+                        avg_speed=trip.avg_speed,
+                        max_speed=trip.max_speed,
+                    )
                     month_trip_info = MonthTripInfo(
                         yyyymm=yyyymm_string,
-                        summary=TripInfo(
-                            drive_time=trip.drive_time,
-                            idle_time=trip.idle_time,
-                            distance=trip.distance,
-                            avg_speed=trip.avg_speed,
-                            max_speed=trip.max_speed,
-                        ),
+                        summary=summary,
                         day_list=[],
                     )
                     month_trip_info_count = 1
                 else:
                     # increment totals for month (for the few trips available)
                     month_trip_info_count += 1
-                    summary = month_trip_info.summary
                     summary.drive_time += trip.drive_time
                     summary.idle_time += trip.idle_time
                     summary.distance += trip.distance
                     summary.avg_speed += trip.avg_speed
                     summary.max_speed = max(trip.max_speed, summary.max_speed)
 
-                month_trip_info.summary.avg_speed /= month_trip_info_count
-                month_trip_info.summary.avg_speed = round(
-                    month_trip_info.summary.avg_speed, 1
+                summary.avg_speed = round(
+                    cast(float, summary.avg_speed) / month_trip_info_count, 1
                 )
 
                 # also fill DayTripCount
@@ -868,7 +966,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 day_trip_found = False
                 for day in month_trip_info.day_list:
                     if day.yyyymmdd == yyyymmdd:
-                        day.trip_count += 1
+                        day.trip_count = cast(int, day.trip_count) + 1
                         day_trip_found = True
 
                 if not day_trip_found:
@@ -880,9 +978,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def update_day_trip_info(
         self,
-        token,
-        vehicle,
-        yyyymmdd_string,
+        token: Token,
+        vehicle: Vehicle,
+        yyyymmdd_string: str,
     ) -> None:
         """
         feature only available for some regions.
@@ -902,7 +1000,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         trips = vehicle.data["filled_trips"]
         _LOGGER.debug(f"filled_trips: {trips}")
 
-        day_trip_info: DayTripInfo = None
+        day_trip_info: DayTripInfo | None = None
         day_trip_info_count = 0
 
         for trip in trips:
@@ -910,32 +1008,31 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             yyyymmdd = date_str[0:4] + date_str[5:7] + date_str[8:10]
             _LOGGER.debug(f"update_day_trip_info: {yyyymmdd} trip: {trip}")
             if yyyymmdd == yyyymmdd_string:
-                if day_trip_info_count == 0:
+                if day_trip_info is None:
+                    summary = TripInfo(
+                        drive_time=trip.drive_time,
+                        idle_time=trip.idle_time,
+                        distance=trip.distance,
+                        avg_speed=trip.avg_speed,
+                        max_speed=trip.max_speed,
+                    )
                     day_trip_info = DayTripInfo(
                         yyyymmdd=yyyymmdd_string,
-                        summary=TripInfo(
-                            drive_time=trip.drive_time,
-                            idle_time=trip.idle_time,
-                            distance=trip.distance,
-                            avg_speed=trip.avg_speed,
-                            max_speed=trip.max_speed,
-                        ),
+                        summary=summary,
                         trip_list=[],
                     )
                     day_trip_info_count = 1
                 else:
                     # increment totals for month (for the few trips available)
                     day_trip_info_count += 1
-                    summary = day_trip_info.summary
                     summary.drive_time += trip.drive_time
                     summary.idle_time += trip.idle_time
                     summary.distance += trip.distance
                     summary.avg_speed += trip.avg_speed
                     summary.max_speed = max(trip.max_speed, summary.max_speed)
 
-                day_trip_info.summary.avg_speed /= day_trip_info_count
-                day_trip_info.summary.avg_speed = round(
-                    day_trip_info.summary.avg_speed, 1
+                summary.avg_speed = round(
+                    cast(float, summary.avg_speed) / day_trip_info_count, 1
                 )
 
                 # also fill TripInfo
@@ -1063,7 +1160,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if response.status_code == 502:
             try:
                 response_json = response.json()
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:
                 raise APIError("SVM request failed with HTTP 502")
             if response_json.get("errorSubCode") == "HT_533":
                 raise DuplicateRequestError(
@@ -1122,7 +1219,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         # Without any timestamp we cannot determine freshness.
         return False
 
-    def get_vehicles(self, token: Token):
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
         response = self._get_enrollment_details(token, force_refresh=True)
         result = []
         for entry in response["enrolledVehicleDetails"]:
@@ -1145,14 +1242,19 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=int(entry.get("vehicleGeneration", "2")),
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = False
+            # SVM / Find My Car; the image is fetched on demand via
+            # get_svm_details / request_svm_capture.
+            vehicle.supports.svm = True
             result.append(vehicle)
 
         return result
 
-    def _get_transaction_id(self, response) -> str | None:
+    def _get_transaction_id(self, response: requests.Response) -> str | None:
         for key in ("tmsTid", "transactionId", "Xid"):
             if key in response.headers:
-                return response.headers[key]
+                return cast(str | None, response.headers[key])
         _LOGGER.warning(
             f"{DOMAIN} - No transaction ID found in response headers: "
             f"{dict(response.headers)}"
@@ -1196,7 +1298,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             return ORDER_STATUS.TIMEOUT
         return ORDER_STATUS.PENDING
 
-    def lock_action(self, token: Token, vehicle: Vehicle, action) -> str:
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str | None:
         _LOGGER.debug(f"{DOMAIN} - Action for lock is: {action}")
 
         if action == VEHICLE_LOCK_ACTION.LOCK:
@@ -1225,7 +1329,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
-    ) -> str:
+    ) -> str | None:
         _LOGGER.debug(f"{DOMAIN} - Start engine..")
         if vehicle.engine_type == ENGINE_TYPES.EV:
             url = self.API_URL + "evc/fatc/start"
@@ -1300,7 +1404,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str | None:
         _LOGGER.debug(f"{DOMAIN} - Stop engine..")
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -1323,9 +1427,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Start charging..")
 
@@ -1344,9 +1448,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Stop charging..")
 
@@ -1367,9 +1471,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
     def set_charge_limits(
         self, token: Token, vehicle: Vehicle, ac: int, dc: int
-    ) -> str:
+    ) -> str | None:
         if vehicle.engine_type != ENGINE_TYPES.EV:
-            return {}
+            return None
 
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
         url = self.API_URL + "evc/charge/targetsoc/set"
@@ -1402,7 +1506,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         return self._get_transaction_id(response)
 
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str | None:
         url = self.API_URL + "rcs/rhl/light"
         headers = self._get_vehicle_headers(token, vehicle)
         headers["APPCLOUD-VIN"] = vehicle.VIN
@@ -1425,7 +1529,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             self._action_service_types[action_id] = "LIGHTS_ONLY"
         return action_id
 
-    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
+    def start_hazard_lights_and_horn(
+        self, token: Token, vehicle: Vehicle
+    ) -> str | None:
         url = self.API_URL + "rcs/rhl/hnl"
         headers = self._get_vehicle_headers(token, vehicle)
         headers["APPCLOUD-VIN"] = vehicle.VIN

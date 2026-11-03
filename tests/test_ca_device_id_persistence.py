@@ -1,6 +1,7 @@
-"""Tests for KiaUvoApiCA device_id persistence (kia_uvo#1715).
+"""Tests for KiaUvoApiCA device_id persistence (Hyundai-Kia-Connect/kia_uvo#1715).
 
-CA has no refresh endpoint, so token refresh re-logs-in. Previously device_id
+CA token refresh refreshes via gtothbyrftkn and falls back to re-login when
+the refresh is rejected. Previously device_id
 was regenerated from uuid5(MAC+hostname) on every login and never stored in
 the Token — a Docker restart with a changed MAC/hostname produced a new
 device_id the server did not recognize, triggering 7110 OTP. These tests lock

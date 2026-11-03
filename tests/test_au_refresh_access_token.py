@@ -22,10 +22,11 @@ def test_cn_refresh_hook_default_empty() -> None:
     assert api._refresh_access_token_headers() == {}
 
 
-def test_in_refresh_hook_default_empty() -> None:
-    """IN inherits the base hook and must not send Stamp on refresh."""
-    api = KiaUvoApiIN(brand=2)
-    assert api._refresh_access_token_headers() == {}
+def test_in_refresh_hook_sends_stamp() -> None:
+    """IN overrides the hook: its login flow always sent Stamp on this grant."""
+    api = KiaUvoApiIN(region=6, brand=2, language="en")
+    api._get_stamp = lambda: "STAMP-FAKE"  # type: ignore[assignment]
+    assert api._refresh_access_token_headers() == {"Stamp": "STAMP-FAKE"}
 
 
 def _au_api_with_mock_session() -> KiaUvoApiAU:
@@ -40,7 +41,9 @@ def _au_api_with_mock_session() -> KiaUvoApiAU:
 def test_au_refresh_sends_stamp() -> None:
     """AU refresh_token grant must include the Stamp header."""
     api = _au_api_with_mock_session()
-    api.refresh_access_token(Token(refresh_token="old-rtk"))
+    api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     sent_headers = api.session.post.call_args.kwargs["headers"]
     assert sent_headers.get("Stamp") == "STAMP-FAKE"
 
@@ -48,7 +51,9 @@ def test_au_refresh_sends_stamp() -> None:
 def test_au_refresh_grant_type_and_url() -> None:
     """AU refresh uses grant_type=refresh_token to the oauth2/token endpoint."""
     api = _au_api_with_mock_session()
-    api.refresh_access_token(Token(refresh_token="old-rtk"))
+    api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     call = api.session.post.call_args
     assert call.args[0] == api.USER_API_URL + "oauth2/token"
     assert "grant_type=refresh_token" in call.kwargs["data"]
@@ -63,6 +68,8 @@ def test_au_refresh_falls_back_to_login_on_error() -> None:
         side_effect=DeviceIDError("4002 Invalid parameters")
     )
     api.login = MagicMock(return_value="FELLBACK")  # type: ignore[assignment]
-    result = api.refresh_access_token(Token(refresh_token="old-rtk"))
+    result = api.refresh_access_token(
+        Token(username="test-user", password="test-pass", refresh_token="old-rtk")
+    )
     assert result == "FELLBACK"
     api.login.assert_called_once()

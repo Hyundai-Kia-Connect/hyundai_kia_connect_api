@@ -1,0 +1,15 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/vrfypin",
+        "source": "Received Pin validation response debug log in kia_uvo #459 (2021 Kona EV)",
+        "description": "Real response; pAuth replaced."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "pAuth": "PAUTH-1"
+    }
+}

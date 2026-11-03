@@ -17,7 +17,6 @@ from hyundai_kia_connect_api.Token import Token
 def usa_api() -> KiaUvoApiUSA:
     api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
     api.API_URL = "https://example.com/"
-    api._otp_handler = None
     api.api_headers = dict
     return api
 

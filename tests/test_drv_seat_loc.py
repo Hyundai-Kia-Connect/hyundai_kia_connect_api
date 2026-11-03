@@ -27,7 +27,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 @pytest.fixture
 def vehicle():
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "test-vehicle-id"
     return v
 
@@ -93,7 +93,7 @@ class TestINDrvSeatLoc:
 
     def setup_method(self):
         # brand=2 (Hyundai)
-        self.api = KiaUvoApiIN(brand=2)
+        self.api = KiaUvoApiIN(region=6, brand=2, language="en")
 
     def test_in_kilometres_still_rhd(self, vehicle):
         assert self.api._get_drv_seat_loc(_set_km(vehicle)) == "R"

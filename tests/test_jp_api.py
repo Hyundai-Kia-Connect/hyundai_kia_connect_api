@@ -21,7 +21,7 @@ from hyundai_kia_connect_api.exceptions import (
 )
 from hyundai_kia_connect_api.HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
 
@@ -169,7 +169,9 @@ def test_refresh_preserves_device_and_refresh_token(api):
 def test_invalid_token_schema(api, payload):
     api.session.request.return_value = response(payload)
     with pytest.raises(InvalidAPIResponseError):
-        api.refresh_access_token(Token(refresh_token="synthetic"))
+        api.refresh_access_token(
+            Token(username="synthetic", password="synthetic", refresh_token="synthetic")
+        )
 
 
 def test_discovery_requires_profile_protocol_and_uses_tokyo(api):
@@ -198,7 +200,14 @@ def test_discovery_requires_profile_protocol_and_uses_tokyo(api):
             )
         ),
     ]
-    vehicles = api.get_vehicles(Token(access_token="access", device_id="device"))
+    vehicles = api.get_vehicles(
+        Token(
+            username="synthetic",
+            password="synthetic",
+            access_token="access",
+            device_id="device",
+        )
+    )
     assert len(vehicles) == 1
     assert vehicles[0].VIN == "SYNTHETIC_VIN"
     assert str(vehicles[0].timezone) == "Asia/Tokyo"
@@ -214,7 +223,7 @@ def test_discovery_does_not_guess_protocol(api, protocol):
         ),
     ]
     with pytest.raises(InvalidAPIResponseError):
-        api.get_vehicles(Token())
+        api.get_vehicles(Token(username="synthetic", password="synthetic"))
 
 
 def test_legacy_cached_wrapper_single_request(api):
@@ -233,7 +242,9 @@ def test_legacy_cached_wrapper_single_request(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.is_locked is True
     assert vehicle.car_battery_percentage == 80
     assert vehicle.last_updated_at.utcoffset() == dt.timedelta(hours=9)
@@ -259,7 +270,9 @@ def test_ccs2_cached_single_request(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.ev_battery_percentage == 65
     assert vehicle.total_driving_range == 300
     assert vehicle.total_driving_range_unit == "km"
@@ -278,7 +291,9 @@ def test_malformed_status_rejected(api, payload):
     api.session.request.return_value = response(envelope(payload))
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
     with pytest.raises(InvalidAPIResponseError):
-        api.update_vehicle_with_cached_state(Token(), vehicle)
+        api.update_vehicle_with_cached_state(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.last_updated_at is None
 
 
@@ -318,7 +333,8 @@ def test_api_redirect_does_not_forward_secrets(api, status):
 def test_cached_arguments_validated_before_io(api, identifier, protocol):
     with pytest.raises(InvalidAPIResponseError):
         api.update_vehicle_with_cached_state(
-            Token(), Vehicle(id=identifier, ccu_ccs2_protocol_support=protocol)
+            Token(username="synthetic", password="synthetic"),
+            Vehicle(id=identifier, ccu_ccs2_protocol_support=protocol),
         )
     api.session.request.assert_not_called()
 
@@ -338,7 +354,9 @@ def test_parser_failure_does_not_partially_mutate_vehicle(api):
         )
     )
     with pytest.raises(InvalidAPIResponseError):
-        api.update_vehicle_with_cached_state(Token(), vehicle)
+        api.update_vehicle_with_cached_state(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.last_updated_at is None
     assert vehicle.car_battery_percentage is None
 
@@ -361,14 +379,16 @@ def test_legacy_temperature_does_not_guess_profile_dependent_scale(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.air_temperature is None
 
 
 def test_unknown_error_code_does_not_become_success(api):
     api.session.request.return_value = response({"resCode": "unrecognized"})
     with pytest.raises(APIError):
-        api.get_vehicles(Token())
+        api.get_vehicles(Token(username="synthetic", password="synthetic"))
 
 
 def test_authorize_external_redirect_rejected_before_signin(api):
@@ -398,7 +418,9 @@ def test_legacy_zero_and_false_status_are_preserved(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.is_locked is False
     assert vehicle.engine_is_running is False
     assert vehicle.car_battery_percentage == 0
@@ -408,7 +430,7 @@ def test_legacy_zero_and_false_status_are_preserved(api):
 
 def test_empty_account_discovery(api):
     api.session.request.return_value = response(envelope({"vehicles": []}))
-    assert api.get_vehicles(Token()) == []
+    assert api.get_vehicles(Token(username="synthetic", password="synthetic")) == []
     api.session.request.assert_called_once()
 
 
@@ -427,7 +449,7 @@ def test_discovery_keeps_multiple_vehicles_separate(api):
         response(envelope({"vinInfo": [{"basic": {"ccuCCS2ProtocolSupport": 0}}]})),
         response(envelope({"vinInfo": [{"basic": {"ccuCCS2ProtocolSupport": 1}}]})),
     ]
-    vehicles = api.get_vehicles(Token())
+    vehicles = api.get_vehicles(Token(username="synthetic", password="synthetic"))
     assert [v.id for v in vehicles] == ["first", "second"]
     assert [v.ccu_ccs2_protocol_support for v in vehicles] == [0, 1]
 
@@ -444,7 +466,9 @@ def test_discovery_keeps_multiple_vehicles_separate(api):
 def test_bad_request_classifies_only_known_auth_failures(api, payload, error):
     api.session.request.return_value = response(payload, 400)
     with pytest.raises(error) as raised:
-        api.refresh_access_token(Token(refresh_token="synthetic"))
+        api.refresh_access_token(
+            Token(username="synthetic", password="synthetic", refresh_token="synthetic")
+        )
     assert type(raised.value) is error
 
 
@@ -478,7 +502,7 @@ def test_requests_json_decode_error_has_response_classification(api):
     )
     api.session.request.return_value = bad_response
     with pytest.raises(InvalidAPIResponseError) as raised:
-        api.get_vehicles(Token())
+        api.get_vehicles(Token(username="synthetic", password="synthetic"))
     assert "UNIQUE_SYNTHETIC_SECRET" not in str(raised.value)
 
 
@@ -523,7 +547,9 @@ def test_stored_location_including_zero_coordinates(api, wrapped):
         envelope({"gpsDetail": payload} if wrapped else payload)
     )
     vehicle = Vehicle(id="synthetic")
-    api.update_vehicle_with_cached_location(Token(), vehicle)
+    api.update_vehicle_with_cached_location(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.location_latitude == 0
     assert vehicle.location_longitude == 0
     assert vehicle.location_last_updated_at.utcoffset() == dt.timedelta(hours=9)
@@ -541,7 +567,9 @@ def test_invalid_parking_coordinates_do_not_mutate_vehicle(api, latitude, longit
     )
     vehicle = Vehicle(id="synthetic")
     with pytest.raises(InvalidAPIResponseError):
-        api.update_vehicle_with_cached_location(Token(), vehicle)
+        api.update_vehicle_with_cached_location(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.location_latitude is None
 
 
@@ -560,7 +588,9 @@ def test_stored_energy_totals_preserve_zero(api):
         )
     )
     vehicle = Vehicle(id="synthetic")
-    api.update_vehicle_with_driving_info(Token(), vehicle)
+    api.update_vehicle_with_driving_info(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.total_power_consumed == 0
     assert vehicle.total_power_regenerated == 123.5
     assert api.session.request.call_args.kwargs["json"] == {"periodTarget": 0}
@@ -582,7 +612,9 @@ def test_invalid_energy_totals_do_not_mutate_vehicle(api):
     )
     vehicle = Vehicle(id="synthetic")
     with pytest.raises(InvalidAPIResponseError):
-        api.update_vehicle_with_driving_info(Token(), vehicle)
+        api.update_vehicle_with_driving_info(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.total_power_consumed is None
 
 
@@ -592,6 +624,8 @@ def test_profile_camera_capability_survives_vehicle_manager_initialization(
     api._vehicle_profiles["supported"] = {"option": {"svmOptionInfo": 1}}
     api._vehicle_profiles["unsupported"] = {"option": {"svmOptionInfo": 0}}
     vehicles = [Vehicle(id="supported"), Vehicle(id="unsupported")]
+    for vehicle in vehicles:
+        api.initialize_vehicle_capabilities(vehicle)
     monkeypatch.setattr(api, "get_vehicles", lambda token: vehicles)
     monkeypatch.setattr(
         VehicleManager, "get_implementation_by_region_brand", lambda *args: api
@@ -600,8 +634,8 @@ def test_profile_camera_capability_survives_vehicle_manager_initialization(
         10, 2, "synthetic", "synthetic", "1234", geocode_api_enable=False
     )
     manager.initialize_vehicles()
-    assert manager.vehicles["supported"].supports_svm is True
-    assert manager.vehicles["unsupported"].supports_svm is False
+    assert manager.vehicles["supported"].supports.svm is True
+    assert manager.vehicles["unsupported"].supports.svm is False
 
 
 def test_optional_auth_failure_does_not_publish_partial_status(api):
@@ -622,7 +656,9 @@ def test_optional_auth_failure_does_not_publish_partial_status(api):
     ]
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
     with pytest.raises(AuthenticationError):
-        api.update_vehicle_with_cached_state(Token(), vehicle)
+        api.update_vehicle_with_cached_state(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.is_locked is None
     assert vehicle.last_updated_at is None
 
@@ -638,8 +674,12 @@ def test_missing_parking_data_is_not_requested_each_poll(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert (
         sum(
             call.args[1].endswith("/location/park")
@@ -651,7 +691,10 @@ def test_missing_parking_data_is_not_requested_each_poll(api):
 
 def test_mqtt_registration_uuid_token_roundtrip_and_refresh(api):
     token = Token(
-        refresh_token="refresh", mqtt_registration_uuid="synthetic-registration"
+        username="synthetic",
+        password="synthetic",
+        refresh_token="refresh",
+        mqtt_registration_uuid="synthetic-registration",
     )
     restored = Token.from_dict(token.to_dict())
     assert restored.mqtt_registration_uuid == "synthetic-registration"
@@ -686,7 +729,9 @@ def test_force_refresh_requires_correlated_completion_and_newer_state(api, monke
     api.session.request.return_value = response({"msgId": "synthetic-action"})
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
     vehicle.last_updated_at = dt.datetime(2026, 10, 13, tzinfo=dt.UTC)
-    api.force_refresh_vehicle_state(Token(pin="1234"), vehicle)
+    api.force_refresh_vehicle_state(
+        Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+    )
     helper.prepare.assert_called_once()
     helper.track.assert_called_once_with("synthetic-action")
     assert vehicle.ev_battery_percentage == 70
@@ -719,7 +764,9 @@ def test_force_refresh_ack_does_not_mean_success(api, monkeypatch, status, error
     api.session.request.return_value = response({"msgId": "synthetic-action"})
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
     with pytest.raises(error):
-        api.force_refresh_vehicle_state(Token(pin="1234"), vehicle)
+        api.force_refresh_vehicle_state(
+            Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+        )
     assert vehicle.last_updated_at is None
 
 
@@ -738,7 +785,9 @@ def test_confirmed_refresh_without_new_telemetry_times_out(api, monkeypatch):
     api.session.request.return_value = response({"msgId": "synthetic-action"})
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
     with pytest.raises(RequestTimeoutError):
-        api.force_refresh_vehicle_state(Token(pin="1234"), vehicle)
+        api.force_refresh_vehicle_state(
+            Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+        )
     assert vehicle.last_updated_at is None
 
 
@@ -761,7 +810,9 @@ def test_force_ignores_retained_state_and_uses_newer_cached_status(api, monkeypa
     api.session.request.return_value = response({"msgId": "synthetic-action"})
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
     vehicle.last_updated_at = dt.datetime(2026, 10, 13, 10, tzinfo=dt.UTC)
-    api.force_refresh_vehicle_state(Token(pin="1234"), vehicle)
+    api.force_refresh_vehicle_state(
+        Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+    )
     assert vehicle.last_updated_at > dt.datetime(2026, 10, 13, tzinfo=dt.UTC)
     assert vehicle.is_locked is True
 
@@ -790,7 +841,9 @@ def test_force_completion_before_vss_waits_for_newer_message(api, monkeypatch):
     api.session.request.return_value = response({"msgId": "synthetic-action"})
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
     vehicle.last_updated_at = dt.datetime(2026, 10, 13, tzinfo=dt.UTC)
-    api.force_refresh_vehicle_state(Token(pin="1234"), vehicle)
+    api.force_refresh_vehicle_state(
+        Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+    )
     assert vehicle.last_updated_at > dt.datetime(2026, 10, 13, tzinfo=dt.UTC)
     assert vehicle.total_driving_range == 321
 
@@ -807,7 +860,9 @@ def test_charge_target_mapping_and_cache(api):
         )
     )
     vehicle = Vehicle(id="synthetic")
-    api.update_vehicle_with_charge_targets(Token(), vehicle)
+    api.update_vehicle_with_charge_targets(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.ev_charge_limits_dc == 80
     assert vehicle.ev_charge_limits_ac == 90
     assert api._charge_target_cache[vehicle.id][1] == {0: 80, 1: 90}
@@ -826,7 +881,9 @@ def test_invalid_charge_targets_are_transactional(api, entries):
     api.session.request.return_value = response(envelope({"targetSOClist": entries}))
     vehicle = Vehicle(id="synthetic", ev_charge_limits_dc=70)
     with pytest.raises(InvalidAPIResponseError):
-        api.update_vehicle_with_charge_targets(Token(), vehicle)
+        api.update_vehicle_with_charge_targets(
+            Token(username="synthetic", password="synthetic"), vehicle
+        )
     assert vehicle.ev_charge_limits_dc == 70
     assert vehicle.id not in api._charge_target_cache
 
@@ -843,7 +900,9 @@ def test_charge_targets_preserve_alternate_ac_plug_type(api):
         )
     )
     vehicle = Vehicle(id="synthetic")
-    api.update_vehicle_with_charge_targets(Token(), vehicle)
+    api.update_vehicle_with_charge_targets(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.ev_charge_limits_ac == 90
     assert api._charge_target_cache[vehicle.id][1] == {0: 80, 2: 90}
 
@@ -910,7 +969,9 @@ def test_rhd_legacy_driver_seat_fallback(api):
         )
     )
     vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=0)
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.front_right_seat_status == "Low Heat"
     assert vehicle.front_left_seat_status == "Low Cool"
 
@@ -935,7 +996,9 @@ def test_daily_energy_rows_use_japan_calendar_dates_and_wh(api):
         )
     )
     vehicle = Vehicle(id="synthetic")
-    api.update_vehicle_with_driving_info(Token(), vehicle)
+    api.update_vehicle_with_driving_info(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert len(vehicle.daily_stats) == 1
     day = vehicle.daily_stats[0]
     assert day.date.utcoffset() == dt.timedelta(hours=9)
@@ -975,7 +1038,9 @@ def test_front_only_window_capability_preserves_rear_telemetry(api):
 
 def test_old_cached_only_token_requires_reauthentication_without_io(api):
     with pytest.raises(AuthenticationError, match="Reauthenticate"):
-        api._mqtt_for_vehicle(Token(), Vehicle(id="synthetic"))
+        api._mqtt_for_vehicle(
+            Token(username="synthetic", password="synthetic"), Vehicle(id="synthetic")
+        )
     api.session.request.assert_not_called()
 
 
@@ -1045,6 +1110,8 @@ def test_invalid_request_is_not_assumed_to_be_invalid_device_id(api):
 
 def test_vehicle_headers_use_protocol_and_ready_context_only(api):
     token = Token(
+        username="synthetic",
+        password="synthetic",
         access_token="Bearer synthetic",
         device_id="synthetic-device",
         mqtt_registration_uuid="synthetic-registration",
@@ -1079,12 +1146,16 @@ def test_real_adapter_camera_http_5911_polls_then_returns_image(api, monkeypatch
         response(envelope({"scsDetail": {"svmImage": "U1lOVEhFVElDX0lNQUdF"}})),
     ]
     token = Token(
+        username="synthetic",
+        password="synthetic",
         access_token="Bearer synthetic-access",
         device_id="synthetic-device",
         pin="1234",
         mqtt_registration_uuid="synthetic-registration",
     )
-    vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1, supports_svm=True)
+    vehicle = Vehicle(
+        id="synthetic", ccu_ccs2_protocol_support=1, supports=VehicleSupports(svm=True)
+    )
     image = api.request_svm_capture(token, vehicle, acknowledged_warning=True)
     assert image.image_bytes == b"SYNTHETIC_IMAGE"
     calls = api.session.request.call_args_list
@@ -1143,6 +1214,8 @@ def test_force_refresh_renews_control_grant_after_slow_connection(api, monkeypat
         ]
     )
     token = Token(
+        username="synthetic",
+        password="synthetic",
         pin="synthetic-pin",
         mqtt_registration_uuid="synthetic-registration",
         device_id="synthetic-device",
@@ -1164,6 +1237,8 @@ def test_disconnected_persistent_telemetry_session_is_replaced_before_next_comma
     api, monkeypatch
 ):
     token = Token(
+        username="synthetic",
+        password="synthetic",
         access_token="Bearer synthetic-access",
         device_id="synthetic-device",
         mqtt_registration_uuid="synthetic-registration",

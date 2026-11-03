@@ -18,7 +18,7 @@ from hyundai_kia_connect_api.Vehicle import Vehicle
 
 @pytest.fixture
 def vehicle():
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 class TestUnitPreservation:

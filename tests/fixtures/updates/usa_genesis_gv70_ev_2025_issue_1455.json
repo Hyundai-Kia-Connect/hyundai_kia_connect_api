@@ -1,0 +1,32 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2025 GV70 EV (EV)",
+        "source": "kia_uvo #1455 debug log: enrollment details, vehicle status, evTripDetails, findMyCar",
+        "follow_up_sources": "same car",
+        "not_captured": [],
+        "description": "Whole update chain from one car; account blocks, identifiers and coordinates replaced or removed."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Genesis"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV"
+    },
+    "responses": {
+        "GET /ac/v2/enrollment/details/user": {
+            "body": "$fixture:updates/responses/usa_genesis_enrollment_1455.json"
+        },
+        "GET /ac/v2/rcs/rvs/vehicleStatus": {
+            "body": "$fixture:updates/responses/usa_genesis_vehicle_status_1455.json"
+        },
+        "GET /ac/v2/ts/alerts/maintenance/evTripDetails": {
+            "body": "$fixture:updates/responses/us_hyundai_evtripdetails.json"
+        },
+        "GET /ac/v2/rcs/rfc/findMyCar": {
+            "body": "$fixture:updates/responses/us_hyundai_findmycar_feature_off.json"
+        }
+    }
+}

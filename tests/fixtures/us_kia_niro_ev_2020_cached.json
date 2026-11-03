@@ -6,18 +6,7 @@
         "brand": "Kia",
         "endpoint": "cmm/gvi",
         "description": "Cached vehicle state from cmm/gvi endpoint. This response does NOT include targetSOC under evStatus; it uses the older path structure without targetSOC.",
-        "has_target_soc": false,
-        "expected": {
-            "ev_battery_percentage": 68,
-            "ev_charge_limits_dc": null,
-            "ev_charge_limits_ac": null,
-            "odometer_value": 23456,
-            "car_battery_percentage": 87,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0
-        }
+        "has_target_soc": false
     },
     "vehicleConfig": {
         "vehicleDetail": {

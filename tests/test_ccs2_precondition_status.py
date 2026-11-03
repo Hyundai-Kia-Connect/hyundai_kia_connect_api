@@ -116,7 +116,7 @@ class TestCCS2PreconditionSensor:
     )
     def test_ioniq5_precondition_status_enum(self, ccs2_api, status, expected_enabled):
         """EV: BatteryPreCondition.Status maps 0/2/6 -> off, 3/4 -> on."""
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="test-id")
         ccs2_api._update_vehicle_properties_ccs2(vehicle, _ev_state(status))
         assert vehicle.ev_battery_precondition_enabled is expected_enabled
         # Status present -> WinterModeOperation is not mapped to a boolean.
@@ -130,7 +130,7 @@ class TestCCS2PreconditionSensor:
         Precondition must read OFF (app mapping: 2 -> off) and winter_mode
         must not become a boolean from WinterModeOperation on an EV.
         """
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="test-id")
         state = _state(
             {
                 "SoH": {"Ratio": 100},
@@ -153,7 +153,7 @@ class TestCCS2PreconditionSensor:
         Confirmed via reporter dump (kia_uvo #1652, 2026-07-12): with
         preconditioning turned OFF in the myHyundai app, Status reads 0.
         """
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="test-id")
         ccs2_api._update_vehicle_properties_ccs2(vehicle, _ev_state(0))
         assert vehicle.ev_battery_precondition_enabled is False
         assert vehicle.ev_battery_winter_mode is None
@@ -161,7 +161,7 @@ class TestCCS2PreconditionSensor:
     def test_hev_precondition_falls_back_to_winter_mode_off(self, ccs2_api):
         """HEV: no BatteryPreCondition -> fallback to WinterModeOperation=0 ->
         False. No-regression guarantee: existing HEV behaviour is unchanged."""
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="test-id")
         ccs2_api._update_vehicle_properties_ccs2(vehicle, _HEV_WINTER_MODE_OFF)
         assert vehicle.ev_battery_precondition_enabled is False
         assert vehicle.ev_battery_winter_mode is False
@@ -169,17 +169,17 @@ class TestCCS2PreconditionSensor:
     def test_hev_precondition_falls_back_to_winter_mode_on(self, ccs2_api):
         """HEV: no BatteryPreCondition -> fallback to WinterModeOperation=1 ->
         True for both fields. No-regression guarantee for the armed case."""
-        vehicle = Vehicle()
+        vehicle = Vehicle(id="test-id")
         ccs2_api._update_vehicle_properties_ccs2(vehicle, _HEV_WINTER_MODE_ON)
         assert vehicle.ev_battery_precondition_enabled is True
         assert vehicle.ev_battery_winter_mode is True
 
     def test_precondition_field_exists_in_vehicle(self):
-        v = Vehicle()
+        v = Vehicle(id="test-id")
         assert hasattr(v, "ev_battery_precondition_enabled")
         assert v.ev_battery_precondition_enabled is None
 
     def test_winter_mode_field_exists_in_vehicle(self):
-        v = Vehicle()
+        v = Vehicle(id="test-id")
         assert hasattr(v, "ev_battery_winter_mode")
         assert v.ev_battery_winter_mode is None

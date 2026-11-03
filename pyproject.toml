@@ -18,3 +18,16 @@ ignore = [
     # Deferred to a separate tz-aware migration PR.
     "DTZ001", "DTZ004", "DTZ005", "DTZ006", "DTZ007", "DTZ901",
 ]
+
+# Modules not yet clean under `mypy --strict` (pre-commit). Remove a module
+# from this list in the PR that makes it pass; new modules must pass.
+[[tool.mypy.overrides]]
+module = [
+    "hyundai_kia_connect_api.VehicleManager",
+]
+ignore_errors = true
+
+# geopy (the "google" extra) ships no type hints and has no stub package.
+[[tool.mypy.overrides]]
+module = ["geopy.*"]
+ignore_missing_imports = true

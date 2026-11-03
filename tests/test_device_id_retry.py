@@ -23,7 +23,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             return "success"
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         # Simulate calling as unbound method with mock self
         mock_self = type(
             "MockApi",
@@ -51,7 +56,12 @@ class TestRetryOnDeviceIdError:
                 raise DeviceIDError("Invalid deviceId")
             return "success_after_retry"
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -76,7 +86,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             raise DeviceIDError("Still invalid")
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -99,7 +114,12 @@ class TestRetryOnDeviceIdError:
             call_count += 1
             raise ValueError("some other error")
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         mock_self = type(
             "MockApi",
             (),
@@ -144,7 +164,12 @@ class TestCheckActionStatusDecorator:
         ]
         api.session.get = lambda url, headers=None: responses.pop(0)
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
 
         result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
@@ -170,10 +195,60 @@ class TestCheckActionStatusDecorator:
             }
         )
 
-        token = Token(access_token="at", device_id="old-device-id")
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="at",
+            device_id="old-device-id",
+        )
         vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
 
         result = api.check_action_status(token, vehicle, "action-1", synchronous=False)
 
         assert result == ORDER_STATUS.SUCCESS
         assert token.device_id == "old-device-id"  # unchanged — no error occurred
+
+
+class TestGetDrivingInfoDecorator:
+    """_get_driving_info must be decorated with @_retry_on_device_id_error.
+
+    Its callers wrap it in ``except Exception`` and only log, so the decorator
+    on the outer update method never sees a 4002 from /drvhistory: the
+    device_id was not re-registered and the drive stats were skipped.
+    """
+
+    def test_recovers_from_4002_and_reregisters_device_id(self):
+        api = ApiImplType1()
+        api.SPA_API_URL = "https://example.test/"
+        api._get_device_id = lambda stamp: "new-device-id"
+        api._get_stamp = lambda: "stamp"
+        api._get_authenticated_headers = lambda token, ccu: {}
+
+        driving_info = {"drivingPeriod": 0, "calculativeOdo": 100, "totalPwrCsp": 15000}
+        ok = {"resCode": "0000", "resMsg": {"drivingInfo": [driving_info]}}
+        responses = [
+            SimpleNamespace(
+                json=lambda: {
+                    "retCode": "F",
+                    "resCode": "4002",
+                    "resMsg": "Invalid request body - Invalid deviceId.",
+                }
+            ),
+            SimpleNamespace(json=lambda: ok),
+            SimpleNamespace(json=lambda: ok),
+        ]
+        api.session.post = lambda url, json=None, headers=None: responses.pop(0)
+
+        token = Token(
+            username="test-user",
+            password="test-pass",
+            access_token="access-token",
+            device_id="old-device-id",
+        )
+        vehicle = SimpleNamespace(id="vid", ccu_ccs2_protocol_support=0)
+
+        result = api._get_driving_info(token, vehicle)
+
+        assert result["consumption30d"] == 150
+        assert token.device_id == "new-device-id"
+        assert len(responses) == 0  # 4002, then both drvhistory POSTs on retry

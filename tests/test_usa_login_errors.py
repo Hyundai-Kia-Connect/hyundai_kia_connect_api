@@ -19,7 +19,6 @@ from hyundai_kia_connect_api.Token import Token
 def usa_api() -> KiaUvoApiUSA:
     api = KiaUvoApiUSA.__new__(KiaUvoApiUSA)
     api.API_URL = "https://example.com/"
-    api._otp_handler = None
     api.api_headers = dict
     api.device_id = "device-key"
     return api
@@ -101,7 +100,7 @@ def test_login_wrong_credentials_raises_authentication_error(usa_api):
     )
 
     with pytest.raises(AuthenticationError) as exc_info:
-        usa_api.login("u", "bad", token)
+        usa_api.login("u", "bad", token=token)
     assert "Invalid Email or Password" in str(exc_info.value)
 
 
@@ -117,7 +116,7 @@ def test_login_invalid_request_raises_apierror_not_auth(usa_api):
     )
 
     with pytest.raises(APIError) as exc_info:
-        usa_api.login("u", "p", token)
+        usa_api.login("u", "p", token=token)
     assert not isinstance(exc_info.value, AuthenticationError)
 
 
@@ -129,7 +128,7 @@ def test_login_status_zero_no_sid_raises_apierror(usa_api):
     )
 
     with pytest.raises(APIError) as exc_info:
-        usa_api.login("u", "p", token)
+        usa_api.login("u", "p", token=token)
     assert not isinstance(exc_info.value, AuthenticationError)
 
 
@@ -225,7 +224,7 @@ def test_login_non_dict_status_raises_apierror(usa_api):
     usa_api.session.post.return_value = resp
 
     with pytest.raises(APIError) as exc_info:
-        usa_api.login("u", "p", token)
+        usa_api.login("u", "p", token=token)
     assert not isinstance(exc_info.value, AuthenticationError)
     assert not isinstance(exc_info.value, AttributeError)
 
@@ -275,3 +274,36 @@ def test_complete_login_with_otp_success_returns_sid(usa_api):
     result = usa_api._complete_login_with_otp("u", "p", "sid", "rmtoken")
 
     assert result == "final-sid"
+
+
+def test_login_positional_pin_lands_in_pin(usa_api):
+    """login() takes (username, password, pin) like the base class.
+
+    VehicleManager re-logs in with ``api.login(username, password, pin)``;
+    the pin used to land in the ``token`` slot and crash on
+    ``token.refresh_token``.
+    """
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=0, sid="session-id", error_message="Success"
+    )
+
+    result = usa_api.login("u", "p", "1234")
+
+    assert isinstance(result, Token)
+    assert result.pin == "1234"
+
+
+def test_refresh_access_token_keeps_pin(usa_api):
+    usa_api.session = MagicMock()
+    usa_api.session.post.return_value = _login_response(
+        status_code=0, sid="session-id", error_message="Success"
+    )
+    token = Token(
+        username="u", password="p", access_token="x", refresh_token="r", pin="1234"
+    )
+
+    result = usa_api.refresh_access_token(token)
+
+    assert result.pin == "1234"
+    assert result.refresh_token == "r"

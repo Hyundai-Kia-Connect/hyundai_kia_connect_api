@@ -1,0 +1,105 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Kia",
+        "endpoint": "ownr/gvl",
+        "vehicles": "2022 EV6 (EV)",
+        "source": "Get Vehicles Response debug log in kia_uvo #722",
+        "description": "Real vehicle summary. VIN, vehicle id, vehicle key, dealer code and mileage replaced."
+    },
+    "status": {
+        "statusCode": 0,
+        "errorType": 0,
+        "errorCode": 0,
+        "errorMessage": "Success with response body"
+    },
+    "payload": {
+        "vehicleSummary": [
+            {
+                "vin": "TESTVIN0000000001",
+                "vehicleIdentifier": "VEHICLE-1",
+                "modelName": "EV6",
+                "modelYear": "2022",
+                "nickName": "My EV6",
+                "generation": 2,
+                "extColorCode": "CR5",
+                "trim": "GT-LINE",
+                "imagePath": {
+                    "imageName": "2022-ev6-gt-line-cr5.png",
+                    "imagePath": "/content/dam/kia/us/owners/image/vehicle-app/2022/ev6/gt-line/",
+                    "imageType": "1",
+                    "imageSize": {
+                        "length": "100",
+                        "width": "100",
+                        "uom": 0
+                    }
+                },
+                "enrollmentStatus": 1,
+                "fatcAvailable": 1,
+                "telematicsUnit": 1,
+                "fuelType": 4,
+                "colorName": "RUNWAY RED",
+                "activationType": 2,
+                "mileage": "0",
+                "dealerCode": "XXX",
+                "mobileStore": [
+                    {
+                        "osType": 0,
+                        "downloadURL": "https://itunes.apple.com/us/app/kia-access-with-uvo-link/id1280548773?mt=8",
+                        "image": {
+                            "imageName": "iosImage.png",
+                            "imagePath": "/content/dam/kia/us/owners/image/common/app/",
+                            "imageType": "2",
+                            "imageSize": {
+                                "length": "100",
+                                "width": "100",
+                                "uom": 0
+                            }
+                        }
+                    },
+                    {
+                        "osType": 1,
+                        "downloadURL": "https://play.google.com/store/apps/details?id=com.myuvo.link",
+                        "image": {
+                            "imageName": "androidImage.png",
+                            "imagePath": "/content/dam/kia/us/owners/image/common/app/",
+                            "imageType": "2",
+                            "imageSize": {
+                                "length": "100",
+                                "width": "100",
+                                "uom": 0
+                            }
+                        }
+                    }
+                ],
+                "supportedApp": {
+                    "appType": "5",
+                    "appImage": {
+                        "imageName": "uvo-app.png",
+                        "imagePath": "/content/dam/kia/us/owners/image/common/app/access/",
+                        "imageType": "2",
+                        "imageSize": {
+                            "length": "100",
+                            "width": "100",
+                            "uom": 0
+                        }
+                    }
+                },
+                "licensePlate": "",
+                "psi": "",
+                "supportAdditionalDriver": 1,
+                "customerType": 0,
+                "projectCode": "CV",
+                "headUnitDesc": "AVN5.0W",
+                "provStatus": "4",
+                "enrollmentSuppressionType": 0,
+                "rsaStatus": 0,
+                "dsEnrollment": 0,
+                "ubiEnrollment": 0,
+                "notificationCount": 0,
+                "vehicleKey": "KEY-1"
+            }
+        ],
+        "chatbotSupport": true
+    }
+}

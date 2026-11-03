@@ -16,14 +16,6 @@
                 "msgId": "<redacted>",
                 "message": "Success"
             }
-        },
-        "expected": {
-            "ev_battery_percentage": 70.0,
-            "car_battery_percentage": 70,
-            "engine_is_running": false,
-            "front_left_door_is_locked": true,
-            "is_locked": true,
-            "air_temperature_on": false
         }
     },
     "Location": {

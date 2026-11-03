@@ -48,7 +48,11 @@ def response(payload, status=200, headers=None):
 @pytest.fixture
 def session(monkeypatch):
     instance = JapanMqttSession(
-        Token(access_token="Bearer synthetic-access"),
+        Token(
+            username="synthetic-user",
+            password="synthetic-password",
+            access_token="Bearer synthetic-access",
+        ),
         "synthetic-vehicle",
         "synthetic-uuid",
         lambda: {

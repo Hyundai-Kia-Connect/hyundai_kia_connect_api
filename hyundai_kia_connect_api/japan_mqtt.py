@@ -13,9 +13,14 @@ from collections import OrderedDict, deque
 from collections.abc import Callable
 from contextlib import suppress
 from copy import deepcopy
+from types import TracebackType
+from typing import Any, Literal, Self, cast, overload
 
 import paho.mqtt.client as mqtt
 import requests
+from paho.mqtt.enums import CallbackAPIVersion
+from paho.mqtt.properties import Properties
+from paho.mqtt.reasoncodes import ReasonCode
 
 from .ApiImpl import ApiImplSession
 from .const import ORDER_STATUS
@@ -46,7 +51,7 @@ class JapanMqttSession:
         token: Token,
         vehicle_id: str,
         registration_uuid: str,
-        headers_factory: Callable[[], dict],
+        headers_factory: Callable[[], dict[str, str]],
     ) -> None:
         if not isinstance(vehicle_id, str) or not re.fullmatch(
             r"[A-Za-z0-9_-]+", vehicle_id
@@ -67,20 +72,22 @@ class JapanMqttSession:
         self._registration_uuid = registration_uuid
         self._headers_factory = headers_factory
         self._http_session = ApiImplSession()
-        self._client = None
+        self._client: mqtt.Client | None = None
         self._condition = threading.Condition()
         self._prepare_lock = threading.Lock()
         self._ready = False
         self._closed = False
-        self._error = None
-        self._subscription_mid = None
-        self._results = OrderedDict()
-        self._tracked = set()
-        self._latest_state = None
-        self._state_updates = deque(maxlen=self.MAX_STATE_UPDATES)
-        self._topics = ()
-        self._pending_context = {}
-        self._request_context = {}
+        self._error: str | None = None
+        self._subscription_mid: int | None = None
+        self._results: OrderedDict[str, ORDER_STATUS] = OrderedDict()
+        self._tracked: set[str] = set()
+        self._latest_state: dict[str, Any] | None = None
+        self._state_updates: deque[dict[str, Any]] = deque(
+            maxlen=self.MAX_STATE_UPDATES
+        )
+        self._topics: tuple[str, ...] = ()
+        self._pending_context: dict[str, str] = {}
+        self._request_context: dict[str, str] = {}
         self._diagnostics = dict.fromkeys(
             (
                 "messages_received",
@@ -105,9 +112,37 @@ class JapanMqttSession:
         )
         self._last_status = "not_started"
 
+    @overload
     def _http(
-        self, method: str, path: str, *, headers=None, allow_not_found=False, **kwargs
-    ):
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        allow_not_found: Literal[True],
+        **kwargs: Any,
+    ) -> dict[str, Any] | None: ...
+
+    @overload
+    def _http(
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        allow_not_found: Literal[False] = False,
+        **kwargs: Any,
+    ) -> dict[str, Any]: ...
+
+    def _http(
+        self,
+        method: str,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        allow_not_found: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any] | None:
         with self._condition:
             self._raise_if_closed()
         stage = {
@@ -170,7 +205,7 @@ class JapanMqttSession:
         return result
 
     @classmethod
-    def _broker(cls, payload: dict) -> tuple[str, int]:
+    def _broker(cls, payload: dict[str, Any]) -> tuple[str, int]:
         broker = payload.get("mqtt")
         if not isinstance(broker, dict):
             raise InvalidAPIResponseError("Japan MQTT broker configuration is missing")
@@ -198,7 +233,7 @@ class JapanMqttSession:
         return host, port
 
     @staticmethod
-    def _metadata_vehicle_id(metadata: dict | None) -> str | None:
+    def _metadata_vehicle_id(metadata: dict[str, Any] | None) -> str | None:
         if metadata is None:
             return None
         vehicles = metadata.get("vehicles")
@@ -311,13 +346,15 @@ class JapanMqttSession:
                 # client under the same lock used by close().
                 self._raise_if_closed()
                 client = mqtt.Client(
-                    mqtt.CallbackAPIVersion.VERSION2,
+                    CallbackAPIVersion.VERSION2,
                     client_id=client_id,
                     clean_session=True,
                     reconnect_on_failure=False,
                 )
                 self._client = client
-                client.username_pw_set(client_id, self._token.access_token[7:])
+                client.username_pw_set(
+                    client_id, cast(str, self._token.access_token)[7:]
+                )
                 client.tls_set_context(ssl.create_default_context())
                 client.on_connect = self._on_connect
                 client.on_connect_fail = self._on_connect_fail
@@ -350,15 +387,15 @@ class JapanMqttSession:
                 raise
             raise APIError("Japan MQTT connection setup failed") from None
 
-    def _raise_error(self):
+    def _raise_error(self) -> None:
         if self._error is not None:
             raise APIError(self._error)
 
-    def _raise_if_closed(self):
+    def _raise_if_closed(self) -> None:
         if self._closed:
             raise APIError("Japan MQTT session is closed")
 
-    def _fail(self, message):
+    def _fail(self, message: str) -> None:
         with self._condition:
             if self._closed:
                 return
@@ -366,7 +403,14 @@ class JapanMqttSession:
             self._last_status = "connection_error"
             self._condition.notify_all()
 
-    def _on_connect(self, client, userdata, flags, reason_code, properties):
+    def _on_connect(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        flags: mqtt.ConnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None,
+    ) -> None:
         with self._condition:
             if self._closed:
                 return
@@ -382,10 +426,17 @@ class JapanMqttSession:
                 self._fail("Japan MQTT subscription was rejected")
             self._subscription_mid = mid
 
-    def _on_connect_fail(self, client, userdata):
+    def _on_connect_fail(self, client: mqtt.Client, userdata: object) -> None:
         self._fail("Japan MQTT connection failed")
 
-    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
+    def _on_disconnect(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        flags: mqtt.DisconnectFlags,
+        reason_code: ReasonCode,
+        properties: Properties | None,
+    ) -> None:
         with self._condition:
             if not self._closed:
                 self._error = "Japan MQTT connection was lost"
@@ -393,7 +444,14 @@ class JapanMqttSession:
             self._ready = False
             self._condition.notify_all()
 
-    def _on_subscribe(self, client, userdata, mid, reason_codes, properties):
+    def _on_subscribe(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        mid: int,
+        reason_codes: list[ReasonCode],
+        properties: Properties | None,
+    ) -> None:
         with self._condition:
             if self._closed or mid != self._subscription_mid:
                 return
@@ -406,7 +464,9 @@ class JapanMqttSession:
             self._ready = True
             self._condition.notify_all()
 
-    def _on_message(self, client, userdata, message):
+    def _on_message(
+        self, client: mqtt.Client, userdata: object, message: mqtt.MQTTMessage
+    ) -> None:
         with self._condition:
             self._diagnostics["messages_received"] += 1
             if message.retain:
@@ -549,7 +609,7 @@ class JapanMqttSession:
             return self._results[action_id] if ready else ORDER_STATUS.TIMEOUT
 
     @property
-    def diagnostics(self) -> dict:
+    def diagnostics(self) -> dict[str, int | str | bool]:
         """Return identifier-free counters, retained after session close."""
         with self._condition:
             return {
@@ -584,12 +644,12 @@ class JapanMqttSession:
             return self._error is not None
 
     @property
-    def latest_state(self):
+    def latest_state(self) -> dict[str, Any] | None:
         """Copy the latest received vehicle state; never expose mutable callback data."""
         with self._condition:
             return deepcopy(self._latest_state)
 
-    def drain_state_updates(self) -> list[dict]:
+    def drain_state_updates(self) -> list[dict[str, Any]]:
         """Copy and consume queued passive updates without making a network request."""
         with self._condition:
             updates = deepcopy(list(self._state_updates))
@@ -615,9 +675,14 @@ class JapanMqttSession:
                 client.loop_stop()
         self._http_session.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.prepare()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         self.close()

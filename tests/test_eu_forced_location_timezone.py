@@ -50,7 +50,7 @@ def eu_api() -> KiaUvoApiEU:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "vid-123"
     # ccu_ccs2_protocol_support defaults to None, and None != 0 is True, so it
     # must be set to take the legacy branch that calls _get_location.

@@ -1,16 +1,6 @@
 {
     "_fixture_meta": {
         "description": "BR Hyundai Creta 2025 (ICE, reports ccuCCS2ProtocolSupport=0) cached status from /ccs2/carstatus/latest. Anonymized: GeoCoord replaced with a placeholder, no VIN/tokens.",
-        "expected": {
-            "car_battery_percentage": 59,
-            "engine_is_running": false,
-            "fuel_level": 20,
-            "is_locked": true,
-            "odometer": 6208.1,
-            "odometer_unit": "km",
-            "total_driving_range": 102.0,
-            "total_driving_range_unit": "km"
-        },
         "source": "GET /api/v1/spa/vehicles/{id}/ccs2/carstatus/latest"
     },
     "resMsg": {

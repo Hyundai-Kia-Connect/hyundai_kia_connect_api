@@ -19,7 +19,7 @@ API Usage
 
 This package is designed to simplify the complexity of using multiple regions.  It attempts to standardize the usage regardless of what brand or region the car is in.  That isn't always possible though, in particular some features differ from one to the next.
 
-Europe Hyundai and Kia login logic is based on the `bluelink-refresh-token <https://github.com/TMA84/bluelink-refresh-token>`_ project.  Username/password login is supported directly for Kia, Hyundai, and Genesis (EU) — no browser or manual token extraction needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
+Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
 China (Hyundai Bluelink / Kia UVO CN)
 -------------------------------------
@@ -54,44 +54,38 @@ Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Co
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
 
-Japan (region 10, Hyundai brand 2) adds Hyundai Japan authentication, token
-renewal, vehicle discovery, profile-aware telemetry, and vehicle controls. Its
-request contracts are based on the Japan Bluelink Android app 1.0.17 and public
-login page. Supported controls include door locks, charging, model-dependent
-climate/windows/charge-port features, schedules, navigation and manual SVM capture.
+Japan (region 10, Hyundai brand 2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Japan commands require the actual account PIN and a prepared MQTT context.
-Ordinary controls follow the app's validated HTTP service-result contract and
-return ORDER_STATUS.ACCEPTED. This means the service accepted the request; it
-does not independently prove physical execution. Vehicle state is read separately.
-Unknown action handles remain UNKNOWN, and HTTP/vendor failures are not accepted.
-No command is automatically repeated after a request timeout.
+The Japan adapter supports authentication, token renewal, vehicle discovery,
+cached telemetry and profile-aware remote controls. Kia and Genesis Japan
+accounts are not supported. Its request contracts follow Japan Bluelink Android
+app versions 1.0.17 and 1.0.18 and the public login page.
 
-Fresh-status requests are different: they still require the matching MQTT result
-and newer telemetry. SVM capture still polls its own correlated image request.
-The supported_commands set and profile capabilities identify available controls.
-Optional vehicle metadata supplies supported window positions and climate bounds.
-Existing regional adapters and their command-result semantics are not modified.
+Commands require the account PIN and a registered MQTT context. Ordinary controls
+return ``ORDER_STATUS.ACCEPTED`` after the service validates the request; this
+is separate from proof that the car executed it. Later telemetry supplies the
+observed vehicle state. ``apply_cached_mqtt_state(vehicle)`` consumes received
+MQTT deltas without authentication or network requests and rejects stale state.
+Commands are never automatically repeated after a timeout.
 
-Japan SVM reads return only manually captured images cached in the current
-session; no camera request is made by passive reads. A new capture is needed
-after restart. Trip-summary APIs and unproven 30-day metrics remain unavailable.
-Local diagnostics expose fixed workflow stages and counters without raw messages,
-identifiers, account secrets, GPS or image contents.
+Forced refresh requires the matching MQTT completion result and newer telemetry.
+SVM capture polls its own correlated image request. Passive SVM reads return only
+images captured manually during the current session; after restart a new capture
+is required. Local diagnostics expose fixed workflow stages and counters without
+raw messages, identifiers, account secrets, GPS or images.
 
-Authentication, token renewal, cached telemetry and charge-limit settings have
-been observed working on one Japan vehicle. The user also confirmed a physical
-lock action and climate-stop action while HA incorrectly timed out waiting for
-an additional MQTT response. The corrected ordinary-control acceptance path is
-verified offline against the app contracts; other physical controls remain under
-validation. A report of unexpected liftgate movement is
-unresolved; offline contract tests do not establish physical vehicle behavior.
-Vehicle-command testing remains paused pending a controlled test plan.
+``Vehicle.supports`` and the reported profile options determine model-dependent
+features. Optional Japan metadata supplies climate bounds and window positions.
+Trip summaries and unproven 30-day metrics remain unavailable. Existing regional
+adapters and their command-result semantics are unchanged.
 
-The Japan branch contains only regional implementation and necessary routing,
-token, profile and capability hooks. Independent shared Home Assistant camera
-and adapter cleanup fixes are developed on separate branches and are not required
-by this API branch. Release versions are unchanged until upstream review.
+One Japan IONIQ 5 owner has confirmed unlocking with Home Assistant state updates,
+locking, climate start/stop, charge-port opening, AC/DC charge limits, forced
+refresh and SVM capture with available images. Charging start/stop and the other
+profile-dependent commands are implemented but not yet verified on a vehicle.
+Offline tests validate request contracts and failure handling; they do not prove
+physical behavior on other models.
 
 
 Once this is done you can now make the following calls against the vehicle manager::
@@ -187,6 +181,8 @@ Example of getting trip info of the current month and day (vm is VehicleManager 
                 if vehicle.day_trip_info is not None:
                     for trip in reversed(vehicle.day_trip_info.trip_list):  # show oldest first
                         print(f"{day.yyyymmdd},{trip.hhmmss},{trip.drive_time},{trip.idle_time},{trip.distance},{trip.avg_speed},{trip.max_speed}")
+
+In India the day trip list only carries start/end times, so each trip's figures come from a per-trip detail call (cached per trip). India trips also report ``trip.end_hhmmss`` and the driving-behaviour counters ``trip.hard_braking_count``, ``trip.rapid_acceleration_count`` and ``trip.excessive_speed_count``.
 
 CLI Usage
 =========

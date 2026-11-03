@@ -8,3 +8,7 @@
 __pycache__/
 .env
 *.egg-info
+.coverage
+coverage.xml
+# Created by the prettier pre-commit hook
+node_modules/

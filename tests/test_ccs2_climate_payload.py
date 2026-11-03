@@ -37,7 +37,7 @@ def _make_api():
 
 
 def _make_vehicle(ccs2: bool = True) -> Vehicle:
-    v = Vehicle()
+    v = Vehicle(id="test-id")
     v.id = "test-vehicle-id"
     v.name = "Kona EV"
     v.ccu_ccs2_protocol_support = ccs2
@@ -45,7 +45,7 @@ def _make_vehicle(ccs2: bool = True) -> Vehicle:
 
 
 def _make_token():
-    return MagicMock(spec=Token)
+    return MagicMock(spec=Token(username="test-user", password="test-pass"))
 
 
 def _post_payload(api, vehicle, options):

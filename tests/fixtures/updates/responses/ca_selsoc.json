@@ -1,0 +1,56 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/evc/selsoc",
+        "source": "Received get_charge_limits debug log in kia_uvo #592 (2021 Kona EV)",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": [
+        {
+            "plugType": 0,
+            "level": 80,
+            "dte": {
+                "rangeByFuel": {
+                    "gasModeRange": {
+                        "value": 0.0,
+                        "unit": 1
+                    },
+                    "evModeRange": {
+                        "value": 314.0,
+                        "unit": 1
+                    },
+                    "totalAvailableRange": {
+                        "value": 314.0,
+                        "unit": 1
+                    }
+                },
+                "type": 2
+            }
+        },
+        {
+            "plugType": 1,
+            "level": 90,
+            "dte": {
+                "rangeByFuel": {
+                    "gasModeRange": {
+                        "value": 0.0,
+                        "unit": 1
+                    },
+                    "evModeRange": {
+                        "value": 314.0,
+                        "unit": 1
+                    },
+                    "totalAvailableRange": {
+                        "value": 314.0,
+                        "unit": 1
+                    }
+                },
+                "type": 2
+            }
+        }
+    ]
+}

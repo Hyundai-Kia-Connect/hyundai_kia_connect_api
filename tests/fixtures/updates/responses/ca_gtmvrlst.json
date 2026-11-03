@@ -1,0 +1,46 @@
+{
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "day": "25",
+        "MVRs": [
+            {
+                "reportId": 1002003001,
+                "reportDate": "2026-10-25"
+            },
+            {
+                "reportId": 1002003002,
+                "reportDate": "2026-09-25"
+            },
+            {
+                "reportId": 1002003003,
+                "reportDate": "2026-08-25"
+            },
+            {
+                "reportId": 1002003004,
+                "reportDate": "2026-07-25"
+            },
+            {
+                "reportId": 1002003005,
+                "reportDate": "2026-06-25"
+            },
+            {
+                "reportId": 1002003006,
+                "reportDate": "2026-05-25"
+            },
+            {
+                "reportId": 1002003007,
+                "reportDate": "2026-04-25"
+            }
+        ]
+    },
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "POST tods/api/gtmvrlst",
+        "source": "read-only capture from a contributor session, kia_uvo #2025 work (PALISADE 2023)",
+        "vehicles": "1 vehicle",
+        "description": "Monthly maintenance report list; report ids replaced with placeholders, newest first."
+    }
+}

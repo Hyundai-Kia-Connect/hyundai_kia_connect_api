@@ -10,6 +10,7 @@ import binascii
 import datetime as dt
 import re
 import time
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from .exceptions import (
     APIError,
@@ -25,16 +26,29 @@ from .svm import (
     SVMDetails,
     _parse_bool,
     _parse_door_open,
-    _parse_float,
     _parse_float_list,
     _parse_image_sizes,
-    _parse_int,
     redact_svm_metadata,
 )
-from .utils import get_child_value, parse_datetime
+from .Token import Token
+from .utils import float_or_none, get_child_value, int_or_none, parse_datetime
+from .Vehicle import Vehicle
+
+if TYPE_CHECKING:
+    from .japan_mqtt import JapanMqttSession
 
 
-def parse_japan_svm(payload: dict, timezone: dt.tzinfo) -> SVMDetails:
+class _CaptureDiagnostics(TypedDict, total=False):
+    stage: str
+    poll_count: int
+    image_present: bool
+    dimensions_present: bool
+    failure_category: str | None
+    failed_stage: str
+    elapsed_seconds: float
+
+
+def parse_japan_svm(payload: dict[str, Any], timezone: dt.tzinfo) -> SVMDetails:
     """Parse a Japan resMsg.scsDetail without logging image or location data."""
     if not isinstance(payload, dict):
         raise InvalidAPIResponseError("Japan camera response is incomplete")
@@ -69,11 +83,11 @@ def parse_japan_svm(payload: dict, timezone: dt.tzinfo) -> SVMDetails:
         image_bytes=image,
         captured_at=captured_at,
         captured_at_raw=raw_time,
-        latitude=_parse_float(get_child_value(detail, "gpsDetail.coord.lat")),
-        longitude=_parse_float(get_child_value(detail, "gpsDetail.coord.lon")),
-        heading=_parse_int(get_child_value(detail, "gpsDetail.head")),
+        latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
+        longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
+        heading=int_or_none(get_child_value(detail, "gpsDetail.head")),
         speed=(
-            _parse_float(get_child_value(detail, "gpsDetail.speed.value")),
+            float_or_none(get_child_value(detail, "gpsDetail.speed.value")),
             get_child_value(detail, "gpsDetail.speed.unit"),
         ),
         door_open=_parse_door_open(detail.get("doorOpen")),
@@ -91,9 +105,38 @@ class JapanSVM:
     _SVM_POLL_INTERVAL_SECONDS = 5
     # Japan's app allows 145 seconds for the vehicle to upload its capture.
     _SVM_POLL_TIMEOUT_SECONDS = 145
+    _japan_svm_started: float | None
+    _japan_svm_diagnostics: _CaptureDiagnostics
+    _japan_svm_cache: dict[str, SVMDetails]
+
+    if TYPE_CHECKING:
+        data_timezone: dt.tzinfo
+
+        def _control_headers(
+            self, token: Token, vehicle: Vehicle | None = None
+        ) -> dict[str, str]: ...
+
+        def _vehicle_headers(
+            self,
+            token: Token,
+            vehicle: Vehicle,
+            helper: JapanMqttSession | None = None,
+        ) -> dict[str, str]: ...
+
+        def _request(
+            self,
+            method: str,
+            path: str,
+            *,
+            json_response: bool = True,
+            **kwargs: Any,
+        ) -> Any: ...
+
+        @staticmethod
+        def _payload(result: dict[str, Any]) -> dict[str, Any]: ...
 
     @property
-    def svm_diagnostics(self) -> dict:
+    def svm_diagnostics(self) -> dict[str, Any]:
         """Describe only the latest local capture workflow, without private data."""
         summary = dict(getattr(self, "_japan_svm_diagnostics", {"stage": "idle"}))
         started = getattr(self, "_japan_svm_started", None)
@@ -101,15 +144,16 @@ class JapanSVM:
             summary["elapsed_seconds"] = round(max(0, time.perf_counter() - started), 1)
         return summary
 
-    def get_svm_details(self, token, vehicle) -> SVMDetails:
+    def get_svm_details(self, token: Token, vehicle: Vehicle) -> SVMDetails:
         """Return this session's last completed capture without waking the car."""
-        details = getattr(self, "_japan_svm_cache", {}).get(vehicle.id)
+        cache: dict[str, SVMDetails] = getattr(self, "_japan_svm_cache", {})
+        details = cache.get(vehicle.id)
         if details is None:
             raise NoDataFound("Japan camera requires a new manual capture")
         return details
 
     def request_svm_capture(
-        self, token, vehicle, acknowledged_warning: bool = False
+        self, token: Token, vehicle: Vehicle, acknowledged_warning: bool = False
     ) -> SVMDetails:
         """Keep a secret-free workflow outcome even when a capture fails."""
         self._japan_svm_started = time.perf_counter()
@@ -137,9 +181,11 @@ class JapanSVM:
                     category = label
                     break
             self._japan_svm_diagnostics.update(
-                failed_stage=self._japan_svm_diagnostics["stage"],
-                stage="failed",
-                failure_category=category,
+                {
+                    "failed_stage": self._japan_svm_diagnostics["stage"],
+                    "stage": "failed",
+                    "failure_category": category,
+                }
             )
             raise
         finally:
@@ -149,14 +195,14 @@ class JapanSVM:
             self._japan_svm_started = None
 
     def _request_japan_svm_capture(
-        self, token, vehicle, acknowledged_warning: bool
+        self, token: Token, vehicle: Vehicle, acknowledged_warning: bool
     ) -> SVMDetails:
         """Request once and poll only that request; an ACK is not an image."""
         if acknowledged_warning is not True:
             raise SafetyAcknowledgmentError(
                 "request_svm_capture requires acknowledged_warning=True"
             )
-        if vehicle.supports_svm is not True:
+        if vehicle.supports.svm is not True:
             raise UnsupportedControlError(
                 "Japan vehicle does not support camera capture"
             )
@@ -195,9 +241,11 @@ class JapanSVM:
                 continue
             details = parse_japan_svm(self._payload(result), self.data_timezone)
             self._japan_svm_diagnostics.update(
-                stage="complete",
-                image_present=bool(details.image_bytes),
-                dimensions_present=details.image_size is not None,
+                {
+                    "stage": "complete",
+                    "image_present": bool(details.image_bytes),
+                    "dimensions_present": details.image_size is not None,
+                }
             )
             if not hasattr(self, "_japan_svm_cache"):
                 self._japan_svm_cache = {}

@@ -50,15 +50,6 @@ import inspect as insp
 - **This approach ensures compatibility with all other regions WITHOUT modifying them**
 - Other region APIs (CA, EU, AU, CN, IN, BR, Hyundai USA) remain unchanged
 
-### 3. tests/us_login_test.py
-
-#### Updated test to verify rmtoken persistence:
-
-- First login prompts for OTP and stores rmtoken
-- Forces token expiration by setting `valid_until` to past time
-- Second login should use stored rmtoken without OTP prompt
-- Verifies rmtoken is preserved across logins
-
 ## Authentication Flow
 
 ### First Login (OTP Required):
@@ -88,22 +79,6 @@ import inspect as insp
 2. **Better UX**: Integration works more seamlessly without constant user intervention
 3. **Backward compatible**: Works with accounts that don't have OTP enabled
 4. **No changes to other regions**: EU, CA, AU, etc. continue to work as before
-
-## Testing
-
-Run the test:
-
-```bash
-source .venv/bin/activate
-pytest tests/us_login_test.py -v -s
-```
-
-Expected behavior:
-
-1. First login prompts for OTP (email or phone choice, then OTP code entry)
-2. Test forces token expiration
-3. Second login uses stored rmtoken without OTP prompt
-4. Test passes if both logins succeed
 
 ## Notes
 

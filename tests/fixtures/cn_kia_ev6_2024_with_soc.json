@@ -6,17 +6,7 @@
         "brand": "Kia",
         "endpoint": "vehicles/{vehicleId}/status/latest",
         "description": "CN Kia EV6 response with targetSOC. Uses status root with hex-encoded temperature. Structure mirrors AU/EU.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 55,
-            "ev_charge_limits_dc": 90,
-            "ev_charge_limits_ac": 100,
-            "car_battery_percentage": 82,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": true,
-            "ev_battery_is_plugged_in": 1
-        }
+        "has_target_soc": true
     },
     "status": {
         "time": "20240810140000",

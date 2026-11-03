@@ -11,7 +11,7 @@ import math
 import re
 import time
 import uuid
-from typing import ClassVar
+from typing import Any, ClassVar, cast
 from urllib.parse import parse_qs, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
@@ -68,9 +68,6 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             "set_navigation",
         }
     )
-    supports_svm = True
-    supports_window_control = True
-    supports_valet_mode = True
     BASE_URL = "https://ccs-apigw.hyundaijapan.com:8080"
     SERVICE_ID = "e084c0e4-fcfe-47e3-99c9-36eb93593737"
     APP_ID = "8be122e0-b0d9-40b5-a46e-67b25194ba88"
@@ -83,7 +80,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
     BASIC_AUTHORIZATION = "Basic ZTA4NGMwZTQtZmNmZS00N2UzLTk5YzktMzZlYjkzNTkzNzM3OjFZcWV4dng3TWxiS3c2YUFvYk1FbDJqQVFvQTBtUVhyV1E1SWpIT083TzRZRHRkRw=="
 
     # Reuse only pure schema parsers, never Type1 HTTP/logging helpers.
-    _update_vehicle_properties = ApiImplType1._update_vehicle_properties
+    def _update_vehicle_properties(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        ApiImplType1._update_vehicle_properties(
+            cast(ApiImplType1, self), vehicle, state
+        )
+
     _get_time_from_string = ApiImplType1._get_time_from_string
 
     def __init__(self, region: int, brand: int, language: str) -> None:
@@ -91,11 +94,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             raise APIError("Japan is supported only for Hyundai in region 10")
         super().__init__()
         self.session = ApiImplSession()
-        self._vehicle_profiles: dict[str, dict] = {}
+        self._vehicle_profiles: dict[str, dict[str, Any]] = {}
         self._history_updated_at: dict[str, float] = {}
         self._location_missing_at: dict[str, float] = {}
-        self._charge_target_cache: dict[str, tuple[float, dict]] = {}
-        self._mqtt_sessions: dict[str, tuple[tuple, JapanMqttSession]] = {}
+        self._charge_target_cache: dict[str, tuple[float, dict[int, int]]] = {}
+        self._mqtt_sessions: dict[
+            str, tuple[tuple[str | None, ...], JapanMqttSession]
+        ] = {}
         self._passive_state_observed_at: dict[str, dt.datetime] = {}
 
     def _mqtt_for_vehicle(self, token: Token, vehicle: Vehicle) -> JapanMqttSession:
@@ -129,7 +134,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         return existing[1]
 
     @staticmethod
-    def _ccs2_observation_time(value: str) -> dt.datetime:
+    def _ccs2_observation_time(value: object) -> dt.datetime:
         """Read Japan CCS2 UTC dates without discarding fractional seconds."""
         if not isinstance(value, str):
             raise TypeError("Invalid Japan telemetry timestamp")
@@ -150,7 +155,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         )
 
     @classmethod
-    def _merge_ccs2_observation(cls, baseline: dict, patch: dict) -> dict:
+    def _merge_ccs2_observation(
+        cls, baseline: dict[str, Any], patch: dict[str, Any]
+    ) -> dict[str, Any]:
         """Merge a telemetry delta without treating omitted fields as false."""
         merged = copy.deepcopy(baseline)
         for key, value in patch.items():
@@ -209,9 +216,11 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             self._record_passive_state_result("missing")
             return False
 
-        def observation_time(observation):
+        def observation_time(observation: object) -> dt.datetime:
             try:
-                return self._ccs2_observation_time(observation.get("Date"))
+                return self._ccs2_observation_time(
+                    observation.get("Date") if isinstance(observation, dict) else None
+                )
             except (AttributeError, TypeError, ValueError, OverflowError):
                 return dt.datetime.max.replace(tzinfo=dt.UTC)
 
@@ -221,7 +230,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
                 changed = True
         return changed
 
-    def _apply_cached_mqtt_observation(self, vehicle: Vehicle, observation) -> bool:
+    def _apply_cached_mqtt_observation(
+        self, vehicle: Vehicle, observation: object
+    ) -> bool:
         """Apply one immutable snapshot from the bounded local receive queue."""
         try:
             if not isinstance(observation, dict) or not observation:
@@ -301,7 +312,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         self._record_passive_state_result("applied")
         return True
 
-    def get_local_diagnostics(self) -> dict:
+    def get_local_diagnostics(self) -> dict[str, Any]:
         """Return bounded protocol counters without requests or private data."""
         sessions = list(self._mqtt_sessions.values())[:10]
         return {
@@ -334,7 +345,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         finally:
             helper.close()
 
-    def _force_refresh_with_session(self, token, vehicle, helper, headers):
+    def _force_refresh_with_session(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        helper: JapanMqttSession,
+        headers: dict[str, str],
+    ) -> None:
         vehicle_id = self._command_vehicle_id(vehicle)
         helper.prepare()
         # A cached PIN grant can expire while MQTT bootstrap is in progress.
@@ -396,12 +413,12 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
     def initialize_vehicle_capabilities(self, vehicle: Vehicle) -> None:
         """Japan options describe each vehicle rather than the entire region."""
         service = self._vehicle_profiles.get(vehicle.id, {}).get("serviceOption", {})
-        vehicle.supports_window_control = (
+        vehicle.supports.window_control = (
             isinstance(service, dict)
             and type(service.get("windowControlOption")) is int
             and service.get("windowControlOption") == 1
         )
-        vehicle.supports_valet_mode = (
+        vehicle.supports.valet_mode = (
             isinstance(service, dict)
             and type(service.get("remoteValetActOption")) is int
             and service.get("remoteValetActOption") == 1
@@ -417,7 +434,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             if front_only
             else ("front_left", "front_right", "back_left", "back_right")
         )
-        vehicle.supports_svm = (
+        vehicle.supports.svm = (
             isinstance(options, dict)
             and type(options.get("svmOptionInfo")) is int
             and options.get("svmOptionInfo") == 1
@@ -429,9 +446,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             else None
         )
 
-    def _update_vehicle_properties_ccs2(self, vehicle: Vehicle, state: dict) -> None:
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
         """Map logical driver/passenger telemetry to physical Japan positions."""
-        ApiImplType1._update_vehicle_properties_ccs2(self, vehicle, state)
+        ApiImplType1._update_vehicle_properties_ccs2(
+            cast(ApiImplType1, self), vehicle, state
+        )
         options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
         location = options.get("drvSeatLoc") if isinstance(options, dict) else None
         for left, right in (
@@ -460,7 +481,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             bytes(a ^ b for a, b in zip(self._STAMP_STREAM, plain, strict=True))
         ).decode()
 
-    def _headers(self, token: Token | None = None) -> dict:
+    def _headers(self, token: Token | None = None) -> dict[str, str]:
         headers = {
             "ccsp-service-id": self.SERVICE_ID,
             "ccsp-application-id": self.APP_ID,
@@ -468,11 +489,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             "Stamp": self._stamp(),
         }
         if token is not None:
-            headers["Authorization"] = token.access_token
-            headers["ccsp-device-id"] = token.device_id
+            headers["Authorization"] = token.access_token or ""
+            headers["ccsp-device-id"] = token.device_id or ""
         return headers
 
-    def _vehicle_headers(self, token: Token, vehicle: Vehicle, helper=None) -> dict:
+    def _vehicle_headers(
+        self, token: Token, vehicle: Vehicle, helper: JapanMqttSession | None = None
+    ) -> dict[str, str]:
         """Add only known protocol and authenticated, prepared broker context."""
         headers = self._headers(token)
         protocol = vehicle.ccu_ccs2_protocol_support
@@ -530,7 +553,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
     }
 
     @classmethod
-    def _diagnostic(cls, http_status, result: dict) -> str:
+    def _diagnostic(cls, http_status: int | None, result: dict[str, Any]) -> str:
         details = []
         if type(http_status) is int and 100 <= http_status <= 599:
             details.append(f"HTTP {http_status}")
@@ -542,7 +565,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             details.append(f"code {code}: {known[1]}")
         return " (" + ", ".join(details) + ")" if details else ""
 
-    def _request(self, method: str, path: str, *, json_response=True, **kwargs):
+    def _request(
+        self, method: str, path: str, *, json_response: bool = True, **kwargs: Any
+    ) -> Any:
         """Expose HTTP status and allowlisted labels, never response text or URLs."""
         kwargs.setdefault("allow_redirects", False)
         try:
@@ -581,7 +606,13 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         return result
 
     @classmethod
-    def _check_errors(cls, result: dict, *, http_status=None, path=None) -> None:
+    def _check_errors(
+        cls,
+        result: dict[str, Any],
+        *,
+        http_status: int | None = None,
+        path: str | None = None,
+    ) -> None:
         code = str(
             result.get("resCode", result.get("resultCode", result.get("errCode", "")))
         )
@@ -604,13 +635,20 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             raise APIError("Japan API rejected the request" + diagnostic)
 
     @staticmethod
-    def _payload(result: dict) -> dict:
+    def _payload(result: dict[str, Any]) -> dict[str, Any]:
         payload = result.get("resMsg", result.get("responseEntity"))
         if not isinstance(payload, dict):
             raise InvalidAPIResponseError("Japan API response payload is missing")
         return payload
 
-    def _exchange_token(self, grant: dict, username, password, device_id, pin) -> Token:
+    def _exchange_token(
+        self,
+        grant: dict[str, Any],
+        username: str,
+        password: str,
+        device_id: str | None,
+        pin: str | None,
+    ) -> Token:
         headers = self._headers()
         headers["Authorization"] = self.BASIC_AUTHORIZATION
         result = self._request(
@@ -804,7 +842,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
                     registration_date=entry.get("regDate"),
                     VIN=basic.get("vin"),
                     timezone=self.data_timezone,
-                    engine_type=engine_types.get(entry.get("type")),
+                    engine_type=engine_types.get(entry.get("type", "")),
                     ccu_ccs2_protocol_support=protocol,
                 )
             )
@@ -848,7 +886,11 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
                 if (
                     vehicle.last_updated_at is not None
                     and observed_at < vehicle.last_updated_at
-                ) or (retains_passive_state and observed_at <= passive_at):
+                ) or (
+                    retains_passive_state
+                    and passive_at is not None
+                    and observed_at <= passive_at
+                ):
                     self.apply_cached_mqtt_state(vehicle)
                     return
                 self._update_vehicle_properties_ccs2(parsed_vehicle, state)
@@ -993,7 +1035,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         vehicle.ev_charge_limits_ac = targets.get(1, targets.get(2))
         vehicle.ev_charge_limits_dc = targets.get(0)
 
-    def _legacy_temperature(self, vehicle: Vehicle, air_temp) -> float | None:
+    def _legacy_temperature(self, vehicle: Vehicle, air_temp: object) -> float | None:
         """Decode profile-dependent Japan temperature codes, leaving LO/HI unknown."""
         if not isinstance(air_temp, dict) or air_temp.get("unit", 0) != 0:
             return None
@@ -1011,7 +1053,9 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             else None
         )
 
-    def _temperature_scale(self, vehicle: Vehicle, hvac_type=None):
+    def _temperature_scale(
+        self, vehicle: Vehicle, hvac_type: object = None
+    ) -> tuple[int, int, float] | None:
         """Return only a scale established by profile or reported HVAC type."""
         options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
         if not isinstance(options, dict):
@@ -1099,7 +1143,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         if all_time is None:
             raise NoDataFound("Japan all-time driving history is unavailable")
 
-        def metric(key):
+        def metric(key: str) -> float | int | None:
             value = all_time.get(key)
             if value is None:
                 return None

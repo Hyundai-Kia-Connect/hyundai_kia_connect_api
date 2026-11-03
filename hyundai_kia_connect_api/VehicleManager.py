@@ -1,11 +1,10 @@
 """VehicleManager.py"""
 
-# pylint:disable=logging-fstring-interpolation,missing-class-docstring,missing-function-docstring,line-too-long,invalid-name
-
 import datetime as dt
 import logging
 import re
 from datetime import timedelta
+from typing import Any
 
 from .ApiImpl import (
     ApiImpl,
@@ -22,6 +21,7 @@ from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
     DOMAIN,
+    LAMP_MODE,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
     REGION_AUSTRALIA,
@@ -39,6 +39,7 @@ from .const import (
     VEHICLE_LOCK_ACTION,
 )
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
+from .GenesisCciApiEU import GenesisCciApiEU
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
 from .HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
@@ -81,39 +82,31 @@ class VehicleManager:
         self.geocode_provider: int = geocode_provider
         self.pin: str = pin
         self.language: str = language
-        self.geocode_api_key: str = geocode_api_key
+        self.geocode_api_key: str | None = geocode_api_key
 
         self.api: ApiImpl = self.get_implementation_by_region_brand(
             self.region, self.brand, self.language
         )
 
         self.token: Token = token
-        self.vehicles: dict = {}
+        self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest = None
 
-    @DeprecationWarning
-    def initialize(self) -> None:
-        self.token: Token = self.api.login(
-            username=self.username,
-            password=self.password,
-            pin=self.pin,
-        )
-        self.initialize_vehicles()
-
     def login(self) -> bool | OTPRequest:
-        """Returns True if login successful, or OTPOptions if OTP is required"""
+        """Return True on success, an OTPRequest if OTP is required, else False."""
         result = self.api.login(
             username=self.username,
             password=self.password,
             pin=self.pin,
         )
         if isinstance(result, Token):
-            self.token: Token = result
+            self.token = result
             self.initialize_vehicles()
             return True
         if isinstance(result, OTPRequest):
             self.otp_request = result
             return result
+        return False
 
     def send_otp(self, notify_type: OTP_NOTIFY_TYPE) -> None:
         self.api.send_otp(self.otp_request, notify_type)
@@ -128,14 +121,13 @@ class VehicleManager:
         )
         self.initialize_vehicles()
 
-    def initialize_vehicles(self):
+    def initialize_vehicles(self) -> None:
         if len(self.vehicles) > 0:
             _LOGGER.warning(
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            self.api.initialize_vehicle_capabilities(vehicle)
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -265,7 +257,7 @@ class VehicleManager:
                 else:
                     raise
             if isinstance(result, Token):
-                self.token: Token = result
+                self.token = result
                 # Temp correction to fix bad data due to a bug.
                 if self.token.pin != self.pin:
                     self.token.pin = self.pin
@@ -279,39 +271,80 @@ class VehicleManager:
             self.initialize_vehicles()
         return False
 
-    def start_climate(self, vehicle_id: str, options: ClimateRequestOptions) -> str:
+    def start_climate(
+        self, vehicle_id: str, options: ClimateRequestOptions
+    ) -> str | None:
         return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
 
-    def stop_climate(self, vehicle_id: str) -> str:
+    def stop_climate(self, vehicle_id: str) -> str | None:
         return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
 
-    def lock(self, vehicle_id: str) -> str:
+    def start_pet_care(
+        self, vehicle_id: str, options: ClimateRequestOptions | None = None
+    ) -> str:
+        return self.api.start_pet_care(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def stop_pet_care(self, vehicle_id: str) -> str:
+        return self.api.stop_pet_care(self.token, self.get_vehicle(vehicle_id))
+
+    def start_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.start_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def stop_battery_conditioning(self, vehicle_id: str) -> str:
+        return self.api.stop_battery_conditioning(
+            self.token, self.get_vehicle(vehicle_id)
+        )
+
+    def lock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
             self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
         )
 
-    def unlock(self, vehicle_id: str) -> str:
+    def unlock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
             self.token,
             self.get_vehicle(vehicle_id),
             VEHICLE_LOCK_ACTION.UNLOCK,
         )
 
-    def start_charge(self, vehicle_id: str) -> str:
+    def start_charge(self, vehicle_id: str) -> str | None:
         return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def stop_charge(self, vehicle_id: str) -> str:
+    def stop_charge(self, vehicle_id: str) -> str | None:
         return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
 
-    def start_hazard_lights(self, vehicle_id: str) -> str:
+    def start_hazard_lights(self, vehicle_id: str) -> str | None:
         return self.api.start_hazard_lights(self.token, self.get_vehicle(vehicle_id))
 
-    def start_hazard_lights_and_horn(self, vehicle_id: str) -> str:
+    def start_hazard_lights_and_horn(self, vehicle_id: str) -> str | None:
         return self.api.start_hazard_lights_and_horn(
             self.token, self.get_vehicle(vehicle_id)
         )
 
-    def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str:
+    def door_power_off(self, vehicle_id: str) -> str:
+        return self.api.door_power_off(self.token, self.get_vehicle(vehicle_id))
+
+    def open_frunk(self, vehicle_id: str) -> str:
+        return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
+
+    def turn_off_lamp(
+        self, vehicle_id: str, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
+    ) -> str:
+        return self.api.turn_off_lamp(self.token, self.get_vehicle(vehicle_id), mode)
+
+    def stop_rear_seat_alarm(self, vehicle_id: str) -> str:
+        return self.api.stop_rear_seat_alarm(self.token, self.get_vehicle(vehicle_id))
+
+    def set_charge_alarm(self, vehicle_id: str, enabled: bool) -> str:
+        return self.api.set_charge_alarm(
+            self.token, self.get_vehicle(vehicle_id), enabled
+        )
+
+    def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str | None:
         return self.api.set_charge_limits(
             self.token, self.get_vehicle(vehicle_id), ac, dc
         )
@@ -427,6 +460,11 @@ class VehicleManager:
             self.token, self.get_vehicle(vehicle_id), limit
         )
 
+    def start_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
+        return self.api.start_ota_update(
+            self.token, self.get_vehicle(vehicle_id), start
+        )
+
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
         return self.api.set_navigation(
             self.token, self.get_vehicle(vehicle_id), poi_list
@@ -448,7 +486,7 @@ class VehicleManager:
             if BRANDS[brand] == BRAND_KIA:
                 return KiaCciApiEU(region, brand, language)
             if BRANDS[brand] == BRAND_GENESIS:
-                raise APIError("Genesis EU CCI/GSPA is not supported yet")
+                return GenesisCciApiEU(region, brand, language)
             return HyundaiCciApiEU(region, brand, language)
         elif REGIONS[region] == REGION_USA and (
             BRANDS[brand] == BRAND_HYUNDAI or BRANDS[brand] == BRAND_GENESIS
@@ -468,7 +506,7 @@ class VehicleManager:
                     f"Unknown brand {BRANDS[brand]} for region {REGIONS[region]}"
                 )
         elif REGIONS[region] == REGION_INDIA:
-            return KiaUvoApiIN(brand)
+            return KiaUvoApiIN(region, brand, language)
         elif REGIONS[region] == REGION_BRAZIL:
             return HyundaiBlueLinkApiBR(region, brand, language)
         else:

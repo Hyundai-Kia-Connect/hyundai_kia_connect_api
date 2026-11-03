@@ -8,6 +8,13 @@ is deterministic and human-readable.
 import dataclasses
 import datetime
 
+# Deprecated Vehicle aliases of vehicle.supports.<item>; captured via ``supports``.
+DEPRECATED_PROPERTIES = {
+    "supports_svm",
+    "supports_valet_mode",
+    "supports_window_control",
+}
+
 
 def vehicle_to_dict(vehicle) -> dict:
     """Return a sorted dict of all public Vehicle fields suitable for snapshotting.
@@ -25,6 +32,7 @@ def vehicle_to_dict(vehicle) -> dict:
         name
         for name in dir(type(vehicle))
         if isinstance(getattr(type(vehicle), name, None), property)
+        and name not in DEPRECATED_PROPERTIES
     }
 
     # Track which private fields are backing a property so we skip them

@@ -1,16 +1,21 @@
 """KiaUvoApiAU"""
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,wildcard-import,unused-wildcard-import,invalid-name,logging-fstring-interpolation,broad-except,bare-except,unused-argument,line-too-long,too-many-lines
-
 import base64
 import datetime as dt
 import logging
-import typing as ty
+from time import sleep
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
-from .ApiImpl import ApiImplSession
-from .ApiImplType1 import ApiImplType1, _check_response_for_errors
+from .ApiImpl import ApiImplSession, ClimateRequestOptions
+from .ApiImplType1 import (
+    USER_AGENT_OK_HTTP,
+    ApiImplType1,
+    _check_response_for_errors,
+    _retry_on_device_id_error,
+)
 from .const import (
+    BRAND_GENESIS,
     BRAND_HYUNDAI,
     BRAND_KIA,
     BRANDS,
@@ -21,6 +26,7 @@ from .const import (
     REGION_AUSTRALIA,
     REGION_NZ,
     REGIONS,
+    SEAT_LOCATION,
 )
 from .exceptions import AuthenticationError
 from .Token import Token
@@ -34,9 +40,6 @@ from .Vehicle import (
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
-USER_AGENT_MOZILLA: str = "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
-
 
 class KiaUvoApiAU(ApiImplType1):
     data_timezone = ZoneInfo("Australia/Sydney")
@@ -48,26 +51,37 @@ class KiaUvoApiAU(ApiImplType1):
         super().__init__()
         self.brand = brand
         if BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_AUSTRALIA:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "8acb778a-b918-4a8d-8624-73a0beb64289"
-            self.APP_ID: str = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "8acb778a-b918-4a8d-8624-73a0beb64289"
+            self.APP_ID = "4ad4dcde-be23-48a8-bc1c-91b94f5c06f8"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic OGFjYjc3OGEtYjkxOC00YThkLTg2MjQtNzNhMGJlYjY0Mjg5OjdTY01NbTZmRVlYZGlFUEN4YVBhUW1nZVlkbFVyZndvaDRBZlhHT3pZSVMyQ3U5VA=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaNfSFdtPklZ48xUuVckigYasxmeOQqVgCAC++YNrI1vVabI="
             )
+        elif BRANDS[brand] == BRAND_GENESIS and REGIONS[region] == REGION_AUSTRALIA:
+            # Genesis Connected Services AU (Android app com.genesis.aus v1.0.15).
+            # The Stamp CFB keystream was recovered from the app's whitebox
+            # AES-CFB implementation (IV "iv.ccsp.stamp.ap").
+            self.BASE_URL: str = "au-apigw-genesis.ccs.hyundai.com.au:8081"
+            self.CCSP_SERVICE_ID: str = "c56c78de-b2c2-4831-b776-7bb6830eea97"
+            self.APP_ID: str = "e4bfae6c-ba94-4226-b545-72a08d85944f"  # Android app ID
+            self.BASIC_AUTHORIZATION: str = "Basic YzU2Yzc4ZGUtYjJjMi00ODMxLWI3NzYtN2JiNjgzMGVlYTk3OnhzNWoyVjdGYlF5UzJ3MGhURkFEYW1EVEhDcE15MVFKSFgwVkQ2SElPUm44S1BSNA=="
+            self.CFB = base64.b64decode(
+                "Z31R4ngT9T1snjynGKRcSFMadGU7uBn4U7oJ4r0DyDLPvsSzf+g/m3zTq2chbyI="
+            )
         elif BRANDS[brand] == BRAND_HYUNDAI:
-            self.BASE_URL: str = "au-apigw.ccs.hyundai.com.au:8080"
-            self.CCSP_SERVICE_ID: str = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
-            self.APP_ID: str = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
+            self.BASE_URL = "au-apigw.ccs.hyundai.com.au:8080"
+            self.CCSP_SERVICE_ID = "855c72df-dfd7-4230-ab03-67cbf902bb1c"
+            self.APP_ID = "f9ccfdac-a48d-4c57-bd32-9116963c24ed"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic ODU1YzcyZGYtZGZkNy00MjMwLWFiMDMtNjdjYmY5MDJiYjFjOmU2ZmJ3SE0zMllOYmhRbDBwdmlhUHAzcmY0dDNTNms5MWVjZUEzTUpMZGJkVGhDTw=="
             self.CFB = base64.b64decode(
                 "nGDHng3k4Cg9gWV+C+A6Yk/ecDopUNTkGmDpr2qVKAQXx9bvY2/YLoHPfObliK32mZQ="
             )
         elif BRANDS[brand] == BRAND_KIA and REGIONS[region] == REGION_NZ:
-            self.BASE_URL: str = "au-apigw.ccs.kia.com.au:8082"
-            self.CCSP_SERVICE_ID: str = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
-            self.APP_ID: str = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
-            self.BASIC_AUTHORIZATION: str = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
+            self.BASE_URL = "au-apigw.ccs.kia.com.au:8082"
+            self.CCSP_SERVICE_ID = "4ab606a7-cea4-48a0-a216-ed9c14a4a38c"
+            self.APP_ID = "97745337-cac6-4a5b-afc3-e65ace81c994"  # Android app ID
+            self.BASIC_AUTHORIZATION = "Basic NGFiNjA2YTctY2VhNC00OGEwLWEyMTYtZWQ5YzE0YTRhMzhjOjBoYUZxWFRrS2t0Tktmemt4aFowYWt1MzFpNzRnMHlRRm01b2QybXo0TGRJNW1MWQ=="
             self.CFB = base64.b64decode(
                 "SGGCDRvrzmRa2WTNFQPUaC1OsnAhQgPgcQETEfbY8abEjR/ICXK0p+Rayw5tHCGyiUA="
             )
@@ -78,14 +92,13 @@ class KiaUvoApiAU(ApiImplType1):
         self.CLIENT_ID: str = self.CCSP_SERVICE_ID
         self.PUSH_TYPE: str = "GCM"
 
-    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         return self._get_authenticated_headers(token)
 
     def login(
         self,
         username: str,
         password: str,
-        otp_handler: ty.Callable[[dict], dict] | None = None,
         pin: str | None = None,
     ) -> Token:
         stamp = self._get_stamp()
@@ -224,13 +237,25 @@ class KiaUvoApiAU(ApiImplType1):
                 self._update_vehicle_drive_info(vehicle, state)
 
     def _force_refresh_vehicle_state_ccs2(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
+        """Force-refresh CCS2 state: wake the vehicle, wait, read the cached snapshot.
+
+        GET /ccs2/carstatus (no /latest) wakes the vehicle but returns an async
+        command envelope ({retCode, resCode, msgId}), not state — reading
+        resMsg.state.Vehicle from it raised KeyError: 'resMsg' (kia_uvo #1786,
+        #1806). Instead: wake, sleep for the car to report (~20s live-measured),
+        then read the now-fresh cached /latest snapshot.
+
+        The wake GET must return valid JSON; its body is discarded but errors
+        propagate, so a failed wake does not fall through to a stale /latest apply.
+        """
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        self.session.get(trigger_url, headers=headers).json()
+        sleep(25)
+        latest_url = trigger_url + "/latest"
+        response = self.session.get(latest_url, headers=headers).json()
         _LOGGER.debug(
             f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
         )
@@ -245,7 +270,7 @@ class KiaUvoApiAU(ApiImplType1):
                 parse_datetime(get_child_value(location, "time"), self.data_timezone),
             )
 
-    def _get_location(self, token: Token, vehicle: Vehicle) -> dict:
+    def _get_location(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
         try:
@@ -254,7 +279,7 @@ class KiaUvoApiAU(ApiImplType1):
             ).json()
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
-            return response["resMsg"]
+            return cast(dict[str, Any] | None, response["resMsg"])
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - _get_location failed")
             return None
@@ -272,13 +297,56 @@ class KiaUvoApiAU(ApiImplType1):
         ).json()
         _LOGGER.debug(f"{DOMAIN} - Charge Port Action Response: {response}")
         _check_response_for_errors(response)
-        return response["msgId"]
+        return cast(str, response["msgId"])
 
-    def _get_drv_seat_loc(self, vehicle: Vehicle) -> str:
+    @_retry_on_device_id_error
+    def _post_engine_command(
+        self, token: Token, vehicle: Vehicle, payload: dict[str, Any]
+    ) -> str:
+        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/engine"
+        _LOGGER.debug(f"{DOMAIN} - Engine Action Request: {payload}")
+        response = self.session.post(
+            url, json=payload, headers=self._get_control_headers(token, vehicle)
+        ).json()
+        _LOGGER.debug(f"{DOMAIN} - Engine Action Response: {response}")
+        _check_response_for_errors(response)
+        return cast(str, response["msgId"])
+
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
+        # CCS2 ICE vehicles use /ccs2/control/engine; the temperature endpoint
+        # rejects them with resCode 4005.
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
+            return super().start_climate(token, vehicle, options)
+        return self._post_engine_command(
+            token,
+            vehicle,
+            {
+                "command": "start",
+                "ignitionDuration": 5 if options.duration is None else options.duration,
+                "hvacCtrl": 0 if options.climate is False else 1,
+                "windshieldFrontDefogState": bool(options.defrost),
+                "drvSeatLoc": self._get_drv_seat_loc(vehicle),
+            },
+        )
+
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
+        if not (
+            vehicle.engine_type == ENGINE_TYPES.ICE
+            and vehicle.ccu_ccs2_protocol_support
+        ):
+            return super().stop_climate(token, vehicle)
+        return self._post_engine_command(token, vehicle, {"command": "stop"})
+
+    def _get_drv_seat_loc(self, vehicle: Vehicle) -> SEAT_LOCATION:
         """Australia uses RHD vehicles regardless of the odometer unit."""
-        return "R"
+        return SEAT_LOCATION.RIGHT
 
-    def _get_cookies(self) -> dict:
+    def _get_cookies(self) -> dict[str, Any]:
         # Get Cookies #
         url = (
             self.USER_API_URL
@@ -293,9 +361,11 @@ class KiaUvoApiAU(ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - Get cookies request: {url}")
         session = ApiImplSession()
         _ = session.get(url)
-        return session.cookies.get_dict()
+        return cast(dict[str, Any], session.cookies.get_dict())
 
-    def _get_access_token(self, authorization_code, stamp):
+    def _get_access_token(
+        self, authorization_code: str, stamp: str
+    ) -> tuple[str, str, str, Any]:
         # Get Access Token #
         url = self.USER_API_URL + "oauth2/token"
         headers = {

@@ -25,6 +25,7 @@ from hyundai_kia_connect_api.exceptions import (
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -49,10 +50,24 @@ def _make_token() -> Token:
 
 
 def _make_vehicle(ccs2: int = 1) -> Vehicle:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
+    vehicle.supports.window_control = True
     return vehicle
+
+
+def _run_command_on(api, meth, *args, **kwargs):
+    """Same as _run_command but for a caller-provided api instance."""
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        action_id = meth(token, vehicle, *args, **kwargs)
+    return action_id, post.call_args
 
 
 def _run_command(meth, *args, **kwargs):
@@ -75,14 +90,15 @@ def test_lock_action_unlock():
         HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.UNLOCK
     )
     assert action_id == "gspa:sid-1"
-    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door")
-    assert call.kwargs["json"] == {"command": "open"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-unlock")
+    assert call.kwargs["json"] == {"command": "set"}
     assert call.kwargs["headers"]["AuthorizationCCSP"] == "Bearer ctrl-token-abc"
 
 
 def test_lock_action_lock():
     _, call = _run_command(HyundaiCciApiEU.lock_action, VEHICLE_LOCK_ACTION.LOCK)
-    assert call.kwargs["json"] == {"command": "close"}
+    assert call.args[0].endswith("/gspa/v1/remote/vehicles/test123/door-lock")
+    assert call.kwargs["json"] == {"command": "set"}
 
 
 def test_door_power_off():
@@ -185,10 +201,11 @@ def test_control_command_pre_ccs2_raises_unsupported():
 
 
 def test_kia_remote_control_gated_not_implemented():
-    """Kia EU CCI inherits the GSPA control layer but ships partially
-    gated: only live-proven endpoints pass (door lock + unlock, PV5
-    2026-09-19). Everything else raises NotImplementedError before any
-    request."""
+    """Kia EU CCI ships remote control through the verified-endpoint
+    gate: the 2026-10 vehicle run (EV6, EV3, eNiro 2021, Inster 2026)
+    accepted the hazard, horn, charge and both granular door shapes,
+    so they join the earlier proven set. Everything else raises
+    NotImplementedError before any request."""
     from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 
     api = KiaCciApiEU(9, 2, "en")
@@ -199,10 +216,115 @@ def test_kia_remote_control_gated_not_implemented():
         p.assert_not_called()
     assert HyundaiCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is True
     assert KiaCciApiEU.GSPA_REMOTE_CONTROL_VERIFIED is False
-    # Evidence-mapped: only the live-proven endpoints pass.
+    # Evidence-mapped: the endpoints accepted during the 2026-10 vehicle
+    # run, including the Kia-window acceptance (EV6).
     assert KiaCciApiEU.GSPA_VERIFIED_ENDPOINTS == frozenset(
-        {"door", "temperature", "lamp"}
+        {
+            "door",
+            "door-lock",
+            "door-unlock",
+            "temperature",
+            "lamp",
+            "light",
+            "hornlight",
+            "charge",
+            "windowcurtain",
+            "charge-target",
+            "charging-current",
+            "discharge-limit",
+            "charge-alarm",
+            "reservation-charge",
+        }
     )
+
+
+def test_kia_discharge_limit_sends_the_live_proven_body():
+    """Kia GSPA discharge-limit: {"dischargingLimit": n, "command": "set"}
+    — live-proven on a PV5 (2026-10-22): 202 with the stored
+    VehicleToLoad.DischargeLimitation.SoC following (20 -> 30)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_vehicle_to_load_discharge_limit, 30)
+    assert call.args[0].endswith("/discharge-limit")
+    assert call.kwargs["json"] == {"dischargingLimit": 30, "command": "set"}
+
+
+def test_kia_charge_alarm_sends_both_all_flag_bodies():
+    """Kia GSPA charge-alarm: all-on / all-off flag bodies — live-proven
+    on a PV5 (2026-10-22): 202 (the one 202 that answers with a SID),
+    stored Setting.CompleteAlarm flags following both directions.
+    Per-combination bodies also reach the wire, but the library exposes
+    the boolean pair only."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, True)
+    assert call.args[0].endswith("/charge-alarm")
+    assert call.kwargs["json"] == {
+        "alarmOff": 0,
+        "alarmBefore10": 1,
+        "alarmBefore20": 1,
+        "alarmBefore30": 1,
+        "command": "set",
+    }
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, False)
+    assert call.kwargs["json"] == {
+        "alarmOff": 1,
+        "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
+def test_kia_reservation_charge_uses_the_flat_offpeak_body():
+    """Kia GSPA reservation-charge: reservFlag + offpeakPowerFlag plus
+    the reservStartTime / reservEndTime {time, timeSection} objects — live-proven on a
+    PV5 (2026-10-22): 202 with Reservation.OffPeakTime following. The
+    12-hour clock encoding matches the capture verbatim: 12:00-13:00 =
+    "1200"/1 and "0100"/1 (timeSection 1 marks the afternoon half)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = False
+    options.off_peak_charge_only_enabled = True
+    options.off_peak_start_time = dt.time(12, 0)
+    options.off_peak_end_time = dt.time(13, 0)
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.schedule_reservation_charge, options)
+    assert call.args[0].endswith("/reservation-charge")
+    body = call.kwargs["json"]
+    assert body == {
+        "reservFlag": 0,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {"time": "1200", "timeSection": 1},
+        "reservEndTime": {"time": "0100", "timeSection": 1},
+        "command": "set",
+    }
+
+
+def test_kia_verified_commands_reach_the_wire():
+    """Enabled Kia commands route through the shared implementations
+    (hazard light, horn, charge, granular doors) instead of raising."""
+    from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+
+    api = KiaCciApiEU(9, 2, "en")
+    token, vehicle = _make_token(), _make_vehicle()
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(KiaCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        api.start_hazard_lights(token, vehicle)
+        api.start_hazard_lights_and_horn(token, vehicle)
+        api.start_charge(token, vehicle)
+        api.stop_charge(token, vehicle)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.LOCK)
+        api.lock_action(token, vehicle, VEHICLE_LOCK_ACTION.UNLOCK)
+    urls = [c.args[0] for c in post.call_args_list]
+    bodies = [c.kwargs["json"] for c in post.call_args_list]
+    assert urls[0].endswith("/light") and bodies[0] == {"command": "on"}
+    assert urls[1].endswith("/horn-light") and bodies[1] == {"command": "on"}
+    assert urls[2].endswith("/charge") and bodies[2] == {"command": "start"}
+    assert urls[3].endswith("/charge") and bodies[3] == {"command": "stop"}
+    assert urls[4].endswith("/door-lock") and bodies[4] == {"command": "set"}
+    assert urls[5].endswith("/door-unlock") and bodies[5] == {"command": "set"}
 
 
 def test_start_climate_full_options():
@@ -226,12 +348,14 @@ def test_start_climate_full_options():
     assert body["command"] == "start"
     assert body["hvacTemp"] == "21.5"
     assert body["windshieldFrontDefogState"] is True
-    assert body["heating1"] == 1
+    assert "heating1" not in body
     assert body["tempUnit"] == "C"
     assert body["hvacTempType"] == 1
     assert body["drvSeatLoc"] == "L"
     assert body["ignitionDuration"] == 10
     assert body["strgWhlHeating"] is True
+    # The explicit side_rear_mirror_heating option wins over the heating
+    # mapping (see test_start_climate_heating_maps_to_side_rear_mirror).
     assert body["sideRearMirrorHeating"] is True
     assert body["seatClimateInfo"] == {
         "drvSeatClimateState": 1,
@@ -265,6 +389,28 @@ def test_stop_climate():
     _, call = _run_command(HyundaiCciApiEU.stop_climate)
     assert call.args[0].endswith("/temperature")
     assert call.kwargs["json"] == {"command": "stop"}
+
+
+def test_start_climate_heating_maps_to_side_rear_mirror():
+    """The user-facing heating option maps to sideRearMirrorHeating — the
+    single GSPA flag that covers the rear window and the mirrors (live
+    flip verified on a PV5: flag 1 flips Body.Windshield.Rear.Defog.State
+    0→1 at the car). heating1 is acked by the backend but ignored there."""
+    for heating, flag in ((1, 1), (2, 1), (4, 1), (0, 0), (3, 0)):
+        options = ClimateRequestOptions(heating=heating)
+        _, call = _run_command(HyundaiCciApiEU.start_climate, options)
+        body = call.kwargs["json"]
+        assert "heating1" not in body
+        assert body["sideRearMirrorHeating"] == flag
+
+
+def test_start_engine_heating_maps_to_side_rear_mirror():
+    options = ClimateRequestOptions(heating=2)
+    _, call = _run_command(HyundaiCciApiEU.start_engine, options)
+    assert call.args[0].endswith("/engine")
+    body = call.kwargs["json"]
+    assert "heating1" not in body
+    assert body["sideRearMirrorHeating"] == 1
 
 
 def test_start_engine_maps_climate_field():
@@ -321,7 +467,22 @@ def test_windows_front_open_scope():
         front_right=WINDOW_STATE.OPEN,
     )
     _, call = _run_command(HyundaiCciApiEU.set_windows_state, options)
-    assert call.kwargs["json"]["command"] == "front-open"
+    body: dict[str, Any] = call.kwargs["json"]
+    assert body["command"] == "front-open"
+    # Front-scope commands send the rear pairs as explicit nulls — 0 is
+    # WINDOW_STATE.CLOSED on this endpoint and would close the rear windows.
+    assert body["drvSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["psgSeatWindow"] == WINDOW_STATE.OPEN.value
+    assert body["rlSeatWindow"] is None
+    assert body["rrSeatWindow"] is None
+
+
+def test_windows_raise_when_vehicle_lacks_window_control():
+    options = WindowRequestOptions(front_left=WINDOW_STATE.OPEN)
+    vehicle = _make_vehicle()
+    vehicle.supports.window_control = False
+    with pytest.raises(APIError, match="Window control not supported"):
+        _make_api().set_windows_state(_make_token(), vehicle, options)
 
 
 def test_windows_mixed_state_raises():
@@ -424,7 +585,7 @@ def test_schedule_reservation_charge_body():
     assert call.args[0].endswith("/reservation-charge")
     body = call.kwargs["json"]
     assert body["reservFlag"] == 1
-    assert body["offpeakPowerFlag"] == 1
+    assert body["offpeakPowerFlag"] == 2
     assert body["reservStartTime"] == {"time": "0130", "timeSection": 0}
     assert body["reservEndTime"] == {"time": "0600", "timeSection": 0}
     assert body["command"] == "set"
@@ -432,23 +593,74 @@ def test_schedule_reservation_charge_body():
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
+def test_schedule_reservation_charge_off_peak_only_flag():
+    options = ScheduleChargingClimateRequestOptions()
+    options.charging_enabled = True
+    options.off_peak_charge_only_enabled = True
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_charge, options)
+    assert call.kwargs["json"]["offpeakPowerFlag"] == 1
+
+
 def test_schedule_reservation_hvac_body_shape():
+    """reservInfo = the app DTO (day list + time object only), per the
+    PV5 live round (2026-10-22): the previous nested reservInfo failed
+    with 500-000 twice; the app form returned 202 and applied across
+    four runs. The 12-hour clock and afternoon timeSection match the
+    reservation-charge capture (19:05 -> "0705" / timeSection 1)."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True
     options.first_departure.days = [1]
     options.first_departure.time = dt.time(7, 5)
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.second_departure.enabled = True
+    options.second_departure.days = [4]
+    options.second_departure.time = dt.time(19, 5)
     _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
     assert call.args[0].endswith("/reservation-hvac")
     body = call.kwargs["json"]
     assert body["command"] == "set"
     assert body["reservedHVACInfo1"]["reservHVACflag"] == 1
-    assert body["reservedHVACInfo2"]["reservHVACflag"] == 0
+    assert body["reservedHVACInfo1"]["reservInfo"] == {
+        "day": [1],
+        "time": {"time": "0705", "timeSection": 0},
+    }
+    assert body["reservedHVACInfo2"]["reservHVACflag"] == 1
+    assert body["reservedHVACInfo2"]["reservInfo"] == {
+        "day": [4],
+        "time": {"time": "0705", "timeSection": 1},
+    }
+    # the climate options travel in reservHVACSet, not reservInfo
+    for info in (
+        body["reservedHVACInfo1"]["reservInfo"],
+        body["reservedHVACInfo2"]["reservInfo"],
+    ):
+        assert "scheduleEnable" not in info
+        assert "hvacTemp" not in info
+        assert "drvSeatLoc" not in info
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
-def test_schedule_reservation_engine_body_shape():
+def test_schedule_reservation_hvac_days_default_to_sunday():
+    """day defaults to [0] = Sunday (PV5 live round: day 0 maps to
+    Schedule1.Sun)."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    options.first_departure.enabled = True
+    options.second_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
+    _, call = _run_command(HyundaiCciApiEU.schedule_reservation_hvac, options)
+    info1 = call.kwargs["json"]["reservedHVACInfo1"]["reservInfo"]
+    info2 = call.kwargs["json"]["reservedHVACInfo2"]["reservInfo"]
+    assert info1["day"] == [0] and info2["day"] == [0]
+    # departure times default to dt.time() = 00:00 -> morning section
+    assert info1["time"] == {"time": "1200", "timeSection": 0}
+
+
+def test_schedule_reservation_engine_body_shape_unchanged():
+    """reservation-engine keeps the nested reservInfo for now: no live
+    capture of that endpoint exists (no ICE car in the #1909/#1145
+    loop), so the app-form change stays scoped to reservation-hvac."""
     options = ScheduleChargingClimateRequestOptions()
     options.first_departure = ScheduleChargingClimateRequestOptions.DepartureOptions()
     options.first_departure.enabled = True
@@ -490,14 +702,6 @@ def test_schedule_charging_and_climate_body_shape():
     assert info1["reservInfo"]["time"] == {"time": "0705", "timeSection": 0}
     assert info1["reservFatcSet"]["airTemp"]["value"] == "21.5"
     assert "offPeakPowerInfo" in body
-    assert "AuthorizationCCSP" not in call.kwargs["headers"]
-    assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
-
-
-def test_lock_and_start_toggle():
-    _, call = _run_command(HyundaiCciApiEU.lock_and_start_toggle, True)
-    assert call.args[0].endswith("/lock-and-start-toggle")
-    assert call.kwargs["json"] == {"lockAndStartEnable": True}
     assert "AuthorizationCCSP" not in call.kwargs["headers"]
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
@@ -669,19 +873,19 @@ def test_schedule_reservation_charge_na_utc_day_shift():
     assert body["reservInfo"] == {"day": [6], "time": "22:30:00Z"}
 
 
-def test_set_ota_update_start():
-    """set_ota_update(start=True) POSTs {updateStart: 1} to the mru
+def test_start_ota_update_start():
+    """start_ota_update(start=True) POSTs {updateStart: 1} to the mru
     ota-updates path (1 = start). The response has no polling SID, so
     the parsed body is returned."""
-    result, call = _run_command(HyundaiCciApiEU.set_ota_update, True)
+    result, call = _run_command(HyundaiCciApiEU.start_ota_update, True)
     assert isinstance(result, dict)
     assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
     assert call.kwargs["json"] == {"updateStart": 1}
 
 
-def test_set_ota_update_cancel():
-    """set_ota_update(start=False) POSTs {updateStart: 2} (cancel)."""
-    result, call = _run_command(HyundaiCciApiEU.set_ota_update, False)
+def test_start_ota_update_cancel():
+    """start_ota_update(start=False) POSTs {updateStart: 2} (cancel)."""
+    result, call = _run_command(HyundaiCciApiEU.start_ota_update, False)
     assert isinstance(result, dict)
     assert call.args[0].endswith("/gspa/v1/mru/vehicles/test123/ota-updates")
     assert call.kwargs["json"] == {"updateStart": 2}
@@ -703,7 +907,7 @@ def test_set_ota_reservation_passthrough():
     assert call.kwargs["json"] == settings
 
 
-def test_set_ota_update_uses_bearer_headers():
+def test_start_ota_update_uses_bearer_headers():
     """OTA commands authenticate with the standard GSPA headers — the
     PIN-derived control token path is not used."""
     api = _make_api()
@@ -714,6 +918,32 @@ def test_set_ota_update_uses_bearer_headers():
         patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
     ):
         post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
-        HyundaiCciApiEU.set_ota_update(api, token, vehicle, True)
+        HyundaiCciApiEU.start_ota_update(api, token, vehicle, True)
     get_ct.assert_not_called()
     assert post.call_args.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
+
+
+def test_kia_charge_limits_use_the_live_proven_plugtype_mapping():
+    """Kia GSPA charge-target: plugType 0 = DC, 1 = AC with the
+    targetSOClist / targetSOClevel fields — live-proven on a PV5
+    (2026-10-20): the library body applied (TargetSoC.Quick 100 -> 80,
+    TargetSoC.Standard 70 -> 90), while the 1=AC / 2=DC variant from
+    the issue tables was rejected with 400-002."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_limits, 90, 80)
+    body = call.kwargs["json"]
+    assert body["command"] == "set"
+    assert body["targetSOClist"] == [
+        {"plugType": 0, "targetSOClevel": 80},
+        {"plugType": 1, "targetSOClevel": 90},
+    ]
+
+
+def test_kia_charging_current_sends_the_level_field():
+    """Kia GSPA charging-current: {"chargingCurrent": level, "command":
+    "set"} — live-proven on a PV5 (2026-10-20), 202 S 202-000 with the
+    stored ElectricCurrentLevel.State following the value (1 = 100 %)."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charging_current, 1)
+    body = call.kwargs["json"]
+    assert body == {"chargingCurrent": 1, "command": "set"}

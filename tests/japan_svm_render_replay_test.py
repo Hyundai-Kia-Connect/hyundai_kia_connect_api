@@ -10,7 +10,7 @@ import pytest
 from hyundai_kia_connect_api.exceptions import NoDataFound
 from hyundai_kia_connect_api.japan_svm import JapanSVM
 from hyundai_kia_connect_api.svm_image import render_views
-from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 
 Image = pytest.importorskip("PIL.Image")
 
@@ -68,7 +68,7 @@ def test_completed_camera_capture_decodes_and_renders_all_five_views(
         side_effect=[{"msgId": "synthetic-capture"}, NoDataFound("pending"), response]
     )
     monkeypatch.setattr("hyundai_kia_connect_api.japan_svm.time.sleep", lambda _: None)
-    vehicle = Vehicle(id="synthetic-car", supports_svm=True)
+    vehicle = Vehicle(id="synthetic-car", supports=VehicleSupports(svm=True))
     details = adapter.request_svm_capture(None, vehicle, True)
     assert details.captured_at is None
     assert adapter.get_svm_details(None, vehicle) is details

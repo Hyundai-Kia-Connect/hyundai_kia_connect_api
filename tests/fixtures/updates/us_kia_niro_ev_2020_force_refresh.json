@@ -1,0 +1,39 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/us_kia_niro_ev_2020_force_refresh.json (Kia Niro EV 2020)",
+        "follow_up_sources": "none",
+        "not_captured": ["GET evc/gts (no capture)"],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "key": "KEY-1"
+    },
+    "responses": {
+        "POST /apigw/v1/cmm/gvi": {
+            "body": {
+                "status": {
+                    "statusCode": 0,
+                    "errorType": 0,
+                    "errorCode": 0,
+                    "errorMessage": "Success with response body"
+                },
+                "payload": {
+                    "vehicleInfoList": [
+                        "$fixture:us_kia_niro_ev_2020_force_refresh.json"
+                    ]
+                }
+            }
+        },
+        "GET /apigw/v1/evc/gts": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

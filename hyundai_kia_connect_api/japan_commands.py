@@ -10,6 +10,19 @@ import math
 import re
 import time
 import uuid
+from typing import TYPE_CHECKING, Any
+
+from .ApiImpl import (
+    ClimateRequestOptions,
+    POIInfo,
+    ScheduleChargingClimateRequestOptions,
+    WindowRequestOptions,
+)
+from .Token import Token
+from .Vehicle import Vehicle
+
+if TYPE_CHECKING:
+    from .japan_mqtt import JapanMqttSession
 
 from .const import (
     CHARGE_PORT_ACTION,
@@ -34,16 +47,43 @@ class JapanCommandsMixin:
     silently omit its Object command argument and display misleading names.
     """
 
+    _vehicle_profiles: dict[str, dict[str, Any]]
+    _japan_actions: dict[str, tuple[str, tuple[str, ...] | None, ORDER_STATUS | None]]
+    _charge_target_cache: dict[str, tuple[float, dict[int, int]]]
+    _japan_command_diagnostics: dict[str, Any]
+    _japan_diagnostic_action_id: str | None
+
+    if TYPE_CHECKING:
+
+        def _request(
+            self, method: str, path: str, *, json_response: bool = True, **kwargs: Any
+        ) -> Any: ...
+        def _headers(self, token: Token | None = None) -> dict[str, str]: ...
+        def _vehicle_headers(
+            self, token: Token, vehicle: Vehicle, helper: JapanMqttSession | None = None
+        ) -> dict[str, str]: ...
+        def _mqtt_for_vehicle(
+            self, token: Token, vehicle: Vehicle
+        ) -> JapanMqttSession: ...
+        def _legacy_temperature(
+            self, vehicle: Vehicle, air_temp: object
+        ) -> float | None: ...
+        @staticmethod
+        def _payload(result: dict[str, Any]) -> dict[str, Any]: ...
+        def update_vehicle_with_charge_targets(
+            self, token: Token, vehicle: Vehicle
+        ) -> None: ...
+
     @staticmethod
-    def _japan_capability(value):
+    def _japan_capability(value: object) -> bool:
         return type(value) is int and value == 1
 
-    def _japan_profile_section(self, vehicle, section):
+    def _japan_profile_section(self, vehicle: Vehicle, section: str) -> dict[str, Any]:
         profile = self._vehicle_profiles.get(vehicle.id, {})
         value = profile.get(section) if isinstance(profile, dict) else None
         return value if isinstance(value, dict) else {}
 
-    def _command_vehicle_id(self, vehicle):
+    def _command_vehicle_id(self, vehicle: Vehicle) -> str:
         if not isinstance(vehicle.id, str) or not re.fullmatch(
             r"[A-Za-z0-9_-]+", vehicle.id
         ):
@@ -51,7 +91,7 @@ class JapanCommandsMixin:
         return vehicle.id
 
     @staticmethod
-    def _require_mqtt_identity(token):
+    def _require_mqtt_identity(token: Token) -> None:
         identity = getattr(token, "mqtt_registration_uuid", None)
         if not isinstance(identity, str) or not re.fullmatch(
             r"[A-Za-z0-9_-]{1,128}", identity
@@ -60,7 +100,9 @@ class JapanCommandsMixin:
                 "Sign in again to register Japan vehicle commands"
             )
 
-    def _control_headers(self, token, vehicle=None):
+    def _control_headers(
+        self, token: Token, vehicle: Vehicle | None = None
+    ) -> dict[str, str]:
         self._require_mqtt_identity(token)
         if not isinstance(token.pin, str) or not token.pin.strip():
             raise AuthenticationError("Japan vehicle commands require an explicit PIN")
@@ -100,12 +142,19 @@ class JapanCommandsMixin:
             if vehicle is not None
             else self._headers(token)
         )
+        if token.control_token is None:
+            raise InvalidAPIResponseError("Japan control token is incomplete")
         headers["Authorization"] = token.control_token
         return headers
 
     def _remember_japan_action(
-        self, action_id, vehicle_id, children=None, *, status=None
-    ):
+        self,
+        action_id: str,
+        vehicle_id: str,
+        children: tuple[str, ...] | None = None,
+        *,
+        status: ORDER_STATUS | None = None,
+    ) -> None:
         """Keep bounded local receipts; the adapter owns telemetry sessions."""
         if not hasattr(self, "_japan_actions"):
             self._japan_actions = {}
@@ -115,7 +164,7 @@ class JapanCommandsMixin:
             status = ORDER_STATUS.SUCCESS
         self._japan_actions[action_id] = (vehicle_id, children, status)
 
-    def _record_japan_command_failure(self, error):
+    def _record_japan_command_failure(self, error: Exception) -> None:
         category = "other"
         if isinstance(error, AuthenticationError):
             category = "authentication"
@@ -136,7 +185,15 @@ class JapanCommandsMixin:
         diagnostic["failure_category"] = category
         self._japan_command_diagnostics = diagnostic
 
-    def _japan_command(self, token, vehicle, endpoint, payload, *, ccs2=True):
+    def _japan_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        payload: dict[str, Any],
+        *,
+        ccs2: bool = True,
+    ) -> str:
         endpoints = {
             "control/door": "door",
             "control/portdoor": "portdoor",
@@ -217,11 +274,20 @@ class JapanCommandsMixin:
         return action_id
 
     def check_action_status(
-        self, token, vehicle, action_id, synchronous=False, timeout=0
-    ):
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        action_id: str,
+        synchronous: bool = False,
+        timeout: int = 0,
+    ) -> ORDER_STATUS:
         """Return a local service receipt, never fabricate vehicle execution."""
         vehicle_id = self._command_vehicle_id(vehicle)
-        tracked = getattr(self, "_japan_actions", {}).get(action_id)
+        tracked = (
+            self._japan_actions.get(action_id)
+            if hasattr(self, "_japan_actions")
+            else None
+        )
         if tracked is None or tracked[0] != vehicle_id:
             return ORDER_STATUS.UNKNOWN
         children, status = tracked[1:]
@@ -256,7 +322,9 @@ class JapanCommandsMixin:
         self._japan_actions[action_id] = (vehicle_id, children, status)
         return status
 
-    def valet_mode_action(self, token, vehicle, action):
+    def valet_mode_action(
+        self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
+    ) -> str:
         service = self._japan_profile_section(vehicle, "serviceOption")
         if not self._japan_capability(service.get("remoteValetActOption")):
             raise UnsupportedControlError("Japan valet control capability is absent")
@@ -266,7 +334,9 @@ class JapanCommandsMixin:
             token, vehicle, "control/valet", {"action": action.value}, ccs2=False
         )
 
-    def set_navigation(self, token, vehicle, poi_list):
+    def set_navigation(
+        self, token: Token, vehicle: Vehicle, poi_list: list[POIInfo]
+    ) -> str:
         """Send the app's route envelope using validated existing POI models."""
         if not isinstance(poi_list, list) or not 1 <= len(poi_list) <= 10:
             raise ValueError("Japan navigation requires one to ten destinations")
@@ -275,6 +345,8 @@ class JapanCommandsMixin:
             try:
                 value = poi.to_dict()
                 coord = value["coord"]
+                if not isinstance(coord, dict):
+                    raise TypeError
                 lat, lon = coord["lat"], coord["lon"]
                 if (
                     isinstance(lat, bool)
@@ -301,28 +373,32 @@ class JapanCommandsMixin:
             token, vehicle, "location/routes", {"poiInfoList": destinations}, ccs2=False
         )
 
-    def lock_action(self, token, vehicle, action):
+    def lock_action(
+        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
+    ) -> str:
         if action not in (VEHICLE_LOCK_ACTION.LOCK, VEHICLE_LOCK_ACTION.UNLOCK):
             raise ValueError("Unsupported Japan door action")
         command = action.value
         return self._japan_command(token, vehicle, "control/door", {"command": command})
 
-    def start_charge(self, token, vehicle):
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
         return self._japan_command(
             token, vehicle, "control/charge", {"command": "start"}
         )
 
-    def stop_charge(self, token, vehicle):
+    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
         return self._japan_command(
             token, vehicle, "control/charge", {"command": "stop"}
         )
 
-    def stop_climate(self, token, vehicle):
+    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         return self._japan_command(
             token, vehicle, "control/temperature", {"command": "stop"}
         )
 
-    def charge_port_action(self, token, vehicle, action):
+    def charge_port_action(
+        self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
+    ) -> str:
         if not self._japan_capability(
             self._japan_profile_section(vehicle, "serviceOption").get(
                 "chargePortDoorOption"
@@ -336,14 +412,14 @@ class JapanCommandsMixin:
             token, vehicle, "control/portdoor", {"command": command}
         )
 
-    def start_hazard_lights(self, token, vehicle):
+    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
         if not self._japan_capability(
             self._japan_profile_section(vehicle, "option").get("lightOnlyAvailable")
         ):
             raise UnsupportedControlError("Japan light control capability is absent")
         return self._japan_command(token, vehicle, "control/light", {"command": "on"})
 
-    def start_hazard_lights_and_horn(self, token, vehicle):
+    def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         if not self._japan_capability(
             self._japan_profile_section(vehicle, "option").get("hornLightAvailable")
         ):
@@ -356,7 +432,7 @@ class JapanCommandsMixin:
             token, vehicle, "control/hornlight", {"command": command}
         )
 
-    def set_charging_current(self, token, vehicle, level):
+    def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
         service = self._japan_profile_section(vehicle, "serviceOption")
         if not self._japan_capability(service.get("chargingCurrentSupport")):
             raise UnsupportedControlError("Japan charging current capability is absent")
@@ -366,7 +442,9 @@ class JapanCommandsMixin:
             token, vehicle, "charge/chargingcurrent", {"chargingCurrent": level}
         )
 
-    def set_vehicle_to_load_discharge_limit(self, token, vehicle, limit):
+    def set_vehicle_to_load_discharge_limit(
+        self, token: Token, vehicle: Vehicle, limit: int
+    ) -> str:
         service = self._japan_profile_section(vehicle, "serviceOption")
         if not self._japan_capability(service.get("v2LSocSetServiceOption")):
             raise UnsupportedControlError("Japan V2L limit capability is absent")
@@ -381,7 +459,9 @@ class JapanCommandsMixin:
             token, vehicle, "charge/dischargelimit", {"dischargingLimit": limit}
         )
 
-    def set_windows_state(self, token, vehicle, options):
+    def set_windows_state(
+        self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
+    ) -> str:
         """Send nullable app window/curtain fields with profile seat orientation."""
         service = self._japan_profile_section(vehicle, "serviceOption")
         if not self._japan_capability(service.get("windowControlOption")):
@@ -438,7 +518,7 @@ class JapanCommandsMixin:
             and profile.get("rearWindowCurtainOption") != 1
         ):
             raise UnsupportedControlError("Japan rear curtain capability is absent")
-        payload = {
+        payload: dict[str, Any] = {
             "drvSeatLoc": location,
             "drvSeatWindow": front_left if location == "L" else front_right,
             "psgSeatWindow": front_right if location == "L" else front_left,
@@ -454,7 +534,12 @@ class JapanCommandsMixin:
             )
         return self._japan_command(token, vehicle, "control/windowcurtain", payload)
 
-    def schedule_charging_and_climate(self, token, vehicle, options):
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
         """Preserve unspecified combined schedule fields from the cloud snapshot."""
         profile = self._vehicle_profiles.get(vehicle.id, {})
         flat = profile.get("appMode") == "EV5"
@@ -474,7 +559,7 @@ class JapanCommandsMixin:
                 headers=headers,
             )
         )
-        payload = {
+        payload: dict[str, Any] = {
             "reservFlag": current.get("reservFlag"),
             "offPeakPowerInfo": copy.deepcopy(current.get("offPeakPowerInfo")),
         }
@@ -663,7 +748,7 @@ class JapanCommandsMixin:
         return action_id
 
     @staticmethod
-    def _japan_schedule_time(value):
+    def _japan_schedule_time(value: object) -> dict[str, str | int]:
         if (
             not isinstance(value, dt.time)
             or value.tzinfo is not None
@@ -676,7 +761,9 @@ class JapanCommandsMixin:
             "timeSection": int(value >= dt.time(12)),
         }
 
-    def start_climate(self, token, vehicle, options):
+    def start_climate(
+        self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
+    ) -> str:
         """Construct the supported numeric Celsius Japan climate envelope."""
         profile = self._japan_profile_section(vehicle, "option")
         hvac_type = (
@@ -723,7 +810,7 @@ class JapanCommandsMixin:
             raise UnsupportedControlError(
                 "Japan climate start requires climate enabled"
             )
-        payload = {
+        payload: dict[str, Any] = {
             "command": "start",
             "hvacTemp": str(float(temp)),
             "hvacTempType": hvac_type,
@@ -823,7 +910,9 @@ class JapanCommandsMixin:
             raise UnsupportedControlError("Japan separate heater capability is absent")
         return self._japan_command(token, vehicle, "control/temperature", payload)
 
-    def set_charge_limits(self, token, vehicle, ac, dc):
+    def set_charge_limits(
+        self, token: Token, vehicle: Vehicle, ac: int, dc: int
+    ) -> str:
         """Store charge targets; HTTP success confirms the cloud setting write."""
         vehicle_id = self._command_vehicle_id(vehicle)
         if any(

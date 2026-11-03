@@ -6,17 +6,7 @@
         "brand": "Hyundai",
         "endpoint": "vehicles/{vehicleId}/status/latest",
         "description": "AU Hyundai Ioniq 5 response with targetSOC. Uses status root (not vehicleStatus) with hex-encoded temperature.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 64,
-            "ev_charge_limits_dc": 80,
-            "ev_charge_limits_ac": 90,
-            "car_battery_percentage": 78,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0
-        }
+        "has_target_soc": true
     },
     "status": {
         "time": "20240715080000",

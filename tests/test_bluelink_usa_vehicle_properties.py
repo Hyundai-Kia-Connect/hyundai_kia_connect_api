@@ -9,14 +9,6 @@ import pytest
 
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from hyundai_kia_connect_api.Vehicle import Vehicle
-from tests.fixture_helpers import (
-    discover_fixtures,
-    get_fixture_expected,
-    get_fixture_meta,
-    load_fixture,
-)
-
-BLUELINK_FIXTURE_FILES = discover_fixtures("us_hyundai_")
 
 
 @pytest.fixture
@@ -29,67 +21,7 @@ def bluelink_api() -> HyundaiBlueLinkApiUSA:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
-
-
-@pytest.mark.parametrize(
-    "fixture_file", BLUELINK_FIXTURE_FILES, ids=BLUELINK_FIXTURE_FILES
-)
-class TestBlueLinkUSAUpdateVehicleProperties:
-    def test_ev_battery_percentage(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.ev_battery_percentage == expected["ev_battery_percentage"]
-
-    def test_ev_charge_limits(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        meta = get_fixture_meta(data)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-
-        if meta.get("has_target_soc"):
-            assert vehicle.ev_charge_limits_dc == expected["ev_charge_limits_dc"]
-            assert vehicle.ev_charge_limits_ac == expected["ev_charge_limits_ac"]
-        else:
-            assert vehicle.ev_charge_limits_dc is None
-            assert vehicle.ev_charge_limits_ac is None
-
-    def test_car_battery_percentage(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.car_battery_percentage == expected["car_battery_percentage"]
-
-    def test_engine_is_running(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.engine_is_running == expected["engine_is_running"]
-
-    def test_is_locked(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.is_locked == expected["is_locked"]
-
-    def test_ev_charging_state(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.ev_battery_is_charging == expected["ev_battery_is_charging"]
-        assert vehicle.ev_battery_is_plugged_in == expected["ev_battery_is_plugged_in"]
-
-    def test_ev_charging_power(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        expected = get_fixture_expected(data)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.ev_charging_power == expected["ev_charging_power"]
-
-    def test_data_is_stored(self, bluelink_api, vehicle, fixture_file):
-        data = load_fixture(fixture_file)
-        bluelink_api._update_vehicle_properties(vehicle, data)
-        assert vehicle.data is data
+    return Vehicle(id="test-id")
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +52,7 @@ def test_bluelink_dc_charging_power_reads_real_time_power(bluelink_api):
     asserts 10.9 (the vehicle's AC ceiling) instead of 58.7, which is the
     signature of the bug rather than a rounding difference.
     """
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "vehicleStatus": {
             "evStatus": {
@@ -141,7 +73,7 @@ def test_bluelink_charging_power_none_when_real_time_power_absent(bluelink_api):
     the field is missing, rather than substituting the stale AC rate carried by
     `batteryStndChrgPower`.
     """
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "vehicleStatus": {
             "evStatus": {
@@ -168,7 +100,7 @@ def test_bluelink_air_temp_off_yields_none(
     the conformance fixes is that the setter is not called at all — so the
     raw value slot (_air_temperature_value) stays None instead of holding
     the string "OFF". Assert on that side effect as the real TDD gate."""
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     bluelink_api._update_vehicle_properties(vehicle, bluelink_status_with_air_temp_off)
     assert vehicle.air_temperature is None
     assert vehicle._air_temperature_value is None
@@ -194,7 +126,7 @@ def test_bluelink_odometer_uses_highest_valid_value(
         "vehicleStatus": {"odometer": status_odometer},
     }
 
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     bluelink_api._update_vehicle_properties(vehicle, state)
 
     assert vehicle.odometer == expected

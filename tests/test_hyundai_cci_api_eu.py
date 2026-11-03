@@ -12,9 +12,15 @@ import pytest
 from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
 from hyundai_kia_connect_api.exceptions import (
     APIError,
+    AuthenticationBlockedError,
+    AuthenticationCciTokenExchangeError,
+    AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
+from hyundai_kia_connect_api.GspaApiEU import GspaApiEU
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -90,8 +96,26 @@ def test_login_with_password_certs_endpoint_fails():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="failed to fetch RSA certs"):
+        with pytest.raises(
+            AuthenticationCertificateError, match="failed to fetch RSA certs"
+        ):
             api._login_with_password("user@test.com", "password", "device-1")
+
+
+def test_login_with_password_certs_missing_key_material():
+    """A certificate response without RSA key fields raises a typed error."""
+    api = _make_hyundai_api()
+    certs_resp = MagicMock(status_code=200)
+    certs_resp.json.return_value = {"retValue": {}}
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.ApiImplSession",
+            return_value=_cci_session(certs_resp, MagicMock()),
+        ),
+        pytest.raises(AuthenticationCertificateError, match="missing RSA key material"),
+    ):
+        api._login_with_password("user@test.com", "password", "device-1")
 
 
 def test_login_with_password_signin_returns_non_302():
@@ -107,7 +131,7 @@ def test_login_with_password_signin_returns_non_302():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Signin failed"):
+        with pytest.raises(AuthenticationSigninError, match="Signin failed"):
             api._login_with_password("user@test.com", "password", "device-1")
 
 
@@ -127,7 +151,7 @@ def test_login_with_password_signin_no_code_in_redirect():
         for p in _mock_crypto():
             stack.enter_context(p)
         with pytest.raises(
-            AuthenticationError, match="unexpected redirect after signin"
+            AuthenticationRedirectError, match="unexpected redirect after signin"
         ):
             api._login_with_password("user@test.com", "password", "device-1")
 
@@ -150,7 +174,7 @@ def test_login_with_password_signin_error_in_redirect():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="Authentication rejected"):
+        with pytest.raises(AuthenticationSigninError, match="Authentication rejected"):
             api._login_with_password("user@test.com", "wrong-password", "device-1")
 
 
@@ -171,7 +195,7 @@ def test_login_with_password_signin_redirect_to_login_page():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="returned to login page"):
+        with pytest.raises(AuthenticationRedirectError, match="returned to login page"):
             api._login_with_password("user@test.com", "password", "device-1")
 
 
@@ -193,7 +217,7 @@ def test_login_with_password_waf_block_detected():
         )
         for p in _mock_crypto():
             stack.enter_context(p)
-        with pytest.raises(AuthenticationError, match="abusing request"):
+        with pytest.raises(AuthenticationBlockedError, match="abusing request"):
             api._login_with_password("user@test.com", "password", "device-1")
 
 
@@ -219,7 +243,9 @@ def test_login_with_password_cci_token_exchange_fails():
                 return_value=token_resp,
             )
         )
-        with pytest.raises(AuthenticationError, match="CCI token exchange failed"):
+        with pytest.raises(
+            AuthenticationCciTokenExchangeError, match="CCI token exchange failed"
+        ):
             api._login_with_password("user@test.com", "password", "device-1")
 
 
@@ -428,9 +454,10 @@ def test_refresh_cci_token_uses_v2_endpoint():
         token = _make_token()
         result = api.refresh_access_token(token)
 
-    # First call should be to v2/auth/token-refresh
+    # Primary refresh is the fingerprint-gated /auth route (v2); the legacy
+    # domain/api route is the fallback, not the primary.
     first_call_url = mock_post.call_args_list[0].args[0]
-    assert "v2/auth/token-refresh" in first_call_url
+    assert first_call_url.endswith("/auth/v2/token-refresh")
     assert "v1/auth/token-refresh" not in first_call_url
     assert result.access_token == "Bearer new-ccs-token"
 
@@ -568,15 +595,6 @@ def test_test_token_returns_false_on_non_200():
         assert api.test_token(token) is False
 
 
-# ── supports_valet_mode class attribute ────────────────────────
-
-
-def test_supports_valet_mode_is_true():
-    """HyundaiCciApiEU overrides ApiImpl.supports_valet_mode (False) with True."""
-    api = _make_hyundai_api()
-    assert api.supports_valet_mode is True
-
-
 # ── get_vehicles() CCI parsing ────────────────────────
 
 
@@ -622,7 +640,7 @@ def test_update_vehicle_with_cached_state_populates_vehicle():
     supports_valet_mode)."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     vehicle.engine_type = ENGINE_TYPES.EV
 
@@ -712,7 +730,7 @@ def test_fob_low_battery_bool_or_none(low_battery, expected):
     """Electronics.FOB.LowBattery uses bool_or_none: an absent/unset
     value maps to None (unknown), not False (C3 review finding)."""
     api = _make_hyundai_api()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     state = {
         "Drivetrain": {"FuelSystem": {"DTE": {"Unit": 1}}},
         "Electronics": {"FOB": {"LowBattery": low_battery}},
@@ -725,10 +743,10 @@ def test_prewakeup_sends_action_body():
     """The app's prewakeup call carries {"action": "prewakeup"}
     (PreWakeupApiRequest, Moshi default "prewakeup") — mirror it."""
     api = _make_hyundai_api()
-    token = Token()
+    token = Token(username="test-user", password="test-pass")
     token.access_token = "ccs-token"
     token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     resp = MagicMock(status_code=200)
     resp.json.return_value = {"rc": "0000", "rs": {}}
@@ -747,7 +765,7 @@ def test_prewakeup_sends_action_body():
 def test_prewakeup_failure_returns_none():
     """prewakeup is best-effort: any failure is swallowed to None."""
     api = _make_hyundai_api()
-    token = Token()
+    token = Token(username="test-user", password="test-pass")
     token.access_token = "ccs-token"
     token.valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
     with (
@@ -757,7 +775,7 @@ def test_prewakeup_failure_returns_none():
             side_effect=OSError("offline"),
         ),
     ):
-        assert api.prewakeup(token, Vehicle()) is None
+        assert api.prewakeup(token, Vehicle(id="test-id")) is None
 
 
 def test_refresh_4111_logs_info_not_warning(caplog):
@@ -822,7 +840,7 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
     on the cached-update path."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     with (
         patch.object(
@@ -844,7 +862,7 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
     (None), not stale."""
     api = _make_hyundai_api()
     token = _make_token()
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "car-123"
     with (
         patch.object(api, "get_software_version", side_effect=APIError("boom")),
@@ -853,3 +871,39 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.ota_update_available is None
     assert vehicle._ota_checked is True  # checked — don't retry until force refresh
+
+
+# ── force_refresh_vehicle_state() — shared poll + Hyundai extras ──
+
+
+def test_force_refresh_resets_flags_and_loads_extras():
+    api = _make_hyundai_api()
+    vehicle = Vehicle(id="test-id")
+    vehicle._ota_checked = True
+    vehicle._valet_failed = True
+    with (
+        patch.object(GspaApiEU, "force_refresh_vehicle_state") as shared,
+        patch.object(api, "_update_vehicle_extras") as extras,
+    ):
+        api.force_refresh_vehicle_state(_make_token(), vehicle)
+    shared.assert_called_once()
+    extras.assert_called_once()
+    assert vehicle._ota_checked is False
+    assert vehicle._valet_failed is False
+
+
+def test_force_refresh_failure_skips_extras():
+    """A failed shared refresh propagates; flags and extras stay untouched."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle(id="test-id")
+    vehicle._ota_checked = True
+    with (
+        patch.object(
+            GspaApiEU, "force_refresh_vehicle_state", side_effect=APIError("timeout")
+        ),
+        patch.object(api, "_update_vehicle_extras") as extras,
+        pytest.raises(APIError),
+    ):
+        api.force_refresh_vehicle_state(_make_token(), vehicle)
+    extras.assert_not_called()
+    assert vehicle._ota_checked is True

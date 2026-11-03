@@ -21,7 +21,12 @@ SHARED = (
 
 
 def _token() -> Token:
-    return Token(access_token="Bearer abc", device_id="dev-1")
+    return Token(
+        username="test-user",
+        password="test-pass",
+        access_token="Bearer abc",
+        device_id="dev-1",
+    )
 
 
 def _vehicle() -> Vehicle:
@@ -126,7 +131,7 @@ def test_day_trip_uses_trip_fields_by_default():
 
 
 def test_in_day_trip_falls_back_to_detailed_trip_info():
-    api = KiaUvoApiIN(brand=2)
+    api = KiaUvoApiIN(region=6, brand=2, language="en")
     _mock_posts(api, _day_trip_payload({"tripId": "t1"}))
     sentinel = TripInfo(hhmmss="121212")
     api._get_detailed_trip_info = MagicMock(return_value=sentinel)

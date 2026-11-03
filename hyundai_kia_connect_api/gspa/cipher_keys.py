@@ -46,6 +46,14 @@ BRAND_CIPHER_SPECS: dict[str, dict[str, Any]] = {
         "phases": [("SBOX", "LINEAR", 13)],
         "final_group": "BYTE",
     },
+    # Genesis EU: same 13-round topology as Kia with no mask layer — the
+    # replay reproduces the native cipher output byte-for-byte.
+    "genesis": {
+        "params_file": "genesis_cipher_params.json",
+        "masks": None,
+        "phases": [("SBOX", "LINEAR", 13)],
+        "final_group": "BYTE",
+    },
 }
 
 
@@ -302,6 +310,19 @@ def kia_cipher() -> GspaCipher:
         masks = _load_json(spec["masks"]) if spec["masks"] else None
         _kia_cipher = GspaCipher(params, masks, spec=spec)
     return _kia_cipher
+
+
+_genesis_cipher: GspaCipher | None = None
+
+
+def genesis_cipher() -> GspaCipher:
+    global _genesis_cipher
+    if _genesis_cipher is None:
+        spec = BRAND_CIPHER_SPECS["genesis"]
+        params = _load_json(spec["params_file"])
+        masks = _load_json(spec["masks"]) if spec["masks"] else None
+        _genesis_cipher = GspaCipher(params, masks, spec=spec)
+    return _genesis_cipher
 
 
 # --- Module-level convenience functions (Hyundai delegates, zero API breakage) ---

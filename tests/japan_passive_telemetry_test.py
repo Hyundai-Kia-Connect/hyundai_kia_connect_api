@@ -155,7 +155,9 @@ def test_older_http_cache_cannot_roll_back_an_applied_unlock():
     assert api.apply_cached_mqtt_state(vehicle)
     api._request.side_effect = None
     api._request.return_value = {"resMsg": {"state": {"Vehicle": state()}}}
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.is_locked is False
     assert vehicle.last_updated_at == dt.datetime(2026, 11, 3, 2, 0, 20, tzinfo=dt.UTC)
     assert api._request.call_count == 1
@@ -169,7 +171,9 @@ def test_equal_date_http_cache_cannot_overwrite_an_applied_unlock():
     api._request.return_value = {
         "resMsg": {"state": {"Vehicle": state("20261103020020.000")}}
     }
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.is_locked is False
     assert api._request.call_count == 1
 
@@ -184,7 +188,9 @@ def test_recreated_vehicle_can_load_equal_date_http_baseline():
         "resMsg": {"state": {"Vehicle": state("20261103020020.000")}}
     }
     api.update_vehicle_with_cached_location = Mock()
-    api.update_vehicle_with_cached_state(Token(), replacement)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), replacement
+    )
     assert replacement.data is not None
     assert replacement.is_locked is True
     assert api._request.call_count == 1
@@ -199,7 +205,9 @@ def test_mqtt_arriving_during_http_read_is_applied_before_candidate_commits():
 
     api._request.side_effect = request
     api.update_vehicle_with_cached_location = Mock()
-    api.update_vehicle_with_cached_state(Token(), vehicle)
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
     assert vehicle.is_locked is False
     assert vehicle.last_updated_at == dt.datetime(2026, 11, 3, 2, 0, 20, tzinfo=dt.UTC)
     assert api._request.call_count == 1

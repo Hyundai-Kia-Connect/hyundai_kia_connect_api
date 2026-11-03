@@ -1,6 +1,7 @@
 """GSPA control infra — maps, error classifier, control token, envelope."""
 
 import datetime as dt
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from hyundai_kia_connect_api.const import ORDER_STATUS
 from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationError,
+    AuthenticationTokenExpiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
     ServiceTemporaryUnavailable,
@@ -38,7 +40,7 @@ def _make_token() -> Token:
 
 
 def _make_vehicle(ccs2: int = 1) -> Vehicle:
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     vehicle.id = "test123"
     vehicle.ccu_ccs2_protocol_support = ccs2
     return vehicle
@@ -57,7 +59,10 @@ def test_path_prefix_map():
 
 def test_bearer_endpoints_cover_settings_and_reservations():
     assert "charge-target" in GspaApiEU.GSPA_BEARER_ENDPOINTS
-    assert "lock-and-start-toggle" in GspaApiEU.GSPA_BEARER_ENDPOINTS
+    # lock-and-start-toggle returned 404 on all three models in the
+    # 2026-10 vehicle run (EV6, Tucson, eNiro); the endpoint is dropped
+    # together with its bearer exemption.
+    assert "lock-and-start-toggle" not in GspaApiEU.GSPA_BEARER_ENDPOINTS
     assert "door" not in GspaApiEU.GSPA_BEARER_ENDPOINTS
 
 
@@ -152,8 +157,8 @@ def test_control_token_cci_success():
     # Cache lives on the Token (Type1 pattern), not on the API instance.
     assert token.control_token == "Bearer ctrl-token-abc"
     assert token.control_token_expiry == 4_000_000_000
-    assert post.call_args.args[0].endswith("/domain/api/v1/auth/pin")
-    assert post.call_args.kwargs["json"] == {"pin": "1234"}
+    assert post.call_args.args[0].endswith("/auth/v1/pin")
+    assert json.loads(post.call_args.kwargs["data"]) == {"pin": "1234"}
 
 
 def test_control_token_ttl_seconds_live_shape():
@@ -367,7 +372,7 @@ def test_gspa_control_command_401_invalidates_cache_and_retries_once():
     assert action_id == "gspa:sid-1"
     assert post.call_count == 3  # 401 + PIN re-verify + retried command
     assert token.control_token == "Bearer ctrl-token-abc"
-    assert post.call_args_list[1].args[0].endswith("/domain/api/v1/auth/pin")
+    assert post.call_args_list[1].args[0].endswith("/auth/v1/pin")
 
 
 def test_gspa_control_command_path_prefix_override():
@@ -423,6 +428,28 @@ def test_get_control_token_pin_locked_reports_window():
         post.return_value = _post_mock(200, body)
         with pytest.raises(APIError, match="temporarily locked.*300s"):
             api._get_control_token(_make_token())
+
+
+def test_get_control_token_expired_access_token_is_token_expired_error():
+    """The PIN endpoint answers an expired token with HTTP 401."""
+    token = _make_token()
+    body = {"code": 9030, "message": "error.msg.common.jwt-expired"}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(401, body)
+        with pytest.raises(AuthenticationTokenExpiredError, match="refresh required"):
+            _make_api()._get_control_token(token)
+    assert token.control_token is None
+
+
+def test_get_control_token_error_without_pin_result_is_not_pin_failure():
+    """A body without isMatched carries no PIN result, so the error must
+    not claim the PIN was wrong."""
+    body = {"code": 9999, "message": "error.msg.common.unknown"}
+    with patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post:
+        post.return_value = _post_mock(500, body)
+        with pytest.raises(APIError, match="HTTP 500") as excinfo:
+            _make_api()._get_control_token(_make_token())
+    assert "PIN verification failed" not in str(excinfo.value)
 
 
 def _status_response(polling_state: str) -> dict:

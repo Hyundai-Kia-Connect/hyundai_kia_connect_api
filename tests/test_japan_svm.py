@@ -16,7 +16,7 @@ from hyundai_kia_connect_api.exceptions import (
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.japan_svm import JapanSVM, parse_japan_svm
-from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 
 
 def payload():
@@ -86,7 +86,7 @@ def test_passive_read_does_not_trigger_capture(adapter):
 
 
 def test_warning_and_profile_guard_before_network(adapter):
-    vehicle = Vehicle(id="CAR", supports_svm=False)
+    vehicle = Vehicle(id="CAR", supports=VehicleSupports(svm=False))
     with pytest.raises(SafetyAcknowledgmentError):
         adapter.request_svm_capture(None, vehicle)
     with pytest.raises(UnsupportedControlError):
@@ -103,7 +103,7 @@ def test_poll_is_correlated_and_only_retries_pending(adapter, monkeypatch):
         NoDataFound("pending"),
         {"resMsg": payload()},
     ]
-    vehicle = Vehicle(id="CAR", supports_svm=True)
+    vehicle = Vehicle(id="CAR", supports=VehicleSupports(svm=True))
     result = adapter.request_svm_capture(None, vehicle, True)
     assert adapter._request.call_count == 3
     calls = adapter._request.call_args_list
@@ -122,7 +122,9 @@ def test_poll_is_correlated_and_only_retries_pending(adapter, monkeypatch):
 def test_pin_precondition_failure_never_submits_or_polls_camera(adapter):
     adapter._control_headers.side_effect = AuthenticationError("PIN rejected")
     with pytest.raises(AuthenticationError):
-        adapter.request_svm_capture(None, Vehicle(id="CAR", supports_svm=True), True)
+        adapter.request_svm_capture(
+            None, Vehicle(id="CAR", supports=VehicleSupports(svm=True)), True
+        )
     adapter._request.assert_not_called()
     adapter._vehicle_headers.assert_not_called()
 
@@ -141,14 +143,18 @@ def test_pin_precondition_precedes_camera_oauth_context_and_post(adapter):
         return {"msgId": "SYNTHETIC_ID"} if method == "POST" else {"resMsg": payload()}
 
     adapter._request.side_effect = request
-    adapter.request_svm_capture(None, Vehicle(id="CAR", supports_svm=True), True)
+    adapter.request_svm_capture(
+        None, Vehicle(id="CAR", supports=VehicleSupports(svm=True)), True
+    )
     assert order == ["PIN", "OAuth context", "POST", "OAuth context", "GET"]
 
 
 def test_ack_without_image_is_not_success(adapter):
     adapter._request.side_effect = [{"msgId": "SYNTHETIC_ID"}, {"resMsg": {}}]
     with pytest.raises(InvalidAPIResponseError):
-        adapter.request_svm_capture(None, Vehicle(id="CAR", supports_svm=True), True)
+        adapter.request_svm_capture(
+            None, Vehicle(id="CAR", supports=VehicleSupports(svm=True)), True
+        )
     with pytest.raises(NoDataFound):
         adapter.get_svm_details(None, Vehicle(id="CAR"))
 
@@ -160,7 +166,9 @@ def test_timeout_and_rejection_do_not_repeat_capture(adapter, monkeypatch):
     )
     adapter._request.side_effect = [{"msgId": "SYNTHETIC_ID"}, NoDataFound("pending")]
     with pytest.raises(RequestTimeoutError):
-        adapter.request_svm_capture(None, Vehicle(id="CAR", supports_svm=True), True)
+        adapter.request_svm_capture(
+            None, Vehicle(id="CAR", supports=VehicleSupports(svm=True)), True
+        )
     assert adapter._request.call_count == 2
     assert adapter.svm_diagnostics["stage"] == "failed"
     assert adapter.svm_diagnostics["failed_stage"] == "polling"
@@ -190,7 +198,7 @@ def test_slow_vehicle_upload_within_app_polling_window_is_displayable(
         return {"resMsg": payload()}
 
     adapter._request.side_effect = request
-    vehicle = Vehicle(id="CAR", supports_svm=True)
+    vehicle = Vehicle(id="CAR", supports=VehicleSupports(svm=True))
     details = adapter.request_svm_capture(None, vehicle, True)
     assert clock[0] == 130
     assert adapter.get_svm_details(None, vehicle) is details
@@ -199,7 +207,9 @@ def test_slow_vehicle_upload_within_app_polling_window_is_displayable(
 
 def test_invalid_identifier_before_request(adapter):
     with pytest.raises(InvalidAPIResponseError):
-        adapter.request_svm_capture(None, Vehicle(id="../CAR", supports_svm=True), True)
+        adapter.request_svm_capture(
+            None, Vehicle(id="../CAR", supports=VehicleSupports(svm=True)), True
+        )
     adapter._request.assert_not_called()
 
 
@@ -219,7 +229,7 @@ def test_workflow_diagnostics_track_pending_and_success_without_private_data(
 
     adapter._request.side_effect = request
     adapter.request_svm_capture(
-        None, Vehicle(id="PRIVATE_CAR", supports_svm=True), True
+        None, Vehicle(id="PRIVATE_CAR", supports=VehicleSupports(svm=True)), True
     )
     summary = adapter.svm_diagnostics
     assert [item["stage"] for item in observed] == ["submission", "polling", "polling"]
@@ -246,7 +256,7 @@ def test_workflow_diagnostics_preserve_safe_failure(adapter, failure, category):
     adapter._control_headers.side_effect = failure
     with pytest.raises(type(failure)):
         adapter.request_svm_capture(
-            None, Vehicle(id="PRIVATE_CAR", supports_svm=True), True
+            None, Vehicle(id="PRIVATE_CAR", supports=VehicleSupports(svm=True)), True
         )
     summary = adapter.svm_diagnostics
     assert summary["stage"] == "failed"

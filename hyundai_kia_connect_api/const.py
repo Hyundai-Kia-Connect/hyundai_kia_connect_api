@@ -1,7 +1,5 @@
 """const.py"""
 
-# pylint:disable=invalid-name,missing-class-docstring
-
 import datetime
 from enum import Enum, IntEnum
 
@@ -121,6 +119,16 @@ class ENGINE_TYPES(Enum):
     HEV = "HEV"
 
 
+# Vehicle-list "type" codes; codes not listed leave engine_type as None.
+ENGINE_TYPES_BY_VEHICLE_TYPE = {
+    "GN": ENGINE_TYPES.ICE,
+    "EV": ENGINE_TYPES.EV,
+    "PHEV": ENGINE_TYPES.PHEV,
+    "PE": ENGINE_TYPES.PHEV,
+    "HV": ENGINE_TYPES.HEV,
+}
+
+
 class VEHICLE_LOCK_ACTION(Enum):
     LOCK = "close"
     UNLOCK = "open"
@@ -129,6 +137,10 @@ class VEHICLE_LOCK_ACTION(Enum):
 class CHARGE_PORT_ACTION(Enum):
     CLOSE = "close"
     OPEN = "open"
+
+
+class LAMP_MODE(Enum):
+    ALL_OFF = "all-off"
 
 
 class ORDER_STATUS(Enum):
@@ -151,6 +163,14 @@ class WINDOW_STATE(IntEnum):
     CLOSED = 0
     OPEN = 1
     VENTILATION = 2
+
+
+class CONNECTOR_FASTENING_STATE(IntEnum):
+    DISCONNECTED = 0
+    CONNECTED = 1
+    # The app SDK maps 0/1/2 (2 = Connected); state 2 has never shown up in
+    # a capture, so it stays outside the enum until named from one. An
+    # unreported or out-of-range value holds as None.
 
 
 class SEAT_LOCATION(str, Enum):

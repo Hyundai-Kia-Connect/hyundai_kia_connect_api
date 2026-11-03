@@ -1,12 +1,11 @@
 """Tests for ApiImplType1.refresh_access_token (shared by AU, IN, CN).
 
 The base implementation sends the refresh_token grant to ``oauth2/token``
-without a Stamp header. CN's existing ``_get_refresh_token`` already omits
-Stamp and works, so CN and IN inherit the base (no Stamp). AU, however,
-requires Stamp on the refresh_token grant — confirmed live in kia_uvo #1778
-(errCode 4002 "Invalid parameters" without it) — so AU overrides the
-``_refresh_access_token_headers`` hook to add ``Stamp`` while still inheriting
-the base method. If a region's refresh fails, the base falls back to
+without a Stamp header. AU requires Stamp on the refresh_token grant —
+confirmed live in kia_uvo #1778 (errCode 4002 "Invalid parameters" without
+it) — and IN's login flow has always sent it on that grant, so both override
+the ``_refresh_access_token_headers`` hook to add ``Stamp`` while still
+inheriting the base method. If a region's refresh fails, the base falls back to
 ``self.login()`` — no regression vs. pre-PR.
 """
 
@@ -187,3 +186,24 @@ class TestRegionsUseBaseRefreshAccessToken:
 
         assert "Stamp" in captured["headers"]
         assert captured["headers"]["Stamp"]
+
+    def test_in_refresh_sends_stamp(self):
+        # IN's login flow always sent Stamp on the refresh_token grant, so the
+        # shared refresh path keeps sending it via the header hook.
+        api = KiaUvoApiIN(region=6, brand=1, language="en")
+        captured = {}
+
+        def fake_post(url, data=None, headers=None, **kwargs):
+            captured["headers"] = headers
+            return _FakeResponse(_ok_payload())
+
+        with (
+            patch.object(api, "_get_stamp", return_value="IN-STAMP"),
+            patch(
+                "hyundai_kia_connect_api.ApiImpl.ApiImplSession.post",
+                side_effect=fake_post,
+            ),
+        ):
+            api.refresh_access_token(_make_token())
+
+        assert captured["headers"]["Stamp"] == "IN-STAMP"

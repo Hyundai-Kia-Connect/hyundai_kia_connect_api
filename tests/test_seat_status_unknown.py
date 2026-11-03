@@ -23,7 +23,7 @@ def test_unknown_seat_status_code_does_not_raise():
     # Unmapped code reported by some vehicles (e.g. Genesis G80 EU -> 15)
     data["vehicleStatus"]["seatHeaterVentState"]["rlSeatHeatState"] = 15
 
-    vehicle = Vehicle()
+    vehicle = Vehicle(id="test-id")
     # Must not raise KeyError on the unmapped code.
     _eu_api()._update_vehicle_properties(vehicle, data)
 

@@ -6,17 +6,7 @@
         "brand": "Kia",
         "endpoint": "vehicles/{vehicleId}/status/latest",
         "description": "EU Kia EV6 response with targetSOC and full vehicle status. Uses vehicleStatus root and hex-encoded temperature.",
-        "has_target_soc": true,
-        "expected": {
-            "ev_battery_percentage": 76,
-            "ev_charge_limits_dc": 80,
-            "ev_charge_limits_ac": 100,
-            "car_battery_percentage": 85,
-            "engine_is_running": false,
-            "is_locked": true,
-            "ev_battery_is_charging": false,
-            "ev_battery_is_plugged_in": 0
-        }
+        "has_target_soc": true
     },
     "odometer": {
         "value": 15234,

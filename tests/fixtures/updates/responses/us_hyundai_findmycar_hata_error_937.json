@@ -1,0 +1,16 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/rcs/rfc/findMyCar",
+        "source": "Get Vehicle Location debug log in kia_uvo #937",
+        "description": "Real error response: HATA findMyCar failed."
+    },
+    "errorSubCode": "HT_504",
+    "systemName": "HATA",
+    "functionName": "findMyCar",
+    "errorSubMessage": "HATA findMyCar service failed while performing the operation FindMyCar",
+    "errorMessage": "We're sorry, but we could not complete your request. Please try again later.",
+    "errorCode": 504,
+    "serviceName": "FindMyCar"
+}

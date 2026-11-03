@@ -21,7 +21,7 @@ def eu_api() -> KiaUvoApiEU:
 
 @pytest.fixture
 def vehicle() -> Vehicle:
-    return Vehicle()
+    return Vehicle(id="test-id")
 
 
 def test_battery_soh_is_read(eu_api, vehicle):
@@ -66,6 +66,28 @@ def test_ccs2_battery_soh_zero_is_unknown(ccs2_api, vehicle):
     """A vehicle reporting 0 leaves the state of health unknown."""
     data = load_fixture(CCS2_FIXTURE_FILE)
     data["Green"]["BatteryManagement"]["SoH"]["Ratio"] = 0
+
+    ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+
+    assert vehicle.ev_battery_soh_percentage is None
+
+
+@pytest.mark.parametrize("soh", [255, 101, -1, "not set"])
+def test_battery_soh_out_of_range_is_unknown(eu_api, vehicle, soh):
+    """Sentinels such as 255 leave the state of health unknown."""
+    data = load_fixture(FIXTURE_FILE)
+    data["vehicleStatus"]["evStatus"]["batterySoh"] = soh
+
+    eu_api._update_vehicle_properties(vehicle, data)
+
+    assert vehicle.ev_battery_soh_percentage is None
+
+
+@pytest.mark.parametrize("soh", [255, 101, -1, "not set"])
+def test_ccs2_battery_soh_out_of_range_is_unknown(ccs2_api, vehicle, soh):
+    """Sentinels such as 255 leave the state of health unknown."""
+    data = load_fixture(CCS2_FIXTURE_FILE)
+    data["Green"]["BatteryManagement"]["SoH"]["Ratio"] = soh
 
     ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
 

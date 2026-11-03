@@ -8,7 +8,7 @@ REQUEST_ID_HEADER, DEVICE_ID_HEADER.  Login, token refresh, X-Stamp
 computation, and GSPA GET helpers live here.
 """
 
-# pylint:disable=missing-class-docstring,missing-function-docstring,invalid-name,logging-fstring-interpolation,broad-except,too-many-lines
+from __future__ import annotations
 
 import base64
 import datetime as dt
@@ -17,7 +17,8 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, ClassVar
+from time import sleep, time
+from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -31,12 +32,22 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from .cci_auth import CciAuthMixin
+
+if TYPE_CHECKING:
+    from .gspa.cipher_keys import GspaCipher
+
+from .cci_fingerprint import (
+    is_gate_rejection,
+)
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
+    CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
+    LAMP_MODE,
     ORDER_STATUS,
     PRESSURE_SCALES,
     SEAT_LOCATION,
@@ -49,7 +60,13 @@ from .const import (
 )
 from .exceptions import (
     APIError,
+    AuthenticationBlockedError,
+    AuthenticationCertificateError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
+    AuthenticationRedirectError,
+    AuthenticationSigninError,
+    AuthenticationTokenExpiredError,
     ConsentRequiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
@@ -63,17 +80,18 @@ from .svm import (
     _parse_door_open,
     _parse_float_list,
     _parse_image_sizes,
-    _parse_int,
     redact_svm_metadata,
 )
 from .Token import Token
 from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
+    flag_or_none,
     float_or_none,
     get_child_value,
     int_or_none,
     normalize_battery_soc,
+    normalize_battery_soh,
     parse_datetime,
     pressure_or_none,
 )
@@ -83,8 +101,8 @@ _LOGGER = logging.getLogger(__name__)
 
 USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = (
-    "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) "
-    "AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19"
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/120.0.0.0 Mobile Safari/537.36"
 )
 
 SUPPORTED_LANGUAGES_LIST = [
@@ -110,8 +128,9 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     """Parse a GSPA SVM timestamp (media-set ``date`` or ``gpsDetail.time``).
 
     Shapes seen in the EU response: 14-digit ``yyyyMMddHHmmss`` strings
-    (assumed UTC) and epoch-millisecond numbers. ISO 8601 strings are
-    accepted as a fallback. Returns None for anything unparsable.
+    (assumed UTC) and epoch-millisecond numbers. The location endpoints
+    append ``.mmm`` milliseconds — ``yyyyMMddHHmmss.mmm``. ISO 8601 strings
+    are accepted as a fallback. Returns None for anything unparsable.
     """
     if value is None:
         return None
@@ -130,6 +149,18 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
         if len(value) == 14 and value.isdigit():
             try:
                 return dt.datetime.strptime(value, "%Y%m%d%H%M%S").replace(
+                    tzinfo=dt.UTC
+                )
+            except ValueError:
+                return None
+        if (
+            len(value) == 18
+            and value[:14].isdigit()
+            and value[14] == "."
+            and value[15:].isdigit()
+        ):
+            try:
+                return dt.datetime.strptime(value, "%Y%m%d%H%M%S.%f").replace(
                     tzinfo=dt.UTC
                 )
             except ValueError:
@@ -175,7 +206,7 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
         captured_at_raw=captured_at_raw if isinstance(captured_at_raw, str) else None,
         latitude=float_or_none(coord.get("lat")),
         longitude=float_or_none(coord.get("lon")),
-        heading=_parse_int(gps.get("head")),
+        heading=int_or_none(gps.get("head")),
         speed=(float_or_none(speed.get("value")), speed.get("unit")),
         door_open=_parse_door_open(detail.get("doorOpen")),
         trunk_open=_parse_bool(detail.get("trunkOpen")),
@@ -188,12 +219,11 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     )
 
 
-class GspaApiEU(ApiImpl):
+class GspaApiEU(CciAuthMixin, ApiImpl):
     """Shared EU implementation using the OneApp (CCI) login flow
     and the GSPA secure-request layer."""
 
     data_timezone = dt.UTC
-    supports_valet_mode = True
 
     # Remote control ships per brand only after live verification of the
     # GSPA command layer on that brand. Subclasses flip this to True.
@@ -262,7 +292,6 @@ class GspaApiEU(ApiImpl):
             "reservation-hvac",
             "reservation-charge-hvac",
             "reservation-engine",
-            "lock-and-start-toggle",
             # OTA commands: the app sends these with the standard
             # authenticated headers — no PIN-derived control token.
             "ota-updates",
@@ -272,10 +301,6 @@ class GspaApiEU(ApiImpl):
 
     # Path constant used for action status polling (?path=...).
     GSPA_REMOTE_VEHICLES_PATH = "gspa/v1/remote/vehicles"
-
-    @property
-    def CCI_DOMAIN_API_URL(self) -> str:
-        return self.CCI_API_URL + "/domain/api/"
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
@@ -297,16 +322,12 @@ class GspaApiEU(ApiImpl):
         self._cci_notification_provider: str = "APNS"
 
         self.CCSP_API_URL: str = self.GSPA_BASE_URL.rstrip("/")
-        if self.CIPHER_BRAND == "hyundai":
-            from .gspa.cipher_keys import hyundai_cipher
-
-            self._cipher = hyundai_cipher()
-        elif self.CIPHER_BRAND == "kia":
-            from .gspa.cipher_keys import kia_cipher
-
-            self._cipher = kia_cipher()
-        else:
+        # The brand cipher loads lazily (see _get_cipher): parameter files
+        # are read on first stamp use, so Home Assistant does not run the
+        # disk read inside its event loop while constructing the manager.
+        if self.CIPHER_BRAND not in ("hyundai", "kia", "genesis"):
             raise APIError(f"Unknown cipher brand: {self.CIPHER_BRAND}")
+        self._cipher: GspaCipher | None = None
 
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
@@ -382,7 +403,7 @@ class GspaApiEU(ApiImpl):
         )
         auth_resp = s.get(auth_url, allow_redirects=True)
         if "abusing" in auth_resp.text.lower() or "/error?status=400" in auth_resp.url:
-            raise AuthenticationError(
+            raise AuthenticationBlockedError(
                 "IDPConnect authorize was blocked by the WAF ('abusing request'). "
                 "This is a server-side block, not a credentials problem. See #1273."
             )
@@ -390,14 +411,14 @@ class GspaApiEU(ApiImpl):
         # Step 2: RSA public key
         resp = s.get(f"{host}/auth/api/v1/accounts/certs")
         if resp.status_code != 200:
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 f"API error: failed to fetch RSA certs: HTTP {resp.status_code}. "
                 "This may indicate an API change."
             )
         jwk = resp.json().get("retValue", {})
         kid = jwk.get("kid", "")
         if not jwk.get("n") or not jwk.get("e"):
-            raise AuthenticationError(
+            raise AuthenticationCertificateError(
                 "API error: certs response missing RSA key material"
             )
         n_bytes = base64.urlsafe_b64decode(jwk["n"] + "==")
@@ -426,34 +447,45 @@ class GspaApiEU(ApiImpl):
             allow_redirects=False,
         )
         if resp.status_code != 302:
-            raise AuthenticationError(
-                f"Signin failed: HTTP {resp.status_code} — {resp.text[:300]}. "
-                "Check username and password."
+            raise AuthenticationSigninError(
+                f"Signin failed: HTTP {resp.status_code}. Check username and password."
             )
+
         location = resp.headers.get("location", "")
         code_list = parse_qs(urlparse(location).query).get("code")
+
         if not code_list:
-            if "error" in location.lower():
-                error_desc = parse_qs(urlparse(location).query).get(
-                    "error_description", ["unknown"]
-                )[0]
-                raise AuthenticationError(
+            query = parse_qs(urlparse(location).query)
+
+            if query.get("error"):
+                error_desc = query.get("error_description", ["unknown"])[0]
+
+                if error_desc.strip().casefold() == "invalid credentials":
+                    raise AuthenticationInvalidCredentialsError(
+                        "Authentication rejected: invalid credentials."
+                    )
+
+                raise AuthenticationSigninError(
                     f"Authentication rejected: {error_desc}. "
                     "Check username and password."
                 )
+
             if "/web/v1/user/authorization" in location:
                 raise ConsentRequiredError(
                     "Account consent is required. Please log in via a browser "
                     "once to accept the terms, then retry."
                 )
+
             if "authorize" in location:
-                raise AuthenticationError(
+                raise AuthenticationRedirectError(
                     "Authentication failed — returned to login page. "
                     "Check username and password."
                 )
-            raise AuthenticationError(
+
+            raise AuthenticationRedirectError(
                 f"API error: unexpected redirect after signin: {location[:250]}"
             )
+
         code = code_list[0]
 
         # Step 4: exchange auth code for CCI tokens
@@ -484,73 +516,6 @@ class GspaApiEU(ApiImpl):
             "non_ccs_refresh_token": non_ccs_refresh_token,
             "id_token": id_token,
         }
-
-    def _exchange_auth_code_for_cci_tokens(
-        self, device_id: str, auth_code: str
-    ) -> dict[str, Any]:
-        """POST auth code to CCI v1/auth/token (code in URL query, empty body)."""
-        headers = self._get_cci_headers(device_id)
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token",
-            params={"code": auth_code},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCI token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate an API change."
-            )
-        payload: dict[str, Any] = resp.json()
-        return payload
-
-    # ------------------------------------------------------------------
-    # CCI headers
-    # ------------------------------------------------------------------
-
-    def _cci_timezone_offset(self) -> str:
-        """Current UTC offset as '+HH:MM'."""
-        aware = dt.datetime.now(dt.UTC).astimezone(self.data_timezone)
-        off = aware.strftime("%z")
-        return f"{off[:3]}:{off[3:]}" if off else "+00:00"
-
-    def _get_cci_headers(
-        self,
-        device_id: str,
-        cci_access_token: str | None = None,
-        non_ccs_token: str | None = None,
-        exchangeable_token: str | None = None,
-        content_type: str | None = None,
-    ) -> dict[str, Any]:
-        """Headers for the CCI API."""
-        headers = {
-            "client-id": self.CCI_PACKAGE_ID,
-            "client-name": self._cci_client_name,
-            "client-version": self._cci_client_version,
-            "client-os-code": "ios",
-            "client-os-version": self._cci_client_os_version,
-            "client-device-id": device_id or "",
-            "client-device-model": "iPhone",
-            "client-notification-provider-type": self._cci_notification_provider,
-            "locale": self.LANGUAGE.upper(),
-            "timezone": self._cci_timezone_offset(),
-            "Accept": "application/json",
-            "Accept-Language": self.LANGUAGE,
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
-        if non_ccs_token is not None:
-            headers["Authentication"] = non_ccs_token
-        if cci_access_token is not None:
-            cci_access_token = cci_access_token.removeprefix("Bearer ").strip()
-            headers["authorization"] = f"Bearer {cci_access_token}"
-        if exchangeable_token is not None:
-            headers["exchangeable-token"] = exchangeable_token
-            headers["non-ccs-token"] = non_ccs_token or ""
-        if content_type:
-            headers["Content-Type"] = content_type
-        else:
-            headers["Content-Length"] = "0"
-        return headers
 
     # ------------------------------------------------------------------
     # Vehicle list
@@ -617,72 +582,24 @@ class GspaApiEU(ApiImpl):
             else:
                 entry_engine_type = ENGINE_TYPES.ICE
 
-            vehicles.append(
-                Vehicle(
-                    id=vehicle_id,
-                    name=entry.get(
-                        "vehicleNameView",
-                        entry.get("nickname", entry.get("vehicleName", "")),
-                    ),
-                    model=entry.get("vehicleModelName", entry.get("modelName", "")),
-                    VIN=entry.get("vin", ""),
-                    timezone=self.data_timezone,
-                    engine_type=entry_engine_type,
-                    ccu_ccs2_protocol_support=ccs2_support,
-                )
+            vehicle = Vehicle(
+                id=vehicle_id,
+                name=entry.get(
+                    "vehicleNameView",
+                    entry.get("nickname", entry.get("vehicleName", "")),
+                ),
+                model=entry.get("vehicleModelName", entry.get("modelName", "")),
+                VIN=entry.get("vin", ""),
+                timezone=self.data_timezone,
+                engine_type=entry_engine_type,
+                ccu_ccs2_protocol_support=ccs2_support,
             )
+            vehicle.supports.window_control = False
+            vehicle.supports.valet_mode = True
+            vehicle.supports.svm = False
+            vehicles.append(vehicle)
 
         return vehicles
-
-    # ------------------------------------------------------------------
-    # CCS token exchange
-    # ------------------------------------------------------------------
-
-    def _exchange_ccs_token(
-        self,
-        device_id: str,
-        cci_access_token: str,
-        non_ccs_token: str,
-        exchangeable_token: str,
-    ) -> tuple[str, dt.datetime]:
-        """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
-
-        The CCS token is accepted by GSPA REST endpoints. Returns
-        (ccs_token, valid_until).
-        """
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=cci_access_token,
-            non_ccs_token=non_ccs_token,
-            exchangeable_token=exchangeable_token,
-        )
-        resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
-            params={"serviceType": "CCS"},
-            headers=headers,
-            timeout=(5, 30),
-        )
-        if resp.status_code != 200:
-            raise AuthenticationError(
-                f"CCS token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate an API change."
-            )
-        data = resp.json()
-        ccs_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
-        if not ccs_token:
-            raise AuthenticationError(
-                f"CCS token exchange returned no accessToken: {resp.text[:200]}"
-            )
-        # expiresTime is the CCS token TTL in seconds (e.g. 86400 = 24h),
-        # not an epoch. Treat it as a relative duration from now; fall back to +1h.
-        expires_in = data.get("expiresTime")
-        if expires_in:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
-                seconds=int(expires_in)
-            )
-        else:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
-        return ccs_token, ccs_valid_until
 
     # ------------------------------------------------------------------
     # Device registration (CCI)
@@ -808,24 +725,14 @@ class GspaApiEU(ApiImpl):
     def _refresh_cci_token(self, token: Token) -> Token:
         """Refresh the CCI token set and re-exchange the CCS token.
 
-        POST cci-api-eu/domain/api/v2/auth/token-refresh with the full
-        CCI token set (JSON), then re-exchange the CCS token.
-
-        Live probe (2026-09-04, one account): v1+JSON returns
-        HTTP 500 code 9009; v1+form-encoded and v2+JSON both return
-        HTTP 200 with the full refreshed set (connector, expiresIn,
-        isRequiredTerm). v2+JSON adopted — it is the shape confirmed in
-        production iOS HAR traffic, and the v1 path is form-encoded in
-        the app, not JSON.
+        POST /auth/v2/token-refresh with the full CCI token set, signed
+        with X-Fingerprint over the exact body bytes (the refresh is on the
+        same fingerprint gate as the exchange, live 2026-10-14); the legacy
+        domain/api v2+JSON route runs as fallback (v2 adopted 2026-09-04:
+        v1+JSON returns 500/9009, v1+form is the app shape but not JSON),
+        then re-exchange the CCS token.
         """
         device_id = token.device_id or ""
-        headers = self._get_cci_headers(
-            device_id,
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
-        )
         body = {
             "accessToken": (token.cci_access_token or "").removeprefix("Bearer "),
             "refreshToken": token.refresh_token or "",
@@ -835,12 +742,35 @@ class GspaApiEU(ApiImpl):
             "nonCcsRefreshToken": token.non_ccs_refresh_token or "",
             "idToken": token.id_token or "",
         }
+        payload = json.dumps(body)
+        headers = self._cci_fp_headers(device_id, body=payload)
+        headers["Content-Type"] = "application/json"
         resp = requests.post(
-            f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+            f"{self.CCI_API_URL}/auth/v2/token-refresh",
+            data=payload,
             headers=headers,
-            json=body,
             timeout=(5, 30),
         )
+        if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed token "
+                f"refresh (HTTP {resp.status_code}); fell back to the legacy "
+                "route. This fallback is transitional - report this log so "
+                "the fallback can be removed"
+            )
+            headers = self._get_cci_headers(
+                device_id,
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+            resp = requests.post(
+                f"{self.CCI_DOMAIN_API_URL}v2/auth/token-refresh",
+                headers=headers,
+                json=body,
+                timeout=(5, 30),
+            )
         if resp.status_code != 200:
             raise AuthenticationError(
                 f"CCI token refresh failed: HTTP {resp.status_code} — {resp.text[:200]}"
@@ -913,6 +843,26 @@ class GspaApiEU(ApiImpl):
     # GSPA X-Stamp computation
     # ------------------------------------------------------------------
 
+    def _get_cipher(self) -> GspaCipher:
+        """Load the brand cipher singleton on first use.
+
+        The parameter files are static and read once per process; the
+        load happens inside the first stamp computation, which callers
+        reach through worker threads, never on the Home Assistant event
+        loop that constructs this class.
+        """
+        if self._cipher is None:
+            from .gspa.cipher_keys import genesis_cipher, hyundai_cipher, kia_cipher
+
+            self._cipher = (
+                hyundai_cipher()
+                if self.CIPHER_BRAND == "hyundai"
+                else genesis_cipher()
+                if self.CIPHER_BRAND == "genesis"
+                else kia_cipher()
+            )
+        return self._cipher
+
     def _get_stamp(self, token: Token) -> tuple[str, str]:
         """Compute GSPA X-Stamp + tsid for GSPA endpoint authentication.
 
@@ -926,7 +876,7 @@ class GspaApiEU(ApiImpl):
             tsid = create_tsid(device_id)
             epoch_seconds = int(dt.datetime.now(dt.UTC).timestamp())
             user_id = token.user_id or ""
-            stamp = self._cipher.compute_x_stamp(
+            stamp = self._get_cipher().compute_x_stamp(
                 region=self.STAMP_REGION,
                 tsid=tsid,
                 epoch_seconds=epoch_seconds,
@@ -983,7 +933,9 @@ class GspaApiEU(ApiImpl):
         if valid_until.tzinfo is None:
             valid_until = valid_until.replace(tzinfo=dt.UTC)
         if valid_until - dt.timedelta(seconds=60) <= dt.datetime.now(dt.UTC):
-            raise AuthenticationError("CCS token expired — refresh required")
+            raise AuthenticationTokenExpiredError(
+                "CCS token expired — refresh required"
+            )
 
     def _raise_gspa_error(self, status_code: int, data: dict[str, Any]) -> None:
         """Raise a typed exception from a GSPA failure response.
@@ -1071,9 +1023,14 @@ class GspaApiEU(ApiImpl):
         serialized Token keeps a still-valid control token across restarts.
 
         Uses the CCI PIN endpoint (confirmed endpoint shape):
-          POST {CCI_DOMAIN_API_URL}v1/auth/pin   body: {"pin": "<pin>"}
+          POST {CCI_API_URL}/auth/v1/pin   body: {"pin": "<pin>"}
         Response: {"isMatched": true, "controlTokenInfo":
                    {"controlToken": "...", "expiresTime": <ttl seconds>}}
+
+        The pin endpoint is fingerprint-gated like the other /auth endpoints
+        (same gate list), so the signed primary carries the token headers on
+        the OneApp identity; the legacy domain/api route runs unsigned as
+        fallback.
         """
         now = dt.datetime.now(dt.UTC).timestamp()
         if token.control_token is not None and token.control_token_expiry > now:
@@ -1082,21 +1039,59 @@ class GspaApiEU(ApiImpl):
             raise UnsupportedControlError(
                 "PIN is not configured — remote control requires a PIN"
             )
-        url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
-        headers = self._get_cci_headers(
-            token.device_id or "",
-            cci_access_token=token.cci_access_token,
-            non_ccs_token=token.non_ccs_token,
-            exchangeable_token=token.exchangeable_token,
-            content_type="application/json",
+        headers = self._cci_fp_headers(
+            token.device_id or "", body=json.dumps({"pin": token.pin})
         )
-        try:
+        headers["Content-Type"] = "application/json"
+        headers["authorization"] = (
+            "Bearer " + (token.cci_access_token or "").removeprefix("Bearer ").strip()
+        )
+        headers["Authentication"] = token.non_ccs_token or ""
+        if token.exchangeable_token:
+            headers["exchangeable-token"] = token.exchangeable_token
+            headers["non-ccs-token"] = token.non_ccs_token or ""
+        response = requests.post(
+            self.CCI_API_URL + "/auth/v1/pin",
+            data=json.dumps({"pin": token.pin}),
+            headers=headers,
+            timeout=(5, 30),
+        )
+        if response.status_code != 200 and is_gate_rejection(
+            response.status_code, response.text
+        ):
+            _LOGGER.error(
+                f"{DOMAIN} - Fingerprint gate rejected the signed PIN "
+                f"verification (HTTP {response.status_code}); fell back to "
+                "the legacy route. This fallback is transitional - report "
+                "this log so the fallback can be removed"
+            )
+            headers = self._get_cci_headers(
+                token.device_id or "",
+                cci_access_token=token.cci_access_token,
+                non_ccs_token=token.non_ccs_token,
+                exchangeable_token=token.exchangeable_token,
+                content_type="application/json",
+            )
+            url = self.CCI_DOMAIN_API_URL + "v1/auth/pin"
             response = requests.post(
                 url, json={"pin": token.pin}, headers=headers, timeout=(5, 30)
             )
+        if response.status_code == 401:
+            raise AuthenticationTokenExpiredError(
+                "CCI PIN endpoint rejected the access token "
+                f"(HTTP 401: {response.text[:200]}) - token refresh required"
+            )
+        try:
             resp: dict[str, Any] = response.json()
         except ValueError as e:
             raise APIError("CCI PIN endpoint returned a non-JSON body") from e
+        if "isMatched" not in resp:
+            # No PIN result in the body: the request failed before the PIN
+            # was checked.
+            raise APIError(
+                f"CCI PIN endpoint error: HTTP {response.status_code} - "
+                f"{response.text[:200]}"
+            )
         if resp.get("isMatched") is not True:
             # 2xx business error (live-probed 2026-09-04: HTTP 200 with
             # isMatched false and controlTokenInfo null). After 5 failed
@@ -1200,7 +1195,8 @@ class GspaApiEU(ApiImpl):
         data = self._gspa_post_for_data(
             token, vehicle, endpoint, body, path_prefix=path_prefix
         )
-        data_payload = data.get("data") if isinstance(data.get("data"), dict) else {}
+        raw_data = data.get("data")
+        data_payload = raw_data if isinstance(raw_data, dict) else {}
         rs = data.get("rs")
         rs_payload = rs if isinstance(rs, dict) else {}
         # SID is the primary polling handle; svcSID the alternate (some
@@ -1480,6 +1476,115 @@ class GspaApiEU(ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
+    def _apply_stored_status(
+        self, token: Token, vehicle: Vehicle, data: dict[str, Any]
+    ) -> None:
+        state = data.get("state", {})
+        if isinstance(state, dict) and "Vehicle" in state:
+            state = state["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
+        # Status tree without a Location node (PV5): the location
+        # stored-status endpoint is the only location source (#1331).
+        if get_child_value(state, "Location.GeoCoord.Latitude") is None:
+            self._update_vehicle_gspa_location(token, vehicle)
+
+    def _get_location_stored_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get cached location + vehicle status from GSPA (read-only)."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "location/vehicles/{carId}/stored-status"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
+            return None
+
+    def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate vehicle.location from the GSPA location stored-status.
+
+        Some status trees carry no Location node (confirmed on a PV5,
+        2026-10-27), leaving vehicle.location unset. The endpoint serves
+        the server-cached position {"data": {"coord": {lat, lon, type,
+        alt}, "head", "speed", "time"}} with a UTC ``time`` (wire shape
+        identical to the SVM ``gpsDetail`` block). Read-only — unlike
+        location ``update-status``, which long-polls the car (wake) and
+        reports the car's clock time.
+        """
+        try:
+            data = self._get_location_stored_status(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location fallback read failed")
+            return
+        # _gspa_get already lifts the {"data": ..., "metaInfo": ...} envelope.
+        if not isinstance(data, dict):
+            return
+        coord = data.get("coord")
+        if not isinstance(coord, dict):
+            return
+        latitude = float_or_none(coord.get("lat"))
+        longitude = float_or_none(coord.get("lon"))
+        location_time = _parse_gspa_svm_timestamp(data.get("time"))
+        if latitude is None or longitude is None or location_time is None:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status: no usable position")
+            return
+        vehicle.location = (latitude, longitude, location_time)
+
+    # ------------------------------------------------------------------
+    # Force refresh
+    # ------------------------------------------------------------------
+
+    # 140 s matches the app's read timeout for a wake (#1184).
+    FORCE_REFRESH_TIMEOUT = 140
+    FORCE_REFRESH_INITIAL_DELAY = 5
+    FORCE_REFRESH_POLL_INTERVAL = 5
+    # lastUpdateTime is server time; tolerate a local clock running ahead.
+    FORCE_REFRESH_CLOCK_TOLERANCE_MS = 5000
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wake the vehicle and apply the first stored-status reported after it.
+
+        Raises APIError if the wake fails or no newer status arrives within
+        FORCE_REFRESH_TIMEOUT; the vehicle is left untouched in that case,
+        since its state is unknown.
+        """
+        requested_at = int(time() * 1000)
+        if self.prewakeup(token, vehicle) is None:
+            raise APIError("GSPA prewakeup failed")
+        attempts = 1 + int(
+            (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
+            // self.FORCE_REFRESH_POLL_INTERVAL
+        )
+        oldest = requested_at - self.FORCE_REFRESH_CLOCK_TOLERANCE_MS
+        sleep(self.FORCE_REFRESH_INITIAL_DELAY)
+        for attempt in range(attempts):
+            if attempt:
+                sleep(self.FORCE_REFRESH_POLL_INTERVAL)
+            data = self.get_stored_status(token, vehicle) or {}
+            # The wire sends epoch ms as a string ("1789000000000").
+            updated = int_or_none(data.get("lastUpdateTime"))
+            if updated is not None and updated >= oldest:
+                break
+        else:
+            last = (
+                dt.datetime.fromtimestamp(updated / 1000, dt.UTC).isoformat()
+                if updated is not None
+                else "unknown"
+            )
+            raise APIError(
+                f"Vehicle did not report a new status within "
+                f"{self.FORCE_REFRESH_TIMEOUT} s after prewakeup; "
+                f"last status from {last}"
+            )
+        _LOGGER.debug(
+            f"{DOMAIN} - new stored-status "
+            f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
+        )
+        self._apply_stored_status(token, vehicle, data)
+
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)
     # ------------------------------------------------------------------
@@ -1509,14 +1614,18 @@ class GspaApiEU(ApiImpl):
         vehicle.engine_is_running = get_child_value(state, "DrivingReady")
 
         air_temp = get_child_value(state, "Cabin.HVAC.Row1.Driver.Temperature.Value")
+        air_temp_unit = get_child_value(
+            state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
+        )
         if air_temp is not None and air_temp != "OFF":
-            air_temp_unit = get_child_value(
-                state, "Cabin.HVAC.Row1.Driver.Temperature.Unit"
-            )
             vehicle.air_temperature = (
                 air_temp,
                 TEMPERATURE_UNITS.get(air_temp_unit, TEMPERATURE_UNITS[0]),
             )
+        elif off_unit := TEMPERATURE_UNITS.get(air_temp_unit):
+            # With climate off the setpoint is "OFF" but the unit is still
+            # reported; keep it so consumers know the car's unit.
+            vehicle._air_temperature_unit = off_unit
 
         outside_temp = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Value")
         outside_temp_unit = get_child_value(state, "Cabin.HVAC.OutsideTemperature.Unit")
@@ -1625,10 +1734,8 @@ class GspaApiEU(ApiImpl):
         vehicle.back_right_window_is_open = bool(_open) if _open is not None else None
         if _level and _level > 0 and not _open:
             vehicle.back_right_window_is_open = True  # vented
-        vehicle.sunroof_is_open = (
-            bool(get_child_value(state, "Body.Sunroof.Glass.Open"))
-            if get_child_value(state, "Body.Sunroof.Glass.Open") is not None
-            else None
+        vehicle.sunroof_is_open = flag_or_none(
+            get_child_value(state, "Body.Sunroof.Glass.Open")
         )
         vehicle.tire_pressure_rear_left_warning_is_on = bool(
             get_child_value(state, "Chassis.Axle.Row2.Left.Tire.PressureLow")
@@ -1658,7 +1765,11 @@ class GspaApiEU(ApiImpl):
                     _pu_raw,
                 )
                 vehicle.tire_pressure_unit = None
-        _scale = PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+        _scale = (
+            PRESSURE_SCALES.get(vehicle.tire_pressure_unit)
+            if vehicle.tire_pressure_unit is not None
+            else None
+        )
         _pfl = pressure_or_none(
             get_child_value(state, "Chassis.Axle.Row1.Left.Tire.Pressure")
         )
@@ -1759,14 +1870,32 @@ class GspaApiEU(ApiImpl):
         vehicle.ev_battery_capacity = get_child_value(
             state, "Green.BatteryManagement.BatteryCapacity.Value"
         )
-        # Vehicles that do not report the state of health send 0 rather than
-        # omitting the field, so keep the value unknown instead of reporting a
-        # battery at 0% health.
-        if battery_soh := get_child_value(state, "Green.BatteryManagement.SoH.Ratio"):
+        if battery_soh := normalize_battery_soh(
+            get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
+        ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        vehicle.ev_battery_is_plugged_in = get_child_value(
+        # ConnectorFastening.State follows the connector LOCK, not the
+        # cable: plugged-but-idle reads 0, a released lock after a charge
+        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
+        # kia_uvo#1837). Plug sensor stays unknown; enum carries the state.
+        vehicle.ev_battery_is_plugged_in = None
+        fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
+        vehicle.ev_connector_fastening_state = None
+        if fastening_raw is not None:
+            try:
+                vehicle.ev_connector_fastening_state = CONNECTOR_FASTENING_STATE(
+                    int(fastening_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ConnectorFastening.State %r not in "
+                    "{0: disconnected, 1: connected}",
+                    DOMAIN,
+                    fastening_raw,
+                )
+                vehicle.ev_connector_fastening_state = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -2270,8 +2399,27 @@ class GspaApiEU(ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        command = "close" if action == VEHICLE_LOCK_ACTION.LOCK else "open"
-        return self._gspa_control_command(token, vehicle, "door", {"command": command})
+        """Lock/unlock via the granular per-action endpoints.
+
+        POST .../door-lock {"command": "set"} and .../door-unlock: the
+        action lives in the endpoint (the "lock"/"CLOSE" body forms are
+        rejected with 400-002). Accepted live across the 2026-10 EU
+        vehicle run on every tested model (Kia CCI: EV6, EV3, eNiro
+        2021; Hyundai: IONIQ 5 2022, Tucson PHEV, IONIQ 6) with the
+        door state reflecting it in the fresh server data afterwards.
+        The shared legacy "door" + close/open shape stays accepted by
+        the backend, but the EU apps no longer send it.
+
+        When the vehicle reports SafeMode the apps dispatch lock/unlock
+        to the sibling .../door-lock-safety and .../door-unlock-safety
+        endpoints instead (door lock/unlock only; same
+        {"command": "set"} body, and unrecognized safe states fall back
+        to door-lock-safety). The endpoints are accepted by the backend
+        (202 on a PV5) but the behavioral difference is unverified, so
+        the library keeps the plain door-lock/door-unlock surface.
+        """
+        endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
+        return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
 
     def door_power_off(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -2306,9 +2454,11 @@ class GspaApiEU(ApiImpl):
         )
 
     def turn_off_lamp(
-        self, token: Token, vehicle: Vehicle, mode: str = "all-off"
+        self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
-        return self._gspa_control_command(token, vehicle, "lamp", {"command": mode})
+        return self._gspa_control_command(
+            token, vehicle, "lamp", {"command": mode.value}
+        )
 
     def start_battery_conditioning(self, token: Token, vehicle: Vehicle) -> str:
         return self._gspa_control_command(
@@ -2377,7 +2527,11 @@ class GspaApiEU(ApiImpl):
         if options.defrost is not None:
             body["windshieldFrontDefogState"] = options.defrost
         if options.heating is not None:
-            body["heating1"] = options.heating
+            # heating1 is acked but has no effect on GSPA (PV5, #1398); one
+            # sideRearMirrorHeating flag covers the rear window and the
+            # mirrors, engaged by heating 1/2/4 — same mapping as the CCS2
+            # path. An explicit side_rear_mirror_heating option overrides.
+            body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
         if options.temp_unit is not None:
             # tempUnit is a string on the wire ("C"/"F"); the 0/1 int form is
             # rejected with 400-002 (live-proven on a PV5, 2026-09-19).
@@ -2428,7 +2582,8 @@ class GspaApiEU(ApiImpl):
             if options.climate is not None:
                 body["hvacCtrl"] = 1 if options.climate else 0
             if options.heating is not None:
-                body["heating1"] = options.heating
+                # Same mapping as start_climate (see there for rationale).
+                body["sideRearMirrorHeating"] = 1 if options.heating in (1, 2, 4) else 0
             if options.temp_unit is not None:
                 # tempUnit is a string on the wire ("C"/"F"); the 0/1 int
                 # form is rejected with 400-002 (live-proven on a PV5,
@@ -2486,7 +2641,7 @@ class GspaApiEU(ApiImpl):
         GSPA supports scope commands only (all windows or front windows);
         a mixed per-window request raises UnsupportedControlError.
         """
-        if not self.supports_window_control:
+        if not vehicle.supports.window_control:
             raise APIError("Window control not supported")
         drv_seat_loc = options.driver_seat_location or self._get_drv_seat_loc(vehicle)
         front = (options.front_left, options.front_right)
@@ -2635,7 +2790,8 @@ class GspaApiEU(ApiImpl):
 
         body = {
             "reservFlag": 1 if options.charging_enabled else 0,
-            "offpeakPowerFlag": 2 if options.off_peak_charge_only_enabled else 1,
+            # 1 = off-peak only, 2 = preferred (live on a Kia PV5, as on EV5 flat)
+            "offpeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
             "reservStartTime": _make_time(options.off_peak_start_time or dt.time()),
             "reservEndTime": _make_time(
                 options.off_peak_end_time or options.off_peak_start_time or dt.time()
@@ -2650,7 +2806,11 @@ class GspaApiEU(ApiImpl):
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape)."""
+        """Schedule standalone HVAC reservation (reservedHVACInfo1/2 shape).
+
+        reservInfo carries the app DTO: day list + time object only;
+        the schedule on/off is reservHVACflag and climate options live
+        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22)."""
         if options.first_departure is None:
             options.first_departure = (
                 ScheduleChargingClimateRequestOptions.DepartureOptions()
@@ -2676,17 +2836,20 @@ class GspaApiEU(ApiImpl):
         def _make_reserv_info(
             dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
         ) -> dict[str, Any]:
+            # App-confirmed reservInfo DTO (Kia EU 1.4.0
+            # ReservationInfoApiRequest): day list plus the time object
+            # only. The previous nested shape (scheduleEnable, hvacTemp,
+            # drvSeatLoc, ...) failed server-side with 500-000 on a PV5
+            # twice; with this app form the call returned 202 and
+            # applied, four runs. On/off travels in reservHVACflag, the
+            # climate options in reservHVACSet; 12:00 and later is
+            # afternoon (timeSection 1), matching reservation-charge.
             return {
-                "scheduleEnable": dep.enabled if dep.enabled is not None else False,
                 "day": dep.days or [0],
-                "time": dep.time.strftime("%I%M") if dep.time else "1200",
-                "windshieldFrontDefogState": options.defrost or False,
-                "ignitionDuration": 10,
-                "hvacCtrl": 1 if options.climate_enabled else 0,
-                "hvacTempType": 1,
-                "hvacTemp": f"{temperature:.1f}",
-                "tempUnit": options.temperature_unit,
-                "drvSeatLoc": "L",
+                "time": {
+                    "time": dep.time.strftime("%I%M") if dep.time else "1200",
+                    "timeSection": 1 if dep.time and dep.time >= dt.time(12, 0) else 0,
+                },
             }
 
         def _make_hvac_set() -> dict[str, Any]:
@@ -2869,6 +3032,7 @@ class GspaApiEU(ApiImpl):
         set_default_departure_options(options.first_departure)
         set_default_departure_options(options.second_departure)
         departures = [options.first_departure, options.second_departure]
+        departure_times = [d.time or dt.time() for d in departures]
 
         if options.off_peak_start_time is None:
             options.off_peak_start_time = dt.time()
@@ -2898,9 +3062,9 @@ class GspaApiEU(ApiImpl):
                     "reservInfo": {
                         "day": departures[i].days,
                         "time": {
-                            "time": departures[i].time.strftime("%I%M"),
+                            "time": departure_times[i].strftime("%I%M"),
                             "timeSection": (
-                                1 if departures[i].time >= dt.time(12, 0) else 0
+                                1 if departure_times[i] >= dt.time(12, 0) else 0
                             ),
                         },
                     },
@@ -2938,12 +3102,6 @@ class GspaApiEU(ApiImpl):
             "command": "set",
         }
 
-    def lock_and_start_toggle(
-        self, token: Token, vehicle: Vehicle, enable: bool = True
-    ) -> str:
-        body = {"lockAndStartEnable": enable}
-        return self._gspa_control_command(token, vehicle, "lock-and-start-toggle", body)
-
     def set_ota_reservation(
         self, token: Token, vehicle: Vehicle, settings: dict[str, Any]
     ) -> dict[str, Any]:
@@ -2965,7 +3123,7 @@ class GspaApiEU(ApiImpl):
             path_prefix="mru/vehicles",
         )
 
-    def set_ota_update(
+    def start_ota_update(
         self, token: Token, vehicle: Vehicle, start: bool
     ) -> dict[str, Any]:
         """Start or cancel a CCU OTA update via GSPA.

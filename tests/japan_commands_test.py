@@ -579,7 +579,8 @@ def test_uniform_window_wire_values_are_not_enum_names(state, command):
 def test_command_values_match_independent_dex_constructor_facts():
     facts = json.loads(
         (
-            Path(__file__).parent / "fixtures/jp_android_1_0_17_command_values.json"
+            Path(__file__).parent
+            / "fixtures/japan/jp_android_1_0_17_command_values.json"
         ).read_text()
     )["command_values"]
     cases = [

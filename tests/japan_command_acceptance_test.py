@@ -19,7 +19,9 @@ from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 CONTRACT = json.loads(
-    (Path(__file__).parent / "fixtures/jp_control_completion_contract.json").read_text()
+    (
+        Path(__file__).parent / "fixtures/japan/jp_control_completion_contract.json"
+    ).read_text()
 )
 
 
@@ -46,6 +48,8 @@ def setup():
     )
     api._mqtt_for_vehicle = Mock(return_value=helper)
     token = Token(
+        username="synthetic",
+        password="synthetic",
         access_token="Bearer synthetic-access",
         device_id="synthetic-device",
         pin="synthetic-pin",
