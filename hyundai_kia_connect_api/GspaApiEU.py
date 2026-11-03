@@ -2085,6 +2085,128 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             if defrost2 is not None:
                 vehicle.ev_second_departure_climate_defrost = bool(defrost2)
 
+        # PV5 GSPA departure carriers (issue #1145 run-23 stored-status):
+        # per-day Sun..Sat flags instead of a DaysOfWeek list, Hour/Min
+        # instead of Time, and per-plan Climate at Departure.Climate
+        # (plan 1) and Schedule2.Climate (plan 2, activation at Schedule2
+        # level). Parsed only where the carriers above left the field
+        # unset. Day flags all zero -> None, like the list carrier.
+        schedule1 = get_child_value(state, "Green.Reservation.Departure.Schedule1")
+        if isinstance(schedule1, dict):
+            if vehicle.ev_first_departure_time is None and "Hour" in schedule1:
+                try:
+                    vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
+                        schedule1.get("Hour"), schedule1.get("Min")
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
+            if vehicle.ev_first_departure_days is None:
+                vehicle.ev_first_departure_days = [
+                    i
+                    for i, k in enumerate(
+                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    )
+                    if schedule1.get(k) == 1
+                ] or None
+        schedule2 = get_child_value(state, "Green.Reservation.Departure.Schedule2")
+        if isinstance(schedule2, dict):
+            if vehicle.ev_second_departure_time is None and "Hour" in schedule2:
+                try:
+                    vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
+                        schedule2.get("Hour"), schedule2.get("Min")
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
+            if vehicle.ev_second_departure_days is None:
+                vehicle.ev_second_departure_days = [
+                    i
+                    for i, k in enumerate(
+                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    )
+                    if schedule2.get(k) == 1
+                ] or None
+
+        climate1 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Climate"
+        ) or get_child_value(state, "Green.Reservation.Departure.Climate")
+        climate2 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Climate"
+        )
+        if isinstance(climate1, dict) or isinstance(climate2, dict):
+            # Temperature string without a unit inherits plan 1's unit.
+            default_temp_unit = 0
+            if (
+                isinstance(climate1, dict)
+                and climate1.get("TemperatureUnit") is not None
+            ):
+                default_temp_unit = climate1["TemperatureUnit"]
+
+            def _parse_departure_climate(
+                climate: dict[str, Any],
+                activation: object = None,
+            ) -> tuple[bool | None, bool | None, tuple[float, str | None] | None]:
+                enabled_at = (
+                    activation if activation is not None else climate.get("Activation")
+                )
+                enabled = bool(enabled_at) if enabled_at is not None else None
+                defrost_at = climate.get("Defrost")
+                defrost = bool(defrost_at) if defrost_at is not None else None
+                temp = None
+                temp_val = climate.get("Temperature")
+                if temp_val is not None:
+                    try:
+                        unit_int = climate.get("TemperatureUnit")
+                        if unit_int is None:
+                            unit_int = default_temp_unit
+                        temp = (
+                            float(temp_val),
+                            TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0]),
+                        )
+                    except (ValueError, TypeError):
+                        # "OFF" / non-numeric — leave the field unset.
+                        pass
+                return enabled, defrost, temp
+
+            if isinstance(climate1, dict):
+                enabled, defrost, temp = _parse_departure_climate(climate1)
+                if (
+                    enabled is not None
+                    and vehicle.ev_first_departure_climate_enabled is None
+                ):
+                    vehicle.ev_first_departure_climate_enabled = enabled
+                if (
+                    defrost is not None
+                    and vehicle.ev_first_departure_climate_defrost is None
+                ):
+                    vehicle.ev_first_departure_climate_defrost = defrost
+                if (
+                    temp is not None
+                    and vehicle.ev_first_departure_climate_temperature is None
+                ):
+                    vehicle.ev_first_departure_climate_temperature = temp
+            if isinstance(climate2, dict):
+                sched2_activation = get_child_value(
+                    state, "Green.Reservation.Departure.Schedule2.Activation"
+                )
+                enabled, defrost, temp = _parse_departure_climate(
+                    climate2, sched2_activation
+                )
+                if (
+                    enabled is not None
+                    and vehicle.ev_second_departure_climate_enabled is None
+                ):
+                    vehicle.ev_second_departure_climate_enabled = enabled
+                if (
+                    defrost is not None
+                    and vehicle.ev_second_departure_climate_defrost is None
+                ):
+                    vehicle.ev_second_departure_climate_defrost = defrost
+                if (
+                    temp is not None
+                    and vehicle.ev_second_departure_climate_temperature is None
+                ):
+                    vehicle.ev_second_departure_climate_temperature = temp
+
         # Off-peak charging window — flat CCS2-schema OffPeakTime block
         # (live EV6/PV5 GSPA stored-status + Sportage PHEV CCS2 dump; the
         # nested "OffPeakPower.*" variants appear in no captured payload).
