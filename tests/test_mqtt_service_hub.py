@@ -163,7 +163,7 @@ def _vehicle() -> Vehicle:
 
 
 def _token() -> Token:
-    token = Token()
+    token = Token(username="u", password="p")
     token.mqtt_client_id = "client-1"
     return token
 
@@ -195,7 +195,7 @@ def test_metadata_populates_capabilities_and_topics():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.mqtt_vehicle_id == "mqtt-v1"
     # protocol present → True; list read, protocol absent → False
     assert vehicle.supports.hvac_close_remote is True
@@ -228,7 +228,7 @@ def test_metadata_absent_protocol_is_false_not_none():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.supports.ota_progress is False
     assert vehicle.supports.schedule_update is False
     topics = api.get_push_topics(_token(), vehicle)
@@ -245,7 +245,7 @@ def test_metadata_unknown_shape_leaves_capabilities_unknown():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.supports.ota_progress is None
     topics = api.get_push_topics(_token(), vehicle)
     assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
@@ -269,7 +269,7 @@ def test_metadata_entry_level_capabilities():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.hu_client_id == "hu-1"
     assert vehicle.supports.schedule_update is True
 
@@ -308,7 +308,7 @@ def test_parse_push_message_unknown_group_none():
 
 def test_get_push_topics_without_identity_empty():
     """No mqtt_vehicle_id / client id → no topics (registry not done)."""
-    topics = _kia_api().get_push_topics(Token(), _vehicle())
+    topics = _kia_api().get_push_topics(Token(username="u", password="p"), _vehicle())
     assert topics == []
 
 
@@ -321,7 +321,7 @@ def test_register_push_vehicle_ota_protocols_conditional():
     api._service_hub_session = session
 
     vehicle.supports.ota_progress = None
-    api.register_push_vehicle(Token(), vehicle)
+    api.register_push_vehicle(Token(username="u", password="p"), vehicle)
     assert len(session.calls) == 1
     body = session.calls[0][2]["json"]
     assert "vehicle.ota.otaprogress" not in body["protocols"]
@@ -332,7 +332,7 @@ def test_register_push_vehicle_ota_protocols_conditional():
     vehicle.supports.ota_progress = True
     vehicle.supports.schedule_update = True
     api._service_hub_session = _FakeSession([_FakeResponse(text="", status_code=200)])
-    api.register_push_vehicle(Token(), vehicle)
+    api.register_push_vehicle(Token(username="u", password="p"), vehicle)
     body = api._service_hub_session.calls[0][2]["json"]
     assert "vehicle.ota.otaprogress" in body["protocols"]
     assert "vehicle.ota.scheduleupdate" in body["protocols"]
@@ -344,12 +344,12 @@ def test_register_vehicle_failure_returns_none():
     api._service_hub_session = _FakeSession(
         [_FakeResponse(json_data={}, status_code=400, text='{"err": "nope"}')]
     )
-    assert api.register_push_vehicle(Token(), vehicle) is None
+    assert api.register_push_vehicle(Token(username="u", password="p"), vehicle) is None
 
 
 def test_connection_state_enum_and_graceful_unknown():
     api = _kia_api()
-    token = Token()
+    token = Token(username="u", password="p")
     token.mqtt_client_id = "client-1"
     api._service_hub_session = _FakeSession(
         [_FakeResponse(json_data={"connState": "ONLINE"})]
@@ -386,7 +386,7 @@ def test_get_service_hub_url_missing_base_empty():
 
 
 def test_service_hub_headers_app_confirmed_set():
-    token = Token()
+    token = Token(username="u", password="p")
     token.access_token = "tok-1"
     token.exchangeable_token = "ex-1"
     api = _kia_api()
@@ -473,7 +473,7 @@ def test_metadata_prefers_hu_entry_over_tmu():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.supports.hvac_close_remote is True  # from hu, not tmu
     assert vehicle.supports.schedule_update is True  # from hu
 
@@ -495,7 +495,7 @@ def test_metadata_prefers_hu_entry_over_tmu():
         ]
     )
     vehicle2 = _vehicle()
-    api.get_push_vehicle_identity(Token(), vehicle2)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle2)
     assert vehicle2.supports.hvac_close_remote is False  # tmu fallback
     # hu present but no RC protocol in its list = False (refined, real);
     # tmu-only = unknown (Kia shape); the flag is never a region constant.
@@ -524,7 +524,7 @@ def test_metadata_hu_entry_with_phone_rc_says_push():
             _FakeResponse(json_data={"vehicleId": "mqtt-v1"}),
         ]
     )
-    api.get_push_vehicle_identity(Token(), vehicle)
+    api.get_push_vehicle_identity(Token(username="u", password="p"), vehicle)
     assert vehicle.supports.mqtt_push is True
 
 
@@ -600,7 +600,7 @@ def test_get_push_broker_info_failures():
 
 def test_register_push_client_success_and_side_effects():
     api = _kia_api()
-    token = Token()
+    token = Token(username="u", password="p")
     api._service_hub_session = _FakeSession(
         [
             _FakeResponse(
@@ -641,7 +641,9 @@ def test_register_push_client_failures():
     api._service_hub_session = _FakeSession(
         [_FakeResponse(json_data={"username": "u1"})]
     )
-    token_fresh = Token()  # mqtt_client_id unset — must stay unset on failure
+    token_fresh = Token(
+        username="u", password="p"
+    )  # mqtt_client_id unset — must stay unset on failure
     assert api.register_push_client(token_fresh) is None  # no clientId
     assert token_fresh.mqtt_client_id is None  # side effect not applied
 

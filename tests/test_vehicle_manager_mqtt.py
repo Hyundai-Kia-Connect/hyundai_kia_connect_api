@@ -82,7 +82,7 @@ def _make_vm() -> VehicleManager:
         region=9, brand=2, language="en", username="u", password="p", pin="0000"
     )
     vm.api = FakePushApi()  # type: ignore[assignment]
-    vm.token = Token()
+    vm.token = Token(username="u", password="p")
     vehicle = Vehicle()
     vehicle.id = "careu1"
     vehicle.supports.mqtt_push = True
