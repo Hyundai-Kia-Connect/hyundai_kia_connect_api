@@ -751,3 +751,83 @@ def test_excessively_nested_json_cannot_stop_completion_processing(session):
     )
     assert instance.status("synthetic-action") == ORDER_STATUS.SUCCESS
     assert instance.diagnostics["malformed_messages"] == 1
+
+
+@pytest.mark.parametrize(
+    "topic_index,counter",
+    [
+        (0, "retained_vss_messages"),
+        (1, "retained_result_messages"),
+        (2, "retained_connection_messages"),
+        (None, "retained_other_topic_messages"),
+    ],
+)
+def test_retained_stream_diagnostics_do_not_complete_or_expose_data(
+    session, topic_index, counter
+):
+    instance, client = session
+    instance.prepare()
+    instance.track("synthetic-private-action")
+    topic = (
+        instance._topics[topic_index]
+        if topic_index is not None
+        else "synthetic-private-other-topic"
+    )
+    instance._on_message(
+        client,
+        None,
+        message(
+            topic,
+            {"sid": "synthetic-private-action", "res-msg": "S", "private": "secret"},
+            retained=True,
+        ),
+    )
+    assert instance.status("synthetic-private-action") == ORDER_STATUS.PENDING
+    assert instance.diagnostics["retained_messages"] == 1
+    assert instance.diagnostics[counter] == 1
+    assert (
+        sum(
+            instance.diagnostics[key]
+            for key in (
+                "retained_vss_messages",
+                "retained_result_messages",
+                "retained_connection_messages",
+                "retained_other_topic_messages",
+            )
+        )
+        == 1
+    )
+    assert instance.diagnostics["matched_results"] == 0
+    assert "private" not in json.dumps(instance.diagnostics)
+    assert "secret" not in json.dumps(instance.diagnostics)
+    instance.close()
+    assert instance.diagnostics[counter] == 1
+
+
+def test_failed_property_distinguishes_healthy_close_from_connection_failure(session):
+    instance, _client = session
+    assert instance.failed is False
+    instance.prepare()
+    assert instance.failed is False
+    instance.close()
+    assert instance.closed is True
+    assert instance.failed is False
+
+
+def test_disconnected_session_exposes_failure_without_error_details(session):
+    instance, client = session
+    instance.prepare()
+    instance._on_disconnect(client, None, {}, 1, None)
+    assert instance.failed is True
+    assert instance.closed is False
+    instance.close()
+    assert instance.failed is True
+
+
+def test_connection_rejection_is_failed_after_prepare_closes_session(session):
+    instance, client = session
+    client.connect_code = 5
+    with pytest.raises(APIError, match="connection was rejected"):
+        instance.prepare()
+    assert instance.failed is True
+    assert instance.closed is True

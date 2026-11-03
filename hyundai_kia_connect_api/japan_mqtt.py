@@ -83,6 +83,10 @@ class JapanMqttSession:
             (
                 "messages_received",
                 "retained_messages",
+                "retained_vss_messages",
+                "retained_result_messages",
+                "retained_connection_messages",
+                "retained_other_topic_messages",
                 "oversized_messages",
                 "malformed_messages",
                 "vss_messages",
@@ -405,6 +409,23 @@ class JapanMqttSession:
             self._diagnostics["messages_received"] += 1
             if message.retain:
                 self._diagnostics["retained_messages"] += 1
+                # Keep historical snapshots unable to complete a new command,
+                # while identifying their stream without exposing topic IDs.
+                retained_counter = "retained_other_topic_messages"
+                if self._topics:
+                    for topic, counter in zip(
+                        self._topics,
+                        (
+                            "retained_vss_messages",
+                            "retained_result_messages",
+                            "retained_connection_messages",
+                        ),
+                        strict=True,
+                    ):
+                        if message.topic == topic:
+                            retained_counter = counter
+                            break
+                self._diagnostics[retained_counter] += 1
                 return
             if len(message.payload) > self.MAX_MESSAGE_BYTES:
                 self._diagnostics["oversized_messages"] += 1
@@ -551,6 +572,12 @@ class JapanMqttSession:
         """Whether the caller must create a replacement session."""
         with self._condition:
             return self._closed
+
+    @property
+    def failed(self) -> bool:
+        """Whether a connection error requires a replacement session."""
+        with self._condition:
+            return self._error is not None
 
     @property
     def latest_state(self):
