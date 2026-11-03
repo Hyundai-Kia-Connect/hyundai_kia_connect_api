@@ -1200,6 +1200,10 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
+        # fndmcr refuses from:CWP with error 6459 (kia_uvo#1069)
+        headers["from"] = "SPA"
+        if BRANDS[self.brand] != BRAND_HYUNDAI:
+            headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
             headers["pAuth"] = self._get_pin_token(token, vehicle)
             response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
@@ -1534,6 +1538,12 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
+        # setsoc expects the SPA channel plus portal extras on kiaconnect (kia_uvo#957)
+        headers["from"] = "SPA"
+        if BRANDS[self.brand] != BRAND_HYUNDAI:
+            headers["offset"] = "-8"
+            headers["priority"] = "u=1, i"
+            headers["Referer"] = f"https://{self.BASE_URL}/remote/"
 
         payload = {
             "tsoc": [

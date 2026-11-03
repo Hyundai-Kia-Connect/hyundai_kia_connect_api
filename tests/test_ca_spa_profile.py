@@ -187,3 +187,66 @@ def test_offset_pacific_and_half_zone_truncate_toward_zero() -> None:
 
 def test_offset_none_is_zero() -> None:
     assert _offset_from_tz(dt.datetime(2026, 11, 3, tzinfo=None)) == "0"
+
+
+def _capture_api_calls(monkeypatch, brand: int) -> tuple[KiaUvoApiCA, MagicMock]:
+    """Return an api whose session captures (headers, url, json) per post."""
+    from unittest.mock import MagicMock as MM
+
+    api = KiaUvoApiCA(2, brand, "en")
+
+    class Cap:
+        def __init__(self) -> None:
+            self.calls: list[tuple[dict, str]] = []
+
+        def post(self, url, headers=None, json=None, data=None, timeout=None):
+            self.calls.append((dict(headers or {}), url))
+            resp = MM()
+            resp.json.return_value = {
+                "responseHeader": {"responseCode": 0},
+                "result": {"pAuth": "PT", "expireIn": 3600},
+            }
+            resp.headers = {"transactionId": "TX"}
+            resp.ok = True
+            resp.status_code = 200
+            return resp
+
+    api._sessions = Cap()
+    monkeypatch.setattr(KiaUvoApiCA, "_get_pin_token", lambda self, tok, veh: "PT")
+    return api, api._sessions
+
+
+def test_kia_location_and_setsoc_keep_proven_shapes(monkeypatch) -> None:
+    """#1069: fndmcr needs from:SPA + Referer /remote/; #957: setsoc needs SPA + portal extras."""
+    api, cap = _capture_api_calls(monkeypatch, brand=1)
+    token = Token(username="u", password="p", pin="1234", device_id="DEV")
+    vehicle = Vehicle(id="VEH")
+    api._get_location(token, vehicle)
+    api.set_charge_limits(token, vehicle, 50, 50)
+    loc_hdr, loc_url = cap.calls[0]
+    soc_hdr, soc_url = cap.calls[-1]
+    assert loc_url.endswith("fndmcr")
+    assert (
+        loc_hdr["from"] == "SPA"
+        and loc_hdr["Referer"] == "https://kiaconnect.ca/remote/"
+    )
+    assert soc_url.endswith("evc/setsoc")
+    assert (
+        soc_hdr["from"] == "SPA"
+        and soc_hdr["Referer"] == "https://kiaconnect.ca/remote/"
+    )
+    assert soc_hdr["offset"] == "-8" and soc_hdr["priority"] == "u=1, i"
+
+
+def test_hyundai_location_and_setsoc_carry_no_portal_extras(monkeypatch) -> None:
+    api, cap = _capture_api_calls(monkeypatch, brand=2)
+    token = Token(username="u", password="p", pin="1234", device_id="DEV")
+    vehicle = Vehicle(id="VEH")
+    api._get_location(token, vehicle)
+    api.set_charge_limits(token, vehicle, 50, 50)
+    loc_hdr, _ = cap.calls[0]
+    soc_hdr, _ = cap.calls[-1]
+    assert loc_hdr["from"] == "SPA"
+    assert "Referer" not in loc_hdr
+    assert soc_hdr["from"] == "SPA"
+    assert "priority" not in soc_hdr and "Referer" not in soc_hdr
