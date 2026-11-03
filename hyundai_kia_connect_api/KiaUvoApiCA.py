@@ -199,7 +199,7 @@ class RetrySession(ApiImplSession):
 
 
 _CA_APP_HEADERS: dict[str, str | None] = {
-    # App-shaped profile, myHyundai CA 2.0.47 HACCRequestHeader (kia_uvo#2054)
+    # App-shaped profile, myHyundai CA 2.0.47 HACCRequestHeader (Hyundai-Kia-Connect/kia_uvo#2054)
     "User-Agent": "okhttp/4.12.0",
     "Accept-Encoding": "gzip, deflate",
     "Content-Type": "application/json;charset=UTF-8",
@@ -243,7 +243,7 @@ class KiaUvoApiCA(ApiImpl):
 
     @property
     def API_HEADERS(self) -> dict[str, str | None]:
-        """Hyundai app profile with a fresh offset (kia_uvo#2054); other brands keep the proven web-portal shape."""
+        """Hyundai app profile with a fresh offset (Hyundai-Kia-Connect/kia_uvo#2054); other brands keep the proven web-portal shape."""
         if BRANDS[self.brand] != BRAND_HYUNDAI:
             return {
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
@@ -441,15 +441,13 @@ class KiaUvoApiCA(ApiImpl):
     def refresh_access_token(self, token: Token) -> Token | OTPRequest:
         """Refresh via gtothbyrftkn (Hyundai; SPA host) or re-login (Kia/Genesis, the proven pre-#1496 path).
 
-        The Hyundai app refreshes with POST gtothbyrftkn: the refresh token
-        in the JSON body, the common request headers without accessToken, and
-        the from: SPA header value (CWP is the web-portal path and carries the
-        7549 captcha challenge, Hyundai-Kia-Connect/kia_uvo#2025). Any failure
-        falls back to re-login, which carries forward the persisted device_id
-        so the server still recognizes the device (kia_uvo#1715). kiaconnect.ca
-        rejects SPA-shaped v2/login requests (7404), so Kia/Genesis mint
-        refresh tokens through a full login instead — the pre-#1496 behavior
-        that never showed the 7602 freeze.
+        The Hyundai app refreshes with POST gtothbyrftkn (refresh token in the
+        body, SPA headers, no accessToken); CWP carries the 7549 captcha
+        challenge (Hyundai-Kia-Connect/kia_uvo#2025). Failure falls back to
+        re-login, carrying the persisted device_id (
+        Hyundai-Kia-Connect/kia_uvo#1715). kiaconnect.ca rejects SPA-shaped
+        v2/login (7404), so Kia/Genesis re-login instead: the pre-#1496
+        behavior without the 7602 freeze.
         """
         if token.device_id:
             self._device_id = token.device_id
@@ -1200,7 +1198,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        # fndmcr refuses from:CWP with error 6459 (kia_uvo#1069)
+        # fndmcr refuses from:CWP with error 6459 (Hyundai-Kia-Connect/kia_uvo#1069)
         headers["from"] = "SPA"
         if BRANDS[self.brand] != BRAND_HYUNDAI:
             headers["Referer"] = f"https://{self.BASE_URL}/remote/"
@@ -1538,7 +1536,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
-        # setsoc expects the SPA channel plus portal extras on kiaconnect (kia_uvo#957)
+        # setsoc expects the SPA channel plus portal extras on kiaconnect (Hyundai-Kia-Connect/kia_uvo#957)
         headers["from"] = "SPA"
         if BRANDS[self.brand] != BRAND_HYUNDAI:
             headers["offset"] = "-8"
