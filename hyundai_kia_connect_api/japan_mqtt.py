@@ -9,7 +9,7 @@ import json
 import re
 import ssl
 import threading
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from contextlib import suppress
 from copy import deepcopy
@@ -38,6 +38,7 @@ class JapanMqttSession:
     TOPIC_PREFIX = "service/phone/_/"
     CONNECT_TIMEOUT = 30
     MAX_RESULTS = 64
+    MAX_STATE_UPDATES = 64
     MAX_MESSAGE_BYTES = 2 * 1024 * 1024
 
     def __init__(
@@ -76,6 +77,7 @@ class JapanMqttSession:
         self._results = OrderedDict()
         self._tracked = set()
         self._latest_state = None
+        self._state_updates = deque(maxlen=self.MAX_STATE_UPDATES)
         self._topics = ()
         self._pending_context = {}
         self._request_context = {}
@@ -452,6 +454,7 @@ class JapanMqttSession:
                 )
                 if isinstance(state, dict):
                     self._latest_state = deepcopy(state)
+                    self._state_updates.append(deepcopy(state))
             elif message.topic == self._topics[1]:
                 self._diagnostics["result_messages"] += 1
                 sid = payload.get("sid")
@@ -554,6 +557,7 @@ class JapanMqttSession:
                 "last_status": self._last_status,
                 "ready": self._ready,
                 "closed": self._closed,
+                "pending_state_updates": len(self._state_updates),
             }
 
     @property
@@ -585,6 +589,13 @@ class JapanMqttSession:
         with self._condition:
             return deepcopy(self._latest_state)
 
+    def drain_state_updates(self) -> list[dict]:
+        """Copy and consume queued passive updates without making a network request."""
+        with self._condition:
+            updates = deepcopy(list(self._state_updates))
+            self._state_updates.clear()
+            return updates
+
     def close(self) -> None:
         """Stop network activity and release all session data; safe to repeat."""
         with self._condition:
@@ -593,6 +604,7 @@ class JapanMqttSession:
             self._results.clear()
             self._tracked.clear()
             self._latest_state = None
+            self._state_updates.clear()
             self._pending_context.clear()
             client, self._client = self._client, None
             self._condition.notify_all()

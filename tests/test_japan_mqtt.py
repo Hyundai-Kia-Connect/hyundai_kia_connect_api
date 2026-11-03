@@ -217,6 +217,111 @@ def test_latest_vss_state_is_copied(session):
     assert instance.latest_state == {"synthetic-value": 1}
 
 
+def test_passive_state_queue_preserves_deltas_in_arrival_order(session):
+    instance, client = session
+    instance.prepare()
+    updates = [
+        {"Cabin": {"Door": {"Row1": {"Driver": {"IsLocked": False}}}}},
+        {"Powertrain": {"TractionBattery": {"StateOfCharge": 69}}},
+    ]
+    for state in updates:
+        instance._on_message(
+            client, None, message(instance._topics[0], {"state": {"Vehicle": state}})
+        )
+
+    assert instance.diagnostics["pending_state_updates"] == 2
+    assert instance.drain_state_updates() == updates
+    assert instance.diagnostics["pending_state_updates"] == 0
+    assert instance.drain_state_updates() == []
+    assert instance.latest_state == updates[-1]
+
+
+def test_passive_state_queue_keeps_only_64_most_recent_updates(session):
+    instance, client = session
+    instance.prepare()
+    for value in range(70):
+        instance._on_message(
+            client,
+            None,
+            message(instance._topics[0], {"state": {"Vehicle": {"value": value}}}),
+        )
+
+    assert instance.diagnostics["pending_state_updates"] == 64
+    assert instance.drain_state_updates() == [
+        {"value": value} for value in range(6, 70)
+    ]
+    assert instance.latest_state == {"value": 69}
+
+
+def test_passive_state_updates_are_defensive_copies_without_network(session):
+    instance, client = session
+    instance.prepare()
+    instance._on_message(
+        client,
+        None,
+        message(instance._topics[0], {"state": {"Vehicle": {"nested": {"value": 1}}}}),
+    )
+    queued_state = instance._state_updates[0]
+    latest = instance.latest_state
+    latest["nested"]["value"] = 2
+    instance._http_session.request.reset_mock()
+    client.connect_async.reset_mock()
+    client.subscribe.reset_mock()
+
+    updates = instance.drain_state_updates()
+    updates[0]["nested"]["value"] = 3
+
+    assert queued_state == {"nested": {"value": 1}}
+    assert instance.latest_state == {"nested": {"value": 1}}
+    assert instance.drain_state_updates() == []
+    instance._http_session.request.assert_not_called()
+    client.connect_async.assert_not_called()
+    client.subscribe.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "topic_index,payload,retained",
+    [
+        (0, {}, False),
+        (0, {"state": []}, False),
+        (0, {"state": {"Vehicle": None}}, False),
+        (0, {"state": {"Vehicle": []}}, False),
+        (0, {"state": {"Vehicle": {"value": 1}}}, True),
+        (1, {"state": {"Vehicle": {"value": 1}}}, False),
+        (2, {"state": {"Vehicle": {"value": 1}}}, False),
+        (None, {"state": {"Vehicle": {"value": 1}}}, False),
+    ],
+)
+def test_invalid_retained_and_wrong_topic_states_are_not_queued(
+    session, topic_index, payload, retained
+):
+    instance, client = session
+    instance.prepare()
+    topic = instance._topics[topic_index] if topic_index is not None else "other"
+    instance._on_message(client, None, message(topic, payload, retained))
+
+    assert instance.drain_state_updates() == []
+    assert instance.diagnostics["pending_state_updates"] == 0
+    assert instance.latest_state is None
+
+
+def test_close_clears_passive_state_queue_and_late_updates_cannot_repopulate_it(
+    session,
+):
+    instance, client = session
+    instance.prepare()
+    state_message = message(instance._topics[0], {"state": {"Vehicle": {"value": 1}}})
+    instance._on_message(client, None, state_message)
+    assert instance.diagnostics["pending_state_updates"] == 1
+
+    instance.close()
+    instance._on_message(client, None, state_message)
+
+    assert instance.drain_state_updates() == []
+    assert instance.diagnostics["pending_state_updates"] == 0
+    assert instance.latest_state is None
+
+
 @pytest.mark.parametrize("grant", [[0, 0, 0], [128, 1, 1], [1]])
 def test_subscription_failure_disconnects_without_command(session, grant):
     instance, client = session
