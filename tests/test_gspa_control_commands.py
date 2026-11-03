@@ -300,11 +300,8 @@ def test_kia_reservation_charge_uses_the_flat_offpeak_body():
 
 
 def test_kia_reservation_hvac_uses_the_library_body():
-    """Kia GSPA reservation-hvac: reservHVACInfo1/2 with the app-form
-    reservInfo (day list + time object), climate in reservHVACSet —
-    live-proven on a PV5 (2026-10-31, library 4.44.0 body): 202-000 and
-    all 22 checked Reservation.Departure fields following (Schedule1
-    7:40 Mon/Wed/Fri, Schedule2 17:30 Sat, temperatures 22.5)."""
+    """Kia GSPA reservation-hvac — live-proven on a PV5 (2026-10-31):
+    202-000, 22/22 Reservation.Departure fields following."""
     options = ScheduleChargingClimateRequestOptions()
     options.temperature = 22.5
     options.temperature_unit = 0
