@@ -118,6 +118,7 @@ class TestCheckAndForceUpdateVehicleNoData:
         from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
         mgr = VehicleManager.__new__(VehicleManager)
+        mgr.api = HyundaiBlueLinkApiUSA(3, 2, "en")
         vehicle = _make_vehicle()
         mgr.vehicles = {vehicle.id: vehicle}
 
@@ -136,6 +137,7 @@ class TestCheckAndForceUpdateVehicleNoData:
         from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
         mgr = VehicleManager.__new__(VehicleManager)
+        mgr.api = HyundaiBlueLinkApiUSA(3, 2, "en")
         vehicle = _make_vehicle()
         vehicle.last_updated_at = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=30)
         mgr.vehicles = {vehicle.id: vehicle}
@@ -153,6 +155,7 @@ class TestCheckAndForceUpdateVehicleNoData:
         from hyundai_kia_connect_api.VehicleManager import VehicleManager
 
         mgr = VehicleManager.__new__(VehicleManager)
+        mgr.api = HyundaiBlueLinkApiUSA(3, 2, "en")
         vehicle = _make_vehicle()
         vehicle.last_updated_at = dt.datetime.now(dt.UTC) - dt.timedelta(hours=25)
         mgr.vehicles = {vehicle.id: vehicle}

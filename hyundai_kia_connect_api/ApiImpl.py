@@ -437,6 +437,12 @@ class ApiImpl:
     def __init__(self) -> None:
         """Initialize."""
 
+    def initialize_vehicle_capabilities(self, vehicle: Vehicle) -> None:
+        """Apply regional capabilities; adapters may specialize by profile."""
+        vehicle.supports_window_control = self.supports_window_control
+        vehicle.supports_valet_mode = self.supports_valet_mode
+        vehicle.supports_svm = self.supports_svm
+
     def login(
         self,
         username: str,

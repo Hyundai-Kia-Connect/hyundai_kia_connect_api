@@ -31,6 +31,7 @@ from .const import (
     REGION_EUROPE,
     REGION_EUROPE_CCI,
     REGION_INDIA,
+    REGION_JAPAN,
     REGION_NZ,
     REGION_USA,
     REGIONS,
@@ -39,6 +40,7 @@ from .const import (
 )
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
+from .HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
 from .KiaCciApiEU import KiaCciApiEU
@@ -133,9 +135,7 @@ class VehicleManager:
             )
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
-            vehicle.supports_window_control = self.api.supports_window_control
-            vehicle.supports_valet_mode = self.api.supports_valet_mode
-            vehicle.supports_svm = self.api.supports_svm
+            self.api.initialize_vehicle_capabilities(vehicle)
             self.vehicles[vehicle.id] = vehicle
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
@@ -436,6 +436,10 @@ class VehicleManager:
     def get_implementation_by_region_brand(
         region: int, brand: int, language: str
     ) -> ApiImpl:
+        if REGIONS[region] == REGION_JAPAN:
+            if BRANDS[brand] != BRAND_HYUNDAI:
+                raise APIError("Japan is supported only for Hyundai")
+            return HyundaiBlueLinkApiJP(region, brand, language)
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:

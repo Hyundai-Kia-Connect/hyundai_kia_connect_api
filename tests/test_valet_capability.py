@@ -35,6 +35,9 @@ def test_vehicle_manager_copies_supports_valet_mode():
 
     fake_api = MagicMock()
     fake_api.supports_valet_mode = True
+    fake_api.initialize_vehicle_capabilities.side_effect = lambda target: (
+        ApiImpl.initialize_vehicle_capabilities(fake_api, target)
+    )
     fake_api.get_vehicles.return_value = [vehicle]
 
     manager = VehicleManager.__new__(VehicleManager)

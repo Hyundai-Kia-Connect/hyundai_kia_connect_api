@@ -1,0 +1,23 @@
+{
+  "provenance": {
+    "package": "com.hyundai.bluelink.jp",
+    "version": "1.0.17",
+    "base_apk_sha256": "2c6f3926f1a57d76c6f37aaf0264c55c9b2344f0d35238f33eef52f80f6c6ca4",
+    "method": "Static DEX constructor instructions: Object command argument, not enum name; K.c serializes the command field",
+    "note": "Protocol facts only; no vendor source, account data, or live requests."
+  },
+  "command_values": {
+    "DOOR_LOCK": "close",
+    "DOOR_UNLOCK": "open",
+    "PORT_DOOR_OPEN": "open",
+    "PORT_DOOR_CLOSE": "close",
+    "CHARGE_START": "start",
+    "CHARGE_STOP": "stop",
+    "EV_ENGINE_STOP": "stop",
+    "WINDOW_OPEN": "open",
+    "WINDOW_CLOSE": "close",
+    "LIGHT": "on",
+    "HORN_LIGHT": "on",
+    "HORN_LAMP": "lowbeam"
+  }
+}

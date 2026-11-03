@@ -49,9 +49,41 @@ Python 3.12 or newer is required to use this package. Vehicle manager is the key
 
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL, 9: REGION_EUROPE_CCI, 10: REGION_JAPAN}
+
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
+
+Japan (region 10, Hyundai brand 2) adds Hyundai Japan authentication, token
+renewal, vehicle discovery, profile-aware telemetry, and vehicle controls. Its
+request contracts are based on the Japan Bluelink Android app 1.0.17 and public
+login page. Supported controls include door locks, charging, model-dependent
+climate/windows/charge-port features, schedules, navigation and manual SVM capture.
+
+Japan commands require the actual account PIN and correlated MQTT completion;
+HTTP acceptance alone does not establish vehicle success. Consumers of the Japan
+adapter must require ORDER_STATUS.SUCCESS when requires_command_confirmation is
+true. The supported_commands set and profile capabilities identify available
+controls. Optional vehicle metadata supplies supported window positions and
+climate temperature bounds. Existing regional adapters are not modified.
+
+Japan SVM reads return only manually captured images cached in the current
+session; no camera request is made by passive reads. A new capture is needed
+after restart. Trip-summary APIs and unproven 30-day metrics remain unavailable.
+Local diagnostics expose fixed workflow stages and counters without raw messages,
+identifiers, account secrets, GPS or image contents.
+
+Authentication, token renewal, cached telemetry and charge-limit settings have
+been observed working on one Japan vehicle. The user also confirmed a physical
+lock action while HA completion was unconfirmed. Other controls and confirmed
+completion remain under validation. A report of unexpected liftgate movement is
+unresolved; offline contract tests do not establish physical vehicle behavior.
+Vehicle-command testing remains paused pending a controlled test plan.
+
+The Japan branch contains only regional implementation and necessary routing,
+token, profile and capability hooks. Independent shared Home Assistant camera
+and adapter cleanup fixes are developed on separate branches and are not required
+by this API branch. Release versions are unchanged until upstream review.
 
 
 Once this is done you can now make the following calls against the vehicle manager::

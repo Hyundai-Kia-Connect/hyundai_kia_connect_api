@@ -145,6 +145,8 @@ class Vehicle:
     back_right_window_is_open: bool = None
     sunroof_is_open: bool = None
     supports_window_control: bool = None
+    supported_window_positions: tuple[str, ...] | None = None
+    climate_temperature_range: tuple[float, float] | None = None
     supports_valet_mode: bool = None
 
     # Valet Status
