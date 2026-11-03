@@ -907,3 +907,33 @@ def test_force_refresh_failure_skips_extras():
         api.force_refresh_vehicle_state(_make_token(), vehicle)
     extras.assert_not_called()
     assert vehicle._ota_checked is True
+
+
+def test_refresh_cci_token_carries_mqtt_client_id():
+    """The registered push client id survives the CCI token refresh.
+
+    Live finding (1909, fellek overnight run): the connstate poll keys
+    on the client id; a mint without it returns UNKNOWN for the whole
+    session.
+    """
+    api = _make_hyundai_api()
+    refresh_resp = MagicMock(status_code=200)
+    refresh_resp.json.return_value = {
+        "accessToken": "new-cci-at",
+        "refreshToken": "new-cci-rt",
+    }
+    exchange_resp = MagicMock(status_code=200)
+    exchange_resp.json.return_value = {
+        "accessToken": "new-ccs-token",
+        "expiresTime": 3600,
+    }
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.post",
+            side_effect=[refresh_resp, exchange_resp],
+        ),
+    ):
+        token = _make_token(mqtt_client_id="reg-client-id")
+        result = api.refresh_access_token(token)
+
+    assert result.mqtt_client_id == "reg-client-id"

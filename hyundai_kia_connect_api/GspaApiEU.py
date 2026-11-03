@@ -826,6 +826,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             non_ccs_refresh_token=non_ccs_refresh_token,
             id_token=id_token,
             user_id=token.user_id,
+            # the push connstate poll keys on this id; it must survive the refresh
+            mqtt_client_id=token.mqtt_client_id,
         )
 
     # ------------------------------------------------------------------
