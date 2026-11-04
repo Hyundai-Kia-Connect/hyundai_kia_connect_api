@@ -1517,3 +1517,28 @@ def test_refresh_authentication_diagnostics_do_not_copy_exception_text(
     }
     assert secret not in repr(api.get_local_diagnostics())
     api.session.request.assert_not_called()
+
+
+@pytest.mark.parametrize("closed", [False, True])
+def test_push_connection_state_before_setup_or_after_close_is_unknown_without_requests(
+    api, closed
+):
+    token = Token(username="synthetic", password="synthetic")
+    if closed:
+        api.close()
+    assert api.get_push_connection_state(token) is None
+    assert api._mqtt_sessions == {}
+    api.session.request.assert_not_called()
+
+
+def test_push_connection_state_does_not_hide_an_initialized_provider_error(api):
+    token = Token(username="synthetic", password="synthetic")
+    provider = Mock(closed=False)
+    provider.get_push_connection_state.side_effect = InvalidAPIResponseError(
+        "synthetic"
+    )
+    api._mqtt_sessions["synthetic"] = ((None, None, None), provider)
+    with pytest.raises(InvalidAPIResponseError):
+        api.get_push_connection_state(token)
+    provider.get_push_connection_state.assert_called_once_with(token)
+    api.session.request.assert_not_called()

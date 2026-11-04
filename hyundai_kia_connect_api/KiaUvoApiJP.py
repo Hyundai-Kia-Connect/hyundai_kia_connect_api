@@ -193,7 +193,15 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
     def get_push_connection_state(
         self, token: Token
     ) -> MQTT_PUSH_CONNECTION_STATE | None:
-        return self._authenticated_push_provider(token).get_push_connection_state(token)
+        identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+        with self._mqtt_sessions_lock:
+            if not any(
+                saved == identity and helper.closed is not True
+                for saved, helper in self._mqtt_sessions.values()
+            ):
+                return None
+            provider = self._authenticated_push_provider(token)
+        return provider.get_push_connection_state(token)
 
     def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
         return self._mqtt_for_vehicle(token, vehicle).get_push_topics(token, vehicle)
