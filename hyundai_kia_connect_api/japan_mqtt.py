@@ -33,10 +33,10 @@ from .exceptions import (
 )
 from .mqtt_client import MqttTransport
 from .mqtt_service_hub import (
+    PushMessage,
     ServiceHubProviderMixin,
-    ServiceHubPushMessage,
-    build_service_hub_status_topics,
-    parse_service_hub_message,
+    build_car_status_topics,
+    parse_service_hub_status_message,
 )
 from .Token import Token
 from .Vehicle import Vehicle
@@ -322,16 +322,14 @@ class JapanMqttSession(ServiceHubProviderMixin):
     def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
         if not vehicle.mqtt_vehicle_id or not self._registered_client_id:
             return []
-        return build_service_hub_status_topics(
+        return build_car_status_topics(
             vehicle.mqtt_vehicle_id, result_client_id=self._registered_client_id
         )
 
-    def parse_push_message(
-        self, topic: str, payload: bytes
-    ) -> ServiceHubPushMessage | None:
+    def parse_push_message(self, topic: str, payload: bytes) -> PushMessage | None:
         if self._topics and topic not in self._topics:
             return None
-        return parse_service_hub_message(topic, payload, include_result=True)
+        return parse_service_hub_status_message(topic, payload, include_result=True)
 
     @property
     def is_connected(self) -> bool:

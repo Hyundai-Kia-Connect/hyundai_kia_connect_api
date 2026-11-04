@@ -5,7 +5,7 @@ from threading import Event
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from hyundai_kia_connect_api.mqtt_service_hub_eu import MqttPushSession
+from hyundai_kia_connect_api.mqtt_push_session import MqttPushSession
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -114,7 +114,7 @@ def test_legacy_eager_connect_callback_subscribes_exactly_once(monkeypatch):
         return client
 
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.mqtt_service_hub_eu.MqttTransport", factory
+        "hyundai_kia_connect_api.mqtt_push_session.MqttTransport", factory
     )
     vehicle = Vehicle(id="synthetic-car", mqtt_vehicle_id="synthetic-topic-car")
     api = SimpleNamespace(

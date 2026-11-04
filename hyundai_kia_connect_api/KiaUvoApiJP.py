@@ -35,7 +35,7 @@ from .exceptions import (
 from .japan_commands import JapanCommandsMixin
 from .japan_mqtt import JapanMqttSession, JapanMqttTransportPool
 from .japan_svm import JapanSVM
-from .mqtt_service_hub import ServiceHubPushMessage, parse_service_hub_message
+from .mqtt_service_hub import PushMessage, parse_service_hub_status_message
 from .Token import Token
 from .utils import get_child_value, parse_datetime
 from .Vehicle import DailyDrivingStats, Vehicle
@@ -209,10 +209,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
     def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
         return self._authenticated_push_provider(token).get_push_credentials(token)
 
-    def parse_push_message(
-        self, topic: str, payload: bytes
-    ) -> ServiceHubPushMessage | None:
-        return parse_service_hub_message(topic, payload, include_result=True)
+    def parse_push_message(self, topic: str, payload: bytes) -> PushMessage | None:
+        return parse_service_hub_status_message(topic, payload, include_result=True)
 
     @staticmethod
     def _ccs2_observation_time(value: object) -> dt.datetime:
