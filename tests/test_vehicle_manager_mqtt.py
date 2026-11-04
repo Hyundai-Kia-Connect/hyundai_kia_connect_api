@@ -401,20 +401,21 @@ def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
 def test_start_push_wires_connection_change_callback(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-
-    def before(connected):
-        """first callback"""
-
-    vm.set_push_connection_change_callback(before)
+    seen = []
+    vm.set_push_connection_change_callback(
+        lambda connected: seen.append(("before", connected))
+    )
     assert vm.start_push("careu1") is True
-    assert vm._push_session._client.connection_change_cb is before
-    # late registration rewires the live client
-
-    def after(connected):
-        """replacement callback"""
-
-    vm.set_push_connection_change_callback(after)
-    assert vm._push_session._client.connection_change_cb is after
+    client = vm._push_session._client
+    client.connection_change_cb(True)
+    vm.set_push_connection_change_callback(
+        lambda connected: seen.append(("after", connected))
+    )
+    client.connection_change_cb(False)
+    assert seen == [("before", True), ("after", False)]
+    vm.stop_push()
+    client.connection_change_cb(True)
+    assert seen == [("before", True), ("after", False)]
 
 
 def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
