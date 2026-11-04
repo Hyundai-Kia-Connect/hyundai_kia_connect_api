@@ -50,6 +50,7 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     normalize_battery_soc,
+    offset_from_tz,
     parse_datetime,
 )
 from .Vehicle import DailyDrivingStats, Vehicle
@@ -210,19 +211,33 @@ _CA_APP_HEADERS: dict[str, str | None] = {
     "client_secret": "CLISCR01AHSPA",
 }
 
+_CA_PORTAL_HEADERS: dict[str, str | None] = {
+    # Web-portal profile, kiaconnect.ca — proven since 3.21; kiaconnect rejects SPA-shaped v2/login (7404)
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Content-Type": "application/json;charset=UTF-8",
+    "from": "CWP",
+    "offset": "-5",
+    "language": "0",
+    "Connection": "keep-alive",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "Priority": "u=0",
+    "Pragma": "no-cache",
+    "Cache-Control": "no-cache",
+    "client_id": "HATAHSPACA0232141ED9722C67715A0B",
+    "client_secret": "CLISCR01AHSPA",
+}
+
 _CA_APP_HEADERS_G: dict[str, str | None] = {
     # Genesis CA app (stationdm.hca hca/network/repo/net/c.java): SPA, brand G, own client keys
     "brand": "G",
     "client_id": "HATAGSPACA0232141ED9722C67715A0B",
     "client_secret": "CLISCR01AGSPA",
 }
-
-
-def _offset_from_tz(now: dt.datetime | None = None) -> str:
-    """Whole-hour UTC offset, matching the CA app's offset/3600000 integer division."""
-    moment = now or dt.datetime.now().astimezone()
-    off = moment.utcoffset()
-    return str(int(off.total_seconds() / 3600)) if off else "0"
 
 
 class KiaUvoApiCA(ApiImpl):
@@ -254,32 +269,15 @@ class KiaUvoApiCA(ApiImpl):
         if BRANDS[self.brand] == BRAND_GENESIS:
             headers = dict(_CA_APP_HEADERS)
             headers.update(_CA_APP_HEADERS_G)
-            headers["offset"] = _offset_from_tz()
+            headers["offset"] = offset_from_tz()
             return headers
         if BRANDS[self.brand] != BRAND_HYUNDAI:
-            return {
-                "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-CA,en-US;q=0.8,en;q=0.5,fr;q=0.3",
-                "Accept-Encoding": "gzip, deflate, br, zstd",
-                "Content-Type": "application/json;charset=UTF-8",
-                "from": "CWP",
-                "offset": "-5",
-                "language": "0",
-                "Origin": f"https://{self.BASE_URL}",
-                "Connection": "keep-alive",
-                "Referer": f"https://{self.BASE_URL}/login",
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-origin",
-                "Priority": "u=0",
-                "Pragma": "no-cache",
-                "Cache-Control": "no-cache",
-                "client_id": "HATAHSPACA0232141ED9722C67715A0B",
-                "client_secret": "CLISCR01AHSPA",
-            }
+            headers = dict(_CA_PORTAL_HEADERS)
+            headers["Origin"] = f"https://{self.BASE_URL}"
+            headers["Referer"] = f"https://{self.BASE_URL}/login"
+            return headers
         headers = dict(_CA_APP_HEADERS)
-        headers["offset"] = _offset_from_tz()
+        headers["offset"] = offset_from_tz()
         return headers
 
     def _get_device_id(self) -> str:

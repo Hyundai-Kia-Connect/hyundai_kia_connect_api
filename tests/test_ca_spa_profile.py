@@ -2,8 +2,9 @@ import datetime as dt
 from unittest.mock import MagicMock, patch
 
 from hyundai_kia_connect_api.const import VEHICLE_LOCK_ACTION
-from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA, _offset_from_tz
+from hyundai_kia_connect_api.KiaUvoApiCA import KiaUvoApiCA
 from hyundai_kia_connect_api.Token import Token
+from hyundai_kia_connect_api.utils import offset_from_tz
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
@@ -66,7 +67,7 @@ def test_genesis_profile_is_app_spa() -> None:
 
 def test_offset_wired_from_tz(monkeypatch) -> None:
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.KiaUvoApiCA._offset_from_tz", lambda: "-8"
+        "hyundai_kia_connect_api.KiaUvoApiCA.offset_from_tz", lambda: "-8"
     )
     assert KiaUvoApiCA(2, 2, "en").API_HEADERS["offset"] == "-8"
 
@@ -151,12 +152,12 @@ def test_profile_keys_exact() -> None:
 
 def test_offset_recomputed_per_access(monkeypatch) -> None:
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.KiaUvoApiCA._offset_from_tz", lambda: "-5"
+        "hyundai_kia_connect_api.KiaUvoApiCA.offset_from_tz", lambda: "-5"
     )
     api = _api()
     assert api.API_HEADERS["offset"] == "-5"
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.KiaUvoApiCA._offset_from_tz", lambda: "-8"
+        "hyundai_kia_connect_api.KiaUvoApiCA.offset_from_tz", lambda: "-8"
     )
     assert api.API_HEADERS["offset"] == "-8"
 
@@ -199,17 +200,17 @@ def test_command_request_headers_isolated() -> None:
 
 
 def test_offset_east_coast() -> None:
-    assert _offset_from_tz(_at(-5 * 60)) == "-5"
+    assert offset_from_tz(_at(-5 * 60)) == "-5"
 
 
 def test_offset_pacific_and_half_zone_truncate_toward_zero() -> None:
-    assert _offset_from_tz(_at(-8 * 60)) == "-8"
-    assert _offset_from_tz(_at(-3 * 60 - 30)) == "-3"  # St. John's, Java trunc
-    assert _offset_from_tz(_at(5 * 60 + 30)) == "5"
+    assert offset_from_tz(_at(-8 * 60)) == "-8"
+    assert offset_from_tz(_at(-3 * 60 - 30)) == "-3"  # St. John's, Java trunc
+    assert offset_from_tz(_at(5 * 60 + 30)) == "5"
 
 
 def test_offset_none_is_zero() -> None:
-    assert _offset_from_tz(dt.datetime(2026, 11, 3, tzinfo=None)) == "0"
+    assert offset_from_tz(dt.datetime(2026, 11, 3, tzinfo=None)) == "0"
 
 
 def _capture_api_calls(monkeypatch, brand: int) -> tuple[KiaUvoApiCA, MagicMock]:
