@@ -3,8 +3,8 @@
 
 Uses paho-mqtt 2.x (matches HA 2026.6+). Receive-only: commands are sent
 via the HTTP GSPA layer, never through this client. Carries no topic
-schema knowledge — topics and message parsing belong to the push
-provider (mqtt_service_hub_eu.py for the CCI/EU lineage).
+schema knowledge — topic schemas belong to the push provider classes
+(mqtt_service_hub.py phone-family; mqtt_service_hub_eu.py for EU extras).
 
 Thread safety: paho-mqtt runs its own background network thread and
 dispatches callbacks on it. Callbacks must be thread-safe.

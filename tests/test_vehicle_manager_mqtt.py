@@ -10,8 +10,8 @@ import pytest
 from hyundai_kia_connect_api import VehicleManager
 
 vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
-hub_module = sys.modules["hyundai_kia_connect_api.mqtt_service_hub_eu"]
-from hyundai_kia_connect_api.mqtt_service_hub_eu import CciPushMessage
+session_module = sys.modules["hyundai_kia_connect_api.mqtt_push_session"]
+from hyundai_kia_connect_api.mqtt_service_hub import PushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -139,7 +139,7 @@ def _connected_transport_factory(monkeypatch):
         t.connected = True
         return t
 
-    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    monkeypatch.setattr(session_module, "MqttTransport", factory)
     return FakeTransport
 
 
@@ -249,7 +249,7 @@ def test_message_unknown_vehicle_dropped():
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="unknown-mqtt-id",
@@ -266,7 +266,7 @@ def test_message_status_resolves_vehicle_id():
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="mqttv1",
@@ -296,7 +296,7 @@ def test_res_message_is_ignored_without_callback():
     vm = _make_vm()
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="DeviceRemote",
         topic_type="Res",
         vehicle_id="mqttv1",
@@ -341,7 +341,7 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
         def connect(self):
             attempts["n"] += 1
 
-    monkeypatch.setattr(hub_module, "MqttTransport", _Reconnectable)
+    monkeypatch.setattr(session_module, "MqttTransport", _Reconnectable)
     vm._ensure_push_session()
     vm._push_session._client = None
     vm._ensure_push_session()
@@ -398,6 +398,16 @@ def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
     assert vm._push_session is not None and vm._push_session._client is not None  # kept
 
 
+def test_session_module_imports_nothing_eu():
+    """The session is contract-only; the _eu module must not appear in its source (1332)."""
+    from pathlib import Path
+
+    import hyundai_kia_connect_api
+
+    src = Path(hyundai_kia_connect_api.mqtt_push_session.__file__).read_text()
+    assert "mqtt_service_hub_eu" not in src
+
+
 def test_start_push_wires_connection_change_callback(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
@@ -423,7 +433,7 @@ def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
         t.fail_connect = True
         return t
 
-    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    monkeypatch.setattr(session_module, "MqttTransport", factory)
     vm = _make_vm()
     with pytest.raises(ValueError, match="bad broker config"):
         vm.start_push("careu1")
@@ -443,7 +453,7 @@ def test_connect_callback_during_connect_subscribes(monkeypatch):
             self.on_connect()
             self.connected = True
 
-    monkeypatch.setattr(hub_module, "MqttTransport", _RaceTransport)
+    monkeypatch.setattr(session_module, "MqttTransport", _RaceTransport)
     vm._ensure_push_session()
     if vm._push_session is not None:
         vm._push_session._refresh_fn = lambda: None
@@ -475,7 +485,7 @@ def test_raw_delivery_of_parsed_message_dispatches():
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    vm.api.parse_push_message = lambda topic, payload: CciPushMessage(  # type: ignore[assignment]
+    vm.api.parse_push_message = lambda topic, payload: PushMessage(  # type: ignore[assignment]
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="mqttv1",
@@ -555,7 +565,7 @@ def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run(monkeyp
         t.fail_connect = True  # attempts keep failing → the loop keeps backing off
         return t
 
-    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    monkeypatch.setattr(session_module, "MqttTransport", factory)
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: None)
     from hyundai_kia_connect_api import const as const_mod
 
@@ -631,7 +641,7 @@ def test_reconnect_cancelled_exits_backoff_loop(monkeypatch):
         t.fail_connect = True  # every attempt fails → loop keeps backing off
         return t
 
-    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    monkeypatch.setattr(session_module, "MqttTransport", factory)
     vm._ensure_push_session()
     vm._push_session._client = None
     before = _reconnect_thread_idents()
