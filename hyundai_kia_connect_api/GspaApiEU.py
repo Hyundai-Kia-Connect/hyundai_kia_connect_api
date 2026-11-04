@@ -1885,11 +1885,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        # ConnectorFastening.State follows the connector LOCK, not the
-        # cable: plugged-but-idle reads 0, a released lock after a charge
-        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
-        # kia_uvo#1837). Plug sensor stays unknown; enum carries the state.
-        vehicle.ev_battery_is_plugged_in = None
+        # State 1 proves the cable is in; 0 is ambiguous — unplugged vs
+        # locked only while a session runs (kia_uvo#2069, #1495).
         fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
@@ -1907,6 +1904,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     fastening_raw,
                 )
                 vehicle.ev_connector_fastening_state = None
+        vehicle.ev_battery_is_plugged_in = (
+            True
+            if vehicle.ev_connector_fastening_state
+            is CONNECTOR_FASTENING_STATE.CONNECTED
+            else None
+        )
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
