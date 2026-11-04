@@ -43,6 +43,30 @@ def test_module_has_no_v1_fallback_flags():
     assert not hasattr(mqtt_client_mod, "_PAHO_V2")
 
 
+def test_connect_disables_paho_auto_reconnect(monkeypatch):
+    """Credentials are registration-bound; only the push session rebuilds (1332)."""
+    import hyundai_kia_connect_api.mqtt_client as mqtt_client_mod
+
+    captured = {}
+
+    class _FakePahoClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def username_pw_set(self, *args, **kwargs): ...
+        def tls_set(self, tls_version=None): ...
+        def tls_insecure_set(self, *args, **kwargs): ...
+        def connect_async(self, *args, **kwargs): ...
+        def loop_start(self): ...
+        def max_inflight_messages_set(self, count): ...
+
+    monkeypatch.setattr(mqtt_client_mod.mqtt, "Client", _FakePahoClient)
+    t = MqttTransport()
+    t.configure("broker.example", 8883)
+    t.connect()
+    assert captured.get("reconnect_on_failure") is False
+
+
 def test_subscribe_batch_qos0():
     """subscribe(list[str]) — single batch SUBSCRIBE, QoS 0, no schema knowledge."""
     calls: list[list[tuple[str, int]]] = []

@@ -497,6 +497,7 @@ class MqttPushSession:
         self._status_callback: Callable[[str, str], None] | None = None
         self._connection_change_callback: Callable[[bool], None] | None = None
         self._reconnect_cancel: threading.Event | None = None
+        self._reconnect_lock = threading.Lock()
         self._provider_lock = threading.RLock()
         self._providers: dict[str, Any] = {}
         self._provider_generation = 0
@@ -557,55 +558,62 @@ class MqttPushSession:
                     type(err).__name__[:64],
                 )
 
-    def _ensure_started(self, vehicle_id: str, generation: int) -> bool:
+    def _attempt_active(self, generation: int, cancel: threading.Event | None) -> bool:
+        return self._generation_active(generation) and (
+            cancel is None or not cancel.is_set()
+        )
+
+    def _ensure_started(
+        self, vehicle_id: str, generation: int, cancel: threading.Event | None = None
+    ) -> bool:
         token = self._get_token()
         vehicle = self._get_vehicle(vehicle_id)
         factory = getattr(self._api, "get_push_provider", None)
         provider = factory(token, vehicle) if callable(factory) else self._api
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         starter = getattr(provider, "start_push", None)
         if callable(starter):
-            return self._start_provider(vehicle_id, provider, generation)
+            return self._start_provider(vehicle_id, provider, generation, cancel)
         if self._client is not None:
-            if not self._register_new_vehicle(vehicle, token, generation):
+            if not self._register_new_vehicle(vehicle, token, generation, cancel):
                 return False
             with self._provider_lock:
-                if not self._generation_active(generation):
+                if not self._attempt_active(generation, cancel):
                     return False
                 self._vehicle_ids.add(vehicle_id)
             if self._client is not None and self._client.is_connected:
                 self._subscribe_vehicle_topics(vehicle_id)
-            return self._generation_active(generation)
+            return self._attempt_active(generation, cancel)
 
         broker = self._api.get_push_broker_info(token)
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         if not broker or not broker.get("mqtt_host"):
             _LOGGER.debug(f"{DOMAIN} - Push broker info not available")
             return False
         reg = self._api.register_push_client(token)
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         if not reg:
             _LOGGER.debug(f"{DOMAIN} - Push client registration failed")
             return False
         creds = self._api.get_push_credentials(token)
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
-        if not self._register_new_vehicle(vehicle, token, generation):
+        if not self._register_new_vehicle(vehicle, token, generation, cancel):
             return False
 
         def on_message(topic: str, payload: bytes) -> None:
-            if self._generation_active(generation):
+            if self._attempt_active(generation, cancel):
                 self._on_push_delivery_raw(topic, payload)
 
         def on_connect() -> None:
-            if self._generation_active(generation):
+            if self._attempt_active(generation, cancel):
                 self._on_push_connect()
 
         def on_disconnect(reason: str) -> None:
-            if self._generation_active(generation):
+            if self._attempt_active(generation, cancel):
                 self._on_push_disconnect(reason, generation)
 
         client = MqttTransport(
@@ -622,13 +630,13 @@ class MqttPushSession:
             client.set_on_connection_change(
                 lambda connected: (
                     self._connection_change_callback(connected)
-                    if self._generation_active(generation)
+                    if self._attempt_active(generation, cancel)
                     and self._connection_change_callback
                     else None
                 )
             )
         with self._provider_lock:
-            if not self._generation_active(generation):
+            if not self._attempt_active(generation, cancel):
                 return False
             self._vehicle_ids.add(vehicle_id)
             self._client = client
@@ -641,21 +649,27 @@ class MqttPushSession:
                     self._client = None
             raise
         finally:
-            if not self._generation_active(generation):
+            if not self._attempt_active(generation, cancel):
                 client.disconnect()
                 with self._provider_lock:
                     if self._client is client:
                         self._client = None
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         if client.is_connected:
             self._subscribe_vehicle_topics(vehicle_id)
-        return self._generation_active(generation)
+        return self._attempt_active(generation, cancel)
 
-    def _start_provider(self, vehicle_id: str, provider: Any, generation: int) -> bool:
+    def _start_provider(
+        self,
+        vehicle_id: str,
+        provider: Any,
+        generation: int,
+        cancel: threading.Event | None = None,
+    ) -> bool:
         """Attach a provider-owned session instead of creating another client."""
         with self._provider_lock:
-            if not self._generation_active(generation):
+            if not self._attempt_active(generation, cancel):
                 return False
             previous = self._providers.get(vehicle_id)
             self._providers[vehicle_id] = provider
@@ -666,7 +680,7 @@ class MqttPushSession:
         def status(changed_vehicle: str, kind: str) -> None:
             with self._provider_lock:
                 current = (
-                    self._provider_generation == generation
+                    self._attempt_active(generation, cancel)
                     and self._providers.get(vehicle_id) is provider
                 )
             if current and changed_vehicle == vehicle_id and self._status_callback:
@@ -675,7 +689,7 @@ class MqttPushSession:
         def connection(connected: bool) -> None:
             with self._provider_lock:
                 current = (
-                    self._provider_generation == generation
+                    self._attempt_active(generation, cancel)
                     and self._providers.get(vehicle_id) is provider
                 )
             if not current:
@@ -689,7 +703,7 @@ class MqttPushSession:
             started = bool(provider.start_push(status, connection))
         except Exception:
             with self._provider_lock:
-                stopped = self._provider_generation != generation
+                stopped = not self._attempt_active(generation, cancel)
                 if self._providers.get(vehicle_id) is provider:
                     self._providers.pop(vehicle_id, None)
                     self._vehicle_ids.discard(vehicle_id)
@@ -698,7 +712,7 @@ class MqttPushSession:
                 return False
             raise
         with self._provider_lock:
-            if self._provider_generation != generation:
+            if not self._attempt_active(generation, cancel):
                 if self._providers.get(vehicle_id) is provider:
                     self._providers.pop(vehicle_id, None)
                     self._vehicle_ids.discard(vehicle_id)
@@ -711,11 +725,15 @@ class MqttPushSession:
         return started
 
     def _register_new_vehicle(
-        self, vehicle: Vehicle, token: Token, generation: int
+        self,
+        vehicle: Vehicle,
+        token: Token,
+        generation: int,
+        cancel: threading.Event | None = None,
     ) -> bool:
         """Run the per-vehicle registration steps of the push contract."""
         self._api.get_push_vehicle_identity(self._get_token(), vehicle)
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         if not vehicle.mqtt_vehicle_id:
             _LOGGER.warning(
@@ -723,7 +741,7 @@ class MqttPushSession:
             )
             return False
         registered = self._api.register_push_vehicle(self._get_token(), vehicle)
-        if not self._generation_active(generation):
+        if not self._attempt_active(generation, cancel):
             return False
         if registered is None:
             _LOGGER.warning(
@@ -859,7 +877,6 @@ class MqttPushSession:
             vehicle_ids = list(self._vehicle_ids)
         if previous_cancel is not None:
             previous_cancel.set()
-        self._cleanup_client(generation)
 
         def _reconnect_with_backoff() -> None:
             with ExitStack() as cleanup:
@@ -869,38 +886,39 @@ class MqttPushSession:
                     _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
                     if cancel_event.wait(delay):
                         return
-                    try:
+                    with self._reconnect_lock:
+                        if not self._attempt_active(generation, cancel_event):
+                            return
                         try:
-                            self._refresh_fn()
-                        except Exception as token_ex:
-                            _LOGGER.warning(
-                                "%s - Push reconnect token refresh failed (%s)",
-                                DOMAIN,
-                                type(token_ex).__name__[:64],
+                            try:
+                                self._refresh_fn()
+                            except Exception as token_ex:
+                                _LOGGER.warning(
+                                    "%s - Push reconnect token refresh failed (%s)",
+                                    DOMAIN,
+                                    type(token_ex).__name__[:64],
+                                )
+                            if cancel_event.is_set() or not self._generation_active(
+                                generation
+                            ):
+                                return
+                            if not self._cleanup_client(generation):
+                                return
+                            ok = all(
+                                not cancel_event.is_set()
+                                and self._generation_active(generation)
+                                and self._ensure_started(vid, generation, cancel_event)
+                                for vid in vehicle_ids
                             )
-                        if cancel_event.is_set() or not self._generation_active(
-                            generation
-                        ):
-                            return
-                        if self.is_connected:
-                            return
-                        if not self._cleanup_client(generation):
-                            return
-                        ok = all(
-                            not cancel_event.is_set()
-                            and self._generation_active(generation)
-                            and self.ensure_started(vid)
-                            for vid in vehicle_ids
-                        )
-                        if ok and self.is_connected:
-                            _LOGGER.debug(f"{DOMAIN} - Push reconnected")
-                            return
-                    except Exception as ex:
-                        _LOGGER.warning(
-                            "%s - Push reconnect failed (%s)",
-                            DOMAIN,
-                            type(ex).__name__[:64],
-                        )
+                            if ok and self.is_connected:
+                                _LOGGER.debug(f"{DOMAIN} - Push reconnected")
+                                return
+                        except Exception as ex:
+                            _LOGGER.warning(
+                                "%s - Push reconnect failed (%s)",
+                                DOMAIN,
+                                type(ex).__name__[:64],
+                            )
                     delay = min(delay * 2, const.MQTT_PUSH_RECONNECT_MAX_DELAY)
                 _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 

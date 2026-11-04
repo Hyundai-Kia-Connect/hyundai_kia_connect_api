@@ -37,7 +37,7 @@ def suback(client, grants, mid=7):
     )
 
 
-def test_default_transport_keeps_tls_reconnect_and_immediate_qos_zero_behavior(client):
+def test_default_transport_disables_reconnect_and_preserves_tls_and_qos_zero(client):
     instance, factory = client
     transport = connect(client)
     factory.assert_called_once_with(
@@ -45,12 +45,12 @@ def test_default_transport_keeps_tls_reconnect_and_immediate_qos_zero_behavior(c
         client_id="synthetic-client",
         protocol=4,
         clean_session=True,
-        reconnect_on_failure=True,
+        reconnect_on_failure=False,
     )
     instance.tls_set.assert_called_once_with(tls_version=ssl.PROTOCOL_TLS_CLIENT)
     instance.tls_insecure_set.assert_called_once_with(False)
     instance.tls_set_context.assert_not_called()
-    instance.reconnect_delay_set.assert_called_once_with(min_delay=1, max_delay=30)
+    instance.reconnect_delay_set.assert_not_called()
     instance.max_inflight_messages_set.assert_called_once_with(100)
     assert instance.connect_timeout == 10
     instance.connect_async.assert_called_once_with(
@@ -198,17 +198,19 @@ def test_opt_in_tls_context_and_reconnect_policy_do_not_change_defaults(client):
         client_id="synthetic-client",
         broker_username="synthetic-user",
         broker_password="synthetic-password",
-        reconnect_on_failure=False,
+        reconnect_on_failure=True,
         tls_context=context,
     )
     transport.connect()
-    assert factory.call_args.kwargs["reconnect_on_failure"] is False
+    assert factory.call_args.kwargs["reconnect_on_failure"] is True
     instance.tls_set_context.assert_called_once_with(context)
     instance.tls_set.assert_not_called()
     instance.tls_insecure_set.assert_not_called()
     instance.username_pw_set.assert_called_once_with(
         "synthetic-user", "synthetic-password"
     )
+
+    instance.reconnect_delay_set.assert_called_once_with(min_delay=1, max_delay=30)
 
 
 def test_loop_start_failure_is_reported_only_to_opt_in_callback(client):
