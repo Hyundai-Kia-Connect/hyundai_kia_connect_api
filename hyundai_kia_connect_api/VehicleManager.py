@@ -107,7 +107,8 @@ class VehicleManager:
                 return
             self._closed = True
         try:
-            self.stop_push()
+            if self._push_session is not None:
+                self._push_session.close()
         finally:
             self.api.close()
 
@@ -515,6 +516,7 @@ class VehicleManager:
                 refresh_fn=self.check_and_refresh_token,
                 get_vehicle=self.get_vehicle,
                 vehicles=lambda: self.vehicles,
+                after_close_fn=lambda: self.api.close(),
             )
             self._push_session.set_status_callback(self._push_status_callback)
             session = self._push_session
@@ -548,7 +550,7 @@ class VehicleManager:
             # Startup callbacks can close the manager before registration finishes.
             if self._closed:
                 try:
-                    session.stop()
+                    session.close()
                 finally:
                     self.api.close()
         return started and not self._closed
