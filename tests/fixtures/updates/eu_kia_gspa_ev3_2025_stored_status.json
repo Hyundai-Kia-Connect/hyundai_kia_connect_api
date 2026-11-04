@@ -3,7 +3,7 @@
         "status": "captured in kia_uvo discussion #1909; eu_kia_gspa_ev3_2025_stored_status",
         "follow_up_sources": "none",
         "not_captured": [
-            "legacy-SPA vehicles/{carId}/profile (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump — answered 503; the update path logs and continues)",
             "legacy-SPA notifications/register (deviceId envelope rebuilt from the legacy parser shape)"
         ],
         "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Kia Ev3 2025, ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (dimbeni 19.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",

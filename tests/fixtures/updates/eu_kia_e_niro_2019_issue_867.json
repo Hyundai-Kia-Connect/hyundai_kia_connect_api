@@ -4,7 +4,7 @@
         "source": "kia_uvo #867 debug log: cached status, drvhistory all-time and 30d",
         "follow_up_sources": "location/park: library #1301 shape",
         "not_captured": [
-            "legacy-SPA vehicles/{carId}/profile (no capture in the dump \u2014 answered 503; the update path logs and continues)"
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump — answered 503; the update path logs and continues)"
         ],
         "description": "Whole update chain from one car; identifiers and coordinates replaced."
     },
