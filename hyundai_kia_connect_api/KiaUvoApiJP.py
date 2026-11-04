@@ -9,6 +9,7 @@ import copy
 import datetime as dt
 import math
 import re
+import threading
 import time
 import uuid
 from typing import Any, ClassVar
@@ -17,8 +18,9 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from .ApiImpl import PushProvider
 from .ApiImplType1 import ApiImplType1
-from .const import ENGINE_TYPES, ORDER_STATUS, SEAT_STATUS
+from .const import ENGINE_TYPES, MQTT_PUSH_CONNECTION_STATE, ORDER_STATUS, SEAT_STATUS
 from .exceptions import (
     APIError,
     AuthenticationError,
@@ -31,8 +33,9 @@ from .exceptions import (
     ServiceTemporaryUnavailable,
 )
 from .japan_commands import JapanCommandsMixin
-from .japan_mqtt import JapanMqttSession
+from .japan_mqtt import JapanMqttSession, JapanMqttTransportPool
 from .japan_svm import JapanSVM
+from .mqtt_service_hub import ServiceHubPushMessage, parse_service_hub_message
 from .Token import Token
 from .utils import get_child_value, parse_datetime
 from .Vehicle import DailyDrivingStats, Vehicle
@@ -43,6 +46,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
 
     data_timezone = ZoneInfo("Asia/Tokyo")
     FORCE_REFRESH_TIMEOUT = 120
+    # Japan temperature bounds come from the per-vehicle profile.
+    temperature_range: tuple[float, ...] = ()
     supported_commands = frozenset(
         {
             "request_svm_capture",
@@ -63,21 +68,29 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
             "set_navigation",
         }
     )
-    BASE_URL = "https://ccs-apigw.hyundaijapan.com:8080"
+    BASE_URL = "ccs-apigw.hyundaijapan.com:8080"
+    API_URL = "https://" + BASE_URL
+    USER_API_URL = API_URL + "/api/v1/user/"
+    SPA_API_URL = API_URL + "/api/v1/spa/"
+    SPA_API_URL_V2 = API_URL + "/api/v2/spa/"
+    PUSH_TYPE = "GCM"
     SERVICE_ID = "e084c0e4-fcfe-47e3-99c9-36eb93593737"
     APP_ID = "8be122e0-b0d9-40b5-a46e-67b25194ba88"
-    REDIRECT_URI = BASE_URL + "/api/v1/user/oauth2/redirect"
+    CCSP_SERVICE_ID = SERVICE_ID
+    REDIRECT_URI = API_URL + "/api/v1/user/oauth2/redirect"
     # CFB128 keystream for the fixed UUID prefix and a ten-digit epoch.
     # Derived offline from Japan app 1.0.17; no app binary is distributed.
     _STAMP_STREAM = base64.b64decode(
         "yGeH2vkxepxXpBulEUnI04QXO3CM9oT4E20p+AB8lqHuRZmVEfdQlJmzBX5z5pk="
     )
+    CFB = _STAMP_STREAM
     BASIC_AUTHORIZATION = "Basic ZTA4NGMwZTQtZmNmZS00N2UzLTk5YzktMzZlYjkzNTkzNzM3OjFZcWV4dng3TWxiS3c2YUFvYk1FbDJqQVFvQTBtUVhyV1E1SWpIT083TzRZRHRkRw=="
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         if region != 10 or brand != 2:
             raise APIError("Japan is supported only for Hyundai in region 10")
         super().__init__()
+        self.LANGUAGE = language
         self._vehicle_profiles: dict[str, dict[str, Any]] = {}
         self._history_updated_at: dict[str, float] = {}
         self._location_missing_at: dict[str, float] = {}
@@ -85,6 +98,9 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         self._mqtt_sessions: dict[
             str, tuple[tuple[str | None, ...], JapanMqttSession]
         ] = {}
+        self._mqtt_sessions_lock = threading.RLock()
+        self._mqtt_closed = False
+        self._mqtt_transport_pool = JapanMqttTransportPool()
         self._passive_state_observed_at: dict[str, dt.datetime] = {}
 
     def _mqtt_for_vehicle(self, token: Token, vehicle: Vehicle) -> JapanMqttSession:
@@ -98,24 +114,97 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
             )
         self._command_vehicle_id(vehicle)
         identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
-        existing = self._mqtt_sessions.get(vehicle.id)
-        if existing is not None and (
-            existing[0] != identity
-            or existing[1].closed is True
-            or getattr(existing[1], "failed", False) is True
-        ):
-            existing[1].close()
-            existing = None
-        if existing is None:
-            helper = JapanMqttSession(
-                token,
-                vehicle.id,
-                token.mqtt_registration_uuid,
-                lambda: self._vehicle_headers(token, vehicle),
-            )
-            self._mqtt_sessions[vehicle.id] = (identity, helper)
-            return helper
-        return existing[1]
+        retired = []
+        try:
+            with self._mqtt_sessions_lock:
+                if self._mqtt_closed:
+                    raise APIError("Japan API session is closed")
+                for vehicle_id, (saved, previous) in list(self._mqtt_sessions.items()):
+                    if saved != identity:
+                        retired.append(previous)
+                        del self._mqtt_sessions[vehicle_id]
+                existing = self._mqtt_sessions.get(vehicle.id)
+                if existing is not None and (
+                    existing[1].closed is True
+                    or getattr(existing[1], "failed", False) is True
+                ):
+                    retired.append(existing[1])
+                    del self._mqtt_sessions[vehicle.id]
+                    existing = None
+                if existing is None:
+                    helper = JapanMqttSession(
+                        token,
+                        vehicle.id,
+                        token.mqtt_registration_uuid,
+                        lambda: self._vehicle_headers(token, vehicle),
+                        transport_pool=self._mqtt_transport_pool,
+                        vehicle=vehicle,
+                    )
+                    self._mqtt_sessions[vehicle.id] = (identity, helper)
+                else:
+                    helper = existing[1]
+        finally:
+            # Disconnect callbacks may re-enter the manager and factory.
+            for previous in retired:
+                previous.close(notify_push=True)
+        return helper
+
+    def get_push_provider(self, token: Token, vehicle: Vehicle) -> PushProvider:
+        return self._mqtt_for_vehicle(token, vehicle)
+
+    def _authenticated_push_provider(self, token: Token) -> JapanMqttSession:
+        """Resolve account calls by registered client ID after scoped setup."""
+        identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+        with self._mqtt_sessions_lock:
+            sessions = list(self._mqtt_sessions.values())
+        matches = [
+            helper
+            for saved, helper in sessions
+            if saved == identity and helper.closed is not True
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if token.mqtt_client_id:
+            for helper in matches:
+                if helper.request_context.get("clientId") == token.mqtt_client_id:
+                    return helper
+        raise InvalidAPIResponseError("Select a Japan vehicle's push provider first")
+
+    def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
+        return self._authenticated_push_provider(token).get_push_broker_info(token)
+
+    def register_push_client(self, token: Token) -> dict[str, Any] | None:
+        return self._authenticated_push_provider(token).register_push_client(token)
+
+    def register_push_vehicle(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        return self._mqtt_for_vehicle(token, vehicle).register_push_vehicle(
+            token, vehicle
+        )
+
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        return self._mqtt_for_vehicle(token, vehicle).get_push_vehicle_identity(
+            token, vehicle
+        )
+
+    def get_push_connection_state(
+        self, token: Token
+    ) -> MQTT_PUSH_CONNECTION_STATE | None:
+        return self._authenticated_push_provider(token).get_push_connection_state(token)
+
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
+        return self._mqtt_for_vehicle(token, vehicle).get_push_topics(token, vehicle)
+
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        return self._authenticated_push_provider(token).get_push_credentials(token)
+
+    def parse_push_message(
+        self, topic: str, payload: bytes
+    ) -> ServiceHubPushMessage | None:
+        return parse_service_hub_message(topic, payload, include_result=True)
 
     @staticmethod
     def _ccs2_observation_time(value: object) -> dt.datetime:
@@ -184,7 +273,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         ):
             self._record_passive_state_result("missing")
             return False
-        entry = self._mqtt_sessions.get(vehicle.id)
+        with self._mqtt_sessions_lock:
+            entry = self._mqtt_sessions.get(vehicle.id)
         if entry is None:
             self._record_passive_state_result("missing")
             return False
@@ -298,7 +388,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
 
     def get_local_diagnostics(self) -> dict[str, Any]:
         """Return bounded protocol counters without requests or private data."""
-        sessions = list(self._mqtt_sessions.values())[:10]
+        with self._mqtt_sessions_lock:
+            sessions = list(self._mqtt_sessions.values())[:10]
         return {
             "mqtt_sessions": [helper.diagnostics for _, helper in sessions],
             "svm_images_cached": len(getattr(self, "_japan_svm_cache", {})),
@@ -313,10 +404,15 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
 
     def close(self) -> None:
         """Release Japan MQTT and HTTP sessions on integration unload."""
-        for _, helper in self._mqtt_sessions.values():
+        with self._mqtt_sessions_lock:
+            if self._mqtt_closed:
+                return
+            self._mqtt_closed = True
+            helpers = [helper for _, helper in self._mqtt_sessions.values()]
+            self._mqtt_sessions.clear()
+            self._passive_state_observed_at.clear()
+        for helper in helpers:
             helper.close()
-        self._mqtt_sessions.clear()
-        self._passive_state_observed_at.clear()
         self.session.close()
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
@@ -327,7 +423,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         try:
             self._force_refresh_with_session(token, vehicle, helper, headers)
         finally:
-            helper.close()
+            helper.close(notify_push=True)
 
     def _force_refresh_with_session(
         self,
@@ -468,10 +564,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         epoch = str(int(time.time()))
         if len(epoch) != 10:
             raise APIError("Japan stamp requires a supported ten-digit epoch")
-        plain = f"{self.APP_ID}:{epoch}".encode()
-        return base64.b64encode(
-            bytes(a ^ b for a, b in zip(self._STAMP_STREAM, plain, strict=True))
-        ).decode()
+        return self._stamp_for_epoch(int(epoch))
 
     def _headers(self, token: Token | None = None) -> dict[str, str]:
         headers = {
@@ -498,7 +591,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 )
             headers["ccuCCS2ProtocolSupport"] = str(protocol)
         if helper is None:
-            cached = self._mqtt_sessions.get(vehicle.id)
+            with self._mqtt_sessions_lock:
+                cached = self._mqtt_sessions.get(vehicle.id)
             identity = (
                 token.access_token,
                 token.device_id,
@@ -515,6 +609,17 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 ):
                     headers[key] = value
         return headers
+
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict[str, Any]:
+        headers = self._headers(token)
+        if ccs2_support is not None:
+            headers["ccuCCS2ProtocolSupport"] = str(ccs2_support)
+        return headers
+
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        return self._vehicle_headers(token, vehicle)
 
     _KNOWN_ERRORS: ClassVar[dict[str, tuple[type[Exception], str]]] = {
         "4002": (APIError, "invalid request"),
@@ -563,7 +668,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         """Expose HTTP status and allowlisted labels, never response text or URLs."""
         kwargs.setdefault("allow_redirects", False)
         try:
-            response = self.session.request(method, self.BASE_URL + path, **kwargs)
+            response = self.session.request(method, self.API_URL + path, **kwargs)
         except (requests.exceptions.Timeout, RequestTimeoutError):
             raise RequestTimeoutError("Japan API request timed out") from None
         except requests.exceptions.RequestException:
@@ -701,7 +806,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 break
             target = urljoin(response.url, response.headers.get("Location", ""))
             parsed = urlparse(target)
-            expected = urlparse(self.BASE_URL)
+            expected = urlparse(self.API_URL)
             if (parsed.scheme, parsed.netloc) != (expected.scheme, expected.netloc):
                 raise AuthenticationError(
                     "Japan login redirected to an unexpected host"
@@ -783,6 +888,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
             token.pin,
         )
         refreshed.mqtt_registration_uuid = token.mqtt_registration_uuid
+        refreshed.mqtt_client_id = token.mqtt_client_id
         return refreshed
 
     def get_vehicles(self, token: Token) -> list[Vehicle]:

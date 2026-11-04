@@ -28,7 +28,6 @@ from .const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
     VALET_MODE_ACTION,
-    VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
 )
 from .exceptions import (
@@ -55,6 +54,12 @@ class JapanCommandsMixin:
 
     if TYPE_CHECKING:
 
+        def _get_control_headers(
+            self, token: Token, vehicle: Vehicle | None = None
+        ) -> dict[str, Any]: ...
+        def _get_control_grant(
+            self, token: Token, vehicle: Vehicle | None = None
+        ) -> tuple[str, float]: ...
         def _request(
             self, method: str, path: str, *, json_response: bool = True, **kwargs: Any
         ) -> Any: ...
@@ -100,52 +105,73 @@ class JapanCommandsMixin:
                 "Sign in again to register Japan vehicle commands"
             )
 
-    def _control_headers(
-        self, token: Token, vehicle: Vehicle | None = None
-    ) -> dict[str, str]:
+    def _validate_control_token_request(self, token: Token) -> None:
         self._require_mqtt_identity(token)
         if not isinstance(token.pin, str) or not token.pin.strip():
             raise AuthenticationError("Japan vehicle commands require an explicit PIN")
+
+    def _control_token_is_valid(self, token: Token) -> bool:
         expiry = token.control_token_expiry
-        if (
-            not isinstance(token.control_token, str)
-            or not token.control_token.startswith("Bearer ")
-            or not token.control_token[7:].strip()
-            or isinstance(expiry, bool)
-            or not isinstance(expiry, (int, float))
-            or not math.isfinite(expiry)
-            or expiry <= time.time()
-        ):
-            result = self._request(
-                "PUT",
-                "/api/v1/user/pin",
-                headers=self._vehicle_headers(token, vehicle)
-                if vehicle is not None
-                else self._headers(token),
-                json={"deviceId": token.device_id, "pin": token.pin},
-            )
-            control = result.get("controlToken")
-            expires = result.get("expiresTime")
-            if (
-                not isinstance(control, str)
-                or not control
-                or isinstance(expires, bool)
-                or not isinstance(expires, (int, float))
-                or not math.isfinite(expires)
-                or expires <= 0
-            ):
-                raise InvalidAPIResponseError("Japan control token is incomplete")
-            token.control_token = "Bearer " + control
-            token.control_token_expiry = time.time() + expires
-        headers = (
+        return (
+            isinstance(token.control_token, str)
+            and token.control_token.startswith("Bearer ")
+            and bool(token.control_token[7:].strip())
+            and not isinstance(expiry, bool)
+            and isinstance(expiry, (int, float))
+            and math.isfinite(expiry)
+            and expiry > time.time()
+        )
+
+    def _control_authenticated_headers(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> dict[str, str]:
+        return (
             self._vehicle_headers(token, vehicle)
             if vehicle is not None
             else self._headers(token)
         )
-        if token.control_token is None:
+
+    def _request_control_token(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> dict[str, Any]:
+        result = self._request(
+            "PUT",
+            "/api/v1/user/pin",
+            headers=self._control_authenticated_headers(token, vehicle),
+            json={"deviceId": token.device_id, "pin": token.pin},
+        )
+        if not isinstance(result, dict):
             raise InvalidAPIResponseError("Japan control token is incomplete")
-        headers["Authorization"] = token.control_token
-        return headers
+        return result
+
+    def _normalize_control_token_response(
+        self, response: dict[str, Any]
+    ) -> tuple[str, float]:
+        control = response.get("controlToken")
+        expires = response.get("expiresTime")
+        if (
+            not isinstance(control, str)
+            or not control
+            or isinstance(expires, bool)
+            or not isinstance(expires, (int, float))
+            or not math.isfinite(expires)
+            or expires <= 0
+        ):
+            raise InvalidAPIResponseError("Japan control token is incomplete")
+        return "Bearer " + control, time.time() + expires
+
+    def _control_token_for_vehicle(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> tuple[str, float]:
+        return self._get_control_grant(token, vehicle)
+
+    def _control_token_headers(self, control_token: str) -> dict[str, str]:
+        return {"Authorization": control_token}
+
+    def _control_headers(
+        self, token: Token, vehicle: Vehicle | None = None
+    ) -> dict[str, Any]:
+        return self._get_control_headers(token, vehicle)
 
     def _remember_japan_action(
         self,
@@ -184,6 +210,32 @@ class JapanCommandsMixin:
         )
         diagnostic["failure_category"] = category
         self._japan_command_diagnostics = diagnostic
+
+    def _retry_device_id_error(self) -> bool:
+        return False
+
+    def _uses_ccs2_commands(self, vehicle: Vehicle) -> bool:
+        return True
+
+    def _send_vehicle_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        payload: dict[str, Any],
+        *,
+        ccs2: bool,
+    ) -> str:
+        if endpoint == "control/door" and payload.get("command") not in (
+            "open",
+            "close",
+        ):
+            raise ValueError("Unsupported Japan door action")
+        if endpoint == "control/light" and not self._japan_capability(
+            self._japan_profile_section(vehicle, "option").get("lightOnlyAvailable")
+        ):
+            raise UnsupportedControlError("Japan light control capability is absent")
+        return self._japan_command(token, vehicle, endpoint, payload, ccs2=ccs2)
 
     def _japan_command(
         self,
@@ -325,8 +377,7 @@ class JapanCommandsMixin:
     def valet_mode_action(
         self, token: Token, vehicle: Vehicle, action: VALET_MODE_ACTION
     ) -> str:
-        service = self._japan_profile_section(vehicle, "serviceOption")
-        if not self._japan_capability(service.get("remoteValetActOption")):
+        if vehicle.supports.valet_mode is not True:
             raise UnsupportedControlError("Japan valet control capability is absent")
         if action not in (VALET_MODE_ACTION.ACTIVATE, VALET_MODE_ACTION.DEACTIVATE):
             raise ValueError("Japan valet action is invalid")
@@ -373,29 +424,6 @@ class JapanCommandsMixin:
             token, vehicle, "location/routes", {"poiInfoList": destinations}, ccs2=False
         )
 
-    def lock_action(
-        self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
-    ) -> str:
-        if action not in (VEHICLE_LOCK_ACTION.LOCK, VEHICLE_LOCK_ACTION.UNLOCK):
-            raise ValueError("Unsupported Japan door action")
-        command = action.value
-        return self._japan_command(token, vehicle, "control/door", {"command": command})
-
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
-        return self._japan_command(
-            token, vehicle, "control/charge", {"command": "start"}
-        )
-
-    def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
-        return self._japan_command(
-            token, vehicle, "control/charge", {"command": "stop"}
-        )
-
-    def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        return self._japan_command(
-            token, vehicle, "control/temperature", {"command": "stop"}
-        )
-
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
@@ -411,13 +439,6 @@ class JapanCommandsMixin:
         return self._japan_command(
             token, vehicle, "control/portdoor", {"command": command}
         )
-
-    def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
-        if not self._japan_capability(
-            self._japan_profile_section(vehicle, "option").get("lightOnlyAvailable")
-        ):
-            raise UnsupportedControlError("Japan light control capability is absent")
-        return self._japan_command(token, vehicle, "control/light", {"command": "on"})
 
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
         if not self._japan_capability(
@@ -463,8 +484,7 @@ class JapanCommandsMixin:
         self, token: Token, vehicle: Vehicle, options: WindowRequestOptions
     ) -> str:
         """Send nullable app window/curtain fields with profile seat orientation."""
-        service = self._japan_profile_section(vehicle, "serviceOption")
-        if not self._japan_capability(service.get("windowControlOption")):
+        if vehicle.supports.window_control is not True:
             raise UnsupportedControlError("Japan window control capability is absent")
         profile = self._japan_profile_section(vehicle, "option")
         values = (
@@ -494,6 +514,16 @@ class JapanCommandsMixin:
             for value in curtains
         ):
             raise ValueError("Japan curtain position is invalid")
+        positions = vehicle.supports.supported_window_positions
+        if positions is not None and any(
+            value is not None and position not in positions
+            for position, value in zip(
+                ("front_left", "front_right", "back_left", "back_right"),
+                values,
+                strict=True,
+            )
+        ):
+            raise UnsupportedControlError("Japan window position is unavailable")
         if (
             all(value is not None for value in values)
             and len(set(values)) == 1
@@ -508,8 +538,10 @@ class JapanCommandsMixin:
         if location not in ("L", "R"):
             raise UnsupportedControlError("Japan window seat orientation is unknown")
         front_left, front_right, rear_left, rear_right = values
-        safety = profile.get("windowSafetyOption2")
-        if safety == 4 and any(
+        front_only = positions is not None and not any(
+            position in positions for position in ("back_left", "back_right")
+        )
+        if front_only and any(
             value is not None for value in (rear_left, rear_right) + curtains
         ):
             raise UnsupportedControlError("Japan rear window control is unavailable")
@@ -523,7 +555,7 @@ class JapanCommandsMixin:
             "drvSeatWindow": front_left if location == "L" else front_right,
             "psgSeatWindow": front_right if location == "L" else front_left,
         }
-        if safety != 4:
+        if not front_only:
             payload.update(
                 {
                     "rlSeatWindow": rear_left,
@@ -788,6 +820,11 @@ class JapanCommandsMixin:
             or not math.isfinite(temp)
         ):
             raise ValueError("Japan climate temperature must be finite")
+        bounds = vehicle.supports.climate_temperature_range
+        if bounds is not None and not bounds[0] <= temp <= bounds[1]:
+            raise ValueError(
+                "Japan temperature is outside the established profile range"
+            )
         # Verify that the app's profile-dependent code decoder accepts the setpoint.
         temperatures = [
             self._legacy_temperature(

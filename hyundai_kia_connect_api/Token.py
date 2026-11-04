@@ -36,7 +36,7 @@ class Token:
     user_id: str | None = None
     # Broker-issued MQTT client id, distinct from the phone registration UUID.
     mqtt_client_id: str | None = None
-    # Japan's MQTT client registration uses the notification-registration UUID.
+    # Phone UUID sent to notification registration and Service Hub /device/register.
     mqtt_registration_uuid: str | None = None
 
     def to_dict(self) -> dict[str, Any]:

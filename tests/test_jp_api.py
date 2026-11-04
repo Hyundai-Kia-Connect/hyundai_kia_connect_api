@@ -406,7 +406,7 @@ def test_unknown_error_code_does_not_become_success(api):
 
 def test_authorize_external_redirect_rejected_before_signin(api):
     redirect = response({}, 302)
-    redirect.url = api.BASE_URL + "/api/v1/user/oauth2/authorize"
+    redirect.url = api.API_URL + "/api/v1/user/oauth2/authorize"
     redirect.headers = {"Location": "https://example.invalid/login"}
     api.session.request.return_value = redirect
     with pytest.raises(AuthenticationError):
@@ -708,16 +708,17 @@ def test_mqtt_registration_uuid_token_roundtrip_and_refresh(api):
         password="synthetic",
         refresh_token="refresh",
         mqtt_registration_uuid="synthetic-registration",
+        mqtt_client_id="synthetic-broker-client",
     )
     restored = Token.from_dict(token.to_dict())
     assert restored.mqtt_registration_uuid == "synthetic-registration"
+    assert restored.mqtt_client_id == "synthetic-broker-client"
     api.session.request.return_value = response(
         {"token_type": "Bearer", "access_token": "access", "expires_in": 600}
     )
-    assert (
-        api.refresh_access_token(restored).mqtt_registration_uuid
-        == "synthetic-registration"
-    )
+    refreshed = api.refresh_access_token(restored)
+    assert refreshed.mqtt_registration_uuid == "synthetic-registration"
+    assert refreshed.mqtt_client_id == "synthetic-broker-client"
 
 
 def test_force_refresh_requires_correlated_completion_and_newer_state(api, monkeypatch):
@@ -1268,3 +1269,171 @@ def test_disconnected_persistent_telemetry_session_is_replaced_before_next_comma
     assert api._mqtt_for_vehicle(token, vehicle) is replacement
     failed.close.assert_called_once()
     factory.assert_called_once()
+
+
+def test_japan_populates_type1_urls_and_native_keystream():
+    api = KiaUvoApiJP(10, 2, "ja")
+    assert api.BASE_URL == "ccs-apigw.hyundaijapan.com:8080"
+    assert api.API_URL == "https://" + api.BASE_URL
+    assert api.USER_API_URL == api.API_URL + "/api/v1/user/"
+    assert api.SPA_API_URL == api.API_URL + "/api/v1/spa/"
+    assert api.SPA_API_URL_V2 == api.API_URL + "/api/v2/spa/"
+    assert api.CCSP_SERVICE_ID == api.SERVICE_ID
+    assert api.CFB == api._STAMP_STREAM
+    assert api.LANGUAGE == "ja"
+
+
+def test_shared_push_contract_delegates_to_authenticated_vehicle_provider(api):
+    token = Token(
+        username="synthetic",
+        password="synthetic",
+        access_token="access",
+        device_id="phone",
+        mqtt_registration_uuid="registration",
+        mqtt_client_id="broker-client",
+    )
+    identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+    vehicle = Vehicle(id="synthetic")
+    helper = Mock(closed=False, failed=False)
+    helper.request_context = {"clientId": token.mqtt_client_id}
+    api._mqtt_sessions[vehicle.id] = (identity, helper)
+    assert api.get_push_provider(token, vehicle) is helper
+    for method in (
+        "get_push_broker_info",
+        "register_push_client",
+        "get_push_connection_state",
+        "get_push_credentials",
+    ):
+        assert getattr(api, method)(token) is getattr(helper, method).return_value
+        getattr(helper, method).assert_called_once_with(token)
+    for method in (
+        "register_push_vehicle",
+        "get_push_vehicle_identity",
+        "get_push_topics",
+    ):
+        assert (
+            getattr(api, method)(token, vehicle) is getattr(helper, method).return_value
+        )
+        getattr(helper, method).assert_called_once_with(token, vehicle)
+    api.session.request.assert_not_called()
+
+
+def test_account_push_delegates_use_broker_client_identity_for_fleets(api):
+    token = Token(
+        username="synthetic",
+        password="synthetic",
+        access_token="access",
+        device_id="phone",
+        mqtt_registration_uuid="registration",
+        mqtt_client_id="broker-client",
+    )
+    identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+    old = Mock(closed=False)
+    old.request_context = {"clientId": "old-client"}
+    current = Mock(closed=False)
+    current.request_context = {"clientId": "broker-client"}
+    api._mqtt_sessions = {"one": (identity, old), "two": (identity, current)}
+    assert (
+        api.get_push_connection_state(token)
+        is current.get_push_connection_state.return_value
+    )
+    current.get_push_connection_state.assert_called_once_with(token)
+    old.get_push_connection_state.assert_not_called()
+    token.mqtt_client_id = None
+    with pytest.raises(InvalidAPIResponseError, match="Select a Japan vehicle"):
+        api.get_push_connection_state(token)
+    api.session.request.assert_not_called()
+
+
+def test_japan_push_parser_uses_shared_status_and_result_schema(api):
+    status = api.parse_push_message("service/phone/_/vss/synthetic", b'{"state": {}}')
+    assert status is not None and status.is_status
+    result = api.parse_push_message("service/phone/_/res/client", b'{"state": {}}')
+    assert result is not None and not result.is_status
+    assert api.parse_push_message("service/phone/_/vss/synthetic", b"[]") is None
+    api.session.request.assert_not_called()
+
+
+def test_authentication_rotation_retires_all_older_vehicle_helpers(api, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    token = Token(
+        username="synthetic",
+        password="synthetic",
+        access_token="new",
+        device_id="phone",
+        mqtt_registration_uuid="registration",
+    )
+    old_identity = ("old", token.device_id, token.mqtt_registration_uuid)
+    old_one, old_two = Mock(), Mock()
+    api._mqtt_sessions = {
+        "one": (old_identity, old_one),
+        "two": (old_identity, old_two),
+    }
+    replacement = Mock(closed=False, failed=False)
+    factory = Mock(return_value=replacement)
+    monkeypatch.setattr("hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession", factory)
+    # A disconnect observer can enter the new provider from another thread.
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        old_one.close.side_effect = lambda **kwargs: workers.submit(
+            api._mqtt_for_vehicle, token, Vehicle(id="one")
+        ).result(timeout=2)
+        assert api._mqtt_for_vehicle(token, Vehicle(id="one")) is replacement
+    assert set(api._mqtt_sessions) == {"one"}
+    old_one.close.assert_called_once_with(notify_push=True)
+    old_two.close.assert_called_once_with(notify_push=True)
+    factory.assert_called_once()
+    api.close()
+    replacement.close.assert_called_once_with()
+    assert api._mqtt_sessions == {}
+
+
+def test_failed_replacement_still_releases_retired_authentication(api, monkeypatch):
+    token = Token(
+        username="synthetic",
+        password="synthetic",
+        access_token="new",
+        device_id="phone",
+        mqtt_registration_uuid="registration",
+    )
+    previous = Mock()
+    api._mqtt_sessions = {"one": (("old", "phone", "registration"), previous)}
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession",
+        Mock(side_effect=ValueError("synthetic construction failure")),
+    )
+    with pytest.raises(ValueError, match="synthetic construction"):
+        api._mqtt_for_vehicle(token, Vehicle(id="one"))
+    previous.close.assert_called_once_with(notify_push=True)
+    assert api._mqtt_sessions == {}
+
+
+def test_api_close_releases_lock_before_callbacks_and_prevents_resurrection(
+    api, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+
+    token = Token(
+        username="synthetic",
+        password="synthetic",
+        access_token="access",
+        device_id="phone",
+        mqtt_registration_uuid="registration",
+    )
+    helper = Mock(closed=False, failed=False)
+    api._mqtt_sessions = {"one": (("access", "phone", "registration"), helper)}
+    factory = Mock()
+    monkeypatch.setattr("hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession", factory)
+
+    def reconnect():
+        with pytest.raises(APIError, match="session is closed"):
+            api._mqtt_for_vehicle(token, Vehicle(id="one"))
+        return api.get_local_diagnostics()
+
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        helper.close.side_effect = lambda: workers.submit(reconnect).result(timeout=2)
+        api.close()
+    api.close()
+    helper.close.assert_called_once_with()
+    factory.assert_not_called()
+    assert api._mqtt_sessions == {}

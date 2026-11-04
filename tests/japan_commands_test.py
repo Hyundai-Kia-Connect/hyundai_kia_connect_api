@@ -19,6 +19,7 @@ from hyundai_kia_connect_api.ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.const import (
     CHARGE_PORT_ACTION,
     ORDER_STATUS,
@@ -28,14 +29,17 @@ from hyundai_kia_connect_api.const import (
 )
 from hyundai_kia_connect_api.exceptions import (
     AuthenticationError,
+    DeviceIDError,
     InvalidAPIResponseError,
+    RequestTimeoutError,
     UnsupportedControlError,
 )
 from hyundai_kia_connect_api.japan_commands import JapanCommandsMixin
 from hyundai_kia_connect_api.japan_mqtt import JapanMqttSession
+from hyundai_kia_connect_api.Vehicle import VehicleSupports
 
 
-class Adapter(JapanCommandsMixin):
+class Adapter(JapanCommandsMixin, ApiImplType1):
     def __init__(self):
         self._request = Mock(
             side_effect=[
@@ -74,7 +78,7 @@ def setup():
             control_token=None,
             control_token_expiry=0,
         ),
-        SimpleNamespace(id="synthetic-car"),
+        SimpleNamespace(id="synthetic-car", supports=VehicleSupports()),
     )
 
 
@@ -88,8 +92,12 @@ def setup():
         ("stop_climate", (), "temperature", "stop"),
     ],
 )
-def test_exact_command_payload_and_pin_headers(method, args, endpoint, command):
+@pytest.mark.parametrize("protocol", [0, 1])
+def test_exact_command_payload_and_pin_headers(
+    method, args, endpoint, command, protocol
+):
     api, token, vehicle = setup()
+    vehicle.ccu_ccs2_protocol_support = protocol
     assert getattr(api, method)(token, vehicle, *args) == "synthetic-action"
     grant, request = api._request.call_args_list
     assert grant.args == ("PUT", "/api/v1/user/pin")
@@ -345,6 +353,7 @@ def test_evidenced_charge_setting_commands(method, args, field, value):
 def test_all_window_open_and_unproved_partial_rejection():
     api, token, vehicle = setup()
     api._vehicle_profiles[vehicle.id]["serviceOption"] = {"windowControlOption": 1}
+    vehicle.supports.window_control = True
     options = WindowRequestOptions(
         front_left=WINDOW_STATE.OPEN,
         front_right=WINDOW_STATE.OPEN,
@@ -404,7 +413,7 @@ def test_schedule_cloud_snapshot_preserves_unspecified_fields_and_input():
 
 def test_valet_uses_non_ccs2_endpoint_and_explicit_capability():
     api, token, vehicle = setup()
-    api._vehicle_profiles[vehicle.id]["serviceOption"] = {"remoteValetActOption": 1}
+    vehicle.supports.valet_mode = True
     api.valet_mode_action(token, vehicle, VALET_MODE_ACTION.DEACTIVATE)
     assert api._request.call_args.args[1].endswith("/control/valet")
     assert "/ccs2/" not in api._request.call_args.args[1]
@@ -466,6 +475,7 @@ def test_separate_heating_profile_uses_exact_wire_fields():
 
 def test_nullable_rhd_independent_window_and_vent_fields():
     api, token, vehicle = setup()
+    vehicle.supports.window_control = True
     api._vehicle_profiles[vehicle.id].update(
         {
             "option": {"drvSeatLoc": "R", "windowSafetyOption2": 3},
@@ -561,6 +571,7 @@ def test_ev5_flat_schedule_uses_root_app_mode_and_scope_specific_wire_contracts(
 def test_uniform_window_wire_values_are_not_enum_names(state, command):
     api, token, vehicle = setup()
     api._vehicle_profiles[vehicle.id]["serviceOption"] = {"windowControlOption": 1}
+    vehicle.supports.window_control = True
     api.set_windows_state(
         token,
         vehicle,
@@ -619,6 +630,7 @@ def test_command_values_match_independent_dex_constructor_facts():
     ]:
         api, token, vehicle = setup()
         api._vehicle_profiles[vehicle.id]["serviceOption"] = {"windowControlOption": 1}
+        vehicle.supports.window_control = True
         api.set_windows_state(
             token,
             vehicle,
@@ -793,3 +805,110 @@ def test_flat_schedule_validates_both_envelopes_before_either_write(missing):
         )
     api._japan_command.assert_not_called()
     assert [call.args[0] for call in api._request.call_args_list] == ["PUT", "GET"]
+
+
+@pytest.mark.parametrize(
+    "failure", [DeviceIDError("synthetic"), RequestTimeoutError("synthetic")]
+)
+@pytest.mark.parametrize(
+    "method,args",
+    [
+        ("lock_action", (VEHICLE_LOCK_ACTION.UNLOCK,)),
+        ("start_charge", ()),
+        ("stop_charge", ()),
+        ("stop_climate", ()),
+        ("start_hazard_lights", ()),
+    ],
+)
+def test_inherited_commands_never_repeat_a_failed_japan_submission(
+    failure, method, args
+):
+    api, token, vehicle = setup()
+    api._vehicle_profiles[vehicle.id]["option"]["lightOnlyAvailable"] = 1
+    api._request.side_effect = [
+        {"controlToken": "synthetic-control", "expiresTime": 60},
+        failure,
+    ]
+    with pytest.raises(type(failure)):
+        getattr(api, method)(token, vehicle, *args)
+    assert [call.args[0] for call in api._request.call_args_list] == ["PUT", "POST"]
+    assert token.device_id == "synthetic-device"
+    api.helper.prepare.assert_called_once()
+
+
+def test_window_capability_uses_normalized_supports_not_raw_profile():
+    api, token, vehicle = setup()
+    api._vehicle_profiles[vehicle.id]["serviceOption"] = {"windowControlOption": 1}
+    with pytest.raises(UnsupportedControlError):
+        api.set_windows_state(
+            token, vehicle, WindowRequestOptions(front_left=WINDOW_STATE.OPEN)
+        )
+    api._request.assert_not_called()
+
+
+def test_uniform_all_windows_cannot_bypass_front_only_capability():
+    api, token, vehicle = setup()
+    vehicle.supports.window_control = True
+    vehicle.supports.supported_window_positions = ("front_left", "front_right")
+    with pytest.raises(UnsupportedControlError, match="position"):
+        api.set_windows_state(
+            token,
+            vehicle,
+            WindowRequestOptions(
+                front_left=WINDOW_STATE.OPEN,
+                front_right=WINDOW_STATE.OPEN,
+                back_left=WINDOW_STATE.OPEN,
+                back_right=WINDOW_STATE.OPEN,
+            ),
+        )
+    api._request.assert_not_called()
+
+
+def test_climate_rejects_outside_normalized_temperature_bounds_before_decoding():
+    api, token, vehicle = setup()
+    vehicle.supports.climate_temperature_range = (17.0, 27.0)
+    api._legacy_temperature = Mock(
+        side_effect=AssertionError("must validate bounds first")
+    )
+    with pytest.raises(ValueError, match="range"):
+        api.start_climate(token, vehicle, ClimateRequestOptions(set_temp=30))
+    api._legacy_temperature.assert_not_called()
+    api._request.assert_not_called()
+
+
+def test_valet_capability_uses_normalized_supports_not_raw_profile():
+    api, token, vehicle = setup()
+    api._vehicle_profiles[vehicle.id]["serviceOption"] = {"remoteValetActOption": 1}
+    with pytest.raises(UnsupportedControlError):
+        api.valet_mode_action(token, vehicle, VALET_MODE_ACTION.ACTIVATE)
+    api._request.assert_not_called()
+
+
+def test_shared_header_orchestration_retains_japan_cached_grant_policy(monkeypatch):
+    api, token, vehicle = setup()
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.japan_commands.time.time", lambda: 100.25
+    )
+    token.control_token = "Bearer cached-control"
+    token.control_token_expiry = 200.25
+    assert api._control_headers(token, vehicle) == {
+        "Authorization": "Bearer cached-control",
+        "ccuCCS2ProtocolSupport": "1",
+    }
+    api._request.assert_not_called()
+    token.pin = " "
+    with pytest.raises(AuthenticationError):
+        api._get_control_token(token)
+    api._request.assert_not_called()
+
+
+def test_shared_grant_cache_keeps_japan_fractional_ttl(monkeypatch):
+    api, token, vehicle = setup()
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.japan_commands.time.time", lambda: 100.25
+    )
+    api._request.side_effect = [{"controlToken": "new-control", "expiresTime": 0.5}]
+    assert api._control_headers(token, vehicle)["Authorization"] == "Bearer new-control"
+    assert token.control_token_expiry == 100.75
+    assert api._get_control_token(token) == ("Bearer new-control", 100.75)
+    assert api._request.call_count == 1
