@@ -74,6 +74,8 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     # fields following (VehicleToLoad.DischargeLimitation.SoC 20 -> 30,
     # Setting.CompleteAlarm flags, Reservation.OffPeakTime 12:00-12:30 ->
     # 12:00-13:00). Bearer-only as well.
+    # reservation-hvac live-proven on a PV5 (2026-10-31): 202-000 with
+    # 22/22 Reservation.Departure fields following.
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -90,6 +92,7 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
             "discharge-limit",
             "charge-alarm",
             "reservation-charge",
+            "reservation-hvac",
         }
     )
 
