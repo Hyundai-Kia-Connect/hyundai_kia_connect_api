@@ -210,6 +210,13 @@ _CA_APP_HEADERS: dict[str, str | None] = {
     "client_secret": "CLISCR01AHSPA",
 }
 
+_CA_APP_HEADERS_G: dict[str, str | None] = {
+    # Genesis CA app (stationdm.hca hca/network/repo/net/c.java): SPA, brand G, own client keys
+    "brand": "G",
+    "client_id": "HATAGSPACA0232141ED9722C67715A0B",
+    "client_secret": "CLISCR01AGSPA",
+}
+
 
 def _offset_from_tz(now: dt.datetime | None = None) -> str:
     """Whole-hour UTC offset, matching the CA app's offset/3600000 integer division."""
@@ -243,7 +250,12 @@ class KiaUvoApiCA(ApiImpl):
 
     @property
     def API_HEADERS(self) -> dict[str, str | None]:
-        """Hyundai app profile with a fresh offset (Hyundai-Kia-Connect/kia_uvo#2054); other brands keep the proven web-portal shape."""
+        """App profile per brand with a fresh offset (Hyundai-Kia-Connect/kia_uvo#2054); Kia keeps the proven web-portal shape."""
+        if BRANDS[self.brand] == BRAND_GENESIS:
+            headers = dict(_CA_APP_HEADERS)
+            headers.update(_CA_APP_HEADERS_G)
+            headers["offset"] = _offset_from_tz()
+            return headers
         if BRANDS[self.brand] != BRAND_HYUNDAI:
             return {
                 "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
@@ -451,7 +463,9 @@ class KiaUvoApiCA(ApiImpl):
         """
         if token.device_id:
             self._device_id = token.device_id
-        if BRANDS[self.brand] != BRAND_HYUNDAI:
+        if BRANDS[self.brand] == BRAND_KIA:
+            # kiaconnect.ca rejects SPA-shaped v2/login (7404, measured); the app logs in via
+            # Kia-Account OAuth, so the portal profile mints through a full re-login (pre-#1496)
             return self.login(
                 username=token.username, password=token.password, pin=token.pin
             )

@@ -52,13 +52,16 @@ def test_kia_profile_is_legacy_portal() -> None:
     assert "brand" not in h
 
 
-def test_genesis_profile_is_legacy_portal() -> None:
+def test_genesis_profile_is_app_spa() -> None:
+    """Genesis CA app = stationdm.hca: SPA, brand G, own client keys (README apk_ca)."""
     h = KiaUvoApiCA(2, 3, "en").API_HEADERS
-    assert h["from"] == "CWP"
-    assert h["Origin"] == "https://genesisconnect.ca"
-    assert h["Referer"] == "https://genesisconnect.ca/login"
-    assert h["User-Agent"].startswith("Mozilla/5.0 (Linux; Android")
-    assert h["offset"] == "-5"
+    assert h["from"] == "SPA"
+    assert h["brand"] == "G"
+    assert h["client_id"] == "HATAGSPACA0232141ED9722C67715A0B"
+    assert h["client_secret"] == "CLISCR01AGSPA"
+    assert h["User-Agent"].startswith("okhttp/")
+    for dropped in ("Origin", "Referer", "Sec-Fetch-Site", "Accept"):
+        assert dropped not in h, dropped
 
 
 def test_offset_wired_from_tz(monkeypatch) -> None:
@@ -87,12 +90,32 @@ def test_refresh_relogs_in_for_kia_and_genesis(monkeypatch) -> None:
             calls.append((username, password, pin, self._device_id)) or fresh
         ),
     )
-    for brand in (1, 3):
-        calls.clear()
-        api = KiaUvoApiCA(2, brand, "en")
-        api._device_id = None
-        assert api.refresh_access_token(token) is fresh
-        assert calls == [("user@test.com", "pw", "1234", "PERSISTED")]
+    api = KiaUvoApiCA(2, 1, "en")
+    api._device_id = None
+    assert api.refresh_access_token(token) is fresh
+    assert calls == [("user@test.com", "pw", "1234", "PERSISTED")]
+
+
+def test_refresh_genesis_uses_gtothbyrftkn_like_hyundai(monkeypatch) -> None:
+    """Genesis app refreshes via gtothbyrftkn too (HCARemoteAPI:559)."""
+    from hyundai_kia_connect_api import KiaUvoApiCA as _mod
+
+    token = Token(
+        username="u", password="p", pin="1234", device_id="DEV", refresh_token="RT"
+    )
+    api = KiaUvoApiCA(2, 3, "en")
+    api._sessions = _HeaderCaptureSession()
+    calls = []
+    monkeypatch.setattr(
+        _mod.KiaUvoApiCA,
+        "login",
+        lambda self, **kw: (
+            calls.append(kw)
+            or (_ for _ in ()).throw(AssertionError("Genesis must not re-login"))
+        ),
+    )
+    api.refresh_access_token(token)
+    assert calls == []
 
 
 def test_refresh_hyundai_keeps_gtothbyrftkn() -> None:
