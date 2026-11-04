@@ -874,7 +874,9 @@ class MqttPushSession:
                             self._refresh_fn()
                         except Exception as token_ex:
                             _LOGGER.warning(
-                                f"{DOMAIN} - Push reconnect token refresh failed: {token_ex}"
+                                "%s - Push reconnect token refresh failed (%s)",
+                                DOMAIN,
+                                type(token_ex).__name__[:64],
                             )
                         if cancel_event.is_set() or not self._generation_active(
                             generation
@@ -894,7 +896,11 @@ class MqttPushSession:
                             _LOGGER.debug(f"{DOMAIN} - Push reconnected")
                             return
                     except Exception as ex:
-                        _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
+                        _LOGGER.warning(
+                            "%s - Push reconnect failed (%s)",
+                            DOMAIN,
+                            type(ex).__name__[:64],
+                        )
                     delay = min(delay * 2, const.MQTT_PUSH_RECONNECT_MAX_DELAY)
                 _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 

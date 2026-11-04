@@ -262,3 +262,39 @@ def test_reconnect_finishing_after_close_releases_reopened_http_pool(
     assert not workers[0].is_alive()
     reopened.close.assert_called_once()
     assert not owner.is_connected
+
+
+@pytest.mark.parametrize(
+    ("stage", "expected"),
+    [
+        ("refresh", "Push reconnect token refresh failed"),
+        ("registration", "Push reconnect failed"),
+    ],
+)
+def test_reconnect_errors_log_stage_and_type_without_private_message(
+    generic, monkeypatch, caplog, stage, expected
+):
+    owner, api, _ = generic
+    assert owner.ensure_started("synthetic")
+    monkeypatch.setattr(const, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0)
+    caplog.set_level("WARNING")
+    entered = Event()
+    workers = []
+
+    def fail(*_args):
+        workers.append(current_thread())
+        entered.set()
+        owner.close()
+        raise RuntimeError("PRIVATE_ACCOUNT_TOKEN_AND_RESPONSE")
+
+    if stage == "refresh":
+        owner._refresh_fn = fail
+    else:
+        api.get_push_broker_info.side_effect = fail
+    owner._on_push_disconnect("synthetic disconnect")
+    assert entered.wait(2)
+    workers[0].join(2)
+
+    assert not workers[0].is_alive()
+    assert expected + " (RuntimeError)" in caplog.text
+    assert "PRIVATE_ACCOUNT_TOKEN_AND_RESPONSE" not in caplog.text
