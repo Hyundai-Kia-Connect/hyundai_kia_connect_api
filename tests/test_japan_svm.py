@@ -299,3 +299,28 @@ def test_line_wrapped_base64_is_accepted_but_unknown_characters_are_rejected():
     response["scsDetail"]["svmImage"] += "\u200b"
     with pytest.raises(InvalidAPIResponseError, match="image is invalid"):
         parse_japan_svm(response, ZoneInfo("Asia/Tokyo"))
+
+
+def test_malformed_capture_timestamp_stays_a_sanitized_japan_error():
+    response = payload()
+    response["scsDetail"]["gpsDetail"]["time"] = "PRIVATE_INVALID_TIMESTAMP"
+    with pytest.raises(
+        InvalidAPIResponseError, match="Japan camera timestamp is invalid"
+    ) as error:
+        parse_japan_svm(response, ZoneInfo("Asia/Tokyo"))
+    assert "PRIVATE" not in str(error.value)
+
+
+@pytest.mark.parametrize("gps", [None, [], "invalid", {"coord": [], "speed": []}])
+def test_malformed_optional_gps_metadata_remains_unknown(gps):
+    response = payload()
+    response["scsDetail"]["gpsDetail"] = gps
+    details = parse_japan_svm(response, ZoneInfo("Asia/Tokyo"))
+    assert details.image_bytes == b"SYNTHETIC_IMAGE"
+    assert details.captured_at is None
+    assert details.captured_at_raw is None
+    assert details.latitude is None
+    assert details.longitude is None
+    assert details.heading is None
+    assert details.speed == (None, None)
+    assert details.raw_metadata["scsDetail"]["gpsDetail"] == gps

@@ -24,14 +24,11 @@ from .exceptions import (
 )
 from .svm import (
     SVMDetails,
-    _parse_bool,
-    _parse_door_open,
-    _parse_float_list,
     _parse_image_sizes,
-    redact_svm_metadata,
+    parse_scs_detail,
 )
 from .Token import Token
-from .utils import float_or_none, get_child_value, int_or_none, parse_datetime
+from .utils import get_child_value, parse_datetime
 from .Vehicle import Vehicle
 
 if TYPE_CHECKING:
@@ -79,23 +76,13 @@ def parse_japan_svm(payload: dict[str, Any], timezone: dt.tzinfo) -> SVMDetails:
         raise InvalidAPIResponseError(
             "Japan camera image dimensions are invalid"
         ) from None
-    return SVMDetails(
+    return parse_scs_detail(
+        detail,
         image_bytes=image,
         captured_at=captured_at,
         captured_at_raw=raw_time,
-        latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
-        longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
-        heading=int_or_none(get_child_value(detail, "gpsDetail.head")),
-        speed=(
-            float_or_none(get_child_value(detail, "gpsDetail.speed.value")),
-            get_child_value(detail, "gpsDetail.speed.unit"),
-        ),
-        door_open=_parse_door_open(detail.get("doorOpen")),
-        trunk_open=_parse_bool(detail.get("trunkOpen")),
-        image_size=size,
-        image_sizes=sizes,
-        valid_angle_of_view=_parse_float_list(detail.get("validAngleofView")),
-        raw_metadata=redact_svm_metadata(payload, gps=False),
+        image_dimensions=(size, sizes),
+        metadata=payload,
     )
 
 
