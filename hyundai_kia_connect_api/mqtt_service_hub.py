@@ -17,6 +17,15 @@ from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
+_SERVICE_HUB_STAGES = {
+    "/api/v3/servicehub/device/host": "broker discovery",
+    "/api/v3/servicehub/device/register": "client registration",
+    "/api/v3/servicehub/device/protocol": "vehicle registration",
+    "/api/v3/servicehub/vehicles/metadatalist": "vehicle metadata",
+    "/api/v3/servicehub/vehicleId": "vehicle identity",
+    "/api/v3/vstatus/connstate": "connection state",
+}
+
 TOPIC_PREFIX_VSS = "service/phone/_/vss/"
 TOPIC_PREFIX_CONNECTION = "service/phone/_/connection/"
 TOPIC_PREFIX_LOCATION = "service/phone/_/location/"
@@ -129,6 +138,10 @@ class ServiceHubProviderMixin:
         json: dict[str, Any] | None = None,
         allow_not_found: bool = False,
     ) -> dict[str, Any] | None:
+        # Only fixed route names are safe; arbitrary paths may contain identities.
+        endpoint = path if path in _SERVICE_HUB_STAGES else "<unknown>"
+        stage = _SERVICE_HUB_STAGES.get(path, "unknown stage")
+        safe_method = method if method in ("GET", "POST") else "OTHER"
         request_headers = self._get_service_hub_headers(token)
         if headers:
             request_headers.update(headers)
@@ -150,8 +163,11 @@ class ServiceHubProviderMixin:
             )
             if response.status_code != 200:
                 _LOGGER.warning(
-                    "%s - Service Hub request failed: HTTP %s",
+                    "%s - Service Hub %s %s (%s) failed: HTTP %s",
                     DOMAIN,
+                    safe_method,
+                    endpoint,
+                    stage,
                     response.status_code,
                 )
                 return None
@@ -165,9 +181,25 @@ class ServiceHubProviderMixin:
             ):
                 return {}
             data: dict[str, Any] = response.json()
-            return data if isinstance(data, dict) else None
-        except Exception:
-            _LOGGER.error("%s - Service Hub request failed", DOMAIN)
+            if not isinstance(data, dict):
+                _LOGGER.warning(
+                    "%s - Service Hub %s %s (%s) failed: invalid response object",
+                    DOMAIN,
+                    safe_method,
+                    endpoint,
+                    stage,
+                )
+                return None
+            return data
+        except Exception as error:
+            _LOGGER.error(
+                "%s - Service Hub %s %s (%s) failed: %s",
+                DOMAIN,
+                safe_method,
+                endpoint,
+                stage,
+                type(error).__name__[:64],
+            )
             return None
 
     def _service_hub_registration_headers(
