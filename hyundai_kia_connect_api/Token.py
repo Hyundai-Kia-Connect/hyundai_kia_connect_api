@@ -34,6 +34,8 @@ class Token:
     id_token: str | None = None
     # User ID for GSPA X-Stamp (uid claim from CCS JWT).
     user_id: str | None = None
+    # Broker-issued MQTT client id, distinct from the phone registration UUID.
+    mqtt_client_id: str | None = None
     # Japan's MQTT client registration uses the notification-registration UUID.
     mqtt_registration_uuid: str | None = None
 
@@ -72,5 +74,6 @@ class Token:
             non_ccs_refresh_token=data.get("non_ccs_refresh_token"),
             id_token=data.get("id_token"),
             user_id=data.get("user_id"),
+            mqtt_client_id=data.get("mqtt_client_id"),
             mqtt_registration_uuid=data.get("mqtt_registration_uuid"),
         )
