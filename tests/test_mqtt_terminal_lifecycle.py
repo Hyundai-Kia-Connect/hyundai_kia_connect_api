@@ -9,7 +9,7 @@ import pytest
 import requests
 
 from hyundai_kia_connect_api import const
-from hyundai_kia_connect_api.mqtt_service_hub_eu import MqttPushSession
+from hyundai_kia_connect_api.mqtt_push_session import MqttPushSession
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.test_mqtt_provider_lifecycle import Provider, session
@@ -50,7 +50,7 @@ def generic(monkeypatch):
         return client
 
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.mqtt_service_hub_eu.MqttTransport", factory
+        "hyundai_kia_connect_api.mqtt_push_session.MqttTransport", factory
     )
     owner = MqttPushSession(
         api=api,
@@ -148,7 +148,7 @@ def test_close_during_reconnect_token_refresh_never_registers_again(
 def test_close_during_transport_connect_disconnects_late_connection(
     generic, monkeypatch
 ):
-    from hyundai_kia_connect_api import mqtt_service_hub_eu as hub
+    from hyundai_kia_connect_api import mqtt_push_session as hub
 
     owner, _, transports = generic
     entered, release = Event(), Event()

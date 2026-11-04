@@ -52,7 +52,7 @@ from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
 from .KiaUvoApiUSA import KiaUvoApiUSA
-from .mqtt_service_hub_eu import MqttPushSession
+from .mqtt_push_session import MqttPushSession
 from .svm import SVMDetails
 from .Token import Token
 from .Vehicle import Vehicle
@@ -505,7 +505,7 @@ class VehicleManager:
 
     # Push glue — the VehicleManager stays the surface; the transport
     # lifecycle (broker registration, subscriptions, callbacks, reconnect)
-    # lives in MqttPushSession (mqtt_service_hub_eu).
+    # lives in MqttPushSession (mqtt_push_session).
 
     def _ensure_push_session(self) -> None:
         """Create the push session, wiring manager accessors into it."""

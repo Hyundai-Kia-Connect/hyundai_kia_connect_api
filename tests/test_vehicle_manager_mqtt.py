@@ -10,8 +10,8 @@ import pytest
 from hyundai_kia_connect_api import VehicleManager
 
 vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
-hub_module = sys.modules["hyundai_kia_connect_api.mqtt_service_hub_eu"]
-from hyundai_kia_connect_api.mqtt_service_hub_eu import CciPushMessage
+hub_module = sys.modules["hyundai_kia_connect_api.mqtt_push_session"]
+from hyundai_kia_connect_api.mqtt_service_hub import PushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -249,7 +249,7 @@ def test_message_unknown_vehicle_dropped():
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="unknown-mqtt-id",
@@ -266,7 +266,7 @@ def test_message_status_resolves_vehicle_id():
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="mqttv1",
@@ -296,7 +296,7 @@ def test_res_message_is_ignored_without_callback():
     vm = _make_vm()
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    msg = CciPushMessage(
+    msg = PushMessage(
         topic_group="DeviceRemote",
         topic_type="Res",
         vehicle_id="mqttv1",
@@ -476,7 +476,7 @@ def test_raw_delivery_of_parsed_message_dispatches():
     vm.vehicles["careu1"].mqtt_vehicle_id = "mqttv1"
     seen = []
     vm.set_push_status_callback(lambda vid, tt: seen.append((vid, tt)))
-    vm.api.parse_push_message = lambda topic, payload: CciPushMessage(  # type: ignore[assignment]
+    vm.api.parse_push_message = lambda topic, payload: PushMessage(  # type: ignore[assignment]
         topic_group="CarStatus",
         topic_type="Status",
         vehicle_id="mqttv1",
@@ -708,3 +708,13 @@ def test_set_push_callbacks_before_start_wire_session_later(monkeypatch):
     assert vm._push_session is not None
     assert vm._push_session._status_callback is None
     assert vm._push_session._connection_change_callback is None
+
+
+def test_session_module_imports_nothing_eu():
+    """The session is contract-only; the _eu module must not appear in its source (1332)."""
+    from pathlib import Path
+
+    import hyundai_kia_connect_api
+
+    src = Path(hyundai_kia_connect_api.mqtt_push_session.__file__).read_text()
+    assert "mqtt_service_hub_eu" not in src

@@ -220,7 +220,7 @@ class Vehicle:
     _valet_failed: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
-    # distinct from Token.mqtt_client_id (the broker-issued client id).
+    # distinct from Token.mqtt_client_id (the device-level registration id).
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
 
