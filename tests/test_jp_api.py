@@ -1496,3 +1496,24 @@ def test_force_refresh_accepts_newer_fractional_observation_in_same_second(
     assert vehicle.last_updated_at == now.replace(microsecond=584000)
     assert vehicle.total_driving_range == 321
     api.update_vehicle_with_cached_state.assert_not_called()
+
+
+def test_refresh_authentication_diagnostics_do_not_copy_exception_text(
+    api, monkeypatch
+):
+    secret = "SYNTHETIC_PRIVATE_AUTH_EXCEPTION"
+    monkeypatch.setattr(
+        api, "_control_headers", Mock(side_effect=AuthenticationError(secret))
+    )
+    with pytest.raises(AuthenticationError):
+        api.force_refresh_vehicle_state(
+            Token(username="synthetic", password="synthetic"),
+            Vehicle(id="synthetic", ccu_ccs2_protocol_support=1),
+        )
+    assert api.get_local_diagnostics()["last_refresh"] == {
+        "stage": "authentication",
+        "outcome": "failed",
+        "failure": "authentication",
+    }
+    assert secret not in repr(api.get_local_diagnostics())
+    api.session.request.assert_not_called()

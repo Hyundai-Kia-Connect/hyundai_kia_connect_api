@@ -486,6 +486,24 @@ def test_force_refresh_releases_only_its_own_session_use(
                 assert fleet._push_session._reconnect_cancel is None
             broker[0].disconnect.assert_not_called()
         assert helper.diagnostics["refresh_consumers"] == 0
+        refresh_diagnostics = fleet.api.get_local_diagnostics()["last_refresh"]
+        assert refresh_diagnostics["outcome"] == (
+            "success" if outcome == "success" else "failed"
+        )
+        assert (
+            refresh_diagnostics["stage"]
+            == {
+                "success": "complete",
+                "failed": "completion",
+                "timeout": "completion",
+                "request_error": "http_request",
+            }[outcome]
+        )
+        if outcome != "success":
+            assert refresh_diagnostics["failure"] == (
+                "api_error" if outcome == "failed" else "timeout"
+            )
+        assert "synthetic" not in repr(fleet.api.get_local_diagnostics())
     finally:
         fleet.stop_push()
         fleet.api.close()

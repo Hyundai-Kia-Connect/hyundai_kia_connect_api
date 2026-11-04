@@ -249,6 +249,9 @@ class JapanMqttSession(ServiceHubProviderMixin):
             0,
         )
         self._last_status = "not_started"
+        self._bootstrap_stage = "not_started"
+        self._bootstrap_failure = "none"
+        self._bootstrap_http_status: int | None = None
 
     @property
     def _service_hub_brand(self) -> str:
@@ -419,6 +422,10 @@ class JapanMqttSession(ServiceHubProviderMixin):
             "/api/v3/servicehub/vehicleId": "vehicle registration",
             "/api/v3/servicehub/device/protocol": "protocol registration",
         }.get(path, "bootstrap")
+        with self._condition:
+            self._bootstrap_stage = stage
+            self._bootstrap_failure = "none"
+            self._bootstrap_http_status = None
         request_headers = self._headers_factory()
         if headers:
             request_headers.update(headers)
@@ -432,15 +439,20 @@ class JapanMqttSession(ServiceHubProviderMixin):
             )
             with self._condition:
                 self._raise_if_closed()
+                self._bootstrap_http_status = response.status_code
             if response.status_code == 404 and allow_not_found:
                 return None
             if response.status_code in (401, 403):
+                self._bootstrap_failure = "authentication"
                 raise AuthenticationError("Japan MQTT authentication was rejected")
             if response.status_code == 429:
+                self._bootstrap_failure = "rate_limited"
                 raise RateLimitingError("Japan MQTT service rate limit reached")
             if response.status_code >= 500:
+                self._bootstrap_failure = "service_unavailable"
                 raise ServiceTemporaryUnavailable("Japan MQTT service is unavailable")
             if not 200 <= response.status_code < 300:
+                self._bootstrap_failure = "http_error"
                 raise APIError("Japan MQTT bootstrap request failed")
             # The app maps this response to an empty acknowledgement object
             # without parsing ResponseBody (widget/b.java, case 21). A 204 or
@@ -450,15 +462,19 @@ class JapanMqttSession(ServiceHubProviderMixin):
                 return {}
             result = response.json()
         except (requests.exceptions.Timeout, RequestTimeoutError):
+            self._bootstrap_failure = "timeout"
             raise RequestTimeoutError("Japan MQTT bootstrap timed out") from None
         except ValueError:
+            self._bootstrap_failure = "invalid_json"
             raise InvalidAPIResponseError(
                 f"Japan MQTT bootstrap returned invalid JSON "
                 f"({stage}; HTTP {response.status_code})"
             ) from None
         except requests.exceptions.RequestException:
+            self._bootstrap_failure = "connection_error"
             raise APIError("Japan MQTT bootstrap connection failed") from None
         if not isinstance(result, dict):
+            self._bootstrap_failure = "invalid_object"
             raise InvalidAPIResponseError(
                 f"Japan MQTT bootstrap returned an invalid object "
                 f"({stage}; HTTP {response.status_code})"
@@ -583,6 +599,7 @@ class JapanMqttSession(ServiceHubProviderMixin):
                 # session while a response was in flight. Publish/start the
                 # client under the same lock used by close().
                 self._raise_if_closed()
+                self._bootstrap_stage = "broker connection"
                 connection = self._transport_pool.acquire(self, host, port, client_id)
                 self._connection = connection
                 self._transport = connection.transport
@@ -591,10 +608,14 @@ class JapanMqttSession(ServiceHubProviderMixin):
                     lambda: self._ready or self._error is not None or self._closed,
                     self.CONNECT_TIMEOUT,
                 ):
+                    self._bootstrap_failure = "subscription_timeout"
                     raise RequestTimeoutError("Japan MQTT subscription timed out")
                 self._raise_if_closed()
                 self._raise_error()
+                self._bootstrap_stage = "subscribed"
         except Exception as err:
+            if self._bootstrap_failure == "none":
+                self._bootstrap_failure = "setup_error"
             self.close()
             if isinstance(
                 err,
@@ -632,6 +653,7 @@ class JapanMqttSession(ServiceHubProviderMixin):
                 return
             if self._transport is not None:
                 self._subscription_requested = True
+                self._bootstrap_stage = "subscription"
                 self._transport.subscribe(
                     list(self._topics),
                     qos=1,
@@ -664,6 +686,8 @@ class JapanMqttSession(ServiceHubProviderMixin):
         self._report_connection(True)
 
     def _on_subscribe_failure(self, reason: str) -> None:
+        with self._condition:
+            self._bootstrap_failure = "subscription_rejected"
         self._fail(
             {
                 "subscription failed": "Japan MQTT subscription failed",
@@ -846,6 +870,13 @@ class JapanMqttSession(ServiceHubProviderMixin):
             return {
                 **self._diagnostics,
                 "last_status": self._last_status,
+                "bootstrap_stage": self._bootstrap_stage,
+                "bootstrap_failure": self._bootstrap_failure,
+                **(
+                    {"bootstrap_http_status": self._bootstrap_http_status}
+                    if self._bootstrap_http_status is not None
+                    else {}
+                ),
                 "ready": self._ready,
                 "closed": self._closed,
                 "pending_state_updates": len(self._state_updates),

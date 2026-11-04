@@ -395,6 +395,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
             "svm_images_cached": len(getattr(self, "_japan_svm_cache", {})),
             "last_command": dict(getattr(self, "_japan_command_diagnostics", {})),
             "last_camera_capture": self.svm_diagnostics,
+            "last_refresh": dict(getattr(self, "_japan_refresh_diagnostics", {})),
             **(
                 {"passive_state": dict(self._passive_state_diagnostics)}
                 if hasattr(self, "_passive_state_diagnostics")
@@ -417,11 +418,36 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         """Wait for correlated completion and newer telemetry, never just an ACK."""
-        self._command_vehicle_id(vehicle)
-        headers = self._control_headers(token, vehicle)
-        helper = self._mqtt_for_vehicle(token, vehicle)
-        with helper.refresh_session():
-            self._force_refresh_with_session(token, vehicle, helper, headers)
+        self._japan_refresh_diagnostics: dict[str, Any] = {
+            "stage": "authentication",
+            "outcome": "pending",
+        }
+        try:
+            self._command_vehicle_id(vehicle)
+            headers = self._control_headers(token, vehicle)
+            self._japan_refresh_diagnostics["stage"] = "mqtt_setup"
+            helper = self._mqtt_for_vehicle(token, vehicle)
+            with helper.refresh_session():
+                self._force_refresh_with_session(token, vehicle, helper, headers)
+        except Exception as error:
+            category = next(
+                (
+                    name
+                    for kind, name in (
+                        (RequestTimeoutError, "timeout"),
+                        (AuthenticationError, "authentication"),
+                        (RateLimitingError, "rate_limited"),
+                        (ServiceTemporaryUnavailable, "service_unavailable"),
+                        (InvalidAPIResponseError, "invalid_response"),
+                        (APIError, "api_error"),
+                    )
+                    if isinstance(error, kind)
+                ),
+                "unexpected_error",
+            )
+            self._japan_refresh_diagnostics.update(outcome="failed", failure=category)
+            raise
+        self._japan_refresh_diagnostics.update(stage="complete", outcome="success")
 
     def _force_refresh_with_session(
         self,
@@ -437,6 +463,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         headers["Authorization"] = authorization
         deadline = time.monotonic() + self.FORCE_REFRESH_TIMEOUT
         started_at = dt.datetime.now(dt.UTC).replace(microsecond=0)
+        self._japan_refresh_diagnostics["stage"] = "http_request"
         result = self._request(
             "GET", f"/api/v2/spa/vehicles/{vehicle_id}/ccs2/carstatus", headers=headers
         )
@@ -446,6 +473,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 "Japan refresh tracking identifier is missing"
             )
         helper.track(action_id)
+        self._japan_refresh_diagnostics["stage"] = "completion"
         try:
             status = helper.status(
                 action_id, timeout=min(120, max(0, deadline - time.monotonic()))
@@ -454,6 +482,7 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 raise APIError("Japan vehicle refresh failed")
             if status != ORDER_STATUS.SUCCESS:
                 raise RequestTimeoutError("Japan vehicle refresh was not confirmed")
+            self._japan_refresh_diagnostics["stage"] = "telemetry"
             while time.monotonic() < deadline:
                 state = helper.latest_state
                 candidate = copy.deepcopy(vehicle)

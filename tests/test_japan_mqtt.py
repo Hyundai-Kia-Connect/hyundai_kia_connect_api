@@ -995,3 +995,70 @@ def test_connection_rejection_is_failed_after_prepare_closes_session(session):
         instance.prepare()
     assert instance.failed is True
     assert instance.closed is True
+
+
+@pytest.mark.parametrize(
+    "failure, category, status",
+    [
+        (401, "authentication", 401),
+        (429, "rate_limited", 429),
+        (503, "service_unavailable", 503),
+        (400, "http_error", 400),
+        ("timeout", "timeout", None),
+        ("connection", "connection_error", None),
+        ("json", "invalid_json", 200),
+        ("object", "invalid_object", 200),
+    ],
+)
+def test_bootstrap_diagnostics_keep_stage_and_safe_failure_without_payloads(
+    session, failure, category, status
+):
+    import requests
+
+    instance, client = session
+    secret = "SYNTHETIC_PRIVATE_RESPONSE_OR_EXCEPTION"
+    if failure == "timeout":
+        instance._http_session.request.side_effect = requests.Timeout(secret)
+    elif failure == "connection":
+        instance._http_session.request.side_effect = requests.ConnectionError(secret)
+    else:
+        result = response(secret if failure == "object" else {}, status or 200)
+        if failure == "json":
+            result.json.side_effect = ValueError(secret)
+        instance._http_session.request.side_effect = None
+        instance._http_session.request.return_value = result
+    with pytest.raises((APIError, AuthenticationError)):
+        instance.prepare()
+    summary = instance.diagnostics
+    assert summary["bootstrap_stage"] == "host discovery"
+    assert summary["bootstrap_failure"] == category
+    assert summary.get("bootstrap_http_status") == status
+    assert summary["closed"] is True
+    assert secret not in repr(summary)
+    assert "synthetic" not in repr(summary)
+    client.connect_async.assert_not_called()
+
+
+def test_bootstrap_diagnostics_identify_later_registration_stage(session):
+    instance, client = session
+    replies = iter(instance._http_session.request.side_effect)
+    instance._http_session.request.side_effect = [next(replies), response({}, 401)]
+    with pytest.raises(AuthenticationError):
+        instance.prepare()
+    assert instance.diagnostics["bootstrap_stage"] == "client registration"
+    assert instance.diagnostics["bootstrap_failure"] == "authentication"
+    assert instance.diagnostics["bootstrap_http_status"] == 401
+    client.connect_async.assert_not_called()
+
+
+def test_successful_bootstrap_reports_acknowledged_subscription_without_identity(
+    session,
+):
+    instance, _ = session
+    instance.prepare()
+    summary = instance.diagnostics
+    assert summary["bootstrap_stage"] == "subscribed"
+    assert summary["bootstrap_failure"] == "none"
+    assert summary["command_consumer"] is True
+    assert summary["refresh_consumers"] == 0
+    assert "synthetic" not in repr(summary)
