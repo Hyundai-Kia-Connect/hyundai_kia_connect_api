@@ -96,6 +96,8 @@ def _retry_on_device_id_error[F: Callable[..., Any]](func: F) -> F:
         try:
             return func(self, token, *args, **kwargs)
         except DeviceIDError:
+            if not getattr(self, "_retry_device_id_error", lambda: True)():
+                raise
             with _device_id_lock:
                 _LOGGER.debug(f"{DOMAIN} - DeviceIDError, re-registering device_id")
                 stamp = self._get_stamp()
@@ -268,15 +270,28 @@ class ApiImplType1(ApiImpl):
             "User-Agent": USER_AGENT_OK_HTTP,
         }
 
-    def _get_control_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
-        control_token, _ = self._get_control_token(token)
-        authenticated_headers = self._get_authenticated_headers(
-            token, vehicle.ccu_ccs2_protocol_support
+    def _control_token_for_vehicle(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> tuple[str, float]:
+        return self._get_control_token(token)
+
+    def _control_authenticated_headers(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> dict[str, Any]:
+        return self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support if vehicle is not None else None
         )
-        return authenticated_headers | {
-            "Authorization": control_token,
-            "AuthorizationCCSP": control_token,
-        }
+
+    def _control_token_headers(self, control_token: str) -> dict[str, str]:
+        return {"Authorization": control_token, "AuthorizationCCSP": control_token}
+
+    def _get_control_headers(
+        self, token: Token, vehicle: Vehicle | None = None
+    ) -> dict[str, Any]:
+        control_token, _ = self._control_token_for_vehicle(token, vehicle)
+        return self._control_authenticated_headers(
+            token, vehicle
+        ) | self._control_token_headers(control_token)
 
     def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         """Authenticated headers for the shared per-vehicle read helpers.
@@ -1336,53 +1351,68 @@ class ApiImplType1(ApiImpl):
 
         vehicle.data = state
 
-    @_retry_on_device_id_error
-    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
-        if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
+    def _retry_device_id_error(self) -> bool:
+        return True
 
-            payload = {"action": "start", "deviceId": token.device_id}
-            headers = self._get_authenticated_headers(
+    def _uses_ccs2_commands(self, vehicle: Vehicle) -> bool:
+        """Select the command schema independently of cached telemetry format."""
+        return bool(vehicle.ccu_ccs2_protocol_support)
+
+    def _send_vehicle_command(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        endpoint: str,
+        payload: dict[str, Any],
+        *,
+        ccs2: bool,
+    ) -> str:
+        """Submit a command and return its region-specific receipt identifier."""
+        base_url = self.SPA_API_URL_V2 if ccs2 else self.SPA_API_URL
+        url = (
+            base_url
+            + "vehicles/"
+            + vehicle.id
+            + "/"
+            + ("ccs2/" if ccs2 else "")
+            + endpoint
+        )
+        headers = (
+            self._get_control_headers(token, vehicle)
+            if ccs2
+            else self._get_authenticated_headers(
                 token, vehicle.ccu_ccs2_protocol_support
             )
-
-        else:
-            url = (
-                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
-            )
-
-            payload = {"command": "start"}
-            headers = self._get_control_headers(token, vehicle)
-
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Request: {payload}")
+        )
+        _LOGGER.debug("%s - %s Action Request: %s", DOMAIN, endpoint, payload)
         response = self.session.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Charge Action Response: {response}")
+        _LOGGER.debug("%s - %s Action Response: %s", DOMAIN, endpoint, response)
         _check_response_for_errors(response)
         return cast(str, response["msgId"])
+
+    @_retry_on_device_id_error
+    def start_charge(self, token: Token, vehicle: Vehicle) -> str:
+        ccs2 = self._uses_ccs2_commands(vehicle)
+        payload = (
+            {"command": "start"}
+            if ccs2
+            else {"action": "start", "deviceId": token.device_id}
+        )
+        return self._send_vehicle_command(
+            token, vehicle, "control/charge", payload, ccs2=ccs2
+        )
 
     @_retry_on_device_id_error
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
-        if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/charge"
-
-            payload = {"action": "stop", "deviceId": token.device_id}
-            headers = self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            )
-
-        else:
-            url = (
-                self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/charge"
-            )
-
-            payload = {"command": "stop"}
-            headers = self._get_control_headers(token, vehicle)
-
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Request: {payload}")
-        response = self.session.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Charge Action Response: {response}")
-        _check_response_for_errors(response)
-        return cast(str, response["msgId"])
+        ccs2 = self._uses_ccs2_commands(vehicle)
+        payload = (
+            {"command": "stop"}
+            if ccs2
+            else {"action": "stop", "deviceId": token.device_id}
+        )
+        return self._send_vehicle_command(
+            token, vehicle, "control/charge", payload, ccs2=ccs2
+        )
 
     @_retry_on_device_id_error
     def set_charging_current(self, token: Token, vehicle: Vehicle, level: int) -> str:
@@ -1460,26 +1490,15 @@ class ApiImplType1(ApiImpl):
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
     ) -> str:
-        if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/door"
-
-            payload = {"action": action.value, "deviceId": token.device_id}
-            headers = self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            )
-
-        else:
-            url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/door"
-
-            payload = {"command": action.value}
-            headers = self._get_control_headers(token, vehicle)
-
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Request: {payload}")
-
-        response = self.session.post(url, json=payload, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Lock Action Response: {response}")
-        _check_response_for_errors(response)
-        return cast(str, response["msgId"])
+        ccs2 = self._uses_ccs2_commands(vehicle)
+        payload = (
+            {"command": action.value}
+            if ccs2
+            else {"action": action.value, "deviceId": token.device_id}
+        )
+        return self._send_vehicle_command(
+            token, vehicle, "control/door", payload, ccs2=ccs2
+        )
 
     @_retry_on_device_id_error
     def check_action_status(
@@ -1886,60 +1905,27 @@ class ApiImplType1(ApiImpl):
 
     @_retry_on_device_id_error
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
-        if not vehicle.ccu_ccs2_protocol_support:
-            url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/control/temperature"
-            payload = {
+        ccs2 = self._uses_ccs2_commands(vehicle)
+        payload = (
+            {"command": "stop"}
+            if ccs2
+            else {
                 "action": "stop",
                 "hvacType": 0,
-                "options": {
-                    "defrost": True,
-                    "heating1": 1,
-                },
+                "options": {"defrost": True, "heating1": 1},
                 "tempCode": "10H",
                 "unit": "C",
             }
-            _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-            response = self.session.post(
-                url,
-                json=payload,
-                headers=self._get_authenticated_headers(
-                    token, vehicle.ccu_ccs2_protocol_support
-                ),
-            ).json()
-        else:
-            url = (
-                self.SPA_API_URL_V2
-                + "vehicles/"
-                + vehicle.id
-                + "/ccs2/control/temperature"
-            )
-            payload = {
-                "command": "stop",
-            }
-            _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Request: {payload}")
-            response = self.session.post(
-                url,
-                json=payload,
-                headers=self._get_control_headers(token, vehicle),
-            ).json()
-        _LOGGER.debug(f"{DOMAIN} - Stop Climate Action Response: {response}")
-        _check_response_for_errors(response)
-        return cast(str, response["msgId"])
+        )
+        return self._send_vehicle_command(
+            token, vehicle, "control/temperature", payload, ccs2=ccs2
+        )
 
     @_retry_on_device_id_error
     def start_hazard_lights(self, token: Token, vehicle: Vehicle) -> str:
-        url = self.SPA_API_URL_V2 + "vehicles/" + vehicle.id + "/ccs2/control/light"
-
-        payload = {"command": "on"}
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Request: {payload}")
-        response = self.session.post(
-            url,
-            json=payload,
-            headers=self._get_control_headers(token, vehicle),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - Start Hazard Lights Response: {response}")
-        _check_response_for_errors(response)
-        return cast(str, response["msgId"])
+        return self._send_vehicle_command(
+            token, vehicle, "control/light", {"command": "on"}, ccs2=True
+        )
 
     @_retry_on_device_id_error
     def start_hazard_lights_and_horn(self, token: Token, vehicle: Vehicle) -> str:
@@ -2065,11 +2051,17 @@ class ApiImplType1(ApiImpl):
                 )
         return self.login(token.username, token.password, token.pin)
 
-    def _get_control_token(self, token: Token) -> tuple[str, float]:
-        # Return cached control token if still valid
-        if token.control_token is not None and token.control_token_expiry > time.time():
-            return token.control_token, token.control_token_expiry
+    def _validate_control_token_request(self, token: Token) -> None:
+        pass
 
+    def _control_token_is_valid(self, token: Token) -> bool:
+        return (
+            token.control_token is not None and token.control_token_expiry > time.time()
+        )
+
+    def _request_control_token(
+        self, token: Token, vehicle: Vehicle | None
+    ) -> dict[str, Any]:
         url = self.USER_API_URL + "pin?token="
         headers = {
             "Authorization": token.access_token,
@@ -2078,21 +2070,38 @@ class ApiImplType1(ApiImpl):
             "Accept-Encoding": "gzip",
             "User-Agent": USER_AGENT_OK_HTTP,
         }
-
         data = {"deviceId": token.device_id, "pin": token.pin}
-        response = self.session.put(url, json=data, headers=headers)
-        response = response.json()
+        return cast(
+            dict[str, Any], self.session.put(url, json=data, headers=headers).json()
+        )
+
+    def _normalize_control_token_response(
+        self, response: dict[str, Any]
+    ) -> tuple[str, float]:
         if response.get("controlToken") is None:
             _LOGGER.debug(f"{DOMAIN} - Get Control Token Response {response}")
             raise APIError("PIN verification failed, ensure PIN is entered correctly.")
         control_token = "Bearer " + response["controlToken"]
-        control_token_expire_at = math.floor(
-            dt.datetime.now().timestamp() + response["expiresTime"]
+        expiry = math.floor(dt.datetime.now().timestamp() + response["expiresTime"])
+        return control_token, expiry
+
+    def _get_control_grant(
+        self, token: Token, vehicle: Vehicle | None = None
+    ) -> tuple[str, float]:
+        """Validate, reuse or renew a grant, then cache the normalized result."""
+        self._validate_control_token_request(token)
+        if self._control_token_is_valid(token):
+            assert token.control_token is not None
+            return token.control_token, token.control_token_expiry
+        control_token, expiry = self._normalize_control_token_response(
+            self._request_control_token(token, vehicle)
         )
-        # Cache control token and expiry for reuse
         token.control_token = control_token
-        token.control_token_expiry = control_token_expire_at
-        return control_token, control_token_expire_at
+        token.control_token_expiry = expiry
+        return control_token, expiry
+
+    def _get_control_token(self, token: Token) -> tuple[str, float]:
+        return self._get_control_grant(token)
 
     def _set_session_language(self, cookies: dict[str, Any]) -> None:
         # Set Language for Session #
@@ -2102,7 +2111,10 @@ class ApiImplType1(ApiImpl):
         _ = self.session.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_stamp(self) -> str:
-        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
+        return self._stamp_for_epoch(int(dt.datetime.now().timestamp()))
+
+    def _stamp_for_epoch(self, epoch: int) -> str:
+        raw_data = f"{self.APP_ID}:{epoch}".encode()
         result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
         return base64.b64encode(result).decode("utf-8")
 
