@@ -3,6 +3,7 @@
 import json
 
 import pytest
+import requests
 
 from hyundai_kia_connect_api.const import MQTT_PUSH_CONNECTION_STATE
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
@@ -797,3 +798,103 @@ def test_classify_empty_infix_between_prefix_and_slash():
     msg = parse_mqtt_message("device//", b"{}")
     assert msg.topic_group == "DeviceRemote"
     assert msg.vehicle_id == ""
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "stage"),
+    [
+        ("GET", "/api/v3/servicehub/device/host", "broker discovery"),
+        ("POST", "/api/v3/servicehub/device/register", "client registration"),
+        ("POST", "/api/v3/servicehub/device/protocol", "vehicle registration"),
+        ("GET", "/api/v3/servicehub/vehicles/metadatalist", "vehicle metadata"),
+        ("POST", "/api/v3/servicehub/vehicleId", "vehicle identity"),
+        ("GET", "/api/v3/vstatus/connstate", "connection state"),
+    ],
+)
+def test_service_hub_http_failure_identifies_stage_without_private_data(
+    caplog, method, path, stage
+):
+    secret = "SYNTHETIC_PRIVATE_AUTH_AND_IDENTITY"
+    api = _kia_api()
+    api._service_hub_session = _FakeSession(
+        [_FakeResponse(status_code=503, text=secret, headers={"tid": secret})]
+    )
+
+    assert (
+        api._service_hub_request(
+            _token(),
+            method,
+            path,
+            headers={"Authorization": secret},
+            params={"clientId": secret},
+            json={"carId": secret},
+        )
+        is None
+    )
+
+    assert f"{method} {path} ({stage}) failed: HTTP 503" in caplog.text
+    assert secret not in caplog.text
+
+
+@pytest.mark.parametrize("error_type", [requests.Timeout, requests.ConnectionError])
+def test_service_hub_transport_error_logs_class_without_private_message(
+    caplog, error_type
+):
+    secret = "SYNTHETIC_PRIVATE_AUTH_AND_IDENTITY"
+
+    class FailingSession:
+        def get(self, url, **kwargs):
+            raise error_type(f"{secret} {url}")
+
+    api = _kia_api()
+    api._service_hub_session = FailingSession()
+
+    assert api.get_push_connection_state(_token()) is None
+
+    assert "/api/v3/vstatus/connstate (connection state)" in caplog.text
+    assert error_type.__name__ in caplog.text
+    assert secret not in caplog.text
+    assert "clientId=" not in caplog.text
+
+
+def test_service_hub_bad_json_logs_class_without_private_document(caplog):
+    secret = "SYNTHETIC_PRIVATE_AUTH_AND_IDENTITY"
+
+    class BadResponse(_FakeResponse):
+        def json(self):
+            raise json.JSONDecodeError(secret, secret, 0)
+
+    api = _kia_api()
+    api._service_hub_session = _FakeSession([BadResponse()])
+
+    assert api.get_push_connection_state(_token()) is None
+
+    assert "JSONDecodeError" in caplog.text
+    assert "connection state" in caplog.text
+    assert secret not in caplog.text
+
+
+def test_service_hub_non_object_response_logs_failure_without_contents(caplog):
+    secret = "SYNTHETIC_PRIVATE_AUTH_AND_IDENTITY"
+    api = _kia_api()
+    api._service_hub_session = _FakeSession([_FakeResponse(json_data=[secret])])
+
+    assert api.get_push_connection_state(_token()) is None
+
+    assert "invalid response object" in caplog.text
+    assert "connection state" in caplog.text
+    assert secret not in caplog.text
+
+
+def test_service_hub_unknown_route_and_method_are_not_logged(caplog):
+    secret = "SYNTHETIC_PRIVATE_AUTH_AND_IDENTITY"
+    api = _kia_api()
+    api._service_hub_session = _FakeSession([_FakeResponse(status_code=503)])
+
+    assert (
+        api._service_hub_request(_token(), f"OTHER_{secret}", f"/private/{secret}")
+        is None
+    )
+
+    assert "OTHER <unknown> (unknown stage) failed: HTTP 503" in caplog.text
+    assert secret not in caplog.text
