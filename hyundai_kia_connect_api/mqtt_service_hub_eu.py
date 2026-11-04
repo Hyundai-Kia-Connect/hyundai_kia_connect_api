@@ -3,9 +3,10 @@
 
 ``MqttServiceHubMixin`` implements the ``ApiImpl`` push contract for the
 EU CCI/GPGA brand classes (``HyundaiCciApiEU`` and ``KiaCciApiEU`` both
-mix it in). It carries the Service Hub HTTP methods that configure and
-register the receive-only MQTT client, plus the Service Hub topic
-schema (constants, builders, parser).
+mix it in). It carries the Service Hub HTTP methods that configure and register
+the receive-only MQTT client, the capability mapping, and the EU-only
+DeviceRemote/OTA topic family (phone-family topics live in
+mqtt_service_hub.py).
 
 Endpoint wire shapes are live-probed; parsing is tolerant and shapes
 that could not be confirmed leave the corresponding ``Vehicle`` fields

@@ -130,7 +130,7 @@ class FakeTransport:
 
 
 def _connected_transport_factory(monkeypatch):
-    """Patch the module-level MqttTransport in VehicleManager with a
+    """Patch the module-level MqttTransport in mqtt_push_session with a
     connect-success FakeTransport."""
     FakeTransport.instances = []
 
