@@ -415,13 +415,15 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         """Release Japan MQTT and HTTP sessions on integration unload."""
         with self._mqtt_sessions_lock:
             if self._mqtt_closed:
-                return
-            self._mqtt_closed = True
-            helpers = [helper for _, helper in self._mqtt_sessions.values()]
-            self._mqtt_sessions.clear()
-            self._passive_state_observed_at.clear()
+                helpers = []
+            else:
+                self._mqtt_closed = True
+                helpers = [helper for _, helper in self._mqtt_sessions.values()]
+                self._mqtt_sessions.clear()
+                self._passive_state_observed_at.clear()
         for helper in helpers:
             helper.close()
+        # Finishing background work can recreate a pool after the first close.
         self.session.close()
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:

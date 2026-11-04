@@ -1456,6 +1456,24 @@ def test_api_close_releases_lock_before_callbacks_and_prevents_resurrection(
     assert api._mqtt_sessions == {}
 
 
+def test_repeated_close_releases_http_pools_recreated_by_finishing_work(api):
+    import requests
+
+    api.session = requests.Session()
+    helper = Mock()
+    api._mqtt_sessions = {"synthetic": ((), helper)}
+    api.close()
+    adapter = api.session.get_adapter("https://")
+    adapter.poolmanager.connection_from_url("https://example.invalid")
+    assert len(adapter.poolmanager.pools) == 1
+
+    api.close()
+
+    assert len(adapter.poolmanager.pools) == 0
+    helper.close.assert_called_once_with()
+    assert api._mqtt_sessions == {}
+
+
 def test_force_refresh_accepts_newer_fractional_observation_in_same_second(
     api, monkeypatch
 ):
