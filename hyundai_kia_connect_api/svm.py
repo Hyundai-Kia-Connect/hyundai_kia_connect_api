@@ -1,8 +1,7 @@
 """SVM shared data model and helpers (region-agnostic).
 
-Region-specific response parsing lives in the region API classes
-(HyundaiBlueLinkApiUSA, and the EU GSPA implementation later); this module
-holds only what works for all regions.
+Region classes validate transport, image decoding and timestamps; shared
+scsDetail metadata mapping lives here.
 """
 
 from __future__ import annotations
@@ -11,7 +10,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from .utils import float_or_none, int_or_none
+from .utils import float_or_none, get_child_value, int_or_none
 
 # Keys redacted wherever they appear in an SVM payload. "coord" covers
 # lat/lon/alt for every region's response shape.
@@ -100,6 +99,40 @@ class SVMDetails:
     # on some regions, None when absent or malformed.
     valid_angle_of_view: tuple[float, ...] | None = None
     raw_metadata: dict[str, Any] | None = None
+
+
+def parse_scs_detail(
+    detail: dict[str, Any],
+    *,
+    image_bytes: bytes,
+    captured_at: dt.datetime | None,
+    captured_at_raw: str | None,
+    image_dimensions: tuple[tuple[int, int] | None, tuple[int, ...] | None],
+    metadata: dict[str, Any],
+) -> SVMDetails:
+    """Map common camera metadata after region-specific image/time validation.
+
+    ``metadata`` retains the region's response envelope, with its image redacted.
+    Dimension parsing stays with callers so their validation errors are preserved.
+    """
+    return SVMDetails(
+        image_bytes=image_bytes,
+        captured_at=captured_at,
+        captured_at_raw=captured_at_raw,
+        latitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lat")),
+        longitude=float_or_none(get_child_value(detail, "gpsDetail.coord.lon")),
+        heading=int_or_none(get_child_value(detail, "gpsDetail.head")),
+        speed=(
+            float_or_none(get_child_value(detail, "gpsDetail.speed.value")),
+            get_child_value(detail, "gpsDetail.speed.unit"),
+        ),
+        door_open=_parse_door_open(detail.get("doorOpen")),
+        trunk_open=_parse_bool(detail.get("trunkOpen")),
+        image_size=image_dimensions[0],
+        image_sizes=image_dimensions[1],
+        valid_angle_of_view=_parse_float_list(detail.get("validAngleofView")),
+        raw_metadata=redact_svm_metadata(metadata, gps=False),
+    )
 
 
 def redact_svm_metadata(data: dict[str, Any], *, gps: bool = True) -> dict[str, Any]:

@@ -76,10 +76,8 @@ from .exceptions import (
 from .gspa import create_tsid
 from .svm import (
     SVMDetails,
-    _parse_bool,
-    _parse_door_open,
-    _parse_float_list,
     _parse_image_sizes,
+    parse_scs_detail,
     redact_svm_metadata,
 )
 from .Token import Token
@@ -184,12 +182,6 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     gps = detail.get("gpsDetail")
     if not isinstance(gps, dict):
         gps = {}
-    speed = gps.get("speed")
-    if not isinstance(speed, dict):
-        speed = {}
-    coord = gps.get("coord")
-    if not isinstance(coord, dict):
-        coord = {}
 
     image_b64 = detail.get("svmImage") or ""
     try:
@@ -200,22 +192,13 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     image_size, image_sizes = _parse_image_sizes(detail.get("imageSize"))
 
     captured_at_raw = gps.get("time")
-    return SVMDetails(
+    return parse_scs_detail(
+        detail,
         image_bytes=image_bytes,
         captured_at=_parse_gspa_svm_timestamp(captured_at_raw),
         captured_at_raw=captured_at_raw if isinstance(captured_at_raw, str) else None,
-        latitude=float_or_none(coord.get("lat")),
-        longitude=float_or_none(coord.get("lon")),
-        heading=int_or_none(gps.get("head")),
-        speed=(float_or_none(speed.get("value")), speed.get("unit")),
-        door_open=_parse_door_open(detail.get("doorOpen")),
-        trunk_open=_parse_bool(detail.get("trunkOpen")),
-        image_size=image_size,
-        image_sizes=image_sizes,
-        valid_angle_of_view=_parse_float_list(detail.get("validAngleofView")),
-        # Coordinates are deliberately preserved here (gps=False): the typed
-        # fields above already carry them, advanced consumers get the rest.
-        raw_metadata=redact_svm_metadata(detail, gps=False),
+        image_dimensions=(image_size, image_sizes),
+        metadata=detail,
     )
 
 
