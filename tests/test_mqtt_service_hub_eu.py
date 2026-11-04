@@ -7,14 +7,13 @@ import pytest
 from hyundai_kia_connect_api.const import MQTT_PUSH_CONNECTION_STATE
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
+from hyundai_kia_connect_api.mqtt_service_hub import (
+    TOPIC_PREFIX_LOCATION,
+)
 from hyundai_kia_connect_api.mqtt_service_hub_eu import (
     POSTFIX_OTA_PROGRESS,
     POSTFIX_OTA_SCHEDULEUPDATE,
-    TOPIC_PREFIX_CONNECTION,
     TOPIC_PREFIX_DEVICE,
-    TOPIC_PREFIX_LOCATION,
-    TOPIC_PREFIX_VSS,
-    build_car_status_topics,
     build_device_remote_topics,
     build_ota_topics,
     parse_mqtt_message,
@@ -52,26 +51,6 @@ class _FakeSession:
 
 def _metadata_response(vehicle_payload: dict) -> _FakeResponse:
     return _FakeResponse(json_data={"vehicles": [vehicle_payload]})
-
-
-# ---------------------------------------------------------------------------
-# Topic builders
-# ---------------------------------------------------------------------------
-
-
-class TestBuildCarStatusTopics:
-    def test_base(self):
-        topics = build_car_status_topics("v1")
-        # Res topic excluded — broker rejects rc=128
-        assert topics == [
-            TOPIC_PREFIX_VSS + "v1",
-            TOPIC_PREFIX_CONNECTION + "v1",
-        ]
-
-    def test_location_topic_not_subscribed(self):
-        """The location topic has no confirmed metadata protocol yet."""
-        topics = build_car_status_topics("v1")
-        assert not any(TOPIC_PREFIX_LOCATION in t for t in topics)
 
 
 class TestBuildDeviceRemoteTopics:

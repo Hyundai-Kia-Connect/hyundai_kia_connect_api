@@ -14,14 +14,12 @@ unknown (``None``).
 
 from __future__ import annotations
 
-import json
 import logging
 import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote
 
 import requests
 
@@ -35,6 +33,17 @@ from .const import (
 )
 from .GspaApiEU import USER_AGENT_OK_HTTP
 from .mqtt_client import MqttTransport
+from .mqtt_service_hub import (
+    MQTT_PROTOCOL_ID_CCU_UPDATE,
+    MQTT_PROTOCOL_ID_CONNECTION,
+    MQTT_PROTOCOL_ID_RES,
+    MQTT_PROTOCOL_ID_VSS,
+    _extract_infix,
+    build_car_status_topics,
+    build_service_hub_url_with_params,
+    classify_phone_topic,
+    decode_payload,
+)
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -355,21 +364,8 @@ class MqttServiceHubMixin:
     def _service_hub_get_url_with_params(
         self, path: str, params: dict[str, Any]
     ) -> str:
-        """Build a Service Hub URL with query params (app-confirmed encoding).
-
-        The server validates parameter values exactly as sent
-        (live-probed): '@' is preserved, not percent-encoded.
-        """
         base = self._get_service_hub_url()
-        full_url = base + path
-        if not params:
-            return full_url
-        safe_chars = "-_.~!$'()*,;=:@/?"
-        parts = [
-            f"{quote(str(k), safe=safe_chars)}={quote(str(v), safe=safe_chars)}"
-            for k, v in params.items()
-        ]
-        return f"{full_url}?{'&'.join(parts)}"
+        return build_service_hub_url_with_params(base, path, params)
 
     def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
         """Broker credentials for the MQTT connect.
@@ -578,9 +574,6 @@ def _apply_vehicle_capabilities(entries: Any, vehicle: Vehicle) -> None:
 # Topic prefixes (prefix + infix + postfix = full topic)
 TOPIC_PREFIX_VEHICLE = "vehicle/"  # CarOta (mqtt vehicle id infix)
 TOPIC_PREFIX_DEVICE = "device/"  # DeviceRemote (client id infix)
-TOPIC_PREFIX_VSS = "service/phone/_/vss/"  # CarStatus.Status
-TOPIC_PREFIX_CONNECTION = "service/phone/_/connection/"  # CarStatus.Connect
-TOPIC_PREFIX_LOCATION = "service/phone/_/location/"  # CarStatus.Location
 TOPIC_PREFIX_DEVICE_RES = "$/device/res/"  # DeviceRemote.Res
 
 # Topic postfixes
@@ -593,9 +586,6 @@ POSTFIX_OTA_PROGRESS = "/_/ota/otaprogress"
 POSTFIX_OTA_SCHEDULEUPDATE = "/_/ota/scheduleupdate"
 
 # Protocol IDs — sent as plain strings in the Service Hub body
-MQTT_PROTOCOL_ID_VSS = "service.phone.vss"
-MQTT_PROTOCOL_ID_CONNECTION = "service.phone.connection"
-MQTT_PROTOCOL_ID_RES = "service.phone.res"
 # Vehicle RC protocols (CarRemote topics use the vehicle/ prefix)
 MQTT_PROTOCOL_ID_RC_CONNECT = "vehicle.remotecontroller.connect"
 MQTT_PROTOCOL_ID_RC_COMMAND = "vehicle.remotecontroller.command"
@@ -608,7 +598,6 @@ MQTT_PROTOCOL_ID_DEVICE_RC_COMMAND = "device.remotecontroller.command"
 MQTT_PROTOCOL_ID_DEVICE_RC_CONNECTCHECK = "device.remotecontroller.connectcheck"
 MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_MOBILE = "device.remotecontroller.mobileclose"
 MQTT_PROTOCOL_ID_DEVICE_RC_CLOSE_CAR = "device.remotecontroller.vehicleclose"
-MQTT_PROTOCOL_ID_CCU_UPDATE = "statesync.vehicle.ccu.update"
 
 
 @dataclass
@@ -633,20 +622,8 @@ class CciPushMessage:
 
 
 # ---------------------------------------------------------------------------
-# Topic builders
+# Topic builders (DeviceRemote / OTA families — EU-only schemas)
 # ---------------------------------------------------------------------------
-
-
-def build_car_status_topics(vehicle_id: str) -> list[str]:
-    """Build CarStatus topics for a vehicle.
-
-    The res topic is excluded — the broker rejects phone-client
-    subscriptions to it with rc=128.
-    """
-    return [
-        TOPIC_PREFIX_VSS + vehicle_id,
-        TOPIC_PREFIX_CONNECTION + vehicle_id,
-    ]
 
 
 def build_device_remote_topics(client_id: str) -> list[str]:
@@ -683,33 +660,26 @@ def build_ota_topics(vehicle: Vehicle) -> list[str]:
 
 
 def parse_mqtt_message(topic: str, payload: bytes) -> MqttMessage:
-    """Parse an MQTT message into a structured MqttMessage.
+    """Parse an MQTT message into a structured MqttMessage (schema-internal).
 
-    Classifies the topic (group, type, infix), parses the JSON payload
-    (raw hex fallback for non-JSON payloads).
+    Phone-family topics classify via the neutral module; device/vehicle
+    topics via the local branches. decode_payload covers both.
     """
     topic_group, topic_type, vehicle_id = _classify_topic(topic)
-    try:
-        data = json.loads(payload.decode("utf-8"))
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        data = {"raw": payload.hex()}
     return MqttMessage(
         topic_group=topic_group,
         topic_type=topic_type,
         vehicle_id=vehicle_id,
-        payload=data,
+        payload=decode_payload(payload),
     )
 
 
 def _classify_topic(topic: str) -> tuple[str, str, str]:
     """Classify a topic string into (group, type, infix)."""
-    # CarStatus topics (service/phone/_/ prefix)
-    if topic.startswith(TOPIC_PREFIX_VSS):
-        return ("CarStatus", "Status", _extract_infix(topic, TOPIC_PREFIX_VSS))
-    if topic.startswith(TOPIC_PREFIX_CONNECTION):
-        return ("CarStatus", "Connect", _extract_infix(topic, TOPIC_PREFIX_CONNECTION))
-    if topic.startswith(TOPIC_PREFIX_LOCATION):
-        return ("CarStatus", "Location", _extract_infix(topic, TOPIC_PREFIX_LOCATION))
+    # Phone family (service/phone/_/ prefix) — neutral contract
+    phone = classify_phone_topic(topic)
+    if phone is not None:
+        return phone
 
     # DeviceRemote.Res (special $/device/res/ prefix)
     if topic.startswith(TOPIC_PREFIX_DEVICE_RES):
@@ -746,21 +716,6 @@ def _classify_topic(topic: str) -> tuple[str, str, str]:
         return ("CarOta", "Unknown", infix)
 
     return ("Unknown", "Unknown", "")
-
-
-def _extract_infix(topic: str, prefix: str) -> str:
-    """Extract the vehicle/client id infix from a topic after the prefix.
-
-    The infix is the segment between the prefix and the next '/' (or the
-    whole remainder for a trailing-slash topic).
-    """
-    after_prefix = topic[len(prefix) :]
-    slash_pos = after_prefix.find("/")
-    if slash_pos > 0:
-        return after_prefix[:slash_pos]
-    if after_prefix.endswith("/"):
-        return after_prefix[:-1]
-    return after_prefix
 
 
 class MqttPushSession:
