@@ -497,6 +497,7 @@ class MqttPushSession:
         self._provider_lock = threading.RLock()
         self._providers: dict[str, Any] = {}
         self._provider_generation = 0
+        self._subscribed_vehicle_ids: set[str] = set()
 
     @property
     def is_connected(self) -> bool:
@@ -660,11 +661,15 @@ class MqttPushSession:
 
         Local computation only — no HTTP; a failure here is a bug.
         """
-        assert self._client is not None
-        vehicle = self._get_vehicle(vehicle_id)
-        topics = self._api.get_push_topics(self._get_token(), vehicle)
-        if topics:
-            self._client.subscribe(topics)
+        with self._provider_lock:
+            if vehicle_id in self._subscribed_vehicle_ids:
+                return
+            assert self._client is not None
+            vehicle = self._get_vehicle(vehicle_id)
+            topics = self._api.get_push_topics(self._get_token(), vehicle)
+            if topics:
+                self._client.subscribe(topics)
+                self._subscribed_vehicle_ids.add(vehicle_id)
 
     def _on_push_connect(self) -> None:
         """Subscribe topics for each started push vehicle on (re)connect."""
@@ -726,6 +731,7 @@ class MqttPushSession:
             providers = list(self._providers.values())
             self._providers.clear()
             self._vehicle_ids.clear()
+            self._subscribed_vehicle_ids.clear()
         for provider in providers:
             provider.stop_push()
         if self._reconnect_cancel:
@@ -746,6 +752,8 @@ class MqttPushSession:
         retried (that is stop()).
         """
         _LOGGER.debug(f"{DOMAIN} - Push disconnected: {reason}")
+        with self._provider_lock:
+            self._subscribed_vehicle_ids.clear()
         if reason == "clean disconnect":
             return
         if not self._vehicle_ids:

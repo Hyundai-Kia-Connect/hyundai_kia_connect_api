@@ -99,3 +99,41 @@ def test_old_generation_callback_cannot_observe_restarted_same_provider():
     provider.status("synthetic-car", "Status")
     changed.assert_called_once_with("synthetic-car", "Status")
     owner.stop()
+
+
+def test_legacy_eager_connect_callback_subscribes_exactly_once(monkeypatch):
+    client = SimpleNamespace(is_connected=False, subscribe=Mock(), disconnect=Mock())
+
+    def factory(**callbacks):
+        def connect():
+            client.is_connected = True
+            callbacks["on_connect"]()
+
+        client.connect = connect
+        client.configure = Mock()
+        return client
+
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.mqtt_service_hub_eu.MqttTransport", factory
+    )
+    vehicle = Vehicle(id="synthetic-car", mqtt_vehicle_id="synthetic-topic-car")
+    api = SimpleNamespace(
+        get_push_broker_info=lambda token: {"mqtt_host": "synthetic.example"},
+        register_push_client=lambda token: {"client_id": "synthetic-client"},
+        get_push_credentials=lambda token: ("synthetic-client", "synthetic-password"),
+        get_push_vehicle_identity=lambda token, car: {
+            "mqtt_vehicle_id": car.mqtt_vehicle_id
+        },
+        register_push_vehicle=lambda token, car: {},
+        get_push_topics=lambda token, car: ["synthetic/topic"],
+    )
+    owner = MqttPushSession(
+        api=api,
+        token_fn=lambda: Token(username="synthetic", password="synthetic"),
+        refresh_fn=Mock(),
+        get_vehicle=lambda vehicle_id: vehicle,
+        vehicles=lambda: {vehicle.id: vehicle},
+    )
+    assert owner.ensure_started(vehicle.id)
+    client.subscribe.assert_called_once_with(["synthetic/topic"])
+    owner.stop()
