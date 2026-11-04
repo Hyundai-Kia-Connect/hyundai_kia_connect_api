@@ -86,6 +86,19 @@ SUPPORTED_LANGUAGES_LIST = [
 ]
 
 
+def parse_profile_climate_duration(vehicle: Vehicle, profile: dict[str, Any]) -> None:
+    """Set ``vehicle.supports.climate_duration_setting`` from a profile payload.
+
+    The app reads the duration picker gate from ``clmtCtrlOption == 1``;
+    an absent key means unsupported, exactly as the app's ``== 1`` check.
+    """
+    entries = profile.get("vinInfo") if isinstance(profile, dict) else None
+    option = entries[0].get("option", {}) if entries else {}
+    if not isinstance(option, dict):
+        return  # unexpected shape — leave the flag unknown
+    vehicle.supports.climate_duration_setting = option.get("clmtCtrlOption") == 1
+
+
 class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
     data_timezone = ZoneInfo("Europe/Berlin")
     temperature_range = tuple(x * 0.5 for x in range(28, 64))
@@ -542,6 +555,36 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+        if not vehicle._profile_checked:
+            vehicle._profile_checked = True
+            try:
+                profile = self.get_vehicle_profile(token, vehicle)
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - vehicle profile failed")
+            else:
+                if profile is not None:
+                    parse_profile_climate_duration(vehicle, profile)
+
+    def get_vehicle_profile(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Legacy-SPA vehicle profile — the only source of clmtCtrlOption."""
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/profile"
+        response = self.session.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        if response.status_code != 200:
+            _LOGGER.debug(
+                f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
+            )
+            return None
+        data = response.json()
+        _check_response_for_errors(data)
+        return cast(dict[str, Any] | None, data.get("resMsg"))
 
     @_retry_on_device_id_error
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:

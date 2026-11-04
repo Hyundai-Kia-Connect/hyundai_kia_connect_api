@@ -3,10 +3,12 @@
         "status": "captured in kia_uvo discussion #1909; eu_hyundai_gspa_ioniq_electric_2022_stored_status",
         "follow_up_sources": "none",
         "not_captured": [
-            "gspa driving-info/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa driving-history/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa device-info/vehicles/{carId}/software-version (no capture — answered 503; the update path logs and continues)",
-            "gspa mru/vehicles/{carId}/ota-updates (no capture — answered 503; the update path logs and continues)"
+            "gspa driving-info/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa driving-history/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa device-info/vehicles/{carId}/software-version (no capture \u2014 answered 503; the update path logs and continues)",
+            "gspa mru/vehicles/{carId}/ota-updates (no capture \u2014 answered 503; the update path logs and continues)",
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "legacy-SPA notifications/register (deviceId envelope rebuilt from the legacy parser shape)"
         ],
         "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Hyundai Ioniq Electric 2022, ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (ronnicek 29.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (ronnicek 29.10)"
@@ -311,6 +313,20 @@
         "GET /gspa/v1/mru/vehicles/VEHICLE-1/ota-updates": {
             "status": 503,
             "body": null
+        },
+        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
+            "status": 503,
+            "body": null
+        },
+        "POST /api/v1/spa/notifications/register": {
+            "status": 200,
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "deviceId": "spa-device-0001"
+                }
+            }
         }
     }
 }

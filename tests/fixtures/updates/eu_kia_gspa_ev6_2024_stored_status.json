@@ -2,8 +2,11 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_gspa_ev6_2024_stored_status.json (Kia EV6 2024)",
         "follow_up_sources": "none",
-        "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. Location.GeoCoord is overridden with synthetic coordinates to reflect the real EV6 payload — the base fixture redacts it wholesale, and without a location the cached update would take the location stored-status fallback read."
+        "not_captured": [
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "legacy-SPA notifications/register (deviceId envelope rebuilt from the legacy parser shape)"
+        ],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. Location.GeoCoord is overridden with synthetic coordinates to reflect the real EV6 payload \u2014 the base fixture redacts it wholesale, and without a location the cached update would take the location stored-status fallback read."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -42,6 +45,20 @@
                 "metaInfo": {
                     "retCode": "S",
                     "resCode": "200-000"
+                }
+            }
+        },
+        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
+            "status": 503,
+            "body": null
+        },
+        "POST /api/v1/spa/notifications/register": {
+            "status": 200,
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "deviceId": "spa-device-0001"
                 }
             }
         }

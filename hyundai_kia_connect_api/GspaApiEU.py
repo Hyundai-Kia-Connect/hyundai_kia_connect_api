@@ -18,7 +18,7 @@ import logging
 import re
 import uuid
 from time import sleep, time
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -32,7 +32,9 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     WindowRequestOptions,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .cci_auth import CciAuthMixin
+from .KiaUvoApiEU import parse_profile_climate_duration
 
 if TYPE_CHECKING:
     from .gspa.cipher_keys import GspaCipher
@@ -41,6 +43,8 @@ from .cci_fingerprint import (
     is_gate_rejection,
 )
 from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
     BRANDS,
     CHARGE_PORT_ACTION,
     CONNECTOR_FASTENING_STATE,
@@ -122,6 +126,31 @@ SUPPORTED_LANGUAGES_LIST = [
     "fi",
     "pt",
 ]
+
+# Legacy-SPA (prd.eu-ccapi.*) profile-read parameters per brand:
+# (ccsp-service-id, app-id, CFB stamp key, push type, base url with port).
+# Same values KiaUvoApiEU derives in __init__; used by get_vehicle_profile,
+# whose token/headers must be legacy not CCI (Hyundai-Kia-Connect/kia_uvo#2063).
+LEGACY_PROFILE_APPS: dict[str, tuple[str, str, bytes, str, str]] = {
+    BRAND_KIA: (
+        "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a",
+        "a2b8469b-30a3-4361-8e13-6fceea8fbe74",
+        base64.b64decode(
+            "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+        ),
+        "APNS",
+        "prd.eu-ccapi.kia.com:8080",
+    ),
+    BRAND_HYUNDAI: (
+        "6d477c38-3ca4-4cf3-9557-2a1929a94654",
+        "014d2225-8495-4735-812d-2616334fd15d",
+        base64.b64decode(
+            "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+        ),
+        "GCM",
+        "prd.eu-ccapi.hyundai.com:8080",
+    ),
+}
 
 
 def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
@@ -341,6 +370,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # requests.Session keeping cookies across the Service Hub calls.
         self._service_hub_tid: str | None = None
         self._service_hub_session: requests.Session | None = None
+
+        # Legacy-SPA device id (registered on prd.eu-ccapi.*), needed by
+        # get_vehicle_profile; the CCI uuid is unknown to ccapi:8080.
+        self._legacy_spa_device_id: str = ""
 
         self.session = ApiImplSession()
 
@@ -1498,6 +1531,95 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # stored-status endpoint is the only location source (#1331).
         if get_child_value(state, "Location.GeoCoord.Latitude") is None:
             self._update_vehicle_gspa_location(token, vehicle)
+        if not vehicle._profile_checked:
+            vehicle._profile_checked = True
+            try:
+                profile = self.get_vehicle_profile(token, vehicle)
+            except Exception:
+                _LOGGER.debug(f"{DOMAIN} - vehicle profile failed")
+            else:
+                if profile is not None:
+                    parse_profile_climate_duration(vehicle, profile)
+
+    def get_vehicle_profile(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Legacy-SPA vehicle profile — the only source of clmtCtrlOption.
+
+        Served with a legacy-SPA device id (registered lazily on
+        prd.eu-ccapi.*, see LEGACY_PROFILE_APPS) and the CCS token, which
+        ccapi:8080 accepts after the exchange in the CCI login chain.
+        """
+        params = LEGACY_PROFILE_APPS.get(BRANDS[self.brand])
+        if params is None:
+            return None
+        response = self.session.get(
+            "https://" + params[4] + "/api/v1/spa/vehicles/" + vehicle.id + "/profile",
+            headers=self._get_legacy_profile_headers(token, vehicle, params),
+        )
+        if response.status_code != 200:
+            _LOGGER.debug(
+                f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
+            )
+            return None
+        data = response.json()
+        _check_response_for_errors(data)
+        return cast(dict[str, Any] | None, data.get("resMsg"))
+
+    def _get_legacy_profile_headers(
+        self, token: Token, vehicle: Vehicle, params: tuple[str, str, bytes, str, str]
+    ) -> dict[str, Any]:
+        legacy_service_id, legacy_app_id, cfb, push_type, host = params
+        return {
+            "Authorization": token.access_token,
+            "ccsp-service-id": legacy_service_id,
+            "ccsp-application-id": legacy_app_id,
+            "Stamp": self._legacy_stamp(cfb, legacy_app_id),
+            "ccsp-device-id": self._get_legacy_spa_device_id(push_type),
+            "Host": host,
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": str(vehicle.ccu_ccs2_protocol_support or 0),
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+    @staticmethod
+    def _legacy_stamp(cfb: bytes, app_id: str) -> str:
+        result = bytes(
+            a ^ b
+            for a, b in zip(
+                cfb, f"{app_id}:{int(dt.datetime.now().timestamp())}".encode()
+            )
+        )
+        return base64.b64encode(result).decode()
+
+    def _get_legacy_spa_device_id(self, push_type: str) -> str:
+        if not self._legacy_spa_device_id:
+            params = LEGACY_PROFILE_APPS[BRANDS[self.brand]]
+            host = params[4]
+            response = self.session.post(
+                "https://" + host + "/api/v1/spa/notifications/register",
+                headers={
+                    "ccsp-service-id": params[0],
+                    "ccsp-application-id": params[1],
+                    "Stamp": self._legacy_stamp(params[2], params[1]),
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "Host": host,
+                    "Connection": "Keep-Alive",
+                    "Accept-Encoding": "gzip",
+                    "User-Agent": USER_AGENT_OK_HTTP,
+                },
+                json={
+                    "pushRegId": str(uuid.uuid4())[:64],
+                    "pushType": push_type,
+                    "uuid": str(uuid.uuid4()),
+                },
+            )
+            response_json = response.json() if response.status_code == 200 else {}
+            self._legacy_spa_device_id = response_json.get("resMsg", {}).get(
+                "deviceId", ""
+            )
+        return self._legacy_spa_device_id
 
     def _get_location_stored_status(
         self, token: Token, vehicle: Vehicle

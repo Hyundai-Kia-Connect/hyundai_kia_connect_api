@@ -78,7 +78,11 @@ class DailyDrivingStats:
 
 @dataclass
 class VehicleSupports:
-    """Whether the vehicle supports each VehicleManager call; ``None`` is unknown."""
+    """Whether the vehicle supports a feature; ``None`` is unknown.
+
+    Mostly gates :class:`VehicleManager` calls, but some items exist for
+    the Home Assistant integration to gate entities on; those say so.
+    """
 
     # VehicleManager.set_windows_state
     window_control: bool | None = None
@@ -86,6 +90,9 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
+    # Integration only (kia_uvo): the remote-climate duration selector.
+    # From legacy-SPA profile option.clmtCtrlOption == 1.
+    climate_duration_setting: bool | None = None
     # Service Hub registration + the receive-only MQTT broker
     mqtt_push: bool | None = None
     # device.closeremote.precondition protocol (push metadata hu entry)
@@ -213,8 +220,10 @@ class Vehicle:
     # _ota_checked: True after the first OTA check (no re-check until force
     # refresh); _valet_failed: pessimistic circuit — True while a valet read
     # is in flight or after a failure, reset to False on success.
+    # _profile_checked: one-shot legacy-SPA profile read (stable per car).
     _ota_checked: bool = False
     _valet_failed: bool = False
+    _profile_checked: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).

@@ -2,8 +2,11 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_gspa_pv5_2026_stored_status.json (Kia PV5 Passenger 2026)",
         "follow_up_sources": "none",
-        "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. The PV5 status tree carries no Location node, so the cached update also reads location/stored-status — response from the reporter capture (lib PR #1331), coordinates redacted before sharing."
+        "not_captured": [
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "legacy-SPA notifications/register (deviceId envelope rebuilt from the legacy parser shape)"
+        ],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. The PV5 status tree carries no Location node, so the cached update also reads location/stored-status \u2014 response from the reporter capture (lib PR #1331), coordinates redacted before sharing."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -35,6 +38,20 @@
                 "metaInfo": {
                     "retCode": "S",
                     "resCode": "200-000"
+                }
+            }
+        },
+        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
+            "status": 503,
+            "body": null
+        },
+        "POST /api/v1/spa/notifications/register": {
+            "status": 200,
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "deviceId": "spa-device-0001"
                 }
             }
         }
