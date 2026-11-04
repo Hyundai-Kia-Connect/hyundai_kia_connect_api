@@ -420,10 +420,8 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         self._command_vehicle_id(vehicle)
         headers = self._control_headers(token, vehicle)
         helper = self._mqtt_for_vehicle(token, vehicle)
-        try:
+        with helper.refresh_session():
             self._force_refresh_with_session(token, vehicle, helper, headers)
-        finally:
-            helper.close(notify_push=True)
 
     def _force_refresh_with_session(
         self,
@@ -433,7 +431,6 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
         headers: dict[str, str],
     ) -> None:
         vehicle_id = self._command_vehicle_id(vehicle)
-        helper.prepare()
         # A cached PIN grant can expire while MQTT bootstrap is in progress.
         authorization = self._control_headers(token, vehicle)["Authorization"]
         headers = self._vehicle_headers(token, vehicle, helper)
@@ -449,42 +446,45 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
                 "Japan refresh tracking identifier is missing"
             )
         helper.track(action_id)
-        status = helper.status(
-            action_id, timeout=min(120, max(0, deadline - time.monotonic()))
-        )
-        if status == ORDER_STATUS.FAILED:
-            raise APIError("Japan vehicle refresh failed")
-        if status != ORDER_STATUS.SUCCESS:
-            raise RequestTimeoutError("Japan vehicle refresh was not confirmed")
-        while time.monotonic() < deadline:
-            state = helper.latest_state
-            candidate = copy.deepcopy(vehicle)
-            if isinstance(state, dict):
-                try:
-                    timestamp = self._ccs2_observation_time(state.get("Date"))
-                    if timestamp >= started_at and (
+        try:
+            status = helper.status(
+                action_id, timeout=min(120, max(0, deadline - time.monotonic()))
+            )
+            if status == ORDER_STATUS.FAILED:
+                raise APIError("Japan vehicle refresh failed")
+            if status != ORDER_STATUS.SUCCESS:
+                raise RequestTimeoutError("Japan vehicle refresh was not confirmed")
+            while time.monotonic() < deadline:
+                state = helper.latest_state
+                candidate = copy.deepcopy(vehicle)
+                if isinstance(state, dict):
+                    try:
+                        timestamp = self._ccs2_observation_time(state.get("Date"))
+                        if timestamp >= started_at and (
+                            vehicle.last_updated_at is None
+                            or timestamp > vehicle.last_updated_at
+                        ):
+                            self._update_vehicle_properties_ccs2(candidate, state)
+                            vehicle.__dict__.update(candidate.__dict__)
+                            return
+                    except (KeyError, TypeError, ValueError, AttributeError):
+                        pass
+                # Some cars publish their fresh data to storage before MQTT state.
+                self.update_vehicle_with_cached_state(token, candidate)
+                if (
+                    candidate.last_updated_at is not None
+                    and candidate.last_updated_at >= started_at
+                    and (
                         vehicle.last_updated_at is None
-                        or timestamp > vehicle.last_updated_at
-                    ):
-                        self._update_vehicle_properties_ccs2(candidate, state)
-                        vehicle.__dict__.update(candidate.__dict__)
-                        return
-                except (KeyError, TypeError, ValueError, AttributeError):
-                    pass
-            # Some cars publish their fresh data to storage before MQTT state.
-            self.update_vehicle_with_cached_state(token, candidate)
-            if (
-                candidate.last_updated_at is not None
-                and candidate.last_updated_at >= started_at
-                and (
-                    vehicle.last_updated_at is None
-                    or candidate.last_updated_at > vehicle.last_updated_at
-                )
-            ):
-                vehicle.__dict__.update(candidate.__dict__)
-                return
-            time.sleep(min(5, max(0, deadline - time.monotonic())))
-        raise RequestTimeoutError("Japan refresh completed without newer telemetry")
+                        or candidate.last_updated_at > vehicle.last_updated_at
+                    )
+                ):
+                    vehicle.__dict__.update(candidate.__dict__)
+                    return
+                time.sleep(min(5, max(0, deadline - time.monotonic())))
+            raise RequestTimeoutError("Japan refresh completed without newer telemetry")
+        finally:
+            helper.retire(action_id)
 
     def update_month_trip_info(
         self, token: Token, vehicle: Vehicle, yyyymm_string: str

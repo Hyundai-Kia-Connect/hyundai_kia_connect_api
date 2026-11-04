@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import Mock, PropertyMock
 
@@ -722,8 +723,23 @@ def test_mqtt_registration_uuid_token_roundtrip_and_refresh(api):
     assert refreshed.mqtt_client_id == "synthetic-broker-client"
 
 
-def test_force_refresh_requires_correlated_completion_and_newer_state(api, monkeypatch):
+def refresh_helper():
     helper = Mock()
+
+    @contextmanager
+    def session():
+        helper.prepare()
+        try:
+            yield
+        finally:
+            helper.release_refresh()
+
+    helper.refresh_session.side_effect = session
+    return helper
+
+
+def test_force_refresh_requires_correlated_completion_and_newer_state(api, monkeypatch):
+    helper = refresh_helper()
     helper.prepare.side_effect = lambda: setattr(
         helper,
         "request_context",
@@ -768,7 +784,7 @@ def test_force_refresh_requires_correlated_completion_and_newer_state(api, monke
     ],
 )
 def test_force_refresh_ack_does_not_mean_success(api, monkeypatch, status, error):
-    helper = Mock()
+    helper = refresh_helper()
     helper.status.return_value = status
     monkeypatch.setattr(api, "_mqtt_for_vehicle", lambda *args: helper)
     monkeypatch.setattr(
@@ -786,7 +802,7 @@ def test_force_refresh_ack_does_not_mean_success(api, monkeypatch, status, error
 
 
 def test_confirmed_refresh_without_new_telemetry_times_out(api, monkeypatch):
-    helper = Mock()
+    helper = refresh_helper()
     helper.status.return_value = ORDER_STATUS.SUCCESS
     helper.latest_state = None
     monkeypatch.setattr(api, "_mqtt_for_vehicle", lambda *args: helper)
@@ -807,7 +823,7 @@ def test_confirmed_refresh_without_new_telemetry_times_out(api, monkeypatch):
 
 
 def test_force_ignores_retained_state_and_uses_newer_cached_status(api, monkeypatch):
-    helper = Mock()
+    helper = refresh_helper()
     helper.status.return_value = ORDER_STATUS.SUCCESS
     helper.latest_state = {"Date": "20261013090000"}
     monkeypatch.setattr(api, "_mqtt_for_vehicle", lambda *args: helper)
@@ -833,7 +849,7 @@ def test_force_ignores_retained_state_and_uses_newer_cached_status(api, monkeypa
 
 
 def test_force_completion_before_vss_waits_for_newer_message(api, monkeypatch):
-    helper = Mock()
+    helper = refresh_helper()
     helper.status.return_value = ORDER_STATUS.SUCCESS
     new_state = {
         "Date": dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S"),
@@ -1217,7 +1233,7 @@ def test_force_refresh_renews_control_grant_after_slow_connection(api, monkeypat
     monkeypatch.setattr(
         "hyundai_kia_connect_api.japan_commands.time.time", lambda: clock[0]
     )
-    helper = Mock()
+    helper = refresh_helper()
     helper.request_context = {}
     helper.prepare.side_effect = lambda: clock.__setitem__(0, 1790000100.0)
     helper.status.return_value = ORDER_STATUS.FAILED
@@ -1245,7 +1261,7 @@ def test_force_refresh_renews_control_grant_after_slow_connection(api, monkeypat
     assert grant.args == ("PUT", "/api/v1/user/pin")
     assert refresh.args == ("GET", "/api/v2/spa/vehicles/synthetic/ccs2/carstatus")
     assert refresh.kwargs["headers"]["Authorization"] == "Bearer synthetic-fresh-grant"
-    helper.close.assert_called_once()
+    helper.release_refresh.assert_called_once()
 
 
 def test_disconnected_persistent_telemetry_session_is_replaced_before_next_command(
@@ -1454,7 +1470,7 @@ def test_force_refresh_accepts_newer_fractional_observation_in_same_second(
         "hyundai_kia_connect_api.KiaUvoApiJP.dt",
         SimpleNamespace(datetime=FrozenDateTime, UTC=dt.UTC),
     )
-    helper = Mock()
+    helper = refresh_helper()
     helper.status.return_value = ORDER_STATUS.SUCCESS
     helper.latest_state = {
         "Date": "20261104043833.584",

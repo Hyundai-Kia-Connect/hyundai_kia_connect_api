@@ -1,5 +1,6 @@
 """Replay the shared Service Hub lifecycle and Japan controls without sockets."""
 
+import datetime as dt
 import importlib
 import json
 import time
@@ -12,6 +13,7 @@ import pytest
 
 from hyundai_kia_connect_api import VehicleManager
 from hyundai_kia_connect_api.const import ORDER_STATUS
+from hyundai_kia_connect_api.exceptions import APIError, RequestTimeoutError
 from hyundai_kia_connect_api.japan_mqtt import JapanMqttSession, JapanMqttTransportPool
 from hyundai_kia_connect_api.mqtt_service_hub import ServiceHubProviderMixin
 from hyundai_kia_connect_api.mqtt_service_hub_eu import MqttServiceHubMixin
@@ -414,3 +416,220 @@ def test_concurrent_push_and_command_factory_lookup_cannot_orphan_a_helper(
     assert helper.closed
     assert not fleet.api._mqtt_transport_pool._connections
     broker[0].disconnect.assert_called_once()
+
+
+@pytest.mark.parametrize("consumer", ["push", "commands", "both", "refresh_only"])
+@pytest.mark.parametrize("outcome", ["success", "failed", "timeout", "request_error"])
+def test_force_refresh_releases_only_its_own_session_use(
+    broker, monkeypatch, consumer, outcome
+):
+    fleet, helper = manager()
+    if consumer in ("push", "both"):
+        assert fleet.start_push("synthetic-car")
+    if consumer in ("commands", "both"):
+        helper.prepare()
+    previous = {"Date": "20261104010000.000", "DrivingReady": True}
+    if broker:
+        broker[0].deliver(helper._topics[0], {"state": {"Vehicle": previous}})
+    original_status = helper.status
+    if outcome == "timeout":
+        monkeypatch.setattr(
+            helper, "status", lambda action, timeout: original_status(action, 0.001)
+        )
+    fresh = {
+        "Date": dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S.%f"),
+        "DrivingReady": False,
+        "Drivetrain": {"FuelSystem": {"DTE": {"Total": 321, "Unit": 1}}},
+    }
+
+    def refresh_request(*args, **kwargs):
+        if outcome == "request_error":
+            raise RequestTimeoutError("synthetic request timeout")
+        if outcome != "timeout":
+            broker[0].deliver(
+                helper._topics[1],
+                {
+                    "sid": "synthetic-refresh",
+                    "res-msg": "S" if outcome == "success" else "F",
+                },
+            )
+        broker[0].deliver(helper._topics[0], {"state": {"Vehicle": fresh}})
+        return {"msgId": "synthetic-refresh"}
+
+    fleet.api._request.side_effect = refresh_request
+    try:
+        if outcome == "success":
+            fleet.force_refresh_vehicle_state("synthetic-car")
+            assert fleet.vehicles["synthetic-car"].engine_is_running is False
+        else:
+            error = APIError if outcome == "failed" else RequestTimeoutError
+            with pytest.raises(error):
+                fleet.force_refresh_vehicle_state("synthetic-car")
+        assert fleet.api._request.call_count == 1
+        if consumer == "refresh_only":
+            assert helper.closed
+            assert not helper.is_connected
+            assert not fleet.api._mqtt_transport_pool._connections
+            broker[0].disconnect.assert_called_once()
+        else:
+            assert not helper.closed
+            assert helper.is_connected
+            assert helper.drain_state_updates() == (
+                [previous] if outcome == "request_error" else [previous, fresh]
+            )
+            assert helper.diagnostics["command_consumer"] == (
+                consumer in ("commands", "both")
+            )
+            assert helper.diagnostics["push_consumer"] == (consumer in ("push", "both"))
+            assert fleet.is_push_connected == (consumer in ("push", "both"))
+            if fleet._push_session is not None:
+                assert fleet._push_session._reconnect_cancel is None
+            broker[0].disconnect.assert_not_called()
+        assert helper.diagnostics["refresh_consumers"] == 0
+    finally:
+        fleet.stop_push()
+        fleet.api.close()
+    broker[0].disconnect.assert_called_once()
+
+
+def test_overlapping_refreshes_keep_independent_ownership(broker):
+    fleet, helper = manager()
+    first_entered, second_entered = Event(), Event()
+    first_release, second_release = Event(), Event()
+
+    def refresh(entered, release):
+        with helper.refresh_session():
+            entered.set()
+            assert release.wait(2), "refresh release not signaled"
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            first = workers.submit(refresh, first_entered, first_release)
+            assert first_entered.wait(2)
+            second = workers.submit(refresh, second_entered, second_release)
+            assert second_entered.wait(2)
+            assert helper.diagnostics["refresh_consumers"] == 2
+            first_release.set()
+            first.result(timeout=2)
+            assert helper.diagnostics["refresh_consumers"] == 1
+            assert helper.is_connected
+            broker[0].disconnect.assert_not_called()
+            second_release.set()
+            second.result(timeout=2)
+        assert helper.closed
+        assert helper.diagnostics["refresh_consumers"] == 0
+        broker[0].disconnect.assert_called_once()
+    finally:
+        first_release.set()
+        second_release.set()
+        fleet.api.close()
+
+
+def test_refresh_bootstrap_interrupted_by_api_close_cannot_reconnect(broker):
+    fleet, helper = manager()
+    entered, release = Event(), Event()
+    replies = iter(helper._http_session.request.side_effect)
+
+    def request(*args, **kwargs):
+        entered.set()
+        assert release.wait(2), "bootstrap release not signaled"
+        return next(replies)
+
+    helper._http_session.request.side_effect = request
+    try:
+        with ThreadPoolExecutor(max_workers=1) as workers:
+            refresh = workers.submit(fleet.force_refresh_vehicle_state, "synthetic-car")
+            assert entered.wait(2)
+            fleet.api.close()
+            release.set()
+            with pytest.raises(APIError, match="session is closed"):
+                refresh.result(timeout=2)
+        assert helper.closed
+        assert helper.diagnostics["refresh_consumers"] == 0
+        assert not fleet.api._mqtt_transport_pool._connections
+        assert broker == []
+    finally:
+        release.set()
+        fleet.api.close()
+
+
+def test_stopping_push_keeps_an_active_refresh_until_it_exits(broker):
+    fleet, helper = manager()
+    try:
+        assert fleet.start_push("synthetic-car")
+        with helper.refresh_session():
+            fleet.stop_push()
+            assert helper.is_connected
+            assert not helper.closed
+            assert helper.diagnostics["refresh_consumers"] == 1
+            broker[0].disconnect.assert_not_called()
+        assert helper.closed
+        broker[0].disconnect.assert_called_once()
+    finally:
+        fleet.stop_push()
+        fleet.api.close()
+
+
+def test_failed_refresh_bootstrap_releases_its_session_without_a_late_connection(
+    broker,
+):
+    fleet, helper = manager()
+    helper._http_session.request.side_effect = RequestTimeoutError("synthetic timeout")
+    try:
+        with pytest.raises(RequestTimeoutError):
+            fleet.force_refresh_vehicle_state("synthetic-car")
+        assert helper.closed
+        assert helper.diagnostics["refresh_consumers"] == 0
+        assert not fleet.api._mqtt_transport_pool._connections
+        assert broker == []
+        fleet.api._request.assert_not_called()
+    finally:
+        fleet.api.close()
+
+
+def test_repeated_refreshes_retire_only_their_tracking_on_a_persistent_session(broker):
+    fleet, helper = manager()
+    helper.MAX_RESULTS = 2
+    try:
+        assert fleet.start_push("synthetic-car")
+        helper.track("other-action")
+        broker[0].deliver(helper._topics[1], {"sid": "other-action", "res-msg": "S"})
+        actions = []
+
+        def refresh_request(*args, **kwargs):
+            action = f"refresh-{len(actions)}"
+            actions.append(action)
+            broker[0].deliver(helper._topics[1], {"sid": action, "res-msg": "S"})
+            broker[0].deliver(
+                helper._topics[0],
+                {
+                    "state": {
+                        "Vehicle": {
+                            "Date": dt.datetime.now(dt.UTC).strftime("%Y%m%d%H%M%S.%f"),
+                            "Drivetrain": {
+                                "FuelSystem": {"DTE": {"Total": 321, "Unit": 1}}
+                            },
+                        }
+                    }
+                },
+            )
+            return {"msgId": action}
+
+        fleet.api._request.side_effect = refresh_request
+        for _ in range(6):
+            fleet.force_refresh_vehicle_state("synthetic-car")
+            assert helper._tracked == {"other-action"}
+            assert helper.status("other-action") == ORDER_STATUS.SUCCESS
+            assert len(helper._retired) <= helper.MAX_RESULTS
+            assert helper.is_connected
+        last_action = actions[-1]
+        broker[0].deliver(helper._topics[1], {"sid": last_action, "res-msg": "F"})
+        assert last_action not in helper._results
+        assert helper.diagnostics["retired_result_messages"] == 1
+        assert helper.diagnostics["tracked_actions"] == 1
+        with pytest.raises(APIError, match="already retired"):
+            helper.track(last_action)
+        broker[0].disconnect.assert_not_called()
+    finally:
+        fleet.stop_push()
+        fleet.api.close()
