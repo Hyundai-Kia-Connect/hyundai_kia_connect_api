@@ -431,6 +431,26 @@ def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
     assert vm._push_session is not None and vm._push_session._vehicle_ids == set()
 
 
+def test_connect_callback_during_connect_subscribes(monkeypatch):
+    """CONNACK can arrive before connect() returns; it must be able to subscribe (1332)."""
+    vm = _make_vm()
+    vm.vehicles["careu1"].mqtt_vehicle_id = "testmqtt1"
+
+    class _RaceTransport(FakeTransport):
+        def connect(self):
+            # Fires the session's connect callback mid-connect: self._client
+            # must already be assigned, or the callback hits the assert.
+            self.on_connect()
+            self.connected = True
+
+    monkeypatch.setattr(hub_module, "MqttTransport", _RaceTransport)
+    vm._ensure_push_session()
+    if vm._push_session is not None:
+        vm._push_session._refresh_fn = lambda: None
+    assert vm._push_session.ensure_started("careu1") is True
+    assert vm._push_session._client.subscribed  # subscribed from the callback
+
+
 def test_on_push_connect_subscribes_started_vehicles(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
@@ -514,34 +534,53 @@ def test_get_push_connection_state_delegates():
     assert vm.get_push_connection_state() is MQTT_PUSH_CONNECTION_STATE.ONLINE
 
 
-def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run():
+def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run(monkeypatch):
     vm = _make_vm()
     vm._ensure_push_session()
     vm._push_session._vehicle_ids = {"careu1"}
     prior_cancel = threading.Event()
-    vm._ensure_push_session()
     vm._push_session._reconnect_cancel = prior_cancel
+
+    disconnects: list[int] = []
 
     class _BrokenTransport:
         is_connected = False
 
         def disconnect(self):
+            disconnects.append(1)
             raise RuntimeError("already down")
 
-    vm._ensure_push_session()
+    def factory(*args, **kwargs):
+        t = FakeTransport(*args, **kwargs)
+        t.fail_connect = True  # attempts keep failing → the loop keeps backing off
+        return t
+
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
+    monkeypatch.setattr(vm, "check_and_refresh_token", lambda: None)
+    from hyundai_kia_connect_api import const as const_mod
+
+    monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0.01)
+    monkeypatch.setattr(const_mod, "MQTT_PUSH_RECONNECT_MAX_DELAY", 0.01)
+    vm._push_session._refresh_fn = vm.check_and_refresh_token
     vm._push_session._client = _BrokenTransport()
-    vm._ensure_push_session()
+    before = _reconnect_thread_idents()
     vm._push_session._on_push_disconnect("unexpected (rc=7)")
     assert prior_cancel.is_set()  # prior cancellation event signalled
     assert (
-        vm._push_session is None or vm._push_session._client is None
-    )  # cleanup swallowed the disconnect error
-    assert (
         vm._push_session is not None and vm._push_session._reconnect_cancel is not None
     )  # fresh event
+    assert not disconnects  # no cleanup on the paho thread (loop_stop deadlocks)
+    thread = _new_reconnect_thread(before)
+    deadline = time.time() + 2.0
+    while not disconnects and time.time() < deadline:
+        time.sleep(0.02)
+    assert disconnects  # the reconnect thread ran the cleanup
+    assert vm._push_session is None or vm._push_session._client is None
     vm._ensure_push_session()
     assert vm._push_session is not None
     vm._push_session._reconnect_cancel.set()
+    thread.join(timeout=2.0)
+    assert not thread.is_alive()
 
 
 def test_reconnect_success_returns_after_first_cycle(monkeypatch):

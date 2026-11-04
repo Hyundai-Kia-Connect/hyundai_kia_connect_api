@@ -89,6 +89,9 @@ class MqttTransport:
             client_id=self._client_id,
             protocol=mqtt.MQTTv311,
             clean_session=True,
+            # Registration-bound credentials expire; the push session owns
+            # reconnects (rebuilds the registration chain).
+            reconnect_on_failure=False,
         )
 
         if self._broker_username:
@@ -101,7 +104,6 @@ class MqttTransport:
 
         # App-confirmed client settings: connectionTimeout=10,
         # keepAliveInterval=15.
-        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
         self._client.connect_timeout = 10
         # App-confirmed: MaxInflight=100 (the paho default is 10).
         self._client.max_inflight_messages_set(100)

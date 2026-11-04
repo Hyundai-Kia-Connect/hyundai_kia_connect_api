@@ -791,6 +791,7 @@ class MqttPushSession:
         self._status_callback: Callable[[str, str], None] | None = None
         self._connection_change_callback: Callable[[bool], None] | None = None
         self._reconnect_cancel: threading.Event | None = None
+        self._reconnect_lock = threading.Lock()
 
     @property
     def is_connected(self) -> bool:
@@ -854,14 +855,16 @@ class MqttPushSession:
         )
         if self._connection_change_callback:
             client.set_on_connection_change(self._connection_change_callback)
+        # Set before connect(): the CONNACK callback can arrive first (1332).
+        self._client = client
         try:
             client.connect()
         except (ValueError, OSError):
             # Programming-level failure — propagate, do not retry;
-            # roll the vehicle id back.
+            # roll the vehicle id and the transport back.
+            self._client = None
             self._vehicle_ids.discard(vehicle_id)
             raise
-        self._client = client
         if client.is_connected:
             self._subscribe_vehicle_topics(vehicle_id)
         return True
@@ -962,8 +965,9 @@ class MqttPushSession:
     def _on_push_disconnect(self, reason: str) -> None:
         """Reconnect with capped exponential backoff on unexpected drops.
 
-        Called from the paho background thread. Clean disconnects are not
-        retried (that is stop()).
+        Called from the paho background thread: no cleanup here (loop_stop
+        inside paho's own thread deadlocks); the reconnect thread owns it.
+        Clean disconnects are not retried (that is stop()).
         """
         _LOGGER.debug(f"{DOMAIN} - Push disconnected: {reason}")
         if reason == "clean disconnect":
@@ -972,7 +976,6 @@ class MqttPushSession:
             return
         if self._reconnect_cancel:
             self._reconnect_cancel.set()
-        self._cleanup_client()
         cancel_event = threading.Event()
         self._reconnect_cancel = cancel_event
 
@@ -984,20 +987,29 @@ class MqttPushSession:
                 _LOGGER.debug(f"{DOMAIN} - Push reconnect attempt in {delay}s...")
                 if cancel_event.wait(delay):
                     return
-                try:
-                    try:
-                        self._refresh_fn()
-                    except Exception as token_ex:
-                        _LOGGER.warning(
-                            f"{DOMAIN} - Push reconnect token refresh failed: {token_ex}"
-                        )
-                    self._client = None
-                    ok = all(self.ensure_started(vid) for vid in vehicle_ids)
-                    if ok and self.is_connected:
-                        _LOGGER.debug(f"{DOMAIN} - Push reconnected")
+                if cancel_event.is_set():
+                    return
+                # One owner per rebuild: the lock keeps a superseded
+                # thread from dropping a client the newer thread built,
+                # and a dead transport is disconnected here, not leaked.
+                with self._reconnect_lock:
+                    if cancel_event.is_set():
                         return
-                except Exception as ex:
-                    _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
+                    try:
+                        try:
+                            self._refresh_fn()
+                        except Exception as token_ex:
+                            _LOGGER.warning(
+                                f"{DOMAIN} - Push reconnect token refresh failed: "
+                                f"{token_ex}"
+                            )
+                        self._cleanup_client()
+                        ok = all(self.ensure_started(vid) for vid in vehicle_ids)
+                        if ok and self.is_connected:
+                            _LOGGER.debug(f"{DOMAIN} - Push reconnected")
+                            return
+                    except Exception as ex:
+                        _LOGGER.warning(f"{DOMAIN} - Push reconnect failed: {ex}")
                 delay = min(delay * 2, const.MQTT_PUSH_RECONNECT_MAX_DELAY)
             _LOGGER.debug(f"{DOMAIN} - Push reconnect cancelled")
 
