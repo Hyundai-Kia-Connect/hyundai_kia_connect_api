@@ -1,0 +1,408 @@
+{
+    "serviceNo": "RVS-K",
+    "lastUpdateTime": "1793585496242",
+    "state": {
+        "Vehicle": {
+            "Location": {
+                "Date": "20260327140713.766",
+                "GeoCoord": {
+                    "Altitude": 0,
+                    "Latitude": 0.0,
+                    "Longitude": 0.0,
+                    "Type": 0
+                },
+                "Heading": 24,
+                "Offset": 1,
+                "Servicestate": 0,
+                "Speed": {
+                    "Unit": 0,
+                    "Value": 7.5
+                },
+                "TimeStamp": {
+                    "Day": 27,
+                    "Hour": 15,
+                    "Min": 7,
+                    "Mon": 3,
+                    "Sec": 13,
+                    "Year": 2026
+                },
+                "Version": "HU2026032715071301"
+            },
+            "Body": {
+                "Windshield": {
+                    "Rear": {
+                        "Defog": {
+                            "State": 0
+                        }
+                    },
+                    "Front": {
+                        "Heat": {
+                            "State": 0
+                        },
+                        "Defog": {
+                            "State": 0
+                        },
+                        "WasherFluid": {
+                            "LevelLow": 0
+                        }
+                    }
+                },
+                "Sunroof": {
+                    "Glass": {
+                        "Open": 0
+                    }
+                },
+                "Lights": {
+                    "DischargeAlert": {
+                        "State": 0
+                    },
+                    "Front": {
+                        "HeadLamp": {
+                            "SystemWarning": 0
+                        },
+                        "Left": {
+                            "Low": {
+                                "Warning": 0
+                            },
+                            "High": {
+                                "Warning": 0
+                            },
+                            "TurnSignal": {
+                                "Warning": 0,
+                                "LampState": 0
+                            }
+                        },
+                        "Right": {
+                            "Low": {
+                                "Warning": 0
+                            },
+                            "High": {
+                                "Warning": 0
+                            },
+                            "TurnSignal": {
+                                "Warning": 0,
+                                "LampState": 0
+                            }
+                        }
+                    },
+                    "Rear": {
+                        "Left": {
+                            "StopLamp": {
+                                "Warning": 0
+                            },
+                            "TurnSignal": {
+                                "Warning": 0
+                            }
+                        },
+                        "Right": {
+                            "StopLamp": {
+                                "Warning": 0
+                            },
+                            "TurnSignal": {
+                                "Warning": 0
+                            }
+                        }
+                    },
+                    "TailLamp": {
+                        "Alert": 0
+                    },
+                    "Hazard": {
+                        "Alert": 0
+                    }
+                },
+                "Hood": {
+                    "Open": 0
+                },
+                "Trunk": {
+                    "Open": 0
+                }
+            },
+            "Cabin": {
+                "HVAC": {
+                    "Vent": {
+                        "FineDust": {
+                            "State": 0,
+                            "Level": 0
+                        },
+                        "AirCleaning": {
+                            "Indicator": 1,
+                            "SymbolColor": 0
+                        }
+                    },
+                    "Row1": {
+                        "Driver": {
+                            "Temperature": {
+                                "Value": "OFF",
+                                "Unit": 0
+                            },
+                            "Blower": {
+                                "SpeedLevel": 0
+                            }
+                        }
+                    },
+                    "Temperature": {
+                        "RangeType": 1
+                    }
+                },
+                "Door": {
+                    "Row1": {
+                        "Passenger": {
+                            "Lock": 0,
+                            "Open": 0
+                        },
+                        "Driver": {
+                            "Open": 0,
+                            "Lock": 0
+                        }
+                    },
+                    "Row2": {
+                        "Left": {
+                            "Lock": 0,
+                            "Open": 0
+                        },
+                        "Right": {
+                            "Lock": 0,
+                            "Open": 0
+                        }
+                    }
+                },
+                "Seat": {
+                    "Row2": {
+                        "Left": {
+                            "Climate": {
+                                "State": 2
+                            },
+                            "ArmRest": {
+                                "Heat": 0
+                            }
+                        },
+                        "Right": {
+                            "Climate": {
+                                "State": 2
+                            },
+                            "ArmRest": {
+                                "Heat": 0
+                            }
+                        }
+                    },
+                    "Row1": {
+                        "Passenger": {
+                            "Climate": {
+                                "State": 2
+                            },
+                            "ArmRest": {
+                                "Heat": 0
+                            }
+                        },
+                        "Driver": {
+                            "Climate": {
+                                "State": 2
+                            },
+                            "ArmRest": {
+                                "Heat": 0
+                            }
+                        }
+                    }
+                },
+                "Window": {
+                    "Row1": {
+                        "Driver": {
+                            "Open": 0,
+                            "OpenLevel": 0
+                        },
+                        "Passenger": {
+                            "Open": 0,
+                            "OpenLevel": 0
+                        }
+                    },
+                    "Row2": {
+                        "Left": {
+                            "Open": 0,
+                            "OpenLevel": 0
+                        },
+                        "Right": {
+                            "Open": 0,
+                            "OpenLevel": 0
+                        }
+                    }
+                },
+                "SteeringWheel": {
+                    "Heat": {
+                        "RemoteControl": {
+                            "Step": 0
+                        },
+                        "State": 0
+                    }
+                }
+            },
+            "Chassis": {
+                "Axle": {
+                    "Row1": {
+                        "Left": {
+                            "Tire": {
+                                "WheelSpeed": 11.40625,
+                                "PressureLow": 0,
+                                "Pressure": 255
+                            }
+                        },
+                        "Right": {
+                            "Tire": {
+                                "PressureLow": 0,
+                                "Pressure": 255
+                            }
+                        }
+                    },
+                    "Row2": {
+                        "Left": {
+                            "Tire": {
+                                "PressureLow": 0,
+                                "Pressure": 255
+                            }
+                        },
+                        "Right": {
+                            "Tire": {
+                                "PressureLow": 0,
+                                "Pressure": 255
+                            }
+                        }
+                    },
+                    "Tire": {
+                        "PressureLow": 0,
+                        "PressureUnit": 2
+                    }
+                },
+                "Driving": {
+                    "WheelDriveType": {
+                        "ControllerState1": 1,
+                        "ControllerState2": 1
+                    }
+                },
+                "DrivingMode": {
+                    "State": "Eco"
+                },
+                "Brake": {
+                    "Fluid": {
+                        "Warning": 0
+                    }
+                }
+            },
+            "Drivetrain": {
+                "DrivingReady": 0,
+                "FuelSystem": {
+                    "DTE": {
+                        "Total": 766,
+                        "Unit": 1
+                    },
+                    "LowFuelWarning": 0,
+                    "FuelLevel": 94
+                },
+                "Odometer": 3977.5,
+                "InternalCombustionEngine": {
+                    "OilLevelWarning": 0
+                },
+                "Transmission": {
+                    "ParkingPosition": 1
+                }
+            },
+            "Electronics": {
+                "Battery": {
+                    "Auxiliary": {
+                        "FailWarning": 0
+                    },
+                    "Level": 58,
+                    "Charging": {
+                        "WarningLevel": 65
+                    },
+                    "PowerStateAlert": {
+                        "ClassC": 2
+                    },
+                    "SensorReliability": 0
+                },
+                "AutoCut": {
+                    "PowerMode": 2,
+                    "BatteryPreWarning": 0,
+                    "DeliveryMode": 2
+                },
+                "FOB": {
+                    "LowBattery": 0
+                },
+                "PowerSupply": {
+                    "Accessory": 0,
+                    "Ignition3": 0,
+                    "Ignition1": 0
+                }
+            },
+            "Green": {
+                "BatteryManagement": {
+                    "SoH": {
+                        "Ratio": 100
+                    },
+                    "BatteryPackVoltage": 264.5,
+                    "WinterModeOperation": 0,
+                    "BatteryRemain": {
+                        "Value": 0,
+                        "Ratio": 55,
+                        "Unit": "kJ"
+                    },
+                    "Temperature": {
+                        "Min": {
+                            "Raw": 27
+                        },
+                        "Max": {
+                            "Raw": 29
+                        },
+                        "CoolingWaterInlet": 0
+                    }
+                },
+                "PowerConsumption": {
+                    "Moment": {
+                        "ClimateAirConditioning": 0,
+                        "BatteryCooling": 0,
+                        "BatteryHeater": 0
+                    }
+                },
+                "DrivingReady": 1,
+                "ChargingInformation": {
+                    "EstimatedTime": {
+                        "ICCB": 0,
+                        "Standard": 0,
+                        "Quick": 0
+                    },
+                    "Charging": {
+                        "SoC": {
+                            "Decimal": 0.2,
+                            "Raw": 55
+                        }
+                    }
+                },
+                "DrivingHistory": {
+                    "Average": 8.8,
+                    "Unit": 1
+                }
+            },
+            "Service": {
+                "ConnectedCar": {
+                    "RemoteControl": {
+                        "Available": 0,
+                        "WaitingTime": 336
+                    },
+                    "ActiveAlert": {
+                        "Available": 1
+                    }
+                }
+            },
+            "RemoteControl": {
+                "SleepMode": 0
+            },
+            "Version": "CCU2026110202113301",
+            "Date": "20261102021133.000",
+            "Offset": "1",
+            "ConnectedService": {
+                "OTA": {
+                    "ControllerStatus": 0
+                }
+            },
+            "DrivingReady": 0
+        }
+    }
+}
