@@ -18,9 +18,6 @@ from typing import Any, Literal, Self, cast, overload
 
 import paho.mqtt.client as mqtt
 import requests
-from paho.mqtt.enums import CallbackAPIVersion
-from paho.mqtt.properties import Properties
-from paho.mqtt.reasoncodes import ReasonCode
 
 from .ApiImpl import ApiImplSession
 from .const import ORDER_STATUS
@@ -32,6 +29,7 @@ from .exceptions import (
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
 )
+from .mqtt_client import MqttTransport
 from .Token import Token
 
 
@@ -72,13 +70,12 @@ class JapanMqttSession:
         self._registration_uuid = registration_uuid
         self._headers_factory = headers_factory
         self._http_session = ApiImplSession()
-        self._client: mqtt.Client | None = None
+        self._transport: MqttTransport | None = None
         self._condition = threading.Condition()
         self._prepare_lock = threading.Lock()
         self._ready = False
         self._closed = False
         self._error: str | None = None
-        self._subscription_mid: int | None = None
         self._results: OrderedDict[str, ORDER_STATUS] = OrderedDict()
         self._tracked: set[str] = set()
         self._latest_state: dict[str, Any] | None = None
@@ -345,25 +342,29 @@ class JapanMqttSession:
                 # session while a response was in flight. Publish/start the
                 # client under the same lock used by close().
                 self._raise_if_closed()
-                client = mqtt.Client(
-                    CallbackAPIVersion.VERSION2,
-                    client_id=client_id,
-                    clean_session=True,
+                transport = MqttTransport(
+                    on_connect=self._on_connect,
+                    on_disconnect=self._on_disconnect,
+                    on_message_details=lambda message: self._on_message(
+                        None, None, message
+                    ),
+                    on_subscribe_success=self._on_subscribe,
+                    on_subscribe_failure=self._on_subscribe_failure,
+                    on_loop_start_failure=lambda: self._fail(
+                        "Japan MQTT network loop could not start"
+                    ),
+                )
+                self._transport = transport
+                transport.configure(
+                    host,
+                    port,
+                    client_id,
+                    client_id,
+                    cast(str, self._token.access_token)[7:],
                     reconnect_on_failure=False,
+                    tls_context=ssl.create_default_context(),
                 )
-                self._client = client
-                client.username_pw_set(
-                    client_id, cast(str, self._token.access_token)[7:]
-                )
-                client.tls_set_context(ssl.create_default_context())
-                client.on_connect = self._on_connect
-                client.on_connect_fail = self._on_connect_fail
-                client.on_disconnect = self._on_disconnect
-                client.on_subscribe = self._on_subscribe
-                client.on_message = self._on_message
-                client.connect_async(host, port, keepalive=15)
-                if client.loop_start() != mqtt.MQTT_ERR_SUCCESS:
-                    raise APIError("Japan MQTT network loop could not start")
+                transport.connect()
                 if not self._condition.wait_for(
                     lambda: self._ready or self._error is not None or self._closed,
                     self.CONNECT_TIMEOUT,
@@ -403,69 +404,45 @@ class JapanMqttSession:
             self._last_status = "connection_error"
             self._condition.notify_all()
 
-    def _on_connect(
-        self,
-        client: mqtt.Client,
-        userdata: object,
-        flags: mqtt.ConnectFlags,
-        reason_code: ReasonCode,
-        properties: Properties | None,
-    ) -> None:
+    def _on_connect(self) -> None:
         with self._condition:
             if self._closed:
                 return
-            if reason_code != 0:
-                self._fail("Japan MQTT connection was rejected")
-                return
-            try:
-                result, mid = client.subscribe([(topic, 1) for topic in self._topics])
-            except Exception:
-                self._fail("Japan MQTT subscription failed")
-                return
-            if result != mqtt.MQTT_ERR_SUCCESS:
-                self._fail("Japan MQTT subscription was rejected")
-            self._subscription_mid = mid
+            if self._transport is not None:
+                self._transport.subscribe(list(self._topics), qos=1)
 
-    def _on_connect_fail(self, client: mqtt.Client, userdata: object) -> None:
-        self._fail("Japan MQTT connection failed")
-
-    def _on_disconnect(
-        self,
-        client: mqtt.Client,
-        userdata: object,
-        flags: mqtt.DisconnectFlags,
-        reason_code: ReasonCode,
-        properties: Properties | None,
-    ) -> None:
+    def _on_disconnect(self, reason: str) -> None:
         with self._condition:
             if not self._closed:
-                self._error = "Japan MQTT connection was lost"
+                self._error = (
+                    "Japan MQTT connection was rejected"
+                    if reason.startswith("broker refused")
+                    else "Japan MQTT connection failed"
+                    if reason.startswith("connect failed")
+                    else "Japan MQTT connection was lost"
+                )
                 self._last_status = "connection_error"
             self._ready = False
             self._condition.notify_all()
 
-    def _on_subscribe(
-        self,
-        client: mqtt.Client,
-        userdata: object,
-        mid: int,
-        reason_codes: list[ReasonCode],
-        properties: Properties | None,
-    ) -> None:
+    def _on_subscribe(self) -> None:
         with self._condition:
-            if self._closed or mid != self._subscription_mid:
-                return
-            if len(reason_codes) != len(self._topics) or any(
-                code != 1 for code in reason_codes
-            ):
-                self._fail("Japan MQTT subscriptions were not granted QoS 1")
+            if self._closed:
                 return
             self._request_context = dict(self._pending_context)
             self._ready = True
             self._condition.notify_all()
 
+    def _on_subscribe_failure(self, reason: str) -> None:
+        self._fail(
+            {
+                "subscription failed": "Japan MQTT subscription failed",
+                "subscription rejected": "Japan MQTT subscription was rejected",
+            }.get(reason, "Japan MQTT subscriptions were not granted")
+        )
+
     def _on_message(
-        self, client: mqtt.Client, userdata: object, message: mqtt.MQTTMessage
+        self, client: object, userdata: object, message: mqtt.MQTTMessage
     ) -> None:
         with self._condition:
             self._diagnostics["messages_received"] += 1
@@ -666,13 +643,11 @@ class JapanMqttSession:
             self._latest_state = None
             self._state_updates.clear()
             self._pending_context.clear()
-            client, self._client = self._client, None
+            transport, self._transport = self._transport, None
             self._condition.notify_all()
-        if client is not None:
+        if transport is not None:
             with suppress(Exception):
-                client.disconnect()
-            with suppress(Exception):
-                client.loop_stop()
+                transport.disconnect(stop_loop_first=False)
         self._http_session.close()
 
     def __enter__(self) -> Self:

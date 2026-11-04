@@ -25,6 +25,8 @@ class FakeClient:
         self.kwargs = kwargs
         self.username_pw_set = Mock()
         self.tls_set_context = Mock()
+        self.reconnect_delay_set = Mock()
+        self.max_inflight_messages_set = Mock()
         self.connect_async = Mock()
         self.disconnect = Mock()
         self.loop_stop = Mock()
@@ -78,7 +80,8 @@ def session(monkeypatch):
     ]
     client = FakeClient()
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.japan_mqtt.mqtt.Client", lambda *args, **kwargs: client
+        "hyundai_kia_connect_api.mqtt_client.mqtt.Client",
+        lambda *args, **kwargs: client,
     )
     yield instance, client
     instance.close()
@@ -326,11 +329,11 @@ def test_close_clears_passive_state_queue_and_late_updates_cannot_repopulate_it(
     assert instance.latest_state is None
 
 
-@pytest.mark.parametrize("grant", [[0, 0, 0], [128, 1, 1], [1]])
+@pytest.mark.parametrize("grant", [[128, 1, 1], [1], [1, 2, 1]])
 def test_subscription_failure_disconnects_without_command(session, grant):
     instance, client = session
     client.grant = grant
-    with pytest.raises(APIError, match="QoS 1"):
+    with pytest.raises(APIError, match="subscriptions were not granted"):
         instance.prepare()
     client.disconnect.assert_called_once()
     client.loop_stop.assert_called_once()
@@ -344,11 +347,63 @@ def test_connection_failure_disconnects(session):
     client.disconnect.assert_called_once()
 
 
+def test_granted_lower_qos_still_confirms_all_japan_subscriptions(session):
+    instance, client = session
+    client.grant = [1, 0, 1]
+    instance.prepare()
+    assert instance.diagnostics["ready"] is True
+    assert instance.request_context == {
+        "clientId": "synthetic-client",
+        "vehicleId": "synthetic-vehicle",
+    }
+
+
+def test_shared_transport_preserves_retention_and_exact_result_correlation(session):
+    instance, client = session
+    instance.prepare()
+    instance.track("synthetic-action")
+    client.on_message(
+        client,
+        None,
+        message(
+            instance._topics[1],
+            {"sid": "synthetic-action", "res-msg": "S"},
+            retained=True,
+        ),
+    )
+    assert instance.status("synthetic-action") == ORDER_STATUS.PENDING
+    client.on_message(
+        client,
+        None,
+        message(instance._topics[1], {"sid": "unrelated-action", "res-msg": "S"}),
+    )
+    assert instance.status("synthetic-action") == ORDER_STATUS.PENDING
+    client.on_message(
+        client,
+        None,
+        message(instance._topics[1], {"sid": "synthetic-action", "res-msg": "S"}),
+    )
+    assert instance.status("synthetic-action") == ORDER_STATUS.SUCCESS
+    assert instance.diagnostics["retained_result_messages"] == 1
+    assert instance.diagnostics["matched_results"] == 1
+
+
+def test_shared_transport_loop_start_failure_cannot_mark_session_ready(session):
+    instance, client = session
+    client.loop_start = Mock(return_value=4)
+    with pytest.raises(APIError, match="network loop could not start"):
+        instance.prepare()
+    assert instance.closed
+    assert instance.diagnostics["ready"] is False
+    client.disconnect.assert_called_once()
+    client.loop_stop.assert_called_once()
+
+
 def test_disconnect_interrupts_wait(session):
     instance, client = session
     instance.prepare()
     instance.track("synthetic-action")
-    instance._on_disconnect(client, None, {}, 1, None)
+    client.on_disconnect(client, None, {}, 1, None)
     with pytest.raises(APIError, match="connection was lost"):
         instance.status("synthetic-action")
 
@@ -358,7 +413,7 @@ def test_missing_suback_times_out_and_closes(session, monkeypatch):
     monkeypatch.setattr(instance, "CONNECT_TIMEOUT", 0.001)
 
     def start():
-        instance._on_connect(client, None, {}, 0, None)
+        client.on_connect(client, None, {}, 0, None)
         return 0
 
     client.loop_start = start
@@ -461,7 +516,7 @@ def test_requests_json_decode_error_has_typed_safe_response(session):
     with pytest.raises(InvalidAPIResponseError) as caught:
         instance.prepare()
     assert "synthetic-secret" not in str(caught.value)
-    assert instance._client is None
+    assert instance._transport is None
 
 
 @pytest.mark.parametrize("header_name", ["tid", "Tid", "TID"])
@@ -704,9 +759,9 @@ def test_late_callbacks_cannot_resurrect_closed_session(session):
     instance, client = session
     instance.prepare()
     instance.close()
-    instance._on_connect(client, None, {}, 0, None)
-    instance._on_subscribe(client, None, 7, [1, 1, 1], None)
-    instance._on_connect_fail(client, None)
+    client.on_connect(client, None, {}, 0, None)
+    client.on_subscribe(client, None, 7, [1, 1, 1], None)
+    client.on_connect_fail(client, None)
     assert instance.closed
     assert instance.diagnostics["ready"] is False
     assert instance.diagnostics["last_status"] == "not_started"
@@ -738,7 +793,7 @@ def test_close_during_bootstrap_prevents_client_start(session):
             future.result(timeout=2)
     assert instance._http_session.request.call_count == 1
     client.connect_async.assert_not_called()
-    assert instance._client is None
+    assert instance._transport is None
     assert instance.diagnostics["ready"] is False
 
 
@@ -750,7 +805,7 @@ def test_close_interrupts_subscription_wait_without_waiting_for_timeout(session)
     started = Event()
 
     def start():
-        instance._on_connect(client, None, {}, 0, None)
+        client.on_connect(client, None, {}, 0, None)
         started.set()
         return 0
 
@@ -805,7 +860,7 @@ def test_concurrent_prepare_bootstraps_only_once(session, monkeypatch):
 
     instance._http_session.request.side_effect = request
     factory = Mock(return_value=client)
-    monkeypatch.setattr("hyundai_kia_connect_api.japan_mqtt.mqtt.Client", factory)
+    monkeypatch.setattr("hyundai_kia_connect_api.mqtt_client.mqtt.Client", factory)
     with ThreadPoolExecutor(max_workers=2) as executor:
         first = executor.submit(instance.prepare)
         try:
@@ -823,7 +878,7 @@ def test_concurrent_prepare_bootstraps_only_once(session, monkeypatch):
 def test_disconnected_session_cannot_start_a_replacement_client(session):
     instance, client = session
     instance.prepare()
-    instance._on_disconnect(client, None, {}, 1, None)
+    client.on_disconnect(client, None, {}, 1, None)
     with pytest.raises(APIError, match="connection was lost"):
         instance.prepare()
     assert instance.closed
@@ -926,7 +981,7 @@ def test_failed_property_distinguishes_healthy_close_from_connection_failure(ses
 def test_disconnected_session_exposes_failure_without_error_details(session):
     instance, client = session
     instance.prepare()
-    instance._on_disconnect(client, None, {}, 1, None)
+    client.on_disconnect(client, None, {}, 1, None)
     assert instance.failed is True
     assert instance.closed is False
     instance.close()
