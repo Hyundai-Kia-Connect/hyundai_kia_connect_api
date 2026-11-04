@@ -83,6 +83,7 @@ class VehicleSupports:
     # VehicleManager.set_windows_state
     window_control: bool | None = None
     supported_window_positions: tuple[str, ...] | None = None
+    # VehicleManager.start_climate setpoint bounds (Celsius)
     climate_temperature_range: tuple[float, float] | None = None
     # VehicleManager.start_valet_mode / stop_valet_mode
     valet_mode: bool | None = None
@@ -219,7 +220,7 @@ class Vehicle:
     _valet_failed: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
-    # distinct from Token.mqtt_client_id (the device-level registration id).
+    # distinct from Token.mqtt_client_id (the broker-issued client id).
     mqtt_vehicle_id: str | None = None
     hu_client_id: str | None = None
 

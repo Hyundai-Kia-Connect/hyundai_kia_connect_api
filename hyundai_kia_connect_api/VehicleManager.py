@@ -137,6 +137,19 @@ class VehicleManager:
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
 
+    @property
+    def supported_commands(self) -> frozenset[str] | None:
+        """Advertised command names; None retains existing regional behavior."""
+        return self.api.supported_commands
+
+    def get_local_diagnostics(self) -> dict[str, Any]:
+        """Read protocol diagnostics without contacting the service or vehicle."""
+        return self.api.get_local_diagnostics()
+
+    def apply_cached_mqtt_state(self, vehicle_id: str) -> bool:
+        """Apply locally received telemetry without refreshing authentication."""
+        return self.api.apply_cached_mqtt_state(self.get_vehicle(vehicle_id))
+
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
 
@@ -551,7 +564,7 @@ class VehicleManager:
             if BRANDS[brand] == BRAND_HYUNDAI:
                 return KiaUvoApiJP(region, brand, language)
             raise APIError("Japan is supported only for Hyundai")
-        if REGIONS[region] == REGION_CANADA:
+        elif REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
             return KiaUvoApiEU(region, brand, language)

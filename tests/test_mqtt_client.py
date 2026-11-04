@@ -1,252 +1,267 @@
-"""The shared receive-only transport has no provider or vehicle dependencies."""
-
-import ssl
-from types import SimpleNamespace
-from unittest.mock import Mock
+"""Tests for the generic MQTT transport (mqtt_client module)."""
 
 import pytest
-from paho.mqtt.enums import CallbackAPIVersion
 
 from hyundai_kia_connect_api.mqtt_client import MqttTransport
 
-
-@pytest.fixture
-def client(monkeypatch):
-    instance = Mock()
-    instance.loop_start.return_value = 0
-    instance.subscribe.return_value = (0, 7)
-    factory = Mock(return_value=instance)
-    monkeypatch.setattr("hyundai_kia_connect_api.mqtt_client.mqtt.Client", factory)
-    yield instance, factory
-    instance.publish.assert_not_called()
+pytest.importorskip("paho.mqtt.client")
 
 
-def connect(client, **callbacks):
-    instance, _factory = client
-    transport = MqttTransport(**callbacks)
-    transport.configure("synthetic.example", client_id="synthetic-client")
-    transport.connect()
-    instance.on_connect(instance, None, {}, 0, None)
-    return transport
+def test_connect_constructs_paho_client_with_callback_api_v2(monkeypatch):
+    """paho v2-only: the paho Client is constructed with CallbackAPIVersion.VERSION2."""
+    import hyundai_kia_connect_api.mqtt_client as mqtt_client_mod
 
+    captured = {}
 
-def suback(client, grants, mid=7):
-    instance, _factory = client
-    instance.on_subscribe(
-        instance, None, mid, [SimpleNamespace(value=value) for value in grants], None
+    class _FakePahoClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def username_pw_set(self, *args, **kwargs): ...
+        def tls_set(self, tls_version=None): ...
+        def tls_insecure_set(self, *args, **kwargs): ...
+        def reconnect_delay_set(self, *args, **kwargs): ...
+        def connect_async(self, *args, **kwargs): ...
+        def loop_start(self): ...
+        def max_inflight_messages_set(self, count): ...
+
+    monkeypatch.setattr(mqtt_client_mod.mqtt, "Client", _FakePahoClient)
+    t = MqttTransport()
+    t.configure("broker.example", 8883)
+    t.connect()
+    assert (
+        captured.get("callback_api_version")
+        == mqtt_client_mod.mqtt.CallbackAPIVersion.VERSION2
     )
 
 
-def test_default_transport_keeps_tls_reconnect_and_immediate_qos_zero_behavior(client):
-    instance, factory = client
-    transport = connect(client)
-    factory.assert_called_once_with(
-        callback_api_version=CallbackAPIVersion.VERSION2,
-        client_id="synthetic-client",
-        protocol=4,
-        clean_session=True,
-        reconnect_on_failure=True,
-    )
-    instance.tls_set.assert_called_once_with(tls_version=ssl.PROTOCOL_TLS_CLIENT)
-    instance.tls_insecure_set.assert_called_once_with(False)
-    instance.tls_set_context.assert_not_called()
-    instance.reconnect_delay_set.assert_called_once_with(min_delay=1, max_delay=30)
-    instance.max_inflight_messages_set.assert_called_once_with(100)
-    assert instance.connect_timeout == 10
-    instance.connect_async.assert_called_once_with(
-        "synthetic.example", 8883, keepalive=15
-    )
+def test_module_has_no_v1_fallback_flags():
+    """The v1 compat shells must be gone: no _PAHO_AVAILABLE / _PAHO_V2 flags."""
+    import hyundai_kia_connect_api.mqtt_client as mqtt_client_mod
 
-    assert transport.subscribe(["synthetic/a", "synthetic/b"]) == [
-        "synthetic/a",
-        "synthetic/b",
+    assert not hasattr(mqtt_client_mod, "_PAHO_AVAILABLE")
+    assert not hasattr(mqtt_client_mod, "_PAHO_V2")
+
+
+def test_subscribe_batch_qos0():
+    """subscribe(list[str]) — single batch SUBSCRIBE, QoS 0, no schema knowledge."""
+    calls: list[list[tuple[str, int]]] = []
+
+    class _FakePaho:
+        def subscribe(self, topics):
+            calls.append(list(topics))
+            return (0, 7)
+
+        def connect_async(self, *a, **k): ...
+        def loop_start(self): ...
+        def max_inflight_messages_set(self, count): ...
+        def username_pw_set(self, *a, **k): ...
+        def tls_set(self, tls_version=None): ...
+        def tls_insecure_set(self, *a, **k): ...
+        def reconnect_delay_set(self, *a, **k): ...
+
+    t = MqttTransport()
+    t._client = _FakePaho()  # type: ignore[assignment]
+    t._connected = True
+    t.subscribe(["service/phone/_/vss/v1/", "device/c1/remotecontroller/connect"])
+    assert calls == [
+        [
+            ("service/phone/_/vss/v1/", 0),
+            ("device/c1/remotecontroller/connect", 0),
+        ]
     ]
-    instance.subscribe.assert_called_once_with([("synthetic/a", 0), ("synthetic/b", 0)])
-    snapshot = transport.subscribed_topics
-    snapshot.clear()
-    assert transport.subscribed_topics == ["synthetic/a", "synthetic/b"]
-    assert transport.is_connected
 
 
-def test_connect_requires_configuration_without_starting_a_client(client):
-    _instance, factory = client
-    with pytest.raises(ValueError, match="not configured"):
-        MqttTransport().connect()
-    factory.assert_not_called()
+def test_on_message_receives_raw_topic_payload():
+    got: list[tuple[str, bytes]] = []
+    t = MqttTransport(on_message=lambda topic, payload: got.append((topic, payload)))
+
+    class _Msg:
+        topic = "service/phone/_/vss/v1/"
+        payload = b"j"
+
+    t._on_mqtt_message(None, None, _Msg())
+    assert got == [("service/phone/_/vss/v1/", b"j")]
 
 
-def test_disconnected_and_empty_subscriptions_are_not_sent(client):
-    instance, _factory = client
-    transport = MqttTransport()
-    assert transport.subscribe(["synthetic/a"]) == []
-    transport = connect(client)
-    assert transport.subscribe([]) == []
-    instance.subscribe.assert_not_called()
+def test_configure_accepts_broker_credential_names():
+    """The manager→transport call shape (post-review rename) works on the
+    REAL transport, not just test doubles."""
+    import hyundai_kia_connect_api.mqtt_client as mod
 
-
-@pytest.mark.parametrize("qos", [0, 1, 2])
-def test_opt_in_confirmation_requires_matching_mid_count_and_requested_qos(client, qos):
-    success, failure = Mock(), Mock()
-    transport = connect(
-        client, on_subscribe_success=success, on_subscribe_failure=failure
+    t = mod.MqttTransport()
+    t.configure(
+        broker_host="broker.example",
+        broker_port=8883,
+        client_id="client-1",
+        broker_username="u",
+        broker_password="p",
     )
-    transport.subscribe(["synthetic/a", "synthetic/b"], qos=qos)
-    success.assert_not_called()
-    failure.assert_not_called()
-    suback(client, [qos, qos], mid=99)
-    success.assert_not_called()
-    suback(client, [qos, qos])
-    success.assert_called_once_with()
-    failure.assert_not_called()
-    suback(client, [qos, qos])
-    success.assert_called_once()
+    assert t._broker_username == "u"
 
 
-@pytest.mark.parametrize("grants", [[], [1], [1, 128], [1, 1, 1], [1, 2]])
-def test_opt_in_confirmation_reports_missing_invalid_or_rejected_grants(client, grants):
-    success, failure = Mock(), Mock()
-    transport = connect(
-        client, on_subscribe_success=success, on_subscribe_failure=failure
+def test_connack_refusal_notifies_instead_of_raising():
+    """Refusal on the paho thread must not raise: paho re-raises callback
+    exceptions on its network loop, killing the thread before any glue
+    sees it (live-probed on paho 2.1.0). Surface via on_disconnect +
+    connection-change instead."""
+
+    class _Reason:
+        value = 135
+
+    refused: list[str] = []
+    changes: list[bool] = []
+    t = MqttTransport(
+        on_disconnect=lambda reason: refused.append(reason),
+        on_connect=lambda: refused.append("connected"),  # must NOT fire
     )
-    transport.subscribe(["synthetic/a", "synthetic/b"], qos=1)
-    suback(client, grants)
-    success.assert_not_called()
-    failure.assert_called_once_with("subscriptions not granted requested QoS")
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_connect(None, None, None, _Reason())
+    assert refused == ["broker refused (rc=135)"]
+    assert changes == [False]
+    assert t.is_connected is False
 
 
-def test_opt_in_confirmation_accepts_legal_qos_downgrade(client):
-    success, failure = Mock(), Mock()
-    transport = connect(
-        client, on_subscribe_success=success, on_subscribe_failure=failure
+def test_connect_fail_routes_to_disconnect_callback():
+    """A failed socket connect (DNS/TLS) goes through the same glue path."""
+    refused: list[str] = []
+    changes: list[bool] = []
+    t = MqttTransport(on_disconnect=lambda reason: refused.append(reason))
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_connect_fail(None, None)
+    assert refused == ["connect failed (unreachable)"]
+    assert changes == [False]
+
+
+def test_connect_without_configure_raises():
+    t = MqttTransport()
+    with pytest.raises(ValueError, match="Broker host not configured"):
+        t.connect()
+
+
+def test_connect_passes_broker_credentials(monkeypatch):
+    """broker_username/broker_password (device/register triple) reach
+    username_pw_set on the real transport path."""
+    import hyundai_kia_connect_api.mqtt_client as mod
+
+    captured = {}
+
+    class _FakePaho:
+        def __init__(self, **kwargs): ...
+        def username_pw_set(self, username, password):
+            captured["creds"] = (username, password)
+
+        def tls_set(self, tls_version=None): ...
+        def tls_insecure_set(self, *a, **k): ...
+        def reconnect_delay_set(self, *a, **k): ...
+        def connect_async(self, *a, **k): ...
+        def loop_start(self): ...
+        def max_inflight_messages_set(self, count): ...
+
+    monkeypatch.setattr(mod.mqtt, "Client", _FakePaho)
+    t = mod.MqttTransport()
+    t.configure("broker.example", 8883, broker_username="u", broker_password="p")
+    t.connect()
+    assert captured["creds"] == ("u", "p")
+
+
+def test_disconnect_stops_loop_and_clears_state():
+    import types
+
+    stops, disconnects = [], []
+    t = MqttTransport()
+    t._client = types.SimpleNamespace(  # type: ignore[assignment]
+        loop_stop=lambda: stops.append(1), disconnect=lambda: disconnects.append(1)
     )
-    transport.subscribe(["synthetic/a", "synthetic/b"], qos=1)
-    suback(client, [1, 0])
-    success.assert_called_once_with()
-    failure.assert_not_called()
+    t._connected = True
+    t._subscribed_topics = ["t1"]
+    t.disconnect()
+    assert stops == [1]
+    assert disconnects == [1]
+    assert t._client is None
+    assert t.is_connected is False
+    # idempotent without a client
+    t.disconnect()
+    assert t.is_connected is False
+    assert t.subscribed_topics == []
 
 
-@pytest.mark.parametrize("qos", [True, -1, 3, "1"])
-def test_invalid_qos_never_subscribes(client, qos):
-    transport = connect(client)
-    with pytest.raises(ValueError, match="QoS"):
-        transport.subscribe(["synthetic/a"], qos=qos)
-    client[0].subscribe.assert_not_called()
+def test_subscribe_requires_connected_client():
+    t = MqttTransport()
+    assert t.subscribe(["a"]) == []  # no client
+    t._client = object()  # type: ignore[assignment]  # not connected
+    assert t.subscribe(["a"]) == []
+    t._connected = True
+    assert t.subscribe([]) == []  # nothing to subscribe
 
 
-def test_immediate_subscription_rejection_notifies_opt_in_provider(client):
-    success, failure = Mock(), Mock()
-    transport = connect(
-        client, on_subscribe_success=success, on_subscribe_failure=failure
+def test_connack_success_fires_connection_callbacks():
+    connected_calls, changes = [], []
+    t = MqttTransport(on_connect=lambda: connected_calls.append(1))
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_connect(None, None, None, 0)  # int reason code
+    assert connected_calls == [1]
+    assert changes == [True]
+    assert t.is_connected is True
+
+
+def test_disconnect_callback_routes_reason():
+    refused, changes = [], []
+
+    class _Reason:
+        value = 7
+
+    t = MqttTransport(on_disconnect=lambda r: refused.append(r))
+    t.set_on_connection_change(lambda up: changes.append(up))
+    t._on_mqtt_disconnect(None, None, None, 0)
+    assert refused == ["clean disconnect"]
+    t._on_mqtt_disconnect(None, None, None, _Reason())
+    assert refused[-1] == "unexpected (rc=7)"
+    assert changes == [False, False]
+    assert t.is_connected is False
+
+
+def test_subscribe_ack_logs_rejections_and_grants():
+    import hyundai_kia_connect_api.mqtt_client as mod
+
+    class _RC:
+        def __init__(self, value):
+            self.value = value
+
+    t = mod.MqttTransport()
+    t._on_mqtt_subscribe(None, None, 1, [])  # no reason codes → no-op
+    t._on_mqtt_subscribe(None, None, 2, [_RC(0), _RC(0x80)])
+    t._on_mqtt_subscribe(None, None, 3, [_RC(0), _RC(0)])
+
+
+def test_tls_uses_client_protocol_constant(monkeypatch):
+    """tls_set must pass tls_version explicitly: paho 2.1.0's default builds
+    ssl.PROTOCOL_TLSv1_2, which Python 3.14 removed — a bare tls_set()
+    crashes on 3.14+ at the first real connect (test doubles hide it)."""
+    import ssl as ssl_mod
+
+    import hyundai_kia_connect_api.mqtt_client as mod
+
+    captured = {}
+
+    class _FakePaho:
+        def __init__(self, **kwargs): ...
+        def tls_set(self, tls_version=None):
+            captured["tls_version"] = tls_version
+
+        def tls_insecure_set(self, *a, **k): ...
+        def username_pw_set(self, *a, **k): ...
+        def reconnect_delay_set(self, *a, **k): ...
+        def connect_async(self, *a, **k): ...
+        def loop_start(self): ...
+        def max_inflight_messages_set(self, count): ...
+
+    monkeypatch.setattr(mod.mqtt, "Client", _FakePaho)
+    t = mod.MqttTransport()
+    t.configure("broker.example", 8883)
+    t.connect()
+    assert (
+        captured["tls_version"]
+        == ssl_mod.PROTOCOL_TLS_CLIENT
+        == ssl_mod.PROTOCOL_TLS_CLIENT
     )
-    client[0].subscribe.return_value = (4, None)
-    transport.subscribe(["synthetic/a"], qos=1)
-    failure.assert_called_once_with("subscription rejected")
-    success.assert_not_called()
-
-
-def test_subscription_exception_is_reported_without_exception_text_when_opted_in(
-    client,
-):
-    failure = Mock()
-    transport = connect(client, on_subscribe_failure=failure)
-    client[0].subscribe.side_effect = ValueError("synthetic-private-details")
-    assert transport.subscribe(["synthetic/a"], qos=1) == []
-    failure.assert_called_once_with("subscription failed")
-
-
-def test_default_subscription_exception_behavior_is_unchanged(client):
-    transport = connect(client)
-    client[0].subscribe.side_effect = ValueError("synthetic-error")
-    with pytest.raises(ValueError, match="synthetic-error"):
-        transport.subscribe(["synthetic/a"])
-
-
-def test_default_message_callback_and_optional_metadata_preserve_delivery(client):
-    plain, details = Mock(), Mock()
-    transport = connect(client, on_message=plain, on_message_details=details)
-    instance = client[0]
-    for retained in (False, True):
-        delivery = SimpleNamespace(
-            topic="synthetic/a", payload=b"synthetic", retain=retained
-        )
-        instance.on_message(instance, None, delivery)
-        plain.assert_called_with("synthetic/a", b"synthetic")
-        details.assert_called_with(delivery)
-    assert transport.is_connected
-
-
-def test_opt_in_tls_context_and_reconnect_policy_do_not_change_defaults(client):
-    instance, factory = client
-    context = ssl.create_default_context()
-    transport = MqttTransport()
-    transport.configure(
-        "synthetic.example",
-        client_id="synthetic-client",
-        broker_username="synthetic-user",
-        broker_password="synthetic-password",
-        reconnect_on_failure=False,
-        tls_context=context,
-    )
-    transport.connect()
-    assert factory.call_args.kwargs["reconnect_on_failure"] is False
-    instance.tls_set_context.assert_called_once_with(context)
-    instance.tls_set.assert_not_called()
-    instance.tls_insecure_set.assert_not_called()
-    instance.username_pw_set.assert_called_once_with(
-        "synthetic-user", "synthetic-password"
-    )
-
-
-def test_loop_start_failure_is_reported_only_to_opt_in_callback(client):
-    instance, _factory = client
-    instance.loop_start.return_value = 4
-    failed = Mock()
-    connect(client, on_loop_start_failure=failed)
-    failed.assert_called_once_with()
-
-
-@pytest.mark.parametrize("stop_loop_first", [True, False])
-def test_disconnect_order_and_pending_confirmation_cleanup(client, stop_loop_first):
-    success = Mock()
-    transport = connect(client, on_subscribe_success=success)
-    transport.subscribe(["synthetic/a"], qos=1)
-    instance = client[0]
-    order = []
-    instance.disconnect.side_effect = lambda: order.append("disconnect")
-    instance.loop_stop.side_effect = lambda: order.append("loop_stop")
-    transport.disconnect(stop_loop_first=stop_loop_first)
-    assert order == (
-        ["loop_stop", "disconnect"] if stop_loop_first else ["disconnect", "loop_stop"]
-    )
-    assert not transport.is_connected
-    assert transport.subscribed_topics == []
-    suback(client, [1])
-    success.assert_not_called()
-    transport.disconnect(stop_loop_first=stop_loop_first)
-    assert len(order) == 2
-
-
-def test_opt_in_disconnect_still_stops_loop_and_clears_state_on_disconnect_error(
-    client,
-):
-    transport = connect(client)
-    instance = client[0]
-    instance.disconnect.side_effect = ValueError("synthetic-error")
-    with pytest.raises(ValueError, match="synthetic-error"):
-        transport.disconnect(stop_loop_first=False)
-    instance.loop_stop.assert_called_once()
-    assert not transport.is_connected
-    assert transport.subscribed_topics == []
-    transport.disconnect(stop_loop_first=False)
-    instance.disconnect.assert_called_once()
-
-
-def test_connection_loss_discards_previous_subscription_confirmation(client):
-    success = Mock()
-    transport = connect(client, on_subscribe_success=success)
-    transport.subscribe(["synthetic/a"], qos=1)
-    instance = client[0]
-    instance.on_disconnect(instance, None, {}, 1, None)
-    suback(client, [1])
-    success.assert_not_called()
-    assert not transport.is_connected

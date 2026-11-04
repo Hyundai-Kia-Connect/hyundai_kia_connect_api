@@ -46,7 +46,10 @@ class MqttTransport:
         self._on_subscribe_failure = on_subscribe_failure
         self._on_loop_start_failure = on_loop_start_failure
         self._subscription_lock = threading.RLock()
-        self._pending_subscriptions: dict[int, tuple[int, int]] = {}
+        self._pending_subscriptions: dict[
+            int,
+            tuple[int, int, Callable[[], None] | None, Callable[[str], None] | None],
+        ] = {}
         self._reconnect_on_failure = True
         self._tls_context: ssl.SSLContext | None = None
         self._broker_host: str | None = None
@@ -166,7 +169,14 @@ class MqttTransport:
         with self._subscription_lock:
             self._pending_subscriptions.clear()
 
-    def subscribe(self, topics: list[str], *, qos: int = 0) -> list[str]:
+    def subscribe(
+        self,
+        topics: list[str],
+        *,
+        qos: int = 0,
+        on_success: Callable[[], None] | None = None,
+        on_failure: Callable[[str], None] | None = None,
+    ) -> list[str]:
         """Batch-subscribe the given topics (one SUBSCRIBE).
 
         QoS defaults to the EU provider's required zero. Other providers can
@@ -180,18 +190,20 @@ class MqttTransport:
             return []
         if type(qos) is not int or qos not in (0, 1, 2):
             raise ValueError("Invalid MQTT subscription QoS")
+        success = on_success or self._on_subscribe_success
+        failure = on_failure or self._on_subscribe_failure
         with self._subscription_lock:
             try:
                 result, mid = self._client.subscribe([(topic, qos) for topic in topics])
             except Exception:
-                if self._on_subscribe_failure is None:
+                if failure is None:
                     raise
-                self._on_subscribe_failure("subscription failed")
+                failure("subscription failed")
                 return []
             if result == mqtt.MQTT_ERR_SUCCESS and mid is not None:
-                self._pending_subscriptions[mid] = (len(topics), qos)
-            elif self._on_subscribe_failure:
-                self._on_subscribe_failure("subscription rejected")
+                self._pending_subscriptions[mid] = (len(topics), qos, success, failure)
+            elif failure:
+                failure("subscription rejected")
         _LOGGER.debug(f"{DOMAIN} - Push batch subscribe mid={mid}, rc={result}")
         self._subscribed_topics = list(topics)
         return list(topics)
@@ -279,14 +291,14 @@ class MqttTransport:
         with self._subscription_lock:
             pending = self._pending_subscriptions.pop(mid, None)
         if pending is not None:
-            count, qos = pending
+            count, qos, success, failure = pending
             if len(qos_values) == count and all(
                 0 <= value <= qos for value in qos_values
             ):
-                if self._on_subscribe_success:
-                    self._on_subscribe_success()
-            elif self._on_subscribe_failure:
-                self._on_subscribe_failure("subscriptions not granted requested QoS")
+                if success:
+                    success()
+            elif failure:
+                failure("subscriptions not granted requested QoS")
         if not qos_values:
             return
         rejected = [q for q in qos_values if q >= 0x80]
