@@ -2,6 +2,7 @@
 
 import datetime as dt
 import logging
+from types import SimpleNamespace
 from unittest.mock import Mock, PropertyMock
 
 import pytest
@@ -1437,3 +1438,45 @@ def test_api_close_releases_lock_before_callbacks_and_prevents_resurrection(
     helper.close.assert_called_once_with()
     factory.assert_not_called()
     assert api._mqtt_sessions == {}
+
+
+def test_force_refresh_accepts_newer_fractional_observation_in_same_second(
+    api, monkeypatch
+):
+    now = dt.datetime(2026, 11, 4, 4, 38, 33, 580000, tzinfo=dt.UTC)
+
+    class FrozenDateTime(dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz)
+
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.KiaUvoApiJP.dt",
+        SimpleNamespace(datetime=FrozenDateTime, UTC=dt.UTC),
+    )
+    helper = Mock()
+    helper.status.return_value = ORDER_STATUS.SUCCESS
+    helper.latest_state = {
+        "Date": "20261104043833.584",
+        "Drivetrain": {"FuelSystem": {"DTE": {"Total": 321, "Unit": 1}}},
+    }
+    monkeypatch.setattr(api, "_mqtt_for_vehicle", lambda *args: helper)
+    monkeypatch.setattr(
+        api, "_control_headers", lambda *args: {"Authorization": "synthetic"}
+    )
+    monkeypatch.setattr(
+        api,
+        "update_vehicle_with_cached_state",
+        Mock(side_effect=AssertionError("newer MQTT data must not poll storage")),
+    )
+    api.session.request.return_value = response({"msgId": "synthetic-action"})
+    vehicle = Vehicle(id="synthetic", ccu_ccs2_protocol_support=1)
+    vehicle.last_updated_at = now.replace(microsecond=583000)
+
+    api.force_refresh_vehicle_state(
+        Token(username="synthetic", password="synthetic", pin="1234"), vehicle
+    )
+
+    assert vehicle.last_updated_at == now.replace(microsecond=584000)
+    assert vehicle.total_driving_range == 321
+    api.update_vehicle_with_cached_state.assert_not_called()

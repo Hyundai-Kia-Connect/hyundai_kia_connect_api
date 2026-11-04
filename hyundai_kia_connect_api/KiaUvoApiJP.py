@@ -461,14 +461,10 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
             candidate = copy.deepcopy(vehicle)
             if isinstance(state, dict):
                 try:
-                    timestamp = parse_datetime(state.get("Date"), dt.UTC)
-                    if (
-                        timestamp is not None
-                        and timestamp >= started_at
-                        and (
-                            vehicle.last_updated_at is None
-                            or timestamp > vehicle.last_updated_at
-                        )
+                    timestamp = self._ccs2_observation_time(state.get("Date"))
+                    if timestamp >= started_at and (
+                        vehicle.last_updated_at is None
+                        or timestamp > vehicle.last_updated_at
                     ):
                         self._update_vehicle_properties_ccs2(candidate, state)
                         vehicle.__dict__.update(candidate.__dict__)
@@ -541,6 +537,11 @@ class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
     ) -> None:
         """Map logical driver/passenger telemetry to physical Japan positions."""
         super()._update_vehicle_properties_ccs2(vehicle, state)
+        if state.get("Date"):
+            # Preserve CCS2 precision without the legacy timestamp correction.
+            vehicle._last_updated_at = self._ccs2_observation_time(
+                state["Date"]
+            ).astimezone(self.data_timezone)
         options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
         location = options.get("drvSeatLoc") if isinstance(options, dict) else None
         for left, right in (

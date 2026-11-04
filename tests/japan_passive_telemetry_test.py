@@ -2,6 +2,7 @@
 
 import copy
 import datetime as dt
+import time
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -227,3 +228,71 @@ def test_diagnostics_are_counters_not_identifiers_or_payloads():
     }
     assert "synthetic" not in repr(summary)
     assert "Date" not in repr(summary)
+
+
+@pytest.fixture(params=["UTC", "Asia/Tokyo"])
+def host_timezone(request, monkeypatch):
+    try:
+        with monkeypatch.context() as environment:
+            environment.setenv("TZ", request.param)
+            time.tzset()
+            yield request.param
+    finally:
+        time.tzset()
+
+
+def test_repeated_fractional_cache_reads_preserve_source_time(host_timezone):
+    api, vehicle, _ = setup()
+    api._request.side_effect = None
+    api._request.return_value = {
+        "resMsg": {"state": {"Vehicle": state("20261104043833.583")}}
+    }
+    api.update_vehicle_with_cached_location = Mock()
+    expected = dt.datetime(2026, 11, 4, 4, 38, 33, 583000, tzinfo=dt.UTC)
+    token = Token(username="synthetic", password="synthetic")
+
+    for _ in range(3):
+        api.update_vehicle_with_cached_state(token, vehicle)
+        assert vehicle.last_updated_at == expected
+
+    assert api._request.call_count == 3
+    api.session.request.assert_not_called()
+
+
+def test_fractional_delta_does_not_block_later_lock_and_port_state(host_timezone):
+    api, vehicle, helper = setup()
+    api._request.side_effect = None
+    api._request.return_value = {
+        "resMsg": {"state": {"Vehicle": state("20261104043833.583", lock=1)}}
+    }
+    api.update_vehicle_with_cached_location = Mock()
+    api.update_vehicle_with_cached_state(
+        Token(username="synthetic", password="synthetic"), vehicle
+    )
+    api._request.reset_mock()
+    api._request.side_effect = AssertionError("passive reads must not request")
+    vehicle.ev_charge_port_door_is_open = False
+    helper.latest_state = {"Date": "20261104043833.584", "DrivingReady": False}
+    assert api.apply_cached_mqtt_state(vehicle)
+    assert vehicle.last_updated_at == dt.datetime(
+        2026, 11, 4, 4, 38, 33, 584000, tzinfo=dt.UTC
+    )
+
+    helper.latest_state = {
+        "Date": "20261104043853.123",
+        "Cabin": {
+            "Door": {
+                "Row1": {"Driver": {"Lock": 0}, "Passenger": {"Lock": 0}},
+                "Row2": {"Left": {"Lock": 0}, "Right": {"Lock": 0}},
+            }
+        },
+        "Green": {"ChargingDoor": {"State": 1}},
+    }
+    assert api.apply_cached_mqtt_state(vehicle)
+    assert vehicle.is_locked is True
+    assert vehicle.ev_charge_port_door_is_open is True
+    assert vehicle.last_updated_at == dt.datetime(
+        2026, 11, 4, 4, 38, 53, 123000, tzinfo=dt.UTC
+    )
+    api._request.assert_not_called()
+    api.session.request.assert_not_called()
