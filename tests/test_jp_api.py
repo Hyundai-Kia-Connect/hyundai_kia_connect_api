@@ -247,7 +247,7 @@ def test_legacy_cached_wrapper_single_request(api):
     )
     assert vehicle.is_locked is True
     assert vehicle.car_battery_percentage == 80
-    assert vehicle.last_updated_at.utcoffset() == dt.timedelta(hours=9)
+    assert vehicle.last_updated_at == dt.datetime(2026, 10, 13, tzinfo=dt.UTC)
     assert api.session.request.call_args_list[0].args[1].endswith("/status/latest")
 
 
@@ -276,8 +276,7 @@ def test_ccs2_cached_single_request(api):
     assert vehicle.ev_battery_percentage == 65
     assert vehicle.total_driving_range == 300
     assert vehicle.total_driving_range_unit == "km"
-    assert vehicle.last_updated_at.hour == 18
-    assert vehicle.last_updated_at.utcoffset() == dt.timedelta(hours=9)
+    assert vehicle.last_updated_at == dt.datetime(2026, 10, 13, 9, tzinfo=dt.UTC)
     assert (
         api.session.request.call_args_list[0].args[1].endswith("/ccs2/carstatus/latest")
     )
@@ -552,7 +551,7 @@ def test_stored_location_including_zero_coordinates(api, wrapped):
     )
     assert vehicle.location_latitude == 0
     assert vehicle.location_longitude == 0
-    assert vehicle.location_last_updated_at.utcoffset() == dt.timedelta(hours=9)
+    assert vehicle.location_last_updated_at == dt.datetime(2026, 10, 14, tzinfo=dt.UTC)
     assert api.session.request.call_args.args[1].endswith("/location/park")
 
 
