@@ -74,3 +74,4 @@ repos:
                 - certifi>=2026.10.23
                 - tzdata>=2026.5
                 - pycryptodome>=3.24.1,<4
+                - paho-mqtt>=2.1,<3
