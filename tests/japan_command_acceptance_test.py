@@ -14,7 +14,7 @@ from hyundai_kia_connect_api.exceptions import (
     InvalidAPIResponseError,
     RequestTimeoutError,
 )
-from hyundai_kia_connect_api.HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
+from hyundai_kia_connect_api.KiaUvoApiJP import KiaUvoApiJP
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -33,7 +33,7 @@ def response(body, status=200):
 
 @pytest.fixture
 def setup():
-    api = HyundaiBlueLinkApiJP(10, 2, "en")
+    api = KiaUvoApiJP(10, 2, "en")
     api.session = Mock()
     helper = Mock()
     helper.request_context = {

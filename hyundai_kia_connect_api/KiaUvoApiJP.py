@@ -38,7 +38,7 @@ from .utils import get_child_value, parse_datetime
 from .Vehicle import DailyDrivingStats, Vehicle
 
 
-class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
+class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
     """Japan telemetry, profile-aware controls and explicit acceptance receipts."""
 
     data_timezone = ZoneInfo("Asia/Tokyo")

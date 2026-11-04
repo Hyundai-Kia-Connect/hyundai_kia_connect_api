@@ -20,7 +20,7 @@ from hyundai_kia_connect_api.exceptions import (
     RequestTimeoutError,
     ServiceTemporaryUnavailable,
 )
-from hyundai_kia_connect_api.HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
+from hyundai_kia_connect_api.KiaUvoApiJP import KiaUvoApiJP
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle, VehicleSupports
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -38,14 +38,14 @@ def response(payload, status=200):
 
 @pytest.fixture
 def api():
-    result = HyundaiBlueLinkApiJP(10, 2, "en")
+    result = KiaUvoApiJP(10, 2, "en")
     result.session = Mock()
     return result
 
 
 def test_factory_and_capabilities():
     api = VehicleManager.get_implementation_by_region_brand(10, 2, "en")
-    assert isinstance(api, HyundaiBlueLinkApiJP)
+    assert isinstance(api, KiaUvoApiJP)
     assert "schedule_charging_and_climate" in api.supported_commands
     for brand in (1, 3):
         with pytest.raises(APIError):
@@ -1265,7 +1265,7 @@ def test_disconnected_persistent_telemetry_session_is_replaced_before_next_comma
     replacement = Mock()
     factory = Mock(return_value=replacement)
     monkeypatch.setattr(
-        "hyundai_kia_connect_api.HyundaiBlueLinkApiJP.JapanMqttSession", factory
+        "hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession", factory
     )
     assert api._mqtt_for_vehicle(token, vehicle) is replacement
     failed.close.assert_called_once()

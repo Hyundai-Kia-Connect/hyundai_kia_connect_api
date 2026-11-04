@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from hyundai_kia_connect_api.HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
+from hyundai_kia_connect_api.KiaUvoApiJP import KiaUvoApiJP
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -30,7 +30,7 @@ def delta(date="20261103020020.000", lock=1):
 
 
 def setup():
-    api = HyundaiBlueLinkApiJP(10, 2, "en")
+    api = KiaUvoApiJP(10, 2, "en")
     api.session = Mock()
     api._request = Mock(side_effect=AssertionError("passive reads must not request"))
     api._vehicle_profiles["synthetic"] = {"option": {"drvSeatLoc": "R"}}

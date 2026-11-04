@@ -41,7 +41,7 @@ from .const import (
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
 from .GenesisCciApiEU import GenesisCciApiEU
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
-from .HyundaiBlueLinkApiJP import HyundaiBlueLinkApiJP
+from .KiaUvoApiJP import KiaUvoApiJP
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
 from .KiaCciApiEU import KiaCciApiEU
@@ -476,7 +476,7 @@ class VehicleManager:
     ) -> ApiImpl:
         if REGIONS[region] == REGION_JAPAN:
             if BRANDS[brand] == BRAND_HYUNDAI:
-                return HyundaiBlueLinkApiJP(region, brand, language)
+                return KiaUvoApiJP(region, brand, language)
             raise APIError("Japan is supported only for Hyundai")
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
