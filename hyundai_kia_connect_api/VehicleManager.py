@@ -475,9 +475,9 @@ class VehicleManager:
         region: int, brand: int, language: str
     ) -> ApiImpl:
         if REGIONS[region] == REGION_JAPAN:
-            if BRANDS[brand] != BRAND_HYUNDAI:
-                raise APIError("Japan is supported only for Hyundai")
-            return HyundaiBlueLinkApiJP(region, brand, language)
+            if BRANDS[brand] == BRAND_HYUNDAI:
+                return HyundaiBlueLinkApiJP(region, brand, language)
+            raise APIError("Japan is supported only for Hyundai")
         if REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:

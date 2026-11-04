@@ -7,6 +7,7 @@ from unittest.mock import Mock, PropertyMock
 import pytest
 import requests
 
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.const import ORDER_STATUS
 from hyundai_kia_connect_api.exceptions import (
     APIError,
@@ -45,12 +46,25 @@ def api():
 def test_factory_and_capabilities():
     api = VehicleManager.get_implementation_by_region_brand(10, 2, "en")
     assert isinstance(api, HyundaiBlueLinkApiJP)
-    assert api.supports_force_refresh is True
-    assert api.requires_command_confirmation is False
     assert "schedule_charging_and_climate" in api.supported_commands
     for brand in (1, 3):
         with pytest.raises(APIError):
             VehicleManager.get_implementation_by_region_brand(10, brand, "en")
+
+
+@pytest.mark.parametrize(
+    "method,date",
+    [("update_month_trip_info", "202610"), ("update_day_trip_info", "20261013")],
+)
+def test_unverified_type1_trip_calls_are_rejected_without_network(api, method, date):
+    assert isinstance(api, ApiImplType1)
+    with pytest.raises(NotImplementedError, match="Japan.*trip information"):
+        getattr(api, method)(
+            Token(username="synthetic", password="synthetic"),
+            Vehicle(id="synthetic"),
+            date,
+        )
+    assert api.session.mock_calls == []
 
 
 @pytest.mark.parametrize(
@@ -1021,7 +1035,7 @@ def test_profile_climate_bounds_for_home_assistant(api, option, expected):
     api._vehicle_profiles["synthetic"] = {"option": option}
     vehicle = Vehicle(id="synthetic")
     api.initialize_vehicle_capabilities(vehicle)
-    assert vehicle.climate_temperature_range == expected
+    assert vehicle.supports.climate_temperature_range == expected
 
 
 def test_front_only_window_capability_preserves_rear_telemetry(api):
@@ -1031,7 +1045,7 @@ def test_front_only_window_capability_preserves_rear_telemetry(api):
     }
     vehicle = Vehicle(id="synthetic", back_left_window_is_open=True)
     api.initialize_vehicle_capabilities(vehicle)
-    assert vehicle.supported_window_positions == ("front_left", "front_right")
+    assert vehicle.supports.supported_window_positions == ("front_left", "front_right")
     assert vehicle.back_left_window_is_open is True
 
 

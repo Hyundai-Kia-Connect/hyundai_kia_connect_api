@@ -42,7 +42,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 78,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -190,8 +189,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -259,7 +259,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 59,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -403,8 +402,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -514,7 +514,6 @@
       'brake_fluid_warning_is_on': None,
       'car_battery_percentage': 83,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -740,8 +739,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -851,7 +851,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 91,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -1077,8 +1076,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': 0,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -1178,7 +1178,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 93,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -1404,8 +1403,9 @@
       'stop_lamp_left': False,
       'stop_lamp_right': False,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -1480,7 +1480,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 82,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -1628,8 +1627,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -1717,7 +1717,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 93,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -1861,8 +1860,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -1950,7 +1950,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 71,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -2094,8 +2093,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -2183,7 +2183,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 78,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -2327,8 +2326,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -2416,7 +2416,6 @@
       'brake_fluid_warning_is_on': None,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -2560,8 +2559,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -2649,7 +2649,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 84,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -2793,8 +2792,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -2877,7 +2877,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 80,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -3021,8 +3020,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -3109,7 +3109,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 84,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -3543,8 +3542,9 @@
       'stop_lamp_left': False,
       'stop_lamp_right': False,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -3631,7 +3631,6 @@
       'brake_fluid_warning_is_on': None,
       'car_battery_percentage': 90,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -4077,8 +4076,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -4165,7 +4165,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 95,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -4595,8 +4594,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -4683,7 +4683,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 85,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -5117,8 +5116,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -5205,7 +5205,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -5651,8 +5650,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -5739,7 +5739,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -6185,8 +6184,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -6273,7 +6273,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -6719,8 +6718,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -6807,7 +6807,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 85,
       'ccu_ccs2_protocol_support': 0,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -7241,8 +7240,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -7329,7 +7329,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -7759,8 +7758,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -7847,7 +7847,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': None,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -8277,8 +8276,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -8346,7 +8346,6 @@
       'brake_fluid_warning_is_on': None,
       'car_battery_percentage': 93,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -8490,8 +8489,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -8559,7 +8559,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 95,
       'ccu_ccs2_protocol_support': 2,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -8703,8 +8702,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -8772,7 +8772,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 70,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -8916,8 +8915,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -8990,7 +8990,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -9134,8 +9133,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -9222,7 +9222,6 @@
       'brake_fluid_warning_is_on': 0,
       'car_battery_percentage': 90,
       'ccu_ccs2_protocol_support': 1,
-      'climate_temperature_range': None,
       'daily_stats': list([
         dict({
           'battery_care_consumption': 0,
@@ -9652,8 +9651,9 @@
       'stop_lamp_left': 0,
       'stop_lamp_right': 0,
       'sunroof_is_open': False,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -9736,7 +9736,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 92,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -9880,8 +9879,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -9974,7 +9974,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 87,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -10119,8 +10118,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': 0,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -10213,7 +10213,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 90,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -10358,8 +10357,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': 0,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -10442,7 +10442,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 88,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -10586,8 +10585,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -10665,7 +10665,6 @@
       'brake_fluid_warning_is_on': False,
       'car_battery_percentage': 93,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -10809,8 +10808,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,
@@ -10903,7 +10903,6 @@
       'brake_fluid_warning_is_on': None,
       'car_battery_percentage': 86,
       'ccu_ccs2_protocol_support': None,
-      'climate_temperature_range': None,
       'daily_stats': list([
       ]),
       'day_trip_info': None,
@@ -11047,8 +11046,9 @@
       'stop_lamp_left': None,
       'stop_lamp_right': None,
       'sunroof_is_open': None,
-      'supported_window_positions': None,
       'supports': dict({
+        'climate_temperature_range': None,
+        'supported_window_positions': None,
         'svm': None,
         'valet_mode': None,
         'window_control': None,

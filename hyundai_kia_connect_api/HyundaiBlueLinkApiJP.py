@@ -11,13 +11,12 @@ import math
 import re
 import time
 import uuid
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import requests
 
-from .ApiImpl import ApiImpl, ApiImplSession
 from .ApiImplType1 import ApiImplType1
 from .const import ENGINE_TYPES, ORDER_STATUS, SEAT_STATUS
 from .exceptions import (
@@ -39,14 +38,10 @@ from .utils import get_child_value, parse_datetime
 from .Vehicle import DailyDrivingStats, Vehicle
 
 
-class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
+class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
     """Japan telemetry, profile-aware controls and explicit acceptance receipts."""
 
     data_timezone = ZoneInfo("Asia/Tokyo")
-    supports_remote_commands = True
-    supports_force_refresh = True
-    # Ordinary control success is service acceptance; fresh refresh is separate.
-    requires_command_confirmation = False
     FORCE_REFRESH_TIMEOUT = 120
     supported_commands = frozenset(
         {
@@ -79,21 +74,10 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
     )
     BASIC_AUTHORIZATION = "Basic ZTA4NGMwZTQtZmNmZS00N2UzLTk5YzktMzZlYjkzNTkzNzM3OjFZcWV4dng3TWxiS3c2YUFvYk1FbDJqQVFvQTBtUVhyV1E1SWpIT083TzRZRHRkRw=="
 
-    # Reuse only pure schema parsers, never Type1 HTTP/logging helpers.
-    def _update_vehicle_properties(
-        self, vehicle: Vehicle, state: dict[str, Any]
-    ) -> None:
-        ApiImplType1._update_vehicle_properties(
-            cast(ApiImplType1, self), vehicle, state
-        )
-
-    _get_time_from_string = ApiImplType1._get_time_from_string
-
     def __init__(self, region: int, brand: int, language: str) -> None:
         if region != 10 or brand != 2:
             raise APIError("Japan is supported only for Hyundai in region 10")
         super().__init__()
-        self.session = ApiImplSession()
         self._vehicle_profiles: dict[str, dict[str, Any]] = {}
         self._history_updated_at: dict[str, float] = {}
         self._location_missing_at: dict[str, float] = {}
@@ -410,6 +394,16 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             time.sleep(min(5, max(0, deadline - time.monotonic())))
         raise RequestTimeoutError("Japan refresh completed without newer telemetry")
 
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        raise NotImplementedError("Japan month trip information is not implemented")
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        raise NotImplementedError("Japan day trip information is not implemented")
+
     def initialize_vehicle_capabilities(self, vehicle: Vehicle) -> None:
         """Japan options describe each vehicle rather than the entire region."""
         service = self._vehicle_profiles.get(vehicle.id, {}).get("serviceOption", {})
@@ -429,7 +423,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             and type(options.get("windowSafetyOption2")) is int
             and options.get("windowSafetyOption2") == 4
         )
-        vehicle.supported_window_positions = (
+        vehicle.supports.supported_window_positions = (
             ("front_left", "front_right")
             if front_only
             else ("front_left", "front_right", "back_left", "back_right")
@@ -440,7 +434,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
             and options.get("svmOptionInfo") == 1
         )
         scale = self._temperature_scale(vehicle)
-        vehicle.climate_temperature_range = (
+        vehicle.supports.climate_temperature_range = (
             (scale[2], scale[2] + (scale[1] - scale[0]) * 0.5)
             if scale is not None
             else None
@@ -450,9 +444,7 @@ class HyundaiBlueLinkApiJP(JapanCommandsMixin, JapanSVM, ApiImpl):
         self, vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
         """Map logical driver/passenger telemetry to physical Japan positions."""
-        ApiImplType1._update_vehicle_properties_ccs2(
-            cast(ApiImplType1, self), vehicle, state
-        )
+        super()._update_vehicle_properties_ccs2(vehicle, state)
         options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
         location = options.get("drvSeatLoc") if isinstance(options, dict) else None
         for left, right in (

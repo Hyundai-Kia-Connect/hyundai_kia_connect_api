@@ -78,10 +78,12 @@ class DailyDrivingStats:
 
 @dataclass
 class VehicleSupports:
-    """Whether the vehicle supports each VehicleManager call; ``None`` is unknown."""
+    """Supported vehicle operations and their limits; ``None`` is unknown."""
 
     # VehicleManager.set_windows_state
     window_control: bool | None = None
+    supported_window_positions: tuple[str, ...] | None = None
+    climate_temperature_range: tuple[float, float] | None = None
     # VehicleManager.start_valet_mode / stop_valet_mode
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
@@ -191,8 +193,6 @@ class Vehicle:
     back_left_window_is_open: bool | None = None
     back_right_window_is_open: bool | None = None
     sunroof_is_open: bool | None = None
-    supported_window_positions: tuple[str, ...] | None = None
-    climate_temperature_range: tuple[float, float] | None = None
 
     # Valet Status
     valet_mode_active: bool | None = None
