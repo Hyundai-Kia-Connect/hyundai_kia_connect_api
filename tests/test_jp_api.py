@@ -1264,9 +1264,7 @@ def test_disconnected_persistent_telemetry_session_is_replaced_before_next_comma
     )
     replacement = Mock()
     factory = Mock(return_value=replacement)
-    monkeypatch.setattr(
-        "hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession", factory
-    )
+    monkeypatch.setattr("hyundai_kia_connect_api.KiaUvoApiJP.JapanMqttSession", factory)
     assert api._mqtt_for_vehicle(token, vehicle) is replacement
     failed.close.assert_called_once()
     factory.assert_called_once()

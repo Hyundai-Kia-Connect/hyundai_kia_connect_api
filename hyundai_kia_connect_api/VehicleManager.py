@@ -41,7 +41,6 @@ from .const import (
 from .exceptions import APIError, AuthenticationError, AuthenticationOTPRequired
 from .GenesisCciApiEU import GenesisCciApiEU
 from .HyundaiBlueLinkApiBR import HyundaiBlueLinkApiBR
-from .KiaUvoApiJP import KiaUvoApiJP
 from .HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
 from .HyundaiCciApiEU import HyundaiCciApiEU
 from .KiaCciApiEU import KiaCciApiEU
@@ -50,6 +49,7 @@ from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
+from .KiaUvoApiJP import KiaUvoApiJP
 from .KiaUvoApiUSA import KiaUvoApiUSA
 from .svm import SVMDetails
 from .Token import Token
