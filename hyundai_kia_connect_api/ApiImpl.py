@@ -3,6 +3,7 @@
 import datetime as dt
 import logging
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -495,6 +496,16 @@ class ApiImpl:
 
     def __init__(self) -> None:
         """Initialize."""
+
+    def close(self) -> None:
+        """Release adapter-owned HTTP sessions; safe to repeat."""
+        seen: set[int] = set()
+        with ExitStack() as cleanup:
+            for name in ("session", "_service_hub_session", "_sessions"):
+                session = vars(self).get(name)
+                if isinstance(session, requests.Session) and id(session) not in seen:
+                    seen.add(id(session))
+                    cleanup.callback(session.close)
 
     def login(
         self,

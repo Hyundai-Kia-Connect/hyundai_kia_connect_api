@@ -5,6 +5,7 @@ import logging
 import re
 from collections.abc import Callable
 from datetime import timedelta
+from threading import RLock
 from typing import Any
 
 from .ApiImpl import (
@@ -96,6 +97,19 @@ class VehicleManager:
         self._push_session: MqttPushSession | None = None
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
+        self._lifecycle_lock = RLock()
+        self._closed = False
+
+    def close(self) -> None:
+        """Stop push delivery before releasing the adapter's resources."""
+        with self._lifecycle_lock:
+            if self._closed:
+                return
+            self._closed = True
+        try:
+            self.stop_push()
+        finally:
+            self.api.close()
 
     def login(self) -> bool | OTPRequest:
         """Return True on success, an OTPRequest if OTP is required, else False."""
@@ -515,14 +529,29 @@ class VehicleManager:
         Returns False when push is unavailable (unsupported region, no
         broker info, rejected registration); ``APIError`` propagates.
         """
-        vehicle = self.vehicles.get(vehicle_id)
-        # False skips outright; None attempts (the flow's metadata refines it).
-        if vehicle is None or vehicle.supports.mqtt_push is False:
-            _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
-            return False
-        self._ensure_push_session()
-        assert self._push_session is not None
-        return self._push_session.ensure_started(vehicle_id)
+        with self._lifecycle_lock:
+            if self._closed:
+                return False
+            vehicle = self.vehicles.get(vehicle_id)
+            # False skips outright; None attempts (the flow's metadata refines it).
+            if vehicle is None or vehicle.supports.mqtt_push is False:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Push not supported on {type(self.api).__name__}"
+                )
+                return False
+            self._ensure_push_session()
+            assert self._push_session is not None
+            session = self._push_session
+        try:
+            started = session.ensure_started(vehicle_id)
+        finally:
+            # Startup callbacks can close the manager before registration finishes.
+            if self._closed:
+                try:
+                    session.stop()
+                finally:
+                    self.api.close()
+        return started and not self._closed
 
     def stop_push(self) -> None:
         """Disconnect push and reset orchestration state."""
