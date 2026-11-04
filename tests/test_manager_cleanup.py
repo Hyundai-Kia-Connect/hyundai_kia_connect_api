@@ -25,7 +25,7 @@ def manager():
 def test_close_stops_push_before_adapter_and_is_idempotent():
     fleet = manager()
     events = []
-    fleet._push_session = SimpleNamespace(stop=lambda: events.append("push"))
+    fleet._push_session = SimpleNamespace(close=lambda: events.append("push"))
     fleet.api.close.side_effect = lambda: events.append("adapter")
 
     fleet.close()
@@ -38,7 +38,7 @@ def test_close_stops_push_before_adapter_and_is_idempotent():
 
 def test_adapter_cleanup_runs_even_when_push_stop_fails():
     fleet = manager()
-    fleet._push_session = SimpleNamespace(stop=Mock(side_effect=RuntimeError("stop")))
+    fleet._push_session = SimpleNamespace(close=Mock(side_effect=RuntimeError("stop")))
 
     with pytest.raises(RuntimeError, match="stop"):
         fleet.close()
@@ -49,7 +49,7 @@ def test_adapter_cleanup_runs_even_when_push_stop_fails():
 
 def test_close_can_reenter_through_a_push_callback():
     fleet = manager()
-    fleet._push_session = SimpleNamespace(stop=fleet.close)
+    fleet._push_session = SimpleNamespace(close=fleet.close)
 
     fleet.close()
 
@@ -67,7 +67,7 @@ def test_close_during_startup_does_not_resurrect_push():
         assert release.wait(2)
         return True
 
-    fleet._push_session = SimpleNamespace(ensure_started=startup, stop=stopped)
+    fleet._push_session = SimpleNamespace(ensure_started=startup, close=stopped)
     result = []
     worker = Thread(target=lambda: result.append(fleet.start_push("synthetic")))
     worker.start()
