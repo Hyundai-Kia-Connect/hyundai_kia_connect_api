@@ -50,7 +50,7 @@ class MqttTransport:
             int,
             tuple[int, int, Callable[[], None] | None, Callable[[str], None] | None],
         ] = {}
-        self._reconnect_on_failure = True
+        self._reconnect_on_failure = False
         self._tls_context: ssl.SSLContext | None = None
         self._broker_host: str | None = None
         self._broker_port: int = 8883
@@ -83,7 +83,7 @@ class MqttTransport:
         broker_username: str | None = None,
         broker_password: str | None = None,
         *,
-        reconnect_on_failure: bool = True,
+        reconnect_on_failure: bool = False,
         tls_context: ssl.SSLContext | None = None,
     ) -> None:
         """Set broker connection parameters (call before connect()).
@@ -126,7 +126,8 @@ class MqttTransport:
 
         # App-confirmed client settings: connectionTimeout=10,
         # keepAliveInterval=15.
-        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
+        if self._reconnect_on_failure:
+            self._client.reconnect_delay_set(min_delay=1, max_delay=30)
         self._client.connect_timeout = 10
         # App-confirmed: MaxInflight=100 (the paho default is 10).
         self._client.max_inflight_messages_set(100)

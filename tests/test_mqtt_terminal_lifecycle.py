@@ -1,7 +1,7 @@
 """Terminal shutdown cannot be undone by blocked push registration or reconnect."""
 
 from concurrent.futures import ThreadPoolExecutor
-from threading import Event, current_thread
+from threading import Event, Lock, current_thread
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -298,3 +298,89 @@ def test_reconnect_errors_log_stage_and_type_without_private_message(
     assert not workers[0].is_alive()
     assert expected + " (RuntimeError)" in caplog.text
     assert "PRIVATE_ACCOUNT_TOKEN_AND_RESPONSE" not in caplog.text
+
+
+def test_reconnect_recovers_failed_provider_when_other_vehicle_is_connected(
+    monkeypatch,
+):
+    providers = {"first": Provider(), "second": Provider()}
+    vehicles = {key: Vehicle(id=key) for key in providers}
+    restarted = Event()
+    workers = []
+    original = providers["first"].start_push
+    calls = []
+
+    def first_start(*args):
+        calls.append(1)
+        if len(calls) > 1:
+            workers.append(current_thread())
+            restarted.set()
+        return original(*args)
+
+    providers["first"].start_push = first_start
+    owner = MqttPushSession(
+        api=SimpleNamespace(get_push_provider=lambda token, car: providers[car.id]),
+        token_fn=lambda: Token(username="synthetic", password="synthetic"),
+        refresh_fn=Mock(),
+        get_vehicle=vehicles.__getitem__,
+        vehicles=lambda: vehicles,
+    )
+    monkeypatch.setattr(const, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0)
+    assert owner.ensure_started("first")
+    assert owner.ensure_started("second")
+    providers["first"].is_connected = False
+    providers["first"].connection(False)
+    assert restarted.wait(2)
+    workers[0].join(2)
+
+    assert not workers[0].is_alive()
+    assert providers["first"].is_connected
+    assert providers["second"].is_connected
+    assert providers["second"].stop_count == 0
+    owner.close()
+
+
+def test_superseded_reconnect_cannot_rebuild_alongside_new_worker(generic, monkeypatch):
+    owner, api, transports = generic
+    assert owner.ensure_started("synthetic")
+    entered, release, waiting, next_refresh = Event(), Event(), Event(), Event()
+    workers, attempts = [], []
+    lock = Lock()
+
+    class ObservedRebuildLock:
+        def __enter__(self):
+            attempts.append(1)
+            if len(attempts) == 2:
+                waiting.set()
+            lock.acquire()
+
+        def __exit__(self, *_args):
+            lock.release()
+
+    def refresh():
+        workers.append(current_thread())
+        if len(workers) == 1:
+            entered.set()
+            assert release.wait(2)
+        else:
+            next_refresh.set()
+
+    owner._reconnect_lock = ObservedRebuildLock()
+    owner._refresh_fn = refresh
+    monkeypatch.setattr(const, "MQTT_PUSH_RECONNECT_INITIAL_DELAY", 0)
+    owner._on_push_disconnect("first synthetic disconnect")
+    assert entered.wait(2)
+    owner._on_push_disconnect("second synthetic disconnect")
+    assert waiting.wait(2)
+    assert len(workers) == 1
+    release.set()
+    assert next_refresh.wait(2)
+    for worker in workers:
+        worker.join(2)
+        assert not worker.is_alive()
+
+    assert api.get_push_broker_info.call_count == 2
+    assert len(transports) == 2
+    transports[0].disconnect.assert_called_once()
+    assert owner.is_connected
+    owner.close()
