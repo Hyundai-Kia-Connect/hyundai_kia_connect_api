@@ -1,5 +1,7 @@
 """Tests for the neutral Service Hub phone-family wire contract."""
 
+import pytest
+
 from hyundai_kia_connect_api.mqtt_service_hub import (
     MQTT_PROTOCOL_ID_CCU_UPDATE,
     MQTT_PROTOCOL_ID_CONNECTION,
@@ -14,6 +16,7 @@ from hyundai_kia_connect_api.mqtt_service_hub import (
     classify_phone_topic,
     decode_payload,
     parse_service_hub_message,
+    parse_service_hub_status_message,
 )
 
 
@@ -98,3 +101,42 @@ def test_url_with_params():
         build_service_hub_url_with_params("https://h", "/p", {"a": "@x y"})
         == "https://h/p?a=@x%20y"
     )
+
+
+def test_result_topics_require_explicit_regional_opt_in():
+    topic = "service/phone/_/res/client"
+    assert build_car_status_topics("vehicle", result_client_id="client") == [
+        "service/phone/_/vss/vehicle",
+        topic,
+        "service/phone/_/connection/vehicle",
+    ]
+    assert classify_phone_topic(topic) is None
+    assert classify_phone_topic(topic, include_result=True) == (
+        "CarStatus",
+        "Res",
+        "client",
+    )
+    assert parse_service_hub_status_message(topic, b"{}") is None
+    message = parse_service_hub_status_message(topic, b"{}", include_result=True)
+    assert isinstance(message, PushMessage)
+    assert not message.is_status
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [b"not json", b"\xff", b"[]", b"null", b"{}" + b" " * (2 * 1024 * 1024)],
+)
+def test_strict_status_parser_drops_invalid_or_oversized_objects(payload):
+    assert (
+        parse_service_hub_status_message("service/phone/_/vss/vehicle", payload) is None
+    )
+
+
+def test_strict_status_parser_keeps_default_parser_semantics_separate():
+    topic = "service/phone/_/connection/vehicle"
+    default = parse_service_hub_message(topic, b"{}")
+    strict = parse_service_hub_status_message(topic, b"{}")
+    assert default is not None and default.is_status
+    assert strict is not None and not strict.is_status
+    status = parse_service_hub_status_message("service/phone/_/vss/vehicle", b"{}")
+    assert status is not None and status.is_status

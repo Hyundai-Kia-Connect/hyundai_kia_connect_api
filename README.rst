@@ -21,6 +21,8 @@ This package is designed to simplify the complexity of using multiple regions.  
 
 Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
+Japan supports Hyundai only (``region=10``, ``brand=2``). Use the PIN from your Japan Bluelink account. Available controls depend on the vehicle's equipment and service options.
+
 China (Hyundai Bluelink / Kia UVO CN)
 -------------------------------------
 
@@ -38,7 +40,7 @@ Python 3.12 or newer is required to use this package. Vehicle manager is the key
     brand: int,
     username: str
     password: str
-    pin: str (required for CA, and potentially USA, otherwise pass a blank string)
+    pin: str (required for CA and Japan, and potentially USA, otherwise pass a blank string)
 
     Optional parameters are::
     geocode_api_enable: bool
@@ -49,10 +51,10 @@ Python 3.12 or newer is required to use this package. Vehicle manager is the key
 
 Key values for the int exist in the `const.py <https://github.com/Hyundai-Kia-Connect/hyundai_kia_connect_api/blob/master/hyundai_kia_connect_api/const.py>`_ file as::
 
-    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL}
+    REGIONS = {1: REGION_EUROPE, 2: REGION_CANADA, 3: REGION_USA, 4: REGION_CHINA, 5: REGION_AUSTRALIA, 6: REGION_INDIA, 7: REGION_NZ, 8: REGION_BRAZIL, 9: REGION_EUROPE_CCI, 10: REGION_JAPAN}
+
     BRANDS = {1: BRAND_KIA, 2: BRAND_HYUNDAI, 3: BRAND_GENESIS}
     GEO_LOCATION_PROVIDERS = {1: OPENSTREETMAP, 2: GOOGLE}
-
 
 Once this is done you can now make the following calls against the vehicle manager::
 

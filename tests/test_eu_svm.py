@@ -140,6 +140,48 @@ def test_parse_svm_detail_malformed_gps_no_crash():
     assert detail.latitude is None
 
 
+@pytest.mark.parametrize("gps", [None, [], "invalid", {"coord": [], "speed": []}])
+def test_parse_svm_detail_malformed_gps_blocks_remain_unknown(gps):
+    source = _sample_scs_detail()
+    source["gpsDetail"] = gps
+    detail = parse_svm_detail(source)
+    assert detail.image_bytes == b"hello"
+    assert detail.captured_at is None
+    assert detail.captured_at_raw is None
+    assert detail.latitude is None
+    assert detail.longitude is None
+    assert detail.heading is None
+    assert detail.speed == (None, None)
+
+
+def test_parse_svm_detail_keeps_lenient_image_and_timestamp_handling():
+    source = _sample_scs_detail()
+    source["svmImage"] = "!aGVsbG8=!"
+    source["gpsDetail"]["time"] = "invalid"
+    detail = parse_svm_detail(source)
+    assert detail.image_bytes == b"hello"
+    assert detail.captured_at is None
+    assert detail.captured_at_raw == "invalid"
+
+
+def test_parse_svm_detail_epoch_timestamp_keeps_raw_metadata():
+    source = _sample_scs_detail()
+    source["gpsDetail"]["time"] = 1715000000000
+    detail = parse_svm_detail(source)
+    assert detail.captured_at == dt.datetime.fromtimestamp(1715000000, dt.UTC)
+    assert detail.captured_at_raw is None
+    assert detail.raw_metadata["gpsDetail"]["time"] == 1715000000000
+    assert detail.raw_metadata["svmImage"] == "<redacted>"
+    assert source["svmImage"] != "<redacted>"
+
+
+def test_parse_svm_detail_dimension_overflow_preserves_exception():
+    source = _sample_scs_detail()
+    source["imageSize"] = [float("inf"), 720]
+    with pytest.raises(OverflowError):
+        parse_svm_detail(source)
+
+
 # ---------------------------------------------------------------------------
 # _parse_gspa_svm_timestamp
 # ---------------------------------------------------------------------------

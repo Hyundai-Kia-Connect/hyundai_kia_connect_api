@@ -34,11 +34,10 @@ class Token:
     id_token: str | None = None
     # User ID for GSPA X-Stamp (uid claim from CCS JWT).
     user_id: str | None = None
-    # Device/client registration id (from the push register call).
-    # Distinct identity levels:
-    #   Token.mqtt_client_id    = device/client registration id (token level)
-    #   Vehicle.mqtt_vehicle_id = per-vehicle topic id (vehicle level)
+    # Broker-issued MQTT client id, distinct from the phone registration UUID.
     mqtt_client_id: str | None = None
+    # Phone UUID sent to notification registration and Service Hub /device/register.
+    mqtt_registration_uuid: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert Token to a JSON‑serializable dict."""
@@ -76,4 +75,5 @@ class Token:
             id_token=data.get("id_token"),
             user_id=data.get("user_id"),
             mqtt_client_id=data.get("mqtt_client_id"),
+            mqtt_registration_uuid=data.get("mqtt_registration_uuid"),
         )

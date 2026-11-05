@@ -5,6 +5,7 @@ import logging
 import re
 from collections.abc import Callable
 from datetime import timedelta
+from threading import RLock
 from typing import Any
 
 from .ApiImpl import (
@@ -33,6 +34,7 @@ from .const import (
     REGION_EUROPE,
     REGION_EUROPE_CCI,
     REGION_INDIA,
+    REGION_JAPAN,
     REGION_NZ,
     REGION_USA,
     REGIONS,
@@ -50,6 +52,7 @@ from .KiaUvoApiCA import KiaUvoApiCA
 from .KiaUvoApiCN import KiaUvoApiCN
 from .KiaUvoApiEU import KiaUvoApiEU
 from .KiaUvoApiIN import KiaUvoApiIN
+from .KiaUvoApiJP import KiaUvoApiJP
 from .KiaUvoApiUSA import KiaUvoApiUSA
 from .mqtt_push_session import MqttPushSession
 from .svm import SVMDetails
@@ -96,6 +99,20 @@ class VehicleManager:
         self._push_session: MqttPushSession | None = None
         self._push_status_callback: Callable[[str, str], None] | None = None
         self._push_connection_change_callback: Callable[[bool], None] | None = None
+        self._lifecycle_lock = RLock()
+        self._closed = False
+
+    def close(self) -> None:
+        """Stop push delivery before releasing the adapter's resources."""
+        with self._lifecycle_lock:
+            if self._closed:
+                return
+            self._closed = True
+        try:
+            if self._push_session is not None:
+                self._push_session.close()
+        finally:
+            self.api.close()
 
     def login(self) -> bool | OTPRequest:
         """Return True on success, an OTPRequest if OTP is required, else False."""
@@ -134,6 +151,19 @@ class VehicleManager:
         vehicles = self.api.get_vehicles(self.token)
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
+
+    @property
+    def supported_commands(self) -> frozenset[str] | None:
+        """Advertised command names; None retains existing regional behavior."""
+        return self.api.supported_commands
+
+    def get_local_diagnostics(self) -> dict[str, Any]:
+        """Read protocol diagnostics without contacting the service or vehicle."""
+        return self.api.get_local_diagnostics()
+
+    def apply_cached_mqtt_state(self, vehicle_id: str) -> bool:
+        """Apply locally received telemetry without refreshing authentication."""
+        return self.api.apply_cached_mqtt_state(self.get_vehicle(vehicle_id))
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]
@@ -488,6 +518,7 @@ class VehicleManager:
                 refresh_fn=self.check_and_refresh_token,
                 get_vehicle=self.get_vehicle,
                 vehicles=lambda: self.vehicles,
+                after_close_fn=lambda: self.api.close(),
             )
             self._push_session.set_status_callback(self._push_status_callback)
             session = self._push_session
@@ -502,14 +533,29 @@ class VehicleManager:
         Returns False when push is unavailable (unsupported region, no
         broker info, rejected registration); ``APIError`` propagates.
         """
-        vehicle = self.vehicles.get(vehicle_id)
-        # False skips outright; None attempts (the flow's metadata refines it).
-        if vehicle is None or vehicle.supports.mqtt_push is False:
-            _LOGGER.debug(f"{DOMAIN} - Push not supported on {type(self.api).__name__}")
-            return False
-        self._ensure_push_session()
-        assert self._push_session is not None
-        return self._push_session.ensure_started(vehicle_id)
+        with self._lifecycle_lock:
+            if self._closed:
+                return False
+            vehicle = self.vehicles.get(vehicle_id)
+            # False skips outright; None attempts (the flow's metadata refines it).
+            if vehicle is None or vehicle.supports.mqtt_push is False:
+                _LOGGER.debug(
+                    f"{DOMAIN} - Push not supported on {type(self.api).__name__}"
+                )
+                return False
+            self._ensure_push_session()
+            assert self._push_session is not None
+            session = self._push_session
+        try:
+            started = session.ensure_started(vehicle_id)
+        finally:
+            # Startup callbacks can close the manager before registration finishes.
+            if self._closed:
+                try:
+                    session.close()
+                finally:
+                    self.api.close()
+        return started and not self._closed
 
     def stop_push(self) -> None:
         """Disconnect push and reset orchestration state."""
@@ -545,7 +591,11 @@ class VehicleManager:
     def get_implementation_by_region_brand(
         region: int, brand: int, language: str
     ) -> ApiImpl:
-        if REGIONS[region] == REGION_CANADA:
+        if REGIONS[region] == REGION_JAPAN:
+            if BRANDS[brand] == BRAND_HYUNDAI:
+                return KiaUvoApiJP(region, brand, language)
+            raise APIError("Japan is supported only for Hyundai")
+        elif REGIONS[region] == REGION_CANADA:
             return KiaUvoApiCA(region, brand, language)
         elif REGIONS[region] == REGION_EUROPE:
             return KiaUvoApiEU(region, brand, language)

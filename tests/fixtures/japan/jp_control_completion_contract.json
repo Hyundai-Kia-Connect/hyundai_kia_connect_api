@@ -1,0 +1,150 @@
+{
+    "schema_version": 1,
+    "scope": "Public Japan app ordinary-control versus fresh-status completion contracts; no vehicle requests",
+    "app_artifacts": [
+        {
+            "version": "1.0.17",
+            "version_code": "10260",
+            "xapk_sha256": "767891688f234ce96f9723ddaa1541e5780250f2e2bd187a390432d990b10f03",
+            "base_apk_sha256": "2c6f3926f1a57d76c6f37aaf0264c55c9b2344f0d35238f33eef52f80f6c6ca4",
+            "source_url": "https://d.apkpure.net/b/XAPK/com.hyundai.bluelink.jp?versionCode=10260"
+        },
+        {
+            "version": "1.0.18",
+            "version_code": "10277",
+            "xapk_sha256": "211ba18382903179306100743013dcc8a28b8a421fddef18b76c5869eb7affa6",
+            "base_apk_sha256": "7e8f3a41227ab3cd303d927a13252570e428e3cad0f6288a43a5b0b03fb55641",
+            "source_url": "https://d.apkpure.net/b/XAPK/com.hyundai.bluelink.jp?version=latest"
+        }
+    ],
+    "japan_active_flag": {
+        "version_1_0_17": "hmns/global/porting/C1106b.java:494",
+        "value": true,
+        "derivation": "Japan country boolean contributes directly to CCS2/MQTT control flag"
+    },
+    "ordinary_control": {
+        "completion_transport": "http_service_result",
+        "requires_mqtt_completion": false,
+        "msg_id_required": false,
+        "physical_state_confirmed_by_response": false,
+        "read_timeout_seconds": 140,
+        "known_success_envelope": {
+            "retCode": "S",
+            "resCode": "0000"
+        },
+        "app_rejects_ret_code": "F",
+        "endpoints": [
+            {
+                "suffix": "control/door",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1613"
+            },
+            {
+                "suffix": "control/temperature",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1264"
+            },
+            {
+                "suffix": "control/charge",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1501"
+            },
+            {
+                "suffix": "control/portdoor",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1557"
+            },
+            {
+                "suffix": "control/window",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1714"
+            },
+            {
+                "suffix": "control/windowcurtain",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:236"
+            },
+            {
+                "suffix": "control/light",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:2082"
+            },
+            {
+                "suffix": "control/hornlight",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:2030"
+            },
+            {
+                "suffix": "control/valet",
+                "ccs2": false,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1398"
+            },
+            {
+                "suffix": "charge/chargingcurrent",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1035"
+            },
+            {
+                "suffix": "charge/dischargelimit",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1080"
+            },
+            {
+                "suffix": "reservation/chargehvac",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:855"
+            },
+            {
+                "suffix": "reservation/charge",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1060"
+            },
+            {
+                "suffix": "reservation/hvac",
+                "ccs2": true,
+                "caller": "hmns/global/mobile/viewmodels/D.java:1015"
+            },
+            {
+                "suffix": "location/routes",
+                "ccs2": false,
+                "caller": "raw-fallback:sendPoiToVehicle lambda calls LocationApi.sendRoutesToVehicle then Completable completion",
+                "interface": "hmns/global/server/service/LocationApi.java:41"
+            }
+        ],
+        "references": [
+            "hmns/global/mobile/api/RealApiStore.java:62",
+            "androidx/room/p.java:64",
+            "hmns/global/mobile/viewmodels/D.java:101",
+            "io/reactivex/internal/operators/completable/c.java:84",
+            "com/bumptech/glide/load/resource/bitmap/k.java:778",
+            "androidx/work/impl/model/k.java:125",
+            "hmns/global/server/model/base/BaseResponse.java:32"
+        ]
+    },
+    "forced_refresh": {
+        "completion_transport": "mqtt_result",
+        "requires_mqtt_completion": true,
+        "msg_id_required": true,
+        "wait_timeout_seconds": 120,
+        "reads_cached_status_after_completion": true,
+        "references": [
+            "hmns/global/mobile/viewmodels/D.java:484",
+            "P1/b.java:112",
+            "hmns/global/mobile/special/mqtt/r.java:1166",
+            "raw-fallback:Q1.i.apply case11 extracts msgId; case13 calls d0.d(vehicleId)"
+        ],
+        "existing_adapter_freshness_guard": "Preserve the adapter requirement for newer telemetry; app callback also avoids replacing newer status with older status."
+    },
+    "petcare": {
+        "completion_transport": "mqtt_result",
+        "references": [
+            "hmns/global/mobile/viewmodels/D.java:160",
+            "hmns/global/mobile/repositories/F.java:88"
+        ]
+    },
+    "raw_fallback_sha256": {
+        "stop_climate_lambda": "837181045e877986326e39edfc1768f204e58bc66b0a63ca2e48447bbaa7508a",
+        "send_poi_lambda": "dc799e1002d7ba88741613fbac4bb86a132d94c450c98558e89d1b41ece00e53",
+        "refresh_callback": "f5a9c1ff5b61e0d8647b9d251a59a0849383e06759518d4e128d2c8d4cc73276"
+    }
+}

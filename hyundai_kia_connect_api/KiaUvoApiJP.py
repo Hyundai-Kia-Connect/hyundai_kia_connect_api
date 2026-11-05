@@ -1,0 +1,1347 @@
+"""Hyundai Japan Bluelink adapter.
+
+Ordinary controls report HTTP service acceptance without claiming physical
+execution. Fresh-status requests retain correlated MQTT completion checks.
+"""
+
+import base64
+import copy
+import datetime as dt
+import math
+import re
+import threading
+import time
+import uuid
+from typing import Any, ClassVar
+from urllib.parse import parse_qs, urljoin, urlparse
+from zoneinfo import ZoneInfo
+
+import requests
+
+from .ApiImpl import PushProvider
+from .ApiImplType1 import ApiImplType1
+from .const import ENGINE_TYPES, MQTT_PUSH_CONNECTION_STATE, ORDER_STATUS, SEAT_STATUS
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    ConsentRequiredError,
+    DuplicateRequestError,
+    InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
+    ServiceTemporaryUnavailable,
+)
+from .japan_commands import JapanCommandsMixin
+from .japan_mqtt import JapanMqttSession, JapanMqttTransportPool
+from .japan_svm import JapanSVM
+from .mqtt_service_hub import PushMessage, parse_service_hub_status_message
+from .Token import Token
+from .utils import get_child_value, parse_datetime
+from .Vehicle import DailyDrivingStats, Vehicle
+
+
+class KiaUvoApiJP(JapanCommandsMixin, JapanSVM, ApiImplType1):
+    """Japan telemetry, profile-aware controls and explicit acceptance receipts."""
+
+    data_timezone = ZoneInfo("Asia/Tokyo")
+    FORCE_REFRESH_TIMEOUT = 120
+    # Japan temperature bounds come from the per-vehicle profile.
+    temperature_range: tuple[float, ...] = ()
+    supported_commands = frozenset(
+        {
+            "request_svm_capture",
+            "lock_action",
+            "start_charge",
+            "stop_charge",
+            "start_climate",
+            "stop_climate",
+            "set_charge_limits",
+            "set_charging_current",
+            "set_windows_state",
+            "charge_port_action",
+            "start_hazard_lights",
+            "start_hazard_lights_and_horn",
+            "set_vehicle_to_load_discharge_limit",
+            "schedule_charging_and_climate",
+            "valet_mode_action",
+            "set_navigation",
+        }
+    )
+    BASE_URL = "ccs-apigw.hyundaijapan.com:8080"
+    API_URL = "https://" + BASE_URL
+    USER_API_URL = API_URL + "/api/v1/user/"
+    SPA_API_URL = API_URL + "/api/v1/spa/"
+    SPA_API_URL_V2 = API_URL + "/api/v2/spa/"
+    PUSH_TYPE = "GCM"
+    SERVICE_ID = "e084c0e4-fcfe-47e3-99c9-36eb93593737"
+    APP_ID = "8be122e0-b0d9-40b5-a46e-67b25194ba88"
+    CCSP_SERVICE_ID = SERVICE_ID
+    REDIRECT_URI = API_URL + "/api/v1/user/oauth2/redirect"
+    # CFB128 keystream for the fixed UUID prefix and a ten-digit epoch.
+    # Derived offline from Japan app 1.0.17; no app binary is distributed.
+    _STAMP_STREAM = base64.b64decode(
+        "yGeH2vkxepxXpBulEUnI04QXO3CM9oT4E20p+AB8lqHuRZmVEfdQlJmzBX5z5pk="
+    )
+    CFB = _STAMP_STREAM
+    BASIC_AUTHORIZATION = "Basic ZTA4NGMwZTQtZmNmZS00N2UzLTk5YzktMzZlYjkzNTkzNzM3OjFZcWV4dng3TWxiS3c2YUFvYk1FbDJqQVFvQTBtUVhyV1E1SWpIT083TzRZRHRkRw=="
+
+    def __init__(self, region: int, brand: int, language: str) -> None:
+        if region != 10 or brand != 2:
+            raise APIError("Japan is supported only for Hyundai in region 10")
+        super().__init__()
+        self.LANGUAGE = language
+        self._vehicle_profiles: dict[str, dict[str, Any]] = {}
+        self._history_updated_at: dict[str, float] = {}
+        self._location_missing_at: dict[str, float] = {}
+        self._charge_target_cache: dict[str, tuple[float, dict[int, int]]] = {}
+        self._mqtt_sessions: dict[
+            str, tuple[tuple[str | None, ...], JapanMqttSession]
+        ] = {}
+        self._mqtt_sessions_lock = threading.RLock()
+        self._mqtt_closed = False
+        self._mqtt_transport_pool = JapanMqttTransportPool()
+        self._passive_state_observed_at: dict[str, dt.datetime] = {}
+
+    def _mqtt_for_vehicle(self, token: Token, vehicle: Vehicle) -> JapanMqttSession:
+        """Reuse a subscribed Japan session only while its authentication is current."""
+        if (
+            not isinstance(token.mqtt_registration_uuid, str)
+            or not token.mqtt_registration_uuid
+        ):
+            raise AuthenticationError(
+                "Reauthenticate Japan account to register MQTT support"
+            )
+        self._command_vehicle_id(vehicle)
+        identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+        retired = []
+        try:
+            with self._mqtt_sessions_lock:
+                if self._mqtt_closed:
+                    raise APIError("Japan API session is closed")
+                for vehicle_id, (saved, previous) in list(self._mqtt_sessions.items()):
+                    if saved != identity:
+                        retired.append(previous)
+                        del self._mqtt_sessions[vehicle_id]
+                existing = self._mqtt_sessions.get(vehicle.id)
+                if existing is not None and (
+                    existing[1].closed is True
+                    or getattr(existing[1], "failed", False) is True
+                ):
+                    retired.append(existing[1])
+                    del self._mqtt_sessions[vehicle.id]
+                    existing = None
+                if existing is None:
+                    helper = JapanMqttSession(
+                        token,
+                        vehicle.id,
+                        token.mqtt_registration_uuid,
+                        lambda: self._vehicle_headers(token, vehicle),
+                        transport_pool=self._mqtt_transport_pool,
+                        vehicle=vehicle,
+                    )
+                    self._mqtt_sessions[vehicle.id] = (identity, helper)
+                else:
+                    helper = existing[1]
+        finally:
+            # Disconnect callbacks may re-enter the manager and factory.
+            for previous in retired:
+                previous.close(notify_push=True)
+        return helper
+
+    def get_push_provider(self, token: Token, vehicle: Vehicle) -> PushProvider:
+        return self._mqtt_for_vehicle(token, vehicle)
+
+    def _authenticated_push_provider(self, token: Token) -> JapanMqttSession:
+        """Resolve account calls by registered client ID after scoped setup."""
+        identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+        with self._mqtt_sessions_lock:
+            sessions = list(self._mqtt_sessions.values())
+        matches = [
+            helper
+            for saved, helper in sessions
+            if saved == identity and helper.closed is not True
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        if token.mqtt_client_id:
+            for helper in matches:
+                if helper.request_context.get("clientId") == token.mqtt_client_id:
+                    return helper
+        raise InvalidAPIResponseError("Select a Japan vehicle's push provider first")
+
+    def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
+        return self._authenticated_push_provider(token).get_push_broker_info(token)
+
+    def register_push_client(self, token: Token) -> dict[str, Any] | None:
+        return self._authenticated_push_provider(token).register_push_client(token)
+
+    def register_push_vehicle(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        return self._mqtt_for_vehicle(token, vehicle).register_push_vehicle(
+            token, vehicle
+        )
+
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        return self._mqtt_for_vehicle(token, vehicle).get_push_vehicle_identity(
+            token, vehicle
+        )
+
+    def get_push_connection_state(
+        self, token: Token
+    ) -> MQTT_PUSH_CONNECTION_STATE | None:
+        identity = (token.access_token, token.device_id, token.mqtt_registration_uuid)
+        with self._mqtt_sessions_lock:
+            if not any(
+                saved == identity and helper.closed is not True
+                for saved, helper in self._mqtt_sessions.values()
+            ):
+                return None
+            provider = self._authenticated_push_provider(token)
+        return provider.get_push_connection_state(token)
+
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
+        return self._mqtt_for_vehicle(token, vehicle).get_push_topics(token, vehicle)
+
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        return self._authenticated_push_provider(token).get_push_credentials(token)
+
+    def parse_push_message(self, topic: str, payload: bytes) -> PushMessage | None:
+        return parse_service_hub_status_message(topic, payload, include_result=True)
+
+    @staticmethod
+    def _ccs2_observation_time(value: object) -> dt.datetime:
+        """Read Japan CCS2 UTC dates without discarding fractional seconds."""
+        if not isinstance(value, str):
+            raise TypeError("Invalid Japan telemetry timestamp")
+        if re.fullmatch(r"\d{14}(?:\.\d{1,6})?", value):
+            pattern = "%Y%m%d%H%M%S.%f" if "." in value else "%Y%m%d%H%M%S"
+            return dt.datetime.strptime(value, pattern).replace(tzinfo=dt.UTC)
+        if re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+            r"(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})?",
+            value,
+        ):
+            timestamp = dt.datetime.fromisoformat(value)
+            return timestamp.replace(tzinfo=timestamp.tzinfo or dt.UTC).astimezone(
+                dt.UTC
+            )
+        return dt.datetime.strptime(value, "%a, %d %b %Y %H:%M:%S GMT").replace(
+            tzinfo=dt.UTC
+        )
+
+    @classmethod
+    def _merge_ccs2_observation(
+        cls, baseline: dict[str, Any], patch: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Merge a telemetry delta without treating omitted fields as false."""
+        merged = copy.deepcopy(baseline)
+        for key, value in patch.items():
+            if not isinstance(key, str):
+                raise TypeError("Invalid Japan telemetry field")
+            existing = merged.get(key)
+            if isinstance(value, dict):
+                if existing is not None and not isinstance(existing, dict):
+                    raise ValueError("Invalid Japan telemetry object")
+                merged[key] = cls._merge_ccs2_observation(existing or {}, value)
+            elif isinstance(existing, dict):
+                raise TypeError("Invalid Japan telemetry object")
+            elif isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Invalid Japan telemetry value")
+            elif value is None or isinstance(value, (str, int, float, bool, list)):
+                merged[key] = copy.deepcopy(value)
+            else:
+                raise ValueError("Invalid Japan telemetry value")
+        return merged
+
+    def _record_passive_state_result(self, result: str) -> None:
+        counters = getattr(self, "_passive_state_diagnostics", None)
+        if counters is None:
+            counters = dict.fromkeys(("applied", "stale", "invalid", "missing"), 0)
+            self._passive_state_diagnostics = counters
+        counters[result] += 1
+        counters["last_result"] = result
+
+    def apply_cached_mqtt_state(self, vehicle: Vehicle) -> bool:
+        """Apply newer, already-received telemetry; never log in or make requests.
+
+        A valid stored CCS2 snapshot provides the lineage for a delta. Comparing
+        parser outputs preserves unrelated values obtained from optional APIs.
+        This observation updates state, not the acceptance/execution receipt.
+        """
+        if (
+            type(vehicle.ccu_ccs2_protocol_support) is not int
+            or vehicle.ccu_ccs2_protocol_support <= 0
+            or not isinstance(vehicle.id, str)
+        ):
+            self._record_passive_state_result("missing")
+            return False
+        with self._mqtt_sessions_lock:
+            entry = self._mqtt_sessions.get(vehicle.id)
+        if entry is None:
+            self._record_passive_state_result("missing")
+            return False
+        try:
+            drain = getattr(entry[1], "drain_state_updates", None)
+            observations = drain() if callable(drain) else None
+            if not isinstance(observations, list):
+                observations = [entry[1].latest_state]
+        except (AttributeError, IndexError, TypeError, RecursionError):
+            self._record_passive_state_result("invalid")
+            return False
+        if not observations:
+            self._record_passive_state_result("missing")
+            return False
+
+        def observation_time(observation: object) -> dt.datetime:
+            try:
+                return self._ccs2_observation_time(
+                    observation.get("Date") if isinstance(observation, dict) else None
+                )
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                return dt.datetime.max.replace(tzinfo=dt.UTC)
+
+        changed = False
+        for observation in sorted(observations, key=observation_time):
+            if self._apply_cached_mqtt_observation(vehicle, observation):
+                changed = True
+        return changed
+
+    def _apply_cached_mqtt_observation(
+        self, vehicle: Vehicle, observation: object
+    ) -> bool:
+        """Apply one immutable snapshot from the bounded local receive queue."""
+        try:
+            if not isinstance(observation, dict) or not observation:
+                self._record_passive_state_result("missing")
+                return False
+            supported_roots = {
+                "Body",
+                "Cabin",
+                "Chassis",
+                "Drivetrain",
+                "DrivingReady",
+                "Electronics",
+                "Green",
+                "Location",
+                "RemoteControl",
+            }
+            if not any(key in supported_roots for key in observation):
+                raise ValueError("Japan telemetry contains no state observation")
+            timestamp = self._ccs2_observation_time(observation.get("Date"))
+            baseline = vehicle.data
+            if not isinstance(baseline, dict) or "status" in baseline:
+                raise ValueError("Japan telemetry has no CCS2 baseline")
+            previous = self._ccs2_observation_time(baseline.get("Date"))
+            if vehicle.last_updated_at is not None:
+                if vehicle.last_updated_at.tzinfo is None:
+                    raise ValueError("Japan telemetry baseline has no timezone")
+                previous = max(previous, vehicle.last_updated_at)
+            if timestamp <= previous:
+                self._record_passive_state_result("stale")
+                return False
+            for key in supported_roots - {"DrivingReady"}:
+                if key in observation and not isinstance(observation[key], dict):
+                    raise ValueError("Invalid Japan telemetry section")
+            if "DrivingReady" in observation:
+                ready = observation["DrivingReady"]
+                if ready is not None and (
+                    type(ready) not in (bool, int) or ready not in (0, 1)
+                ):
+                    raise ValueError("Invalid Japan ignition observation")
+            for path in (
+                "Cabin.Door.Row1.Driver.Lock",
+                "Cabin.Door.Row1.Passenger.Lock",
+                "Cabin.Door.Row2.Left.Lock",
+                "Cabin.Door.Row2.Right.Lock",
+            ):
+                raw_lock = get_child_value(observation, path)
+                if raw_lock is not None and (
+                    type(raw_lock) is not int or raw_lock not in (0, 1)
+                ):
+                    raise ValueError("Invalid Japan lock observation")
+            state = self._merge_ccs2_observation(baseline, observation)
+            reference, candidate = copy.deepcopy(vehicle), copy.deepcopy(vehicle)
+            self._update_vehicle_properties_ccs2(reference, copy.deepcopy(baseline))
+            self._update_vehicle_properties_ccs2(candidate, state)
+            candidate.last_updated_at = timestamp.astimezone(self.data_timezone)
+            updates = {
+                key: value
+                for key, value in candidate.__dict__.items()
+                if key not in ("data", "_last_updated_at")
+                and value != reference.__dict__.get(key)
+            }
+            updates["data"] = state
+            updates["_last_updated_at"] = candidate._last_updated_at
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            IndexError,
+            OverflowError,
+            RecursionError,
+        ):
+            self._record_passive_state_result("invalid")
+            return False
+        vehicle.__dict__.update(updates)
+        self._passive_state_observed_at[vehicle.id] = timestamp
+        self._record_passive_state_result("applied")
+        return True
+
+    def get_local_diagnostics(self) -> dict[str, Any]:
+        """Return bounded protocol counters without requests or private data."""
+        with self._mqtt_sessions_lock:
+            sessions = list(self._mqtt_sessions.values())[:10]
+        return {
+            "mqtt_sessions": [helper.diagnostics for _, helper in sessions],
+            "svm_images_cached": len(getattr(self, "_japan_svm_cache", {})),
+            "last_command": dict(getattr(self, "_japan_command_diagnostics", {})),
+            "last_camera_capture": self.svm_diagnostics,
+            "last_refresh": dict(getattr(self, "_japan_refresh_diagnostics", {})),
+            **(
+                {"passive_state": dict(self._passive_state_diagnostics)}
+                if hasattr(self, "_passive_state_diagnostics")
+                else {}
+            ),
+        }
+
+    def close(self) -> None:
+        """Release Japan MQTT and HTTP sessions on integration unload."""
+        with self._mqtt_sessions_lock:
+            if self._mqtt_closed:
+                helpers = []
+            else:
+                self._mqtt_closed = True
+                helpers = [helper for _, helper in self._mqtt_sessions.values()]
+                self._mqtt_sessions.clear()
+                self._passive_state_observed_at.clear()
+        for helper in helpers:
+            helper.close()
+        # Finishing background work can recreate a pool after the first close.
+        self.session.close()
+
+    def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Wait for correlated completion and newer telemetry, never just an ACK."""
+        self._japan_refresh_diagnostics: dict[str, Any] = {
+            "stage": "authentication",
+            "outcome": "pending",
+        }
+        try:
+            self._command_vehicle_id(vehicle)
+            headers = self._control_headers(token, vehicle)
+            self._japan_refresh_diagnostics["stage"] = "mqtt_setup"
+            helper = self._mqtt_for_vehicle(token, vehicle)
+            with helper.refresh_session():
+                self._force_refresh_with_session(token, vehicle, helper, headers)
+        except Exception as error:
+            category = next(
+                (
+                    name
+                    for kind, name in (
+                        (RequestTimeoutError, "timeout"),
+                        (AuthenticationError, "authentication"),
+                        (RateLimitingError, "rate_limited"),
+                        (ServiceTemporaryUnavailable, "service_unavailable"),
+                        (InvalidAPIResponseError, "invalid_response"),
+                        (APIError, "api_error"),
+                    )
+                    if isinstance(error, kind)
+                ),
+                "unexpected_error",
+            )
+            self._japan_refresh_diagnostics.update(outcome="failed", failure=category)
+            raise
+        self._japan_refresh_diagnostics.update(stage="complete", outcome="success")
+
+    def _force_refresh_with_session(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        helper: JapanMqttSession,
+        headers: dict[str, str],
+    ) -> None:
+        vehicle_id = self._command_vehicle_id(vehicle)
+        # A cached PIN grant can expire while MQTT bootstrap is in progress.
+        authorization = self._control_headers(token, vehicle)["Authorization"]
+        headers = self._vehicle_headers(token, vehicle, helper)
+        headers["Authorization"] = authorization
+        deadline = time.monotonic() + self.FORCE_REFRESH_TIMEOUT
+        started_at = dt.datetime.now(dt.UTC).replace(microsecond=0)
+        self._japan_refresh_diagnostics["stage"] = "http_request"
+        result = self._request(
+            "GET", f"/api/v2/spa/vehicles/{vehicle_id}/ccs2/carstatus", headers=headers
+        )
+        action_id = result.get("msgId")
+        if not isinstance(action_id, str) or not action_id:
+            raise InvalidAPIResponseError(
+                "Japan refresh tracking identifier is missing"
+            )
+        helper.track(action_id)
+        self._japan_refresh_diagnostics["stage"] = "completion"
+        try:
+            status = helper.status(
+                action_id, timeout=min(120, max(0, deadline - time.monotonic()))
+            )
+            if status == ORDER_STATUS.FAILED:
+                raise APIError("Japan vehicle refresh failed")
+            if status != ORDER_STATUS.SUCCESS:
+                raise RequestTimeoutError("Japan vehicle refresh was not confirmed")
+            self._japan_refresh_diagnostics["stage"] = "telemetry"
+            while time.monotonic() < deadline:
+                state = helper.latest_state
+                candidate = copy.deepcopy(vehicle)
+                if isinstance(state, dict):
+                    try:
+                        timestamp = self._ccs2_observation_time(state.get("Date"))
+                        if timestamp >= started_at and (
+                            vehicle.last_updated_at is None
+                            or timestamp > vehicle.last_updated_at
+                        ):
+                            self._update_vehicle_properties_ccs2(candidate, state)
+                            vehicle.__dict__.update(candidate.__dict__)
+                            return
+                    except (KeyError, TypeError, ValueError, AttributeError):
+                        pass
+                # Some cars publish their fresh data to storage before MQTT state.
+                self.update_vehicle_with_cached_state(token, candidate)
+                if (
+                    candidate.last_updated_at is not None
+                    and candidate.last_updated_at >= started_at
+                    and (
+                        vehicle.last_updated_at is None
+                        or candidate.last_updated_at > vehicle.last_updated_at
+                    )
+                ):
+                    vehicle.__dict__.update(candidate.__dict__)
+                    return
+                time.sleep(min(5, max(0, deadline - time.monotonic())))
+            raise RequestTimeoutError("Japan refresh completed without newer telemetry")
+        finally:
+            helper.retire(action_id)
+
+    def update_month_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymm_string: str
+    ) -> None:
+        raise NotImplementedError("Japan month trip information is not implemented")
+
+    def update_day_trip_info(
+        self, token: Token, vehicle: Vehicle, yyyymmdd_string: str
+    ) -> None:
+        raise NotImplementedError("Japan day trip information is not implemented")
+
+    def initialize_vehicle_capabilities(self, vehicle: Vehicle) -> None:
+        """Japan options describe each vehicle rather than the entire region."""
+        service = self._vehicle_profiles.get(vehicle.id, {}).get("serviceOption", {})
+        vehicle.supports.window_control = (
+            isinstance(service, dict)
+            and type(service.get("windowControlOption")) is int
+            and service.get("windowControlOption") == 1
+        )
+        vehicle.supports.valet_mode = (
+            isinstance(service, dict)
+            and type(service.get("remoteValetActOption")) is int
+            and service.get("remoteValetActOption") == 1
+        )
+        options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
+        front_only = (
+            isinstance(options, dict)
+            and type(options.get("windowSafetyOption2")) is int
+            and options.get("windowSafetyOption2") == 4
+        )
+        vehicle.supports.supported_window_positions = (
+            ("front_left", "front_right")
+            if front_only
+            else ("front_left", "front_right", "back_left", "back_right")
+        )
+        vehicle.supports.svm = (
+            isinstance(options, dict)
+            and type(options.get("svmOptionInfo")) is int
+            and options.get("svmOptionInfo") == 1
+        )
+        scale = self._temperature_scale(vehicle)
+        vehicle.supports.climate_temperature_range = (
+            (scale[2], scale[2] + (scale[1] - scale[0]) * 0.5)
+            if scale is not None
+            else None
+        )
+
+    def _update_vehicle_properties_ccs2(
+        self, vehicle: Vehicle, state: dict[str, Any]
+    ) -> None:
+        """Map logical driver/passenger telemetry to physical Japan positions."""
+        super()._update_vehicle_properties_ccs2(vehicle, state)
+        if state.get("Date"):
+            # Preserve CCS2 precision without the legacy timestamp correction.
+            vehicle._last_updated_at = self._ccs2_observation_time(
+                state["Date"]
+            ).astimezone(self.data_timezone)
+        options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
+        location = options.get("drvSeatLoc") if isinstance(options, dict) else None
+        for left, right in (
+            ("front_left_seat_status", "front_right_seat_status"),
+            ("front_left_door_is_open", "front_right_door_is_open"),
+            ("front_left_door_is_locked", "front_right_door_is_locked"),
+            ("front_left_window_is_open", "front_right_window_is_open"),
+        ):
+            if location == "R":
+                left_value, right_value = (
+                    getattr(vehicle, left),
+                    getattr(vehicle, right),
+                )
+                setattr(vehicle, left, right_value)
+                setattr(vehicle, right, left_value)
+            elif location != "L":
+                setattr(vehicle, left, None)
+                setattr(vehicle, right, None)
+
+    def _stamp(self) -> str:
+        epoch = str(int(time.time()))
+        if len(epoch) != 10:
+            raise APIError("Japan stamp requires a supported ten-digit epoch")
+        return self._stamp_for_epoch(int(epoch))
+
+    def _headers(self, token: Token | None = None) -> dict[str, str]:
+        headers = {
+            "ccsp-service-id": self.SERVICE_ID,
+            "ccsp-application-id": self.APP_ID,
+            "offset": "9",
+            "Stamp": self._stamp(),
+        }
+        if token is not None:
+            headers["Authorization"] = token.access_token or ""
+            headers["ccsp-device-id"] = token.device_id or ""
+        return headers
+
+    def _vehicle_headers(
+        self, token: Token, vehicle: Vehicle, helper: JapanMqttSession | None = None
+    ) -> dict[str, str]:
+        """Add only known protocol and authenticated, prepared broker context."""
+        headers = self._headers(token)
+        protocol = vehicle.ccu_ccs2_protocol_support
+        if protocol is not None:
+            if type(protocol) is not int or protocol < 0:
+                raise InvalidAPIResponseError(
+                    "Japan vehicle status protocol is invalid"
+                )
+            headers["ccuCCS2ProtocolSupport"] = str(protocol)
+        if helper is None:
+            with self._mqtt_sessions_lock:
+                cached = self._mqtt_sessions.get(vehicle.id)
+            identity = (
+                token.access_token,
+                token.device_id,
+                token.mqtt_registration_uuid,
+            )
+            if cached is not None and cached[0] == identity:
+                helper = cached[1]
+        context = getattr(helper, "request_context", {})
+        if isinstance(context, dict):
+            for key in ("clientId", "vehicleId"):
+                value = context.get(key)
+                if isinstance(value, str) and re.fullmatch(
+                    r"[A-Za-z0-9_.:-]{1,256}", value
+                ):
+                    headers[key] = value
+        return headers
+
+    def _get_authenticated_headers(
+        self, token: Token, ccs2_support: int | None = None
+    ) -> dict[str, Any]:
+        headers = self._headers(token)
+        if ccs2_support is not None:
+            headers["ccuCCS2ProtocolSupport"] = str(ccs2_support)
+        return headers
+
+    def _get_vehicle_headers(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
+        return self._vehicle_headers(token, vehicle)
+
+    _KNOWN_ERRORS: ClassVar[dict[str, tuple[type[Exception], str]]] = {
+        "4002": (APIError, "invalid request"),
+        "4003": (APIError, "invalid value"),
+        "4004": (DuplicateRequestError, "duplicate request"),
+        "4006": (APIError, "account locked"),
+        "4016": (APIError, "account migration required"),
+        "4081": (RequestTimeoutError, "request expired"),
+        "5031": (ServiceTemporaryUnavailable, "remote control unavailable"),
+        "5091": (RateLimitingError, "request limit reached"),
+        "5911": (NoDataFound, "no data found"),
+        "5921": (NoDataFound, "no data found"),
+        "7501": (AuthenticationError, "authentication expired"),
+        "4292": (RateLimitingError, "surround-view capture limit reached"),
+        "7779": (ServiceTemporaryUnavailable, "surround-view unavailable"),
+        "7780": (APIError, "surround-view camera error"),
+        "7781": (APIError, "surround-view blocked by emergency lights"),
+        "7782": (APIError, "surround-view blocked by low battery"),
+        "5016": (APIError, "vehicle has not uploaded data"),
+        "4101": (APIError, "vehicle is not registered"),
+        "4140": (APIError, "vehicle profile is not owned by this account"),
+        "4008": (APIError, "vehicle system is updating"),
+        "4901": (APIError, "vehicle is immobilized"),
+        "5311": (APIError, "stolen-vehicle remote control unavailable"),
+        "5152": (APIError, "no GPS data found"),
+        "4011": (APIError, "verification number is incorrect"),
+        "4291": (APIError, "authentication already processed"),
+    }
+
+    @classmethod
+    def _diagnostic(cls, http_status: int | None, result: dict[str, Any]) -> str:
+        details = []
+        if type(http_status) is int and 100 <= http_status <= 599:
+            details.append(f"HTTP {http_status}")
+        code = str(
+            result.get("resCode", result.get("resultCode", result.get("errCode", "")))
+        )
+        known = cls._KNOWN_ERRORS.get(code)
+        if known is not None:
+            details.append(f"code {code}: {known[1]}")
+        return " (" + ", ".join(details) + ")" if details else ""
+
+    def _request(
+        self, method: str, path: str, *, json_response: bool = True, **kwargs: Any
+    ) -> Any:
+        """Expose HTTP status and allowlisted labels, never response text or URLs."""
+        kwargs.setdefault("allow_redirects", False)
+        try:
+            response = self.session.request(method, self.API_URL + path, **kwargs)
+        except (requests.exceptions.Timeout, RequestTimeoutError):
+            raise RequestTimeoutError("Japan API request timed out") from None
+        except requests.exceptions.RequestException:
+            raise APIError("Japan API connection failed") from None
+        status = response.status_code
+        if not json_response and (200 <= status < 300 or 300 <= status < 400):
+            return response
+        try:
+            result = response.json()
+        except ValueError:
+            if 200 <= status < 300:
+                raise InvalidAPIResponseError(
+                    f"Japan API returned invalid JSON (HTTP {status})"
+                ) from None
+            result = {}
+        if not isinstance(result, dict):
+            if 200 <= status < 300:
+                raise InvalidAPIResponseError(
+                    f"Japan API returned an invalid object (HTTP {status})"
+                )
+            result = {}
+        diagnostic = self._diagnostic(status, result)
+        if status in (401, 403):
+            raise AuthenticationError("Japan authentication was rejected" + diagnostic)
+        if status == 429:
+            raise RateLimitingError("Japan API rate limit reached" + diagnostic)
+        if status >= 500:
+            raise ServiceTemporaryUnavailable("Japan API is unavailable" + diagnostic)
+        self._check_errors(result, http_status=status, path=path)
+        if not 200 <= status < 300:
+            raise APIError("Japan API request was rejected" + diagnostic)
+        return result
+
+    @classmethod
+    def _check_errors(
+        cls,
+        result: dict[str, Any],
+        *,
+        http_status: int | None = None,
+        path: str | None = None,
+    ) -> None:
+        code = str(
+            result.get("resCode", result.get("resultCode", result.get("errCode", "")))
+        )
+        diagnostic = cls._diagnostic(http_status, result)
+        if path == "/api/v1/user/signin" and code in ("4003", "4006", "4016"):
+            raise AuthenticationError("Japan sign-in was rejected" + diagnostic)
+        if path == "/api/v1/user/pin" and code == "4003":
+            raise AuthenticationError("Japan PIN was rejected" + diagnostic)
+        if result.get("error") in ("invalid_grant", "invalid_token"):
+            raise AuthenticationError("Japan token grant was rejected" + diagnostic)
+        known = cls._KNOWN_ERRORS.get(code)
+        if known is not None:
+            raise known[0]("Japan API rejected the request" + diagnostic)
+        failure_marker = result.get("retCode", result.get("resultType"))
+        if (
+            (isinstance(failure_marker, str) and failure_marker.upper() == "F")
+            or (code and code != "0000")
+            or result.get("error")
+        ):
+            raise APIError("Japan API rejected the request" + diagnostic)
+
+    @staticmethod
+    def _payload(result: dict[str, Any]) -> dict[str, Any]:
+        payload = result.get("resMsg", result.get("responseEntity"))
+        if not isinstance(payload, dict):
+            raise InvalidAPIResponseError("Japan API response payload is missing")
+        return payload
+
+    def _exchange_token(
+        self,
+        grant: dict[str, Any],
+        username: str,
+        password: str,
+        device_id: str | None,
+        pin: str | None,
+    ) -> Token:
+        headers = self._headers()
+        headers["Authorization"] = self.BASIC_AUTHORIZATION
+        result = self._request(
+            "POST",
+            "/api/v1/user/oauth2/token",
+            headers=headers,
+            data={
+                "client_id": self.SERVICE_ID,
+                "redirect_uri": self.REDIRECT_URI,
+                **grant,
+            },
+        )
+        try:
+            access = result["access_token"]
+            token_type = result["token_type"]
+            expiry = result["expires_in"]
+            if isinstance(expiry, bool) or not re.fullmatch(r"[0-9]+", str(expiry)):
+                raise ValueError
+            lifetime = int(expiry)
+            if not isinstance(access, str) or not access or lifetime <= 0:
+                raise ValueError
+            if token_type != "Bearer":
+                raise ValueError
+            refresh = result.get("refresh_token", grant.get("refresh_token"))
+            if not isinstance(refresh, str) or not refresh:
+                raise ValueError
+            valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=lifetime)
+        except (KeyError, TypeError, ValueError, OverflowError):
+            raise InvalidAPIResponseError(
+                "Japan token response is incomplete"
+            ) from None
+        return Token(
+            username=username,
+            password=password,
+            access_token=f"{token_type} {access}",
+            refresh_token=refresh,
+            device_id=device_id,
+            pin=pin,
+            valid_until=valid_until,
+        )
+
+    def login(self, username: str, password: str, pin: str | None = None) -> Token:
+        """Establish cookies, sign in, exchange the code, and register a device."""
+        response = self._request(
+            "GET",
+            "/api/v1/user/oauth2/authorize",
+            json_response=False,
+            allow_redirects=False,
+            params={
+                "response_type": "code",
+                "client_id": self.SERVICE_ID,
+                "redirect_uri": self.REDIRECT_URI,
+                "lang": "ja",
+            },
+        )
+        for _ in range(5):
+            if not 300 <= response.status_code < 400:
+                break
+            target = urljoin(response.url, response.headers.get("Location", ""))
+            parsed = urlparse(target)
+            expected = urlparse(self.API_URL)
+            if (parsed.scheme, parsed.netloc) != (expected.scheme, expected.netloc):
+                raise AuthenticationError(
+                    "Japan login redirected to an unexpected host"
+                )
+            response = self._request(
+                "GET",
+                parsed.path + ("?" + parsed.query if parsed.query else ""),
+                json_response=False,
+                allow_redirects=False,
+            )
+        else:
+            raise AuthenticationError("Japan login exceeded its redirect limit")
+        self._request(
+            "POST", "/api/v1/user/language", json_response=False, json={"lang": "ja"}
+        )
+        result = self._request(
+            "POST",
+            "/api/v1/user/signin",
+            json={"email": username, "password": password, "mobileNum": ""},
+        )
+        redirect = result.get("redirectUrl")
+        if not isinstance(redirect, str):
+            raise ConsentRequiredError(
+                "Complete Japan account setup in the official app"
+            )
+        parsed = urlparse(redirect)
+        expected = urlparse(self.REDIRECT_URI)
+        code = parse_qs(parsed.query).get("code", [])
+        if (
+            (parsed.scheme, parsed.netloc, parsed.path)
+            != (
+                expected.scheme,
+                expected.netloc,
+                expected.path,
+            )
+            or len(code) != 1
+            or not code[0]
+        ):
+            raise AuthenticationError(
+                "Japan login returned no valid authorization code"
+            )
+        token = self._exchange_token(
+            {"grant_type": "authorization_code", "code": code[0]},
+            username,
+            password,
+            None,
+            pin,
+        )
+        headers = self._headers()
+        # The app uses blank placeholders; requests rejects whitespace header
+        # values. This fresh session has no default authorization/device header.
+        headers.update({"Authorization": "", "ccsp-device-id": ""})
+        registration_uuid = str(uuid.uuid4())
+        result = self._request(
+            "POST",
+            "/api/v1/spa/notifications/register",
+            headers=headers,
+            json={
+                "uuid": registration_uuid,
+                "pushRegId": uuid.uuid4().hex,
+                "pushType": "GCM",
+            },
+        )
+        token.device_id = self._payload(result).get("deviceId")
+        if not isinstance(token.device_id, str) or not token.device_id:
+            raise InvalidAPIResponseError("Japan device registration was incomplete")
+        token.mqtt_registration_uuid = registration_uuid
+        return token
+
+    def refresh_access_token(self, token: Token) -> Token:
+        """Use the refresh grant; preserve the registered device identity."""
+        if not token.refresh_token:
+            raise AuthenticationError("Japan refresh token is missing; sign in again")
+        refreshed = self._exchange_token(
+            {"grant_type": "refresh_token", "refresh_token": token.refresh_token},
+            token.username,
+            token.password,
+            token.device_id,
+            token.pin,
+        )
+        refreshed.mqtt_registration_uuid = token.mqtt_registration_uuid
+        refreshed.mqtt_client_id = token.mqtt_client_id
+        return refreshed
+
+    def get_vehicles(self, token: Token) -> list[Vehicle]:
+        """Discover vehicles and retrieve profiles to select the status protocol."""
+        result = self._request(
+            "GET", "/api/v1/spa/vehicles", headers=self._headers(token)
+        )
+        entries = self._payload(result).get("vehicles")
+        if not isinstance(entries, list):
+            raise InvalidAPIResponseError("Japan vehicle list is missing")
+        vehicles = []
+        engine_types = {
+            "GN": ENGINE_TYPES.ICE,
+            "EV": ENGINE_TYPES.EV,
+            "PHEV": ENGINE_TYPES.PHEV,
+            "PE": ENGINE_TYPES.PHEV,
+            "HV": ENGINE_TYPES.HEV,
+        }
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(
+                entry.get("vehicleId"), str
+            ):
+                raise InvalidAPIResponseError("Japan vehicle identifier is missing")
+            vehicle_id = entry["vehicleId"]
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", vehicle_id):
+                raise InvalidAPIResponseError("Japan vehicle identifier is invalid")
+            result = self._request(
+                "GET",
+                f"/api/v1/spa/vehicles/{vehicle_id}/profile",
+                headers=self._vehicle_headers(token, Vehicle(id=vehicle_id)),
+            )
+            profiles = self._payload(result).get("vinInfo")
+            if not isinstance(profiles, list) or len(profiles) != 1:
+                raise InvalidAPIResponseError("Japan vehicle profile is incomplete")
+            basic = profiles[0].get("basic") if isinstance(profiles[0], dict) else None
+            if not isinstance(basic, dict):
+                raise InvalidAPIResponseError("Japan vehicle profile is incomplete")
+            protocol = basic.get("ccuCCS2ProtocolSupport")
+            if type(protocol) is not int or protocol < 0:
+                raise InvalidAPIResponseError(
+                    "Japan vehicle status protocol is missing"
+                )
+            self._vehicle_profiles[vehicle_id] = profiles[0]
+            vehicles.append(
+                Vehicle(
+                    id=vehicle_id,
+                    name=entry.get("nickname") or entry.get("vehicleName"),
+                    model=basic.get("modelName") or entry.get("vehicleName"),
+                    registration_date=entry.get("regDate"),
+                    VIN=basic.get("vin"),
+                    timezone=self.data_timezone,
+                    engine_type=engine_types.get(entry.get("type", "")),
+                    ccu_ccs2_protocol_support=protocol,
+                )
+            )
+        for vehicle in vehicles:
+            self.initialize_vehicle_capabilities(vehicle)
+        return vehicles
+
+    def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
+        """Read stored status, optional parking data, and daily energy totals."""
+        protocol = vehicle.ccu_ccs2_protocol_support
+        if type(protocol) is not int or protocol < 0:
+            raise InvalidAPIResponseError("Japan vehicle status protocol is missing")
+        if not isinstance(vehicle.id, str) or not re.fullmatch(
+            r"[A-Za-z0-9_-]+", vehicle.id
+        ):
+            raise InvalidAPIResponseError("Japan vehicle identifier is invalid")
+        endpoint = "ccs2/carstatus/latest" if protocol else "status/latest"
+        headers = self._vehicle_headers(token, vehicle)
+        headers["ccuCCS2ProtocolSupport"] = str(protocol)
+        payload = self._payload(
+            self._request(
+                "GET", f"/api/v1/spa/vehicles/{vehicle.id}/{endpoint}", headers=headers
+            )
+        )
+        try:
+            parsed_vehicle = copy.deepcopy(vehicle)
+            if protocol:
+                state = payload["state"]["Vehicle"]
+                if not isinstance(state, dict):
+                    raise TypeError
+                if not state.get("Date"):
+                    raise ValueError
+                observed_at = self._ccs2_observation_time(state["Date"])
+                passive_at = self._passive_state_observed_at.get(vehicle.id)
+                retains_passive_state = (
+                    passive_at is not None
+                    and isinstance(vehicle.data, dict)
+                    and self._ccs2_observation_time(vehicle.data.get("Date"))
+                    >= passive_at
+                )
+                if (
+                    vehicle.last_updated_at is not None
+                    and observed_at < vehicle.last_updated_at
+                ) or (
+                    retains_passive_state
+                    and passive_at is not None
+                    and observed_at <= passive_at
+                ):
+                    self.apply_cached_mqtt_state(vehicle)
+                    return
+                self._update_vehicle_properties_ccs2(parsed_vehicle, state)
+                parsed_vehicle.last_updated_at = observed_at.astimezone(
+                    self.data_timezone
+                )
+            else:
+                info = payload["vehicleStatusInfo"]
+                state = {
+                    "status": info["vehicleStatus"],
+                    "vehicleLocation": info.get("vehicleLocation"),
+                }
+                if not isinstance(state["status"], dict):
+                    raise TypeError
+                if not state["status"].get("time"):
+                    raise ValueError
+                parse_datetime(state["status"]["time"], self.data_timezone)
+                temperature = self._legacy_temperature(
+                    vehicle, state["status"].get("airTemp")
+                )
+                state = copy.deepcopy(state)
+                state["status"].pop("airTemp", None)
+                self._update_vehicle_properties(parsed_vehicle, state)
+                profile_options = self._vehicle_profiles.get(vehicle.id, {}).get(
+                    "option", {}
+                )
+                seat_location = (
+                    profile_options.get("drvSeatLoc")
+                    if isinstance(profile_options, dict)
+                    else None
+                )
+                seats = get_child_value(state, "status.seatHeaterVentState")
+                if isinstance(seats, dict) and seat_location in ("L", "R"):
+                    for physical, logical in (
+                        (
+                            "front_left_seat_status",
+                            "drvSeatHeatState"
+                            if seat_location == "L"
+                            else "astSeatHeatState",
+                        ),
+                        (
+                            "front_right_seat_status",
+                            "astSeatHeatState"
+                            if seat_location == "L"
+                            else "drvSeatHeatState",
+                        ),
+                    ):
+                        if (
+                            getattr(parsed_vehicle, physical) is None
+                            and logical in seats
+                        ):
+                            setattr(
+                                parsed_vehicle,
+                                physical,
+                                SEAT_STATUS.get(seats[logical]),
+                            )
+                parsed_vehicle.air_temperature = (
+                    temperature,
+                    "°C" if temperature is not None else None,
+                )
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise InvalidAPIResponseError("Japan cached status is incomplete") from None
+        # Supplement only absent parking data and limit history reads to daily.
+        # Optional malformed data cannot invalidate otherwise valid status.
+        if (
+            parsed_vehicle.location_latitude is None
+            or parsed_vehicle.location_longitude is None
+        ) and time.monotonic() - self._location_missing_at.get(
+            vehicle.id, -3600
+        ) >= 3600:
+            try:
+                self.update_vehicle_with_cached_location(token, parsed_vehicle)
+            except (NoDataFound, InvalidAPIResponseError):
+                self._location_missing_at[vehicle.id] = time.monotonic()
+        if (
+            vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV)
+            and time.monotonic() - self._history_updated_at.get(vehicle.id, -86400)
+            >= 86400
+        ):
+            try:
+                self.update_vehicle_with_driving_info(token, parsed_vehicle)
+            except (NoDataFound, InvalidAPIResponseError):
+                pass
+            self._history_updated_at[vehicle.id] = time.monotonic()
+        if parsed_vehicle.engine_type in (ENGINE_TYPES.EV, ENGINE_TYPES.PHEV) and (
+            parsed_vehicle.ev_charge_limits_ac is None
+            or parsed_vehicle.ev_charge_limits_dc is None
+        ):
+            cached_targets = self._charge_target_cache.get(vehicle.id)
+            if (
+                cached_targets is not None
+                and time.monotonic() - cached_targets[0] < 3600
+            ):
+                targets = cached_targets[1]
+                parsed_vehicle.ev_charge_limits_ac = targets.get(1, targets.get(2))
+                parsed_vehicle.ev_charge_limits_dc = targets.get(0)
+            else:
+                try:
+                    self.update_vehicle_with_charge_targets(token, parsed_vehicle)
+                except (NoDataFound, InvalidAPIResponseError):
+                    self._charge_target_cache[vehicle.id] = (time.monotonic(), {})
+        if protocol:
+            # MQTT may arrive during optional cached reads. Apply it to the
+            # candidate so those optional fields are retained without rollback.
+            self.apply_cached_mqtt_state(parsed_vehicle)
+        vehicle.__dict__.update(parsed_vehicle.__dict__)
+
+    def update_vehicle_with_charge_targets(
+        self, token: Token, vehicle: Vehicle
+    ) -> None:
+        """Read stored AC/DC targets without waking the vehicle."""
+        vehicle_id = self._command_vehicle_id(vehicle)
+        payload = self._payload(
+            self._request(
+                "GET",
+                f"/api/v1/spa/vehicles/{vehicle_id}/charge/target",
+                headers=self._vehicle_headers(token, vehicle),
+            )
+        )
+        entries = payload.get("targetSOClist")
+        if not isinstance(entries, list):
+            raise InvalidAPIResponseError("Japan charge target response is incomplete")
+        targets = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise InvalidAPIResponseError(
+                    "Japan charge target response is incomplete"
+                )
+            plug, level = entry.get("plugType"), entry.get("targetSOClevel")
+            if (
+                type(plug) is not int
+                or plug not in (0, 1, 2)
+                or plug in targets
+                or plug in (1, 2)
+                and any(kind in targets for kind in (1, 2))
+                or type(level) is not int
+                or not 0 <= level <= 100
+            ):
+                raise InvalidAPIResponseError("Japan charge target response is invalid")
+            targets[plug] = level
+        self._charge_target_cache[vehicle_id] = (time.monotonic(), targets)
+        vehicle.ev_charge_limits_ac = targets.get(1, targets.get(2))
+        vehicle.ev_charge_limits_dc = targets.get(0)
+
+    def _legacy_temperature(self, vehicle: Vehicle, air_temp: object) -> float | None:
+        """Decode profile-dependent Japan temperature codes, leaving LO/HI unknown."""
+        if not isinstance(air_temp, dict) or air_temp.get("unit", 0) != 0:
+            return None
+        scale = self._temperature_scale(vehicle, air_temp.get("hvacTempType"))
+        if scale is None:
+            return None
+        first_code, last_code, minimum = scale
+        value = air_temp.get("value")
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9A-Fa-f]{2}H?", value):
+            return None
+        code = int(value.removesuffix("H"), 16)
+        return (
+            minimum + (code - first_code) * 0.5
+            if first_code <= code <= last_code
+            else None
+        )
+
+    def _temperature_scale(
+        self, vehicle: Vehicle, hvac_type: object = None
+    ) -> tuple[int, int, float] | None:
+        """Return only a scale established by profile or reported HVAC type."""
+        options = self._vehicle_profiles.get(vehicle.id, {}).get("option", {})
+        if not isinstance(options, dict):
+            return None
+        range_option = options.get("climateTempRangeOption")
+        if hvac_type is None:
+            hvac_type = options.get("hvacTempType")
+        if isinstance(range_option, bool) or isinstance(hvac_type, bool):
+            return None
+        if range_option == 0 or hvac_type in (1, 2) and range_option not in (0, 1):
+            first_code, last_code, minimum = 0x06, 0x1A, 17.0
+        elif range_option == 1:
+            first_code, last_code, minimum = 0x03, 0x1F, 15.5
+        elif hvac_type == 4:
+            first_code, last_code, minimum = 0x02, 0x20, 15.0
+        else:
+            return None
+        return first_code, last_code, minimum
+
+    def update_vehicle_with_cached_location(
+        self, token: Token, vehicle: Vehicle
+    ) -> None:
+        """Read the stored parking position without contacting the vehicle."""
+        if not isinstance(vehicle.id, str) or not re.fullmatch(
+            r"[A-Za-z0-9_-]+", vehicle.id
+        ):
+            raise InvalidAPIResponseError("Japan vehicle identifier is invalid")
+        payload = self._payload(
+            self._request(
+                "GET",
+                f"/api/v1/spa/vehicles/{vehicle.id}/location/park",
+                headers=self._vehicle_headers(token, vehicle),
+            )
+        )
+        location = payload.get("gpsDetail", payload)
+        try:
+            if not isinstance(location, dict):
+                raise TypeError
+            coord = location["coord"]
+            latitude, longitude = coord["lat"], coord["lon"]
+            if isinstance(latitude, bool) or isinstance(longitude, bool):
+                raise TypeError
+            latitude, longitude = float(latitude), float(longitude)
+            if (
+                not math.isfinite(latitude)
+                or not math.isfinite(longitude)
+                or not -90 <= latitude <= 90
+                or not -180 <= longitude <= 180
+            ):
+                raise ValueError
+            timestamp = parse_datetime(location["time"], self.data_timezone)
+            if timestamp is None:
+                raise ValueError
+        except (KeyError, TypeError, ValueError):
+            raise InvalidAPIResponseError(
+                "Japan cached location is incomplete"
+            ) from None
+        vehicle.location = (latitude, longitude, timestamp)
+
+    def update_vehicle_with_driving_info(self, token: Token, vehicle: Vehicle) -> None:
+        """Read all-time stored EV energy history (periodTarget 0)."""
+        if not isinstance(vehicle.id, str) or not re.fullmatch(
+            r"[A-Za-z0-9_-]+", vehicle.id
+        ):
+            raise InvalidAPIResponseError("Japan vehicle identifier is invalid")
+        payload = self._payload(
+            self._request(
+                "POST",
+                f"/api/v1/spa/vehicles/{vehicle.id}/drvhistory",
+                headers=self._vehicle_headers(token, vehicle),
+                json={"periodTarget": 0},
+            )
+        )
+        entries = payload.get("drivingInfo")
+        if not isinstance(entries, list):
+            raise InvalidAPIResponseError("Japan driving history is incomplete")
+        all_time = next(
+            (
+                item
+                for item in entries
+                if isinstance(item, dict) and item.get("drivingPeriod") == 0
+            ),
+            None,
+        )
+        if all_time is None:
+            raise NoDataFound("Japan all-time driving history is unavailable")
+
+        def metric(key: str) -> float | int | None:
+            value = all_time.get(key)
+            if value is None:
+                return None
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+            ):
+                raise InvalidAPIResponseError("Japan driving history metric is invalid")
+            return value
+
+        consumed, regenerated = metric("totalPwrCsp"), metric("regenPwr")
+        daily = payload.get("drivingInfoDetail", [])
+        if not isinstance(daily, list):
+            raise InvalidAPIResponseError("Japan daily energy history is incomplete")
+        daily_stats = []
+        for day in daily:
+            if not isinstance(day, dict):
+                raise InvalidAPIResponseError(
+                    "Japan daily energy history is incomplete"
+                )
+            try:
+                day_date = dt.datetime.strptime(day["drivingDate"], "%Y%m%d").replace(
+                    tzinfo=self.data_timezone
+                )
+            except (KeyError, TypeError, ValueError):
+                raise InvalidAPIResponseError(
+                    "Japan daily energy date is invalid"
+                ) from None
+            for key in (
+                "totalPwrCsp",
+                "motorPwrCsp",
+                "climatePwrCsp",
+                "eDPwrCsp",
+                "batteryMgPwrCsp",
+                "regenPwr",
+                "calculativeOdo",
+            ):
+                value = day.get(key)
+                if value is not None and (
+                    isinstance(value, bool)
+                    or not isinstance(value, (int, float))
+                    or not math.isfinite(value)
+                    or value < 0
+                ):
+                    raise InvalidAPIResponseError(
+                        "Japan daily energy metric is invalid"
+                    )
+            daily_stats.append(
+                DailyDrivingStats(
+                    date=day_date,
+                    total_consumed=day.get("totalPwrCsp"),
+                    engine_consumption=day.get("motorPwrCsp"),
+                    climate_consumption=day.get("climatePwrCsp"),
+                    onboard_electronics_consumption=day.get("eDPwrCsp"),
+                    battery_care_consumption=day.get("batteryMgPwrCsp"),
+                    regenerated_energy=day.get("regenPwr"),
+                    distance=day.get("calculativeOdo"),
+                    distance_unit="km",
+                )
+            )
+        vehicle.total_power_consumed = consumed
+        vehicle.total_power_regenerated = regenerated
+        vehicle.daily_stats = daily_stats

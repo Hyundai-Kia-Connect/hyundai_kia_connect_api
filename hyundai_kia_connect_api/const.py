@@ -23,6 +23,7 @@ REGION_NZ = "New Zealand"
 REGION_INDIA = "India"
 REGION_BRAZIL = "Brazil"
 REGION_EUROPE_CCI = "Europe (CCI/GSPA)"
+REGION_JAPAN = "Japan"
 
 REGIONS = {
     1: REGION_EUROPE,
@@ -34,6 +35,7 @@ REGIONS = {
     7: REGION_NZ,
     8: REGION_BRAZIL,
     9: REGION_EUROPE_CCI,
+    10: REGION_JAPAN,
 }
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
@@ -142,6 +144,8 @@ class LAMP_MODE(Enum):
 
 
 class ORDER_STATUS(Enum):
+    # Service accepted the request; physical vehicle execution is unconfirmed.
+    ACCEPTED = "ACCEPTED"
     # pending (waiting for response from vehicle)
     PENDING = "PENDING"
     # order executed by vehicle and response returned

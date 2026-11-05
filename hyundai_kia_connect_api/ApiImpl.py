@@ -3,8 +3,9 @@
 import datetime as dt
 import logging
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import requests
 from requests.exceptions import JSONDecodeError
@@ -465,7 +466,29 @@ class ApiImplSession(requests.Session):
             raise RequestTimeoutError(str(exc)) from exc
 
 
+class PushProvider(Protocol):
+    """Region or vehicle-scoped Service Hub registration and message parsing."""
+
+    def get_push_broker_info(self, token: Token) -> dict[str, Any] | None: ...
+    def register_push_client(self, token: Token) -> dict[str, Any] | None: ...
+    def register_push_vehicle(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None: ...
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None: ...
+    def get_push_connection_state(
+        self, token: Token
+    ) -> MQTT_PUSH_CONNECTION_STATE | None: ...
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]: ...
+    def parse_push_message(self, topic: str, payload: bytes) -> Any: ...
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None: ...
+
+
 class ApiImpl:
+    # None preserves consumers that allow all existing regional commands.
+    supported_commands: frozenset[str] | None = None
+
     data_timezone: dt.tzinfo = dt.UTC
     temperature_range: Sequence[float] | None = None
     previous_latitude: float | None = None
@@ -473,6 +496,16 @@ class ApiImpl:
 
     def __init__(self) -> None:
         """Initialize."""
+
+    def close(self) -> None:
+        """Release adapter-owned HTTP sessions; safe to repeat."""
+        seen: set[int] = set()
+        with ExitStack() as cleanup:
+            for name in ("session", "_service_hub_session", "_sessions"):
+                session = vars(self).get(name)
+                if isinstance(session, requests.Session) and id(session) not in seen:
+                    seen.add(id(session))
+                    cleanup.callback(session.close)
 
     def login(
         self,
@@ -515,10 +548,22 @@ class ApiImpl:
             "update_vehicle_with_cached_state is not implemented for this region"
         )
 
+    def get_local_diagnostics(self) -> dict[str, Any]:
+        """Return local protocol diagnostics without I/O or private identifiers."""
+        return {}
+
+    def apply_cached_mqtt_state(self, vehicle: Vehicle) -> bool:
+        """Apply already-received state without I/O; return whether it changed."""
+        return False
+
     def test_token(self, token: Token) -> bool:
         """Test if token is valid
         Use any dummy request to test if token is still valid"""
         return True
+
+    def get_push_provider(self, token: Token, vehicle: Vehicle) -> PushProvider:
+        """Select the push provider; existing regions keep their API instance."""
+        return self
 
     # Push contract — regions that support push override these
     # (today: the CCI/EU lineage).

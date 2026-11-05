@@ -10,7 +10,7 @@ import pytest
 from hyundai_kia_connect_api import VehicleManager
 
 vm_module = sys.modules["hyundai_kia_connect_api.VehicleManager"]
-session_module = sys.modules["hyundai_kia_connect_api.mqtt_push_session"]
+hub_module = sys.modules["hyundai_kia_connect_api.mqtt_push_session"]
 from hyundai_kia_connect_api.mqtt_service_hub import PushMessage
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -130,7 +130,7 @@ class FakeTransport:
 
 
 def _connected_transport_factory(monkeypatch):
-    """Patch the module-level MqttTransport in mqtt_push_session with a
+    """Patch the module-level MqttTransport in VehicleManager with a
     connect-success FakeTransport."""
     FakeTransport.instances = []
 
@@ -139,7 +139,7 @@ def _connected_transport_factory(monkeypatch):
         t.connected = True
         return t
 
-    monkeypatch.setattr(session_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     return FakeTransport
 
 
@@ -341,7 +341,7 @@ def test_reconnect_calls_check_and_refresh_token(monkeypatch):
         def connect(self):
             attempts["n"] += 1
 
-    monkeypatch.setattr(session_module, "MqttTransport", _Reconnectable)
+    monkeypatch.setattr(hub_module, "MqttTransport", _Reconnectable)
     vm._ensure_push_session()
     vm._push_session._client = None
     vm._ensure_push_session()
@@ -398,33 +398,24 @@ def test_start_push_second_vehicle_failed_registration_keeps_first(monkeypatch):
     assert vm._push_session is not None and vm._push_session._client is not None  # kept
 
 
-def test_session_module_imports_nothing_eu():
-    """The session is contract-only; the _eu module must not appear in its source (1332)."""
-    from pathlib import Path
-
-    import hyundai_kia_connect_api
-
-    src = Path(hyundai_kia_connect_api.mqtt_push_session.__file__).read_text()
-    assert "mqtt_service_hub_eu" not in src
-
-
 def test_start_push_wires_connection_change_callback(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
-
-    def before(connected):
-        """first callback"""
-
-    vm.set_push_connection_change_callback(before)
+    seen = []
+    vm.set_push_connection_change_callback(
+        lambda connected: seen.append(("before", connected))
+    )
     assert vm.start_push("careu1") is True
-    assert vm._push_session._client.connection_change_cb is before
-    # late registration rewires the live client
-
-    def after(connected):
-        """replacement callback"""
-
-    vm.set_push_connection_change_callback(after)
-    assert vm._push_session._client.connection_change_cb is after
+    client = vm._push_session._client
+    client.connection_change_cb(True)
+    vm.set_push_connection_change_callback(
+        lambda connected: seen.append(("after", connected))
+    )
+    client.connection_change_cb(False)
+    assert seen == [("before", True), ("after", False)]
+    vm.stop_push()
+    client.connection_change_cb(True)
+    assert seen == [("before", True), ("after", False)]
 
 
 def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
@@ -433,7 +424,7 @@ def test_start_push_connect_failure_rolls_vehicle_back(monkeypatch):
         t.fail_connect = True
         return t
 
-    monkeypatch.setattr(session_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     vm = _make_vm()
     with pytest.raises(ValueError, match="bad broker config"):
         vm.start_push("careu1")
@@ -453,7 +444,7 @@ def test_connect_callback_during_connect_subscribes(monkeypatch):
             self.on_connect()
             self.connected = True
 
-    monkeypatch.setattr(session_module, "MqttTransport", _RaceTransport)
+    monkeypatch.setattr(hub_module, "MqttTransport", _RaceTransport)
     vm._ensure_push_session()
     if vm._push_session is not None:
         vm._push_session._refresh_fn = lambda: None
@@ -565,7 +556,7 @@ def test_reconnect_cleanup_tolerates_broken_client_and_cancels_prior_run(monkeyp
         t.fail_connect = True  # attempts keep failing → the loop keeps backing off
         return t
 
-    monkeypatch.setattr(session_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     monkeypatch.setattr(vm, "check_and_refresh_token", lambda: None)
     from hyundai_kia_connect_api import const as const_mod
 
@@ -641,7 +632,7 @@ def test_reconnect_cancelled_exits_backoff_loop(monkeypatch):
         t.fail_connect = True  # every attempt fails → loop keeps backing off
         return t
 
-    monkeypatch.setattr(session_module, "MqttTransport", factory)
+    monkeypatch.setattr(hub_module, "MqttTransport", factory)
     vm._ensure_push_session()
     vm._push_session._client = None
     before = _reconnect_thread_idents()
@@ -717,3 +708,13 @@ def test_set_push_callbacks_before_start_wire_session_later(monkeypatch):
     assert vm._push_session is not None
     assert vm._push_session._status_callback is None
     assert vm._push_session._connection_change_callback is None
+
+
+def test_session_module_imports_nothing_eu():
+    """The session is contract-only; the _eu module must not appear in its source (1332)."""
+    from pathlib import Path
+
+    import hyundai_kia_connect_api
+
+    src = Path(hyundai_kia_connect_api.mqtt_push_session.__file__).read_text()
+    assert "mqtt_service_hub_eu" not in src
