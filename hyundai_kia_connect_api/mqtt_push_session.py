@@ -34,7 +34,7 @@ class MqttPushSession:
         self,
         api: Any,
         token_fn: Callable[[], Token],
-        refresh_fn: Callable[[], None],
+        refresh_fn: Callable[[], object],
         get_vehicle: Callable[[str], Vehicle],
         vehicles: Callable[[], dict[str, Vehicle]],
     ) -> None:
