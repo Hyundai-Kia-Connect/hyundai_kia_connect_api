@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .const import (
+    CHARGING_CONNECTOR_LOCK_STATE,
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     ENGINE_TYPES,
@@ -431,6 +432,9 @@ class Vehicle:
     # Raw connector-fastening state from the stored status (0 = disconnected,
     # 1 = connected; unknown or unreported = None).
     ev_connector_fastening_state: CONNECTOR_FASTENING_STATE | None = None
+    # Connector lock actuator state; 1 = unlocked says nothing about the
+    # cable, 5 = released and the cable can be pulled (kia_uvo#2069).
+    ev_connector_lock_state: CHARGING_CONNECTOR_LOCK_STATE | None = None
 
     _ev_driving_range: float | None = None
     _ev_driving_range_value: float | None = None

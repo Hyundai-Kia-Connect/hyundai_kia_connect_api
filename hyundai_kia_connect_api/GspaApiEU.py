@@ -43,6 +43,7 @@ from .cci_fingerprint import (
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
+    CHARGING_CONNECTOR_LOCK_STATE,
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
@@ -1904,6 +1905,21 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     fastening_raw,
                 )
                 vehicle.ev_connector_fastening_state = None
+        if (
+            lock_raw := get_child_value(state, "Green.ChargingConnector.LockState")
+        ) is not None:
+            try:
+                vehicle.ev_connector_lock_state = CHARGING_CONNECTOR_LOCK_STATE(
+                    int(lock_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ChargingConnector.LockState %r not in {0: idle, "
+                    "1: unlocked, 2: locked, 3: releasing, 4: locking, "
+                    "5: released}",
+                    DOMAIN,
+                    lock_raw,
+                )
         vehicle.ev_battery_is_plugged_in = (
             True
             if vehicle.ev_connector_fastening_state
