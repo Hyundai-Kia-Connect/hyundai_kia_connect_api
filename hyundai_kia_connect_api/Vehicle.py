@@ -143,6 +143,9 @@ class Vehicle:
 
     _geocode_address: str | None = None
     _geocode_name: str | None = None
+    # Coordinates of the last successful reverse geocode, to skip unchanged lookups.
+    _geocode_latitude: float | None = None
+    _geocode_longitude: float | None = None
 
     car_battery_percentage: int | None = None
     engine_is_running: bool | None = None

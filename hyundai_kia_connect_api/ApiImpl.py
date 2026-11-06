@@ -468,8 +468,6 @@ class ApiImplSession(requests.Session):
 class ApiImpl:
     data_timezone: dt.tzinfo = dt.UTC
     temperature_range: Sequence[float] | None = None
-    previous_latitude: float | None = None
-    previous_longitude: float | None = None
 
     def __init__(self) -> None:
         """Initialize."""
@@ -610,8 +608,8 @@ class ApiImpl:
         if vehicle.location_latitude and vehicle.location_longitude:
             if (
                 vehicle.geocode
-                and vehicle.location_latitude == self.previous_latitude
-                and vehicle.location_longitude == self.previous_longitude
+                and vehicle.location_latitude == vehicle._geocode_latitude
+                and vehicle.location_longitude == vehicle._geocode_longitude
             ):  # previous coordinates are the same, so keep last valid vehicle.geocode
                 _LOGGER.debug(f"{DOMAIN} - Keeping last geocode location")
             elif GEO_LOCATION_PROVIDERS[provider] == OPENSTREETMAP:
@@ -639,8 +637,8 @@ class ApiImpl:
                         get_child_value(response, "display_name"),
                         get_child_value(response, "address"),
                     )
-                    self.previous_latitude = vehicle.location_latitude
-                    self.previous_longitude = vehicle.location_longitude
+                    vehicle._geocode_latitude = vehicle.location_latitude
+                    vehicle._geocode_longitude = vehicle.location_longitude
                     _LOGGER.debug(f"{DOMAIN} - geocode openstreetmap")
             elif GEO_LOCATION_PROVIDERS[provider] == GOOGLE:
                 if not API_KEY:
@@ -656,8 +654,8 @@ class ApiImpl:
                         locations = geolocator.reverse(latlong)
                         if locations:
                             vehicle.geocode = locations
-                            self.previous_latitude = vehicle.location_latitude
-                            self.previous_longitude = vehicle.location_longitude
+                            vehicle._geocode_latitude = vehicle.location_latitude
+                            vehicle._geocode_longitude = vehicle.location_longitude
                             _LOGGER.debug(f"{DOMAIN} - geocode google")
                     except Exception as ex:
                         _LOGGER.warning(f"{DOMAIN} - failed geocode Google: {ex}")
