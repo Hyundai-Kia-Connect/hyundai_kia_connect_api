@@ -177,20 +177,14 @@ class VehicleManager:
     ) -> None:
         # Force refresh only if current data is older than the value bassed in seconds.
         # Otherwise runs a cached update.
-        started_at_utc: dt.datetime = dt.datetime.now(dt.UTC)
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.last_updated_at is not None:
-            _LOGGER.debug(
-                f"{DOMAIN} - Time differential in seconds: {(started_at_utc - vehicle.last_updated_at).total_seconds()}"
-            )
-            if (
-                started_at_utc - vehicle.last_updated_at
-            ).total_seconds() > force_refresh_interval:
+            age = (dt.datetime.now(dt.UTC) - vehicle.last_updated_at).total_seconds()
+            _LOGGER.debug("%s - Time differential in seconds: %s", DOMAIN, age)
+            if age > force_refresh_interval:
                 self.force_refresh_vehicle_state(vehicle_id)
-            else:
-                self.update_vehicle_with_cached_state(vehicle_id)
-        else:
-            self.update_vehicle_with_cached_state(vehicle_id)
+                return
+        self.update_vehicle_with_cached_state(vehicle_id)
 
     def force_refresh_all_vehicles_states(self) -> None:
         for vehicle_id in self.vehicles:
