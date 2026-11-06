@@ -461,6 +461,21 @@ def test_connect_callback_during_connect_subscribes(monkeypatch):
     assert vm._push_session._client.subscribed  # subscribed from the callback
 
 
+def test_vss_topics_subscribe_at_qos1(monkeypatch):
+    """vss pairs go out at QoS 1 (delivered at QoS 1); the rest stay at 0 (1332)."""
+    _connected_transport_factory(monkeypatch)
+    vm = _make_vm()
+    vm.vehicles["careu1"].mqtt_vehicle_id = "testmqtt1"
+    vm.start_push("careu1")
+    vm._ensure_push_session()
+    vm._push_session._client.subscribed = vm._push_session._client.subscribed or []
+    vm._push_session._on_push_connect()
+    pairs = vm._push_session._client.subscribed
+    assert pairs and all(
+        (q == 1) == t.startswith("service/phone/_/vss/") for t, q in pairs
+    )
+
+
 def test_on_push_connect_subscribes_started_vehicles(monkeypatch):
     _connected_transport_factory(monkeypatch)
     vm = _make_vm()
