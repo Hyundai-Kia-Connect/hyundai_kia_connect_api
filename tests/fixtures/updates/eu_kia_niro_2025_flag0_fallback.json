@@ -1,0 +1,58 @@
+{
+    "_fixture_meta": {
+        "status": "tests/fixtures/eu_kia_niro_2025_ccs2.json (Kia Niro (PE) 2025)",
+        "follow_up_sources": "5031 envelope and CCS2 fallback read: same issue #1546 capture; drvhistory and location/park: not captured for this car",
+        "not_captured": [
+            "GET /vehicles/VEHICLE-1/location/park",
+            "POST /vehicles/VEHICLE-1/drvhistory"
+        ],
+        "description": "Flag-0 car whose first /status/latest read returns resCode 5031 and the CCS2 fallback read succeeds. Follow-up reads are stubbed 503 (not captured for this car)."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "PHEV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/status/latest": {
+            "status": 200,
+            "body": {
+                "retCode": "F",
+                "resCode": "5031",
+                "resMsg": "Unavailable remote control - Service Temporary Unavailable",
+                "msgId": "MSG-1"
+            }
+        },
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "status": 200,
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "resCode": "0000",
+                    "ServiceNo": "RVS-K",
+                    "RetCode": "S",
+                    "lastUpdateTime": "1793894786761",
+                    "state": {
+                        "Vehicle": "$fixture:eu_kia_niro_2025_ccs2.json"
+                    },
+                    "msgId": "MSG-2"
+                },
+                "msgId": "MSG-2"
+            }
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "status": 503,
+            "body": null
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

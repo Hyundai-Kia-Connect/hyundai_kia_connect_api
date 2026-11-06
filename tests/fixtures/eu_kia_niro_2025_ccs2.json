@@ -1,0 +1,306 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia Niro (PE)",
+        "year": 2025,
+        "region": "EU",
+        "brand": "Kia",
+        "api_class": "ApiImplType1 (CCS2)",
+        "endpoint": "vehicles/{vehicleId}/ccs2/carstatus/latest",
+        "source": "Issue #1546 comment 6672937618 (reporter capture, 2026-11-06), taken by the #1546 capture script; VIN-free and coordinate-free by capture design (the tree carries no Location node)",
+        "description": "EU Kia Niro (PE) 2025 reporting ccuCCS2ProtocolSupport 0 whose cached status is served only by the CCS2 endpoint: captured as the fallback read after /status/latest returned 5031.",
+        "has_target_soc": false
+    },
+    "Chassis": {
+        "Brake": {
+            "Fluid": {
+                "Warning": 0
+            }
+        },
+        "Axle": {
+            "Row1": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 1
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 1
+                    }
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 1
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 1
+                    }
+                }
+            },
+            "Tire": {
+                "PressureLow": 1
+            }
+        }
+    },
+    "Cabin": {
+        "Window": {
+            "Row1": {
+                "Driver": {
+                    "Open": 0
+                },
+                "Passenger": {
+                    "Open": 0
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Open": 0
+                },
+                "Right": {
+                    "Open": 0
+                }
+            }
+        },
+        "HVAC": {
+            "Row1": {
+                "Driver": {
+                    "Temperature": {
+                        "Value": "15.0",
+                        "Unit": 0
+                    },
+                    "Blower": {
+                        "SpeedLevel": 0
+                    }
+                }
+            },
+            "Temperature": {
+                "RangeType": 1
+            }
+        },
+        "SteeringWheel": {
+            "Heat": {
+                "State": 0
+            }
+        },
+        "Door": {
+            "Row1": {
+                "Driver": {
+                    "Open": 0,
+                    "Lock": 1
+                },
+                "Passenger": {
+                    "Open": 0,
+                    "Lock": 1
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Open": 0,
+                    "Lock": 1
+                },
+                "Right": {
+                    "Lock": 1,
+                    "Open": 0
+                }
+            }
+        }
+    },
+    "Electronics": {
+        "PowerSupply": {
+            "Accessory": 0,
+            "Ignition3": 1
+        },
+        "AutoCut": {
+            "BatteryPreWarning": 0,
+            "PowerMode": 2,
+            "DeliveryMode": 0
+        },
+        "Battery": {
+            "Charging": {
+                "WarningLevel": 65
+            },
+            "Level": 100,
+            "SensorReliability": 0
+        },
+        "FOB": {
+            "LowBattery": 0
+        }
+    },
+    "RemoteControl": {
+        "SleepMode": 0
+    },
+    "Drivetrain": {
+        "FuelSystem": {
+            "LowFuelWarning": 0,
+            "FuelLevel": 42,
+            "DTE": {
+                "EV": 36,
+                "Total": 374,
+                "ICE": 338,
+                "Unit": 1
+            }
+        },
+        "Transmission": {
+            "ParkingPosition": 1
+        }
+    },
+    "Body": {
+        "Trunk": {
+            "Open": 0
+        },
+        "Lights": {
+            "Rear": {
+                "Left": {
+                    "StopLamp": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                },
+                "Right": {
+                    "StopLamp": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                }
+            },
+            "Front": {
+                "Left": {
+                    "High": {
+                        "Warning": 0
+                    },
+                    "Low": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                },
+                "Right": {
+                    "High": {
+                        "Warning": 0
+                    },
+                    "Low": {
+                        "Warning": 0
+                    },
+                    "TurnSignal": {
+                        "Warning": 0
+                    }
+                },
+                "HeadLamp": {
+                    "SystemWarning": 0
+                }
+            },
+            "TailLamp": {
+                "Alert": 0
+            },
+            "DischargeAlert": {
+                "State": 0
+            },
+            "Hazard": {
+                "Alert": 0
+            }
+        },
+        "Windshield": {
+            "Rear": {
+                "Defog": {
+                    "State": 0
+                }
+            },
+            "Front": {
+                "Defog": {
+                    "State": 0
+                },
+                "WasherFluid": {
+                    "LevelLow": 0
+                }
+            }
+        },
+        "Hood": {
+            "Open": 0
+        }
+    },
+    "DrivingReady": 0,
+    "Green": {
+        "Reservation": {
+            "OffPeakTime": {
+                "StartHour": 0,
+                "StartMin": 0,
+                "Mode": 3,
+                "EndHour": 2,
+                "EndMin": 0
+            },
+            "Departure": {
+                "Schedule2": {
+                    "Thu": 0,
+                    "Min": 0,
+                    "Tue": 0,
+                    "Hour": 0,
+                    "Sat": 0,
+                    "Wed": 0,
+                    "Enable": 0,
+                    "Fri": 0,
+                    "Sun": 0,
+                    "Mon": 0
+                },
+                "Schedule1": {
+                    "Thu": 1,
+                    "Min": 0,
+                    "Tue": 1,
+                    "Hour": 2,
+                    "Wed": 1,
+                    "Sat": 1,
+                    "Enable": 1,
+                    "Fri": 1,
+                    "Mon": 1,
+                    "Sun": 1
+                }
+            }
+        },
+        "ChargingInformation": {
+            "EstimatedTime": {
+                "Standard": 75,
+                "ICCB": 90
+            },
+            "Charging": {
+                "State": 0,
+                "RemainTimeUnit": 1,
+                "RemainTime": 70
+            },
+            "SequenceDetails": 501,
+            "ExpectedTime": {
+                "StartHour": 0,
+                "StartMin": 0,
+                "EndHour": 1,
+                "EndDay": 5,
+                "StartDay": 2,
+                "EndMin": 10
+            },
+            "SequenceSubcode": -1,
+            "ConnectorFastening": {
+                "State": 1
+            }
+        },
+        "BatteryManagement": {
+            "BatteryRemain": {
+                "Ratio": 70
+            }
+        }
+    },
+    "Date": "20261105160626.722",
+    "Service": {
+        "ConnectedCar": {
+            "RemoteControl": {
+                "WaitingTime": 168,
+                "Available": 1
+            }
+        }
+    }
+}

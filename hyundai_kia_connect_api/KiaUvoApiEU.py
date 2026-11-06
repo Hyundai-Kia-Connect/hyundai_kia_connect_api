@@ -47,6 +47,7 @@ from .exceptions import (
     AuthenticationSigninError,
     ConsentRequiredError,
     DeviceIDError,
+    ServiceTemporaryUnavailable,
 )
 from .Token import Token
 from .utils import (
@@ -507,15 +508,37 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         ).json()
 
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
 
-        if vehicle.ccu_ccs2_protocol_support == 0:
+        ccs2_fallback = False
+        if is_ccs2:
+            _check_response_for_errors(response)
+        else:
+            try:
+                _check_response_for_errors(response)
+            except ServiceTemporaryUnavailable:
+                # Flag-0 cars (issue #1546) can serve cached status only on
+                # the /ccs2/carstatus/latest endpoint; the vehicle flag stays
+                # 0 because it also selects the remote-command endpoints.
+                ccs2_fallback = True
+                response = self.session.get(
+                    self.SPA_API_URL
+                    + "vehicles/"
+                    + vehicle.id
+                    + "/ccs2/carstatus/latest",
+                    headers=self._get_authenticated_headers(token, 1),
+                ).json()
+                _LOGGER.debug(
+                    f"{DOMAIN} - get_cached_vehicle_status response: {response}"
+                )
+                _check_response_for_errors(response)
+
+        if ccs2_fallback or is_ccs2:
+            state = response["resMsg"]["state"]["Vehicle"]
+            self._update_vehicle_properties_ccs2(vehicle, state)
+        else:
             self._update_vehicle_properties(
                 vehicle, response["resMsg"]["vehicleStatusInfo"]
             )
-        else:
-            state = response["resMsg"]["state"]["Vehicle"]
-            self._update_vehicle_properties_ccs2(vehicle, state)
 
         # The status response embeds a stale cached location.
         # Override it with the more current /location/park endpoint.
@@ -1119,28 +1142,6 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                 ),
             )
         vehicle.data = state
-
-    def _get_cached_vehicle_state(
-        self, token: Token, vehicle: Vehicle
-    ) -> dict[str, Any]:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id
-        if vehicle.ccu_ccs2_protocol_support == 0:
-            url = url + "/status/latest"
-        else:
-            url = url + "/ccs2/carstatus/latest"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
-        if vehicle.ccu_ccs2_protocol_support == 0:
-            response = response["resMsg"]["vehicleStatusInfo"]
-        else:
-            response = response["resMsg"]["state"]["Vehicle"]
-        return cast(dict[str, Any], response)
 
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
