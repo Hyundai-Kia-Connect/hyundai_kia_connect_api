@@ -45,7 +45,9 @@ def _refresh_ok_payload(token="RT2"):
 
 
 def _make_api() -> KiaUvoApiCA:
-    api = KiaUvoApiCA(region=2, brand=1, language="en")
+    # gtothbyrftkn is the Hyundai-brand refresh path now (kia_uvo#2054);
+    # Kia/Genesis mint through a full re-login instead.
+    api = KiaUvoApiCA(region=2, brand=2, language="en")
     api._sessions = MagicMock()
     return api
 

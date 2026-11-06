@@ -134,7 +134,7 @@ def test_check_and_refresh_token_reauthenticates_on_ip_validation_error():
     )
     vm = VehicleManager(
         region=2,
-        brand=1,
+        brand=2,  # gtothbyrftkn refresh path is Hyundai-brand only (kia_uvo#2054)
         username="user@test.com",
         password="pw",
         pin="1234",

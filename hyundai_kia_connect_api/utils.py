@@ -75,6 +75,13 @@ def get_float(value: Any) -> Any:
     return value  # original fallback
 
 
+def offset_from_tz(now: datetime.datetime | None = None) -> str:
+    """Whole-hour UTC offset as a string; Java-style truncation toward zero."""
+    moment = now or datetime.datetime.now().astimezone()
+    off = moment.utcoffset()
+    return str(int(off.total_seconds() / 3600)) if off else "0"
+
+
 def float_or_none(value: str | float | None) -> float | None:
     """Coerce to float; return None for missing or non-numeric values."""
     if value is None:
