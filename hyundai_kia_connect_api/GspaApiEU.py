@@ -2901,23 +2901,24 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         body = {"dischargingLimit": int(limit), "command": "set"}
         return self._gspa_control_command(token, vehicle, "discharge-limit", body)
 
-    def set_charge_alarm(self, token: Token, vehicle: Vehicle, enabled: bool) -> str:
-        if enabled:
-            body = {
-                "alarmOff": 0,
-                "alarmBefore10": 1,
-                "alarmBefore20": 1,
-                "alarmBefore30": 1,
-                "command": "set",
-            }
-        else:
-            body = {
-                "alarmOff": 1,
-                "alarmBefore10": 0,
-                "alarmBefore20": 0,
-                "alarmBefore30": 0,
-                "command": "set",
-            }
+    def set_charge_alarm(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        before_10min: bool = False,
+        before_20min: bool = False,
+        before_30min: bool = False,
+    ) -> str:
+        # alarmOff is 1 exactly when no flag is on (PV5, issue #1145:
+        # all-off = alarmOff 1 + 0/0/0, single flag = alarmOff 0), so the
+        # all-on / all-off bodies stay on the wire unchanged.
+        body = {
+            "alarmOff": int(not (before_10min or before_20min or before_30min)),
+            "alarmBefore10": int(before_10min),
+            "alarmBefore20": int(before_20min),
+            "alarmBefore30": int(before_30min),
+            "command": "set",
+        }
         return self._gspa_control_command(token, vehicle, "charge-alarm", body)
 
     def schedule_reservation_charge(

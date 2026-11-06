@@ -374,9 +374,19 @@ class VehicleManager:
             self._require_token(), self.get_vehicle(vehicle_id)
         )
 
-    def set_charge_alarm(self, vehicle_id: str, enabled: bool) -> str:
+    def set_charge_alarm(
+        self,
+        vehicle_id: str,
+        before_10min: bool = False,
+        before_20min: bool = False,
+        before_30min: bool = False,
+    ) -> str:
         return self.api.set_charge_alarm(
-            self._require_token(), self.get_vehicle(vehicle_id), enabled
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            before_10min,
+            before_20min,
+            before_30min,
         )
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str | None:

@@ -253,10 +253,9 @@ def test_kia_charge_alarm_sends_both_all_flag_bodies():
     """Kia GSPA charge-alarm: all-on / all-off flag bodies — live-proven
     on a PV5 (2026-10-22): 202 (the one 202 that answers with a SID),
     stored Setting.CompleteAlarm flags following both directions.
-    Per-combination bodies also reach the wire, but the library exposes
-    the boolean pair only."""
+    Per-combination bodies are exposed by set_charge_alarm."""
     api = KiaCciApiEU(9, 1, "en")
-    _action_id, call = _run_command_on(api, api.set_charge_alarm, True)
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, True, True, True)
     assert call.args[0].endswith("/charge-alarm")
     assert call.kwargs["json"] == {
         "alarmOff": 0,
@@ -265,10 +264,39 @@ def test_kia_charge_alarm_sends_both_all_flag_bodies():
         "alarmBefore30": 1,
         "command": "set",
     }
-    _action_id, call = _run_command_on(api, api.set_charge_alarm, False)
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, False, False, False)
     assert call.kwargs["json"] == {
         "alarmOff": 1,
         "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
+def test_kia_charge_alarm_defaults_turn_the_alarm_off():
+    """Call with no flags -> the same wire body as the live-proven
+    all-off run (2026-10-22): alarmOff 1 + 0/0/0."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm)
+    assert call.kwargs["json"] == {
+        "alarmOff": 1,
+        "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
+def test_kia_charge_alarm_sends_the_single_flag_body():
+    """Kia GSPA charge-alarm single combination — live-proven on a PV5
+    (2026-10-21): {"alarmOff": 0, "alarmBefore10": 1, ...} answered 202
+    and stored 1/0/0/0; the app exposes combinations, not a preset."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm, True, False, False)
+    assert call.kwargs["json"] == {
+        "alarmOff": 0,
+        "alarmBefore10": 1,
         "alarmBefore20": 0,
         "alarmBefore30": 0,
         "command": "set",
@@ -610,7 +638,7 @@ def test_set_v2l_discharge_limit():
 
 
 def test_set_charge_alarm_enabled_and_disabled():
-    _, on = _run_command(HyundaiCciApiEU.set_charge_alarm, True)
+    _, on = _run_command(HyundaiCciApiEU.set_charge_alarm, True, True, True)
     assert on.kwargs["json"] == {
         "alarmOff": 0,
         "alarmBefore10": 1,
@@ -620,7 +648,7 @@ def test_set_charge_alarm_enabled_and_disabled():
     }
     assert "AuthorizationCCSP" not in on.kwargs["headers"]
     assert on.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
-    _, off = _run_command(HyundaiCciApiEU.set_charge_alarm, False)
+    _, off = _run_command(HyundaiCciApiEU.set_charge_alarm, False, False, False)
     assert off.kwargs["json"]["alarmOff"] == 1
     assert off.kwargs["json"]["alarmBefore10"] == 0
     assert "AuthorizationCCSP" not in off.kwargs["headers"]
