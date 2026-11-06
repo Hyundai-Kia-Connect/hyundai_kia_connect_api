@@ -81,3 +81,17 @@ def test_otp_steps_before_login_raise_authentication_error(monkeypatch):
         manager.send_otp(OTP_NOTIFY_TYPE.EMAIL)
     with pytest.raises(AuthenticationError):
         manager.verify_otp_and_complete_login("123456")
+
+
+def test_api_calls_before_login_raise_authentication_error(monkeypatch):
+    dummy_api = DummyApi()
+    monkeypatch.setattr(
+        VehicleManager,
+        "get_implementation_by_region_brand",
+        lambda *args, **kwargs: dummy_api,
+    )
+    manager = VehicleManager(
+        region=3, brand=1, username="user", password="pass", pin="1234"
+    )
+    with pytest.raises(AuthenticationError):
+        manager.initialize_vehicles()
