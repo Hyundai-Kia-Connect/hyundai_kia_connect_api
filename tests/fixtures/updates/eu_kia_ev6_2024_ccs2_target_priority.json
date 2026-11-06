@@ -2,7 +2,9 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_ev6_2024_ccs2_target_priority.json (Kia EV6 2024)",
         "follow_up_sources": "location/park: library #1301 shape; drvhistory: kia_uvo #1031",
-        "not_captured": [],
+        "not_captured": [
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump — answered 503; the update path logs and continues)"
+        ],
         "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
     },
     "implementation": {
@@ -38,6 +40,10 @@
             {
                 "body": "$fixture:updates/responses/eu_drvhistory_30d.json"
             }
-        ]
+        ],
+        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
+            "status": 503,
+            "body": null
+        }
     }
 }

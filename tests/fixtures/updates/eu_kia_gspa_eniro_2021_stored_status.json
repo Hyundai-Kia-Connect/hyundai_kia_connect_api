@@ -2,7 +2,10 @@
     "_fixture_meta": {
         "status": "captured in kia_uvo discussion #1909; eu_kia_gspa_eniro_2021_stored_status",
         "follow_up_sources": "none",
-        "not_captured": [],
+        "not_captured": [
+            "legacy-SPA vehicles/{carId}/profile (no capture in the dump — answered 503; the update path logs and continues)",
+            "legacy-SPA notifications/register (deviceId envelope rebuilt from the legacy parser shape)"
+        ],
         "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Kia eNiro 4+ 2021 (71), ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (rongalbraith 17.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (rongalbraith 17.10)"
     },
@@ -288,6 +291,20 @@
                 "metaInfo": {
                     "retCode": "S",
                     "resCode": "200-000"
+                }
+            }
+        },
+        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
+            "status": 503,
+            "body": null
+        },
+        "POST /api/v1/spa/notifications/register": {
+            "status": 200,
+            "body": {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {
+                    "deviceId": "spa-device-0001"
                 }
             }
         }
