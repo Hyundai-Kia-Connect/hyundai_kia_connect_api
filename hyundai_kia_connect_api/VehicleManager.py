@@ -89,7 +89,7 @@ class VehicleManager:
             self.region, self.brand, self.language
         )
 
-        self.token: Token = token
+        self.token: Token | None = token
         self.vehicles: dict[str, Vehicle] = {}
         self.otp_request: OTPRequest | None = None
         # Connection-scoped state; vehicle push identity lives on Vehicle.
@@ -112,6 +112,11 @@ class VehicleManager:
             self.otp_request = result
             return result
         return False
+
+    def _require_token(self) -> Token:
+        if self.token is None:
+            raise AuthenticationError("Not logged in; call login() first")
+        return self.token
 
     def _pending_otp_request(self) -> OTPRequest:
         if self.otp_request is None:
@@ -136,7 +141,7 @@ class VehicleManager:
             _LOGGER.warning(
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
-        vehicles = self.api.get_vehicles(self.token)
+        vehicles = self.api.get_vehicles(self._require_token())
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
 
@@ -151,10 +156,10 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
-            self.api.update_vehicle_with_cached_state(self.token, vehicle)
+            self.api.update_vehicle_with_cached_state(self._require_token(), vehicle)
             if self.geocode_api_enable is True:
                 self.api.update_geocoded_location(
-                    token=self.token,
+                    token=self._require_token(),
                     vehicle=vehicle,
                     use_email=self.geocode_api_use_email,
                     provider=self.geocode_provider,
@@ -195,7 +200,7 @@ class VehicleManager:
         vehicle = self.get_vehicle(vehicle_id)
         if vehicle.enabled:
             vehicle.last_scanned_at = dt.datetime.now(dt.UTC)
-            self.api.force_refresh_vehicle_state(self.token, vehicle)
+            self.api.force_refresh_vehicle_state(self._require_token(), vehicle)
         else:
             _LOGGER.debug(f"{DOMAIN} - Vehicle Disabled, skipping.")
 
@@ -205,7 +210,9 @@ class VehicleManager:
         Delegates to the region-specific API implementation. Raises
         NotImplementedError on regions without SVM support.
         """
-        return self.api.get_svm_details(self.token, self.get_vehicle(vehicle_id))
+        return self.api.get_svm_details(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def request_svm_capture(
         self, vehicle_id: str, acknowledged_warning: bool
@@ -216,7 +223,7 @@ class VehicleManager:
         acknowledge the safety warning before triggering a capture.
         """
         return self.api.request_svm_capture(
-            self.token, self.get_vehicle(vehicle_id), acknowledged_warning
+            self._require_token(), self.get_vehicle(vehicle_id), acknowledged_warning
         )
 
     def check_and_refresh_token(self) -> bool:
@@ -284,89 +291,107 @@ class VehicleManager:
     def start_climate(
         self, vehicle_id: str, options: ClimateRequestOptions
     ) -> str | None:
-        return self.api.start_climate(self.token, self.get_vehicle(vehicle_id), options)
+        return self.api.start_climate(
+            self._require_token(), self.get_vehicle(vehicle_id), options
+        )
 
     def stop_climate(self, vehicle_id: str) -> str | None:
-        return self.api.stop_climate(self.token, self.get_vehicle(vehicle_id))
+        return self.api.stop_climate(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def start_pet_care(
         self, vehicle_id: str, options: ClimateRequestOptions | None = None
     ) -> str:
         return self.api.start_pet_care(
-            self.token, self.get_vehicle(vehicle_id), options
+            self._require_token(), self.get_vehicle(vehicle_id), options
         )
 
     def stop_pet_care(self, vehicle_id: str) -> str:
-        return self.api.stop_pet_care(self.token, self.get_vehicle(vehicle_id))
+        return self.api.stop_pet_care(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def start_battery_conditioning(self, vehicle_id: str) -> str:
         return self.api.start_battery_conditioning(
-            self.token, self.get_vehicle(vehicle_id)
+            self._require_token(), self.get_vehicle(vehicle_id)
         )
 
     def stop_battery_conditioning(self, vehicle_id: str) -> str:
         return self.api.stop_battery_conditioning(
-            self.token, self.get_vehicle(vehicle_id)
+            self._require_token(), self.get_vehicle(vehicle_id)
         )
 
     def lock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
-            self.token, self.get_vehicle(vehicle_id), VEHICLE_LOCK_ACTION.LOCK
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            VEHICLE_LOCK_ACTION.LOCK,
         )
 
     def unlock(self, vehicle_id: str) -> str | None:
         return self.api.lock_action(
-            self.token,
+            self._require_token(),
             self.get_vehicle(vehicle_id),
             VEHICLE_LOCK_ACTION.UNLOCK,
         )
 
     def start_charge(self, vehicle_id: str) -> str | None:
-        return self.api.start_charge(self.token, self.get_vehicle(vehicle_id))
+        return self.api.start_charge(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def stop_charge(self, vehicle_id: str) -> str | None:
-        return self.api.stop_charge(self.token, self.get_vehicle(vehicle_id))
+        return self.api.stop_charge(self._require_token(), self.get_vehicle(vehicle_id))
 
     def start_hazard_lights(self, vehicle_id: str) -> str | None:
-        return self.api.start_hazard_lights(self.token, self.get_vehicle(vehicle_id))
+        return self.api.start_hazard_lights(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def start_hazard_lights_and_horn(self, vehicle_id: str) -> str | None:
         return self.api.start_hazard_lights_and_horn(
-            self.token, self.get_vehicle(vehicle_id)
+            self._require_token(), self.get_vehicle(vehicle_id)
         )
 
     def door_power_off(self, vehicle_id: str) -> str:
-        return self.api.door_power_off(self.token, self.get_vehicle(vehicle_id))
+        return self.api.door_power_off(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def open_frunk(self, vehicle_id: str) -> str:
-        return self.api.open_frunk(self.token, self.get_vehicle(vehicle_id))
+        return self.api.open_frunk(self._require_token(), self.get_vehicle(vehicle_id))
 
     def turn_off_lamp(
         self, vehicle_id: str, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
-        return self.api.turn_off_lamp(self.token, self.get_vehicle(vehicle_id), mode)
+        return self.api.turn_off_lamp(
+            self._require_token(), self.get_vehicle(vehicle_id), mode
+        )
 
     def stop_rear_seat_alarm(self, vehicle_id: str) -> str:
-        return self.api.stop_rear_seat_alarm(self.token, self.get_vehicle(vehicle_id))
+        return self.api.stop_rear_seat_alarm(
+            self._require_token(), self.get_vehicle(vehicle_id)
+        )
 
     def set_charge_alarm(self, vehicle_id: str, enabled: bool) -> str:
         return self.api.set_charge_alarm(
-            self.token, self.get_vehicle(vehicle_id), enabled
+            self._require_token(), self.get_vehicle(vehicle_id), enabled
         )
 
     def set_charge_limits(self, vehicle_id: str, ac: int, dc: int) -> str | None:
         return self.api.set_charge_limits(
-            self.token, self.get_vehicle(vehicle_id), ac, dc
+            self._require_token(), self.get_vehicle(vehicle_id), ac, dc
         )
 
     def set_charging_current(self, vehicle_id: str, level: int) -> str:
         return self.api.set_charging_current(
-            self.token, self.get_vehicle(vehicle_id), level
+            self._require_token(), self.get_vehicle(vehicle_id), level
         )
 
     def set_windows_state(self, vehicle_id: str, options: WindowRequestOptions) -> str:
         return self.api.set_windows_state(
-            self.token, self.get_vehicle(vehicle_id), options
+            self._require_token(), self.get_vehicle(vehicle_id), options
         )
 
     def check_action_status(
@@ -398,17 +423,23 @@ class VehicleManager:
         :return: status of the order
         """
         return self.api.check_action_status(
-            self.token, self.get_vehicle(vehicle_id), action_id, synchronous, timeout
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            action_id,
+            synchronous,
+            timeout,
         )
 
     def open_charge_port(self, vehicle_id: str) -> str:
         return self.api.charge_port_action(
-            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN
+            self._require_token(), self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.OPEN
         )
 
     def close_charge_port(self, vehicle_id: str) -> str:
         return self.api.charge_port_action(
-            self.token, self.get_vehicle(vehicle_id), CHARGE_PORT_ACTION.CLOSE
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            CHARGE_PORT_ACTION.CLOSE,
         )
 
     def update_month_trip_info(self, vehicle_id: str, yyyymm_string: str) -> None:
@@ -421,7 +452,7 @@ class VehicleManager:
         month_trip_info: MonthTripInfo = None
         """
         vehicle = self.get_vehicle(vehicle_id)
-        self.api.update_month_trip_info(self.token, vehicle, yyyymm_string)
+        self.api.update_month_trip_info(self._require_token(), vehicle, yyyymm_string)
 
     def update_day_trip_info(self, vehicle_id: str, yyyymmdd_string: str) -> None:
         """
@@ -433,7 +464,7 @@ class VehicleManager:
         day_trip_info: DayTripInfo = None
         """
         vehicle = self.get_vehicle(vehicle_id)
-        self.api.update_day_trip_info(self.token, vehicle, yyyymmdd_string)
+        self.api.update_day_trip_info(self._require_token(), vehicle, yyyymmdd_string)
 
     def disable_vehicle(self, vehicle_id: str) -> None:
         self.get_vehicle(vehicle_id).enabled = False
@@ -452,32 +483,36 @@ class VehicleManager:
         calling with no field set raises ``ValueError``.
         """
         return self.api.schedule_charging_and_climate(
-            self.token, self.get_vehicle(vehicle_id), options
+            self._require_token(), self.get_vehicle(vehicle_id), options
         )
 
     def start_valet_mode(self, vehicle_id: str) -> str:
         return self.api.valet_mode_action(
-            self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.ACTIVATE
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            VALET_MODE_ACTION.ACTIVATE,
         )
 
     def stop_valet_mode(self, vehicle_id: str) -> str:
         return self.api.valet_mode_action(
-            self.token, self.get_vehicle(vehicle_id), VALET_MODE_ACTION.DEACTIVATE
+            self._require_token(),
+            self.get_vehicle(vehicle_id),
+            VALET_MODE_ACTION.DEACTIVATE,
         )
 
     def set_vehicle_to_load_discharge_limit(self, vehicle_id: str, limit: int) -> str:
         return self.api.set_vehicle_to_load_discharge_limit(
-            self.token, self.get_vehicle(vehicle_id), limit
+            self._require_token(), self.get_vehicle(vehicle_id), limit
         )
 
     def start_ota_update(self, vehicle_id: str, start: bool) -> dict[str, Any]:
         return self.api.start_ota_update(
-            self.token, self.get_vehicle(vehicle_id), start
+            self._require_token(), self.get_vehicle(vehicle_id), start
         )
 
     def set_navigation(self, vehicle_id: str, poi_list: list[POIInfo]) -> str:
         return self.api.set_navigation(
-            self.token, self.get_vehicle(vehicle_id), poi_list
+            self._require_token(), self.get_vehicle(vehicle_id), poi_list
         )
 
     # Push glue — the VehicleManager stays the surface; the transport
@@ -489,7 +524,7 @@ class VehicleManager:
         if self._push_session is None:
             self._push_session = MqttPushSession(
                 api=self.api,
-                token_fn=lambda: self.token,
+                token_fn=self._require_token,
                 refresh_fn=self.check_and_refresh_token,
                 get_vehicle=self.get_vehicle,
                 vehicles=lambda: self.vehicles,
@@ -544,7 +579,7 @@ class VehicleManager:
 
     def get_push_connection_state(self) -> MQTT_PUSH_CONNECTION_STATE | None:
         """Push connection state through the region API (delegator)."""
-        return self.api.get_push_connection_state(self.token)
+        return self.api.get_push_connection_state(self._require_token())
 
     @staticmethod
     def get_implementation_by_region_brand(
