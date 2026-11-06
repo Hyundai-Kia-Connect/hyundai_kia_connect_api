@@ -1328,17 +1328,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     ) -> ORDER_STATUS:
         """Poll a GSPA action's status.
 
-        GET /gspa/v1/status/vehicles/{carId}/update-status
-            ?path=gspa/v1/remote/vehicles
+        GET /gspa/v1/status/vehicles/{carId}/update-status (no query
+        argument, as the EU apps send it)
         Response: {"metaInfo": {"retCode": "S"}, "data": {"pollingState":
         "WAIT" | "SUCCESS" | "FAILURE" | "TIMEOUT"}}. Any transport/parse
         error or non-success retCode is reported as PENDING (caller re-polls).
         """
-        url = (
-            self.CCSP_API_URL
-            + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
-            + f"?path={self.GSPA_REMOTE_VEHICLES_PATH}"
-        )
+        url = self.CCSP_API_URL + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
         self._validate_ccs_token(token)
         headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support or 0
@@ -1496,12 +1492,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         update-status is called.
         """
         try:
-            self._gspa_get(
-                token,
-                vehicle,
-                "status/vehicles/{carId}/update-status",
-                params={"path": self.GSPA_REMOTE_VEHICLES_PATH},
-            )
+            self._gspa_get(token, vehicle, "status/vehicles/{carId}/update-status")
         except AuthenticationError:
             raise
         except Exception:

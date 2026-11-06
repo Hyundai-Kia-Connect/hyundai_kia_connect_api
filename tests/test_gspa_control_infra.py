@@ -466,7 +466,7 @@ def test_check_action_status_success():
         status = api._gspa_check_action_status(_make_token(), _make_vehicle(), "sid-1")
     assert status is ORDER_STATUS.SUCCESS
     assert "/gspa/v1/status/vehicles/test123/update-status" in get.call_args.args[0]
-    assert "path=gspa/v1/remote/vehicles" in get.call_args.args[0]
+    assert "?" not in get.call_args.args[0]
 
 
 def test_check_action_status_wait_failure_timeout():

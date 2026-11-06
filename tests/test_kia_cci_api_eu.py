@@ -356,13 +356,13 @@ def test_kia_force_refresh_upload_time_counts_against_budget():
 
 
 def test_kia_request_status_upload_calls_update_status():
-    """update-status is requested with the remote-vehicles path."""
+    """update-status is requested without a query argument, as the apps do."""
     api = _make_kia_api()
     vehicle = MagicMock()
     with patch.object(KiaCciApiEU, "_gspa_get") as get:
         api._request_status_upload(MagicMock(), vehicle)
     assert get.call_args.args[2] == "status/vehicles/{carId}/update-status"
-    assert get.call_args.kwargs["params"] == {"path": "gspa/v1/remote/vehicles"}
+    assert get.call_args.kwargs.get("params") is None
 
 
 def test_kia_request_status_upload_is_best_effort():
