@@ -2905,9 +2905,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         self,
         token: Token,
         vehicle: Vehicle,
-        before_10min: bool,
-        before_20min: bool,
-        before_30min: bool,
+        before_10min: bool = False,
+        before_20min: bool = False,
+        before_30min: bool = False,
     ) -> str:
         # alarmOff is 1 exactly when no flag is on (PV5, issue #1145:
         # all-off = alarmOff 1 + 0/0/0, single flag = alarmOff 0), so the

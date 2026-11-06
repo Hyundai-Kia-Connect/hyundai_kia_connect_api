@@ -274,6 +274,20 @@ def test_kia_charge_alarm_sends_both_all_flag_bodies():
     }
 
 
+def test_kia_charge_alarm_defaults_turn_the_alarm_off():
+    """Call with no flags -> the same wire body as the live-proven
+    all-off run (2026-10-22): alarmOff 1 + 0/0/0."""
+    api = KiaCciApiEU(9, 1, "en")
+    _action_id, call = _run_command_on(api, api.set_charge_alarm)
+    assert call.kwargs["json"] == {
+        "alarmOff": 1,
+        "alarmBefore10": 0,
+        "alarmBefore20": 0,
+        "alarmBefore30": 0,
+        "command": "set",
+    }
+
+
 def test_kia_charge_alarm_sends_the_single_flag_body():
     """Kia GSPA charge-alarm single combination — live-proven on a PV5
     (2026-10-21): {"alarmOff": 0, "alarmBefore10": 1, ...} answered 202

@@ -839,9 +839,9 @@ class ApiImpl:
         self,
         token: Token,
         vehicle: Vehicle,
-        before_10min: bool,
-        before_20min: bool,
-        before_30min: bool,
+        before_10min: bool = False,
+        before_20min: bool = False,
+        before_30min: bool = False,
     ) -> str:
         raise NotImplementedError("set_charge_alarm is not implemented for this region")
 

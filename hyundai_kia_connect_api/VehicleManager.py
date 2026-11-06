@@ -377,9 +377,9 @@ class VehicleManager:
     def set_charge_alarm(
         self,
         vehicle_id: str,
-        before_10min: bool,
-        before_20min: bool,
-        before_30min: bool,
+        before_10min: bool = False,
+        before_20min: bool = False,
+        before_30min: bool = False,
     ) -> str:
         return self.api.set_charge_alarm(
             self._require_token(),
