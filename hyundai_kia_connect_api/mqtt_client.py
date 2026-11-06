@@ -88,7 +88,9 @@ class MqttTransport:
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,  # type: ignore[attr-defined]
             client_id=self._client_id,
             protocol=mqtt.MQTTv311,
-            clean_session=True,
+            # Persistent session: the broker replays vss missed while
+            # disconnected (1332, live-probed to 60 min).
+            clean_session=False,
             # Registration-bound credentials expire; the push session owns
             # reconnects (rebuilds the registration chain).
             reconnect_on_failure=False,
@@ -129,22 +131,22 @@ class MqttTransport:
         self._connected = False
         self._subscribed_topics = []
 
-    def subscribe(self, topics: list[str]) -> list[str]:
-        """Batch-subscribe the given topics (QoS 0, one SUBSCRIBE).
+    def subscribe(self, topics: list[tuple[str, int]]) -> list[tuple[str, int]]:
+        """Batch-subscribe (topic, qos) pairs in one SUBSCRIBE packet.
 
-        Broker rules (app-confirmed): QoS 0 only — the broker rejects
-        QoS 1 SUBSCRIBEs outright; one batch SUBSCRIBE for the whole
-        list. Topic selection is the provider's business.
-        Returns the subscribed topic list.
+        Topic selection is the provider's business. Live-probed: the
+        brokers grant QoS 1 on vss and publish it at QoS 1; this call
+        does not choose qos values.
+        Returns the subscribed (topic, qos) pairs.
         """
         if not self._client or not self._connected:
             _LOGGER.warning(f"{DOMAIN} - Push not connected, cannot subscribe")
             return []
         if not topics:
             return []
-        result, mid = self._client.subscribe(list(zip(topics, [0] * len(topics))))
+        result, mid = self._client.subscribe(list(topics))
         _LOGGER.debug(f"{DOMAIN} - Push batch subscribe mid={mid}, rc={result}")
-        self._subscribed_topics = list(topics)
+        self._subscribed_topics = [t for t, _ in topics]
         return list(topics)
 
     # -- paho-mqtt callbacks (called on the background thread) --

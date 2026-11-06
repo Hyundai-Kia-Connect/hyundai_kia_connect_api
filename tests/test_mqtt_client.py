@@ -33,6 +33,7 @@ def test_connect_constructs_paho_client_with_callback_api_v2(monkeypatch):
         captured.get("callback_api_version")
         == mqtt_client_mod.mqtt.CallbackAPIVersion.VERSION2
     )
+    assert captured.get("clean_session") is False
 
 
 def test_module_has_no_v1_fallback_flags():
@@ -67,8 +68,8 @@ def test_connect_disables_paho_auto_reconnect(monkeypatch):
     assert captured.get("reconnect_on_failure") is False
 
 
-def test_subscribe_batch_qos0():
-    """subscribe(list[str]) — single batch SUBSCRIBE, QoS 0, no schema knowledge."""
+def test_subscribe_batch_pairs():
+    """subscribe((topic, qos) pairs) — single batch SUBSCRIBE, no schema knowledge."""
     calls: list[list[tuple[str, int]]] = []
 
     class _FakePaho:
@@ -87,10 +88,12 @@ def test_subscribe_batch_qos0():
     t = MqttTransport()
     t._client = _FakePaho()  # type: ignore[assignment]
     t._connected = True
-    t.subscribe(["service/phone/_/vss/v1/", "device/c1/remotecontroller/connect"])
+    t.subscribe(
+        [("service/phone/_/vss/v1/", 1), ("device/c1/remotecontroller/connect", 0)]
+    )
     assert calls == [
         [
-            ("service/phone/_/vss/v1/", 0),
+            ("service/phone/_/vss/v1/", 1),
             ("device/c1/remotecontroller/connect", 0),
         ]
     ]

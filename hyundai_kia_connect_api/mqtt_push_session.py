@@ -14,6 +14,7 @@ from typing import Any
 from . import const
 from .const import DOMAIN
 from .mqtt_client import MqttTransport
+from .mqtt_service_hub import TOPIC_PREFIX_VSS
 from .Token import Token
 from .Vehicle import Vehicle
 
@@ -151,7 +152,11 @@ class MqttPushSession:
         vehicle = self._get_vehicle(vehicle_id)
         topics = self._api.get_push_topics(self._get_token(), vehicle)
         if topics:
-            self._client.subscribe(topics)
+            # vss is delivered at QoS 1, the rest at QoS 0 (1332 live data)
+            pairs = [
+                (t, 1) if t.startswith(TOPIC_PREFIX_VSS) else (t, 0) for t in topics
+            ]
+            self._client.subscribe(pairs)
 
     def _on_push_connect(self) -> None:
         """Subscribe topics for each started push vehicle on (re)connect."""
