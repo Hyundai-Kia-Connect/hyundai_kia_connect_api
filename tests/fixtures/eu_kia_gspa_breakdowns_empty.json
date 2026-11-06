@@ -1,0 +1,19 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia (GasManGeek capture)",
+        "year": 2026,
+        "region": "EU",
+        "brand": "Kia",
+        "api_class": "GspaApiEU",
+        "endpoint": "gspa diagnostics/vehicles/{carId}/breakdowns",
+        "description": "Breakdowns captured live on a Kia CCI account (GasManGeek, run 5, 2026-09) with an empty breakdown list. Proves the outer envelope (data.breakdown). The per-item field set is NOT proven: the app's ECUsDiagnosticApiResponse model carries title/failureStatus/systemName/message per item (no dtcList), while the existing parser keys on ecuName/ecuIdx/dtcList — the parser's descriptions arm awaits a real capture with actual DTC entries. dtc_count works against both shapes (counts breakdown entries). An empty breakdown list is a known result: dtc_count reads 0 and the descriptions dict reads empty; only a failing or malformed read leaves the fields unknown.",
+        "not_captured": [
+            "non-empty breakdown list — unit tests cover the parser arms; a real capture with DTC entries is pending (volunteers)"
+        ],
+        "expected": {
+            "dtc_count": 0,
+            "dtc_descriptions": {}
+        }
+    },
+    "breakdown": []
+}

@@ -190,9 +190,11 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
 
         Response structure:
           {"breakdown": [{"ecuName": "...", "ecuIdx": 0, "dtcList": [...]}]}
+        An emptied list is a known result (zero active breakdowns), not
+        unknown; a response without the list leaves the fields unknown.
         """
-        breakdown = data.get("breakdown", [])
-        if not breakdown:
+        breakdown = data.get("breakdown")
+        if breakdown is None:
             return
         vehicle.dtc_count = len(breakdown)
         descriptions = {}
@@ -203,8 +205,7 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
             dtc_list = item.get("dtcList", [])
             if dtc_list:
                 descriptions[str(ecu_name)] = dtc_list
-        if descriptions:
-            vehicle.dtc_descriptions = descriptions
+        vehicle.dtc_descriptions = descriptions
 
     # ------------------------------------------------------------------
     # CCS2 vehicle property mapping
@@ -284,3 +285,10 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
         except Exception:
             vehicle.ota_update_available = None  # HA convention: unavailable = unknown
             _LOGGER.debug(f"{DOMAIN} - GSPA ota_updates update failed")
+
+        try:
+            bd = self.get_breakdowns(token, vehicle)
+            if bd and isinstance(bd, dict):
+                self._parse_breakdowns(vehicle, bd)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA breakdowns update failed")

@@ -851,6 +851,7 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
             "get_ota_updates",
             return_value={"otaUpdateList": [{"id": "x"}]},
         ),
+        patch.object(api, "get_breakdowns", return_value=None),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.software_version == "ABC123"
@@ -867,10 +868,80 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
     with (
         patch.object(api, "get_software_version", side_effect=APIError("boom")),
         patch.object(api, "get_ota_updates", side_effect=APIError("boom")),
+        patch.object(api, "get_breakdowns", return_value=None),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.ota_update_available is None
     assert vehicle._ota_checked is True  # checked — don't retry until force refresh
+
+
+def test_update_vehicle_gspa_data_wires_breakdown_count():
+    """dtc_count counts the breakdown entries and works regardless of the
+    per-item field set; descriptions only materialize when dtcList lands
+    (see PR note: item-level field names await a real capture)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="car-123")
+
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(
+            api,
+            "get_breakdowns",
+            return_value={"breakdown": [{"ecuName": "ABS", "dtcList": ["C1234"]}]},
+        ),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+
+    assert vehicle.dtc_count == 1
+    assert vehicle.dtc_descriptions == {"ABS": ["C1234"]}
+
+
+def test_update_vehicle_gspa_data_breakdowns_empty_is_a_real_zero():
+    """An empty breakdown list (real capture: Kia CCI run 5, plus the live
+    probe on a Santa Fe HEV) is a known result: zero active breakdowns,
+    not unknown."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="car-123")
+
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(api, "get_breakdowns", return_value={"breakdown": []}),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+
+    assert vehicle.dtc_count == 0
+    assert vehicle.dtc_descriptions == {}
+
+
+def test_parse_breakdowns_unknown_shape_stays_unknown():
+    """A response without the breakdown list leaves the fields unknown."""
+    api = _make_hyundai_api()
+    vehicle = Vehicle(id="car-123")
+
+    api._parse_breakdowns(vehicle, {"updateDate": "2026-11-03"})
+
+    assert vehicle.dtc_count is None
+    assert vehicle.dtc_descriptions is None
+
+
+def test_update_vehicle_gspa_data_breakdowns_failure_stays_unknown():
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="car-123")
+
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(api, "get_breakdowns", side_effect=APIError("boom")),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+
+    assert vehicle.dtc_count is None
+    assert vehicle.dtc_descriptions is None
 
 
 # ── force_refresh_vehicle_state() — shared poll + Hyundai extras ──

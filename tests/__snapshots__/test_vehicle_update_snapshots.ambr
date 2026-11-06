@@ -1730,6 +1730,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -1758,8 +1763,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': None,
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.EV',
@@ -1969,6 +1975,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -1997,8 +2008,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': None,
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.EV',
@@ -2208,6 +2220,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2236,8 +2253,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': None,
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.EV',
@@ -2447,6 +2465,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2475,8 +2498,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': None,
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.EV',
@@ -2690,6 +2714,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2718,8 +2747,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': 'Normal',
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.EV',
@@ -2924,6 +2954,11 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2952,8 +2987,9 @@
       'day_trip_info': None,
       'defrost_is_on': False,
       'drive_mode': 'Eco',
-      'dtc_count': None,
-      'dtc_descriptions': None,
+      'dtc_count': 0,
+      'dtc_descriptions': dict({
+      }),
       'enabled': True,
       'engine_is_running': 0,
       'engine_type': 'ENGINE_TYPES.ICE',
