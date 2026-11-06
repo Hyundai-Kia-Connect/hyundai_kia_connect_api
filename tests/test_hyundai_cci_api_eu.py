@@ -20,7 +20,7 @@ from hyundai_kia_connect_api.exceptions import (
     AuthenticationSigninError,
 )
 from hyundai_kia_connect_api.gspa.cipher_keys import compute_x_stamp
-from hyundai_kia_connect_api.GspaApiEU import GspaApiEU
+from hyundai_kia_connect_api.GspaApiEU import GspaApiEU, _parse_valet_mode
 from hyundai_kia_connect_api.HyundaiCciApiEU import HyundaiCciApiEU
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
@@ -44,6 +44,10 @@ def _mock_crypto():
 def _make_hyundai_api(brand: int = 2) -> HyundaiCciApiEU:
     """Create a HyundaiCciApiEU instance for testing (brand=2 = Hyundai)."""
     return HyundaiCciApiEU(region=1, brand=brand, language="en")
+
+
+def _vehicle_with_id() -> Vehicle:
+    return Vehicle(id="car-123")
 
 
 def _certs_response() -> MagicMock:
@@ -852,6 +856,7 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
             return_value={"otaUpdateList": [{"id": "x"}]},
         ),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.software_version == "ABC123"
@@ -869,6 +874,7 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
         patch.object(api, "get_software_version", side_effect=APIError("boom")),
         patch.object(api, "get_ota_updates", side_effect=APIError("boom")),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
     assert vehicle.ota_update_available is None
@@ -891,6 +897,7 @@ def test_update_vehicle_gspa_data_wires_breakdown_count():
             "get_breakdowns",
             return_value={"breakdown": [{"ecuName": "ABS", "dtcList": ["C1234"]}]},
         ),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
 
@@ -910,6 +917,7 @@ def test_update_vehicle_gspa_data_breakdowns_empty_is_a_real_zero():
         patch.object(api, "get_software_version", return_value=None),
         patch.object(api, "get_ota_updates", return_value=None),
         patch.object(api, "get_breakdowns", return_value={"breakdown": []}),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
 
@@ -937,11 +945,101 @@ def test_update_vehicle_gspa_data_breakdowns_failure_stays_unknown():
         patch.object(api, "get_software_version", return_value=None),
         patch.object(api, "get_ota_updates", return_value=None),
         patch.object(api, "get_breakdowns", side_effect=APIError("boom")),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
 
     assert vehicle.dtc_count is None
     assert vehicle.dtc_descriptions is None
+
+
+def test_update_vehicle_gspa_data_populates_valet_mode():
+    """valetMode maps through the app's ValetMode enum (ACTIVE=0,
+    IGN_OFF=1, INACTIVE=2; myHyundai 1.4.0 ValetMode)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="car-123")
+
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "_get_valet_status", return_value={"valetMode": 0}),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+
+    assert vehicle.valet_mode_active is True
+    assert vehicle._valet_failed is False
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (0, True),
+        (1, True),
+        (2, False),
+        (-1, None),
+        (3, None),
+        ("active", None),
+        (None, None),
+    ],
+)
+def test_parse_valet_mode(raw: object, expected: bool | None) -> None:
+    """ACTIVE/IGN_OFF/INACTIVE map; anything else stays unknown."""
+    assert _parse_valet_mode(raw) is expected
+
+
+def test_update_vehicle_gspa_data_valet_failure_circuits():
+    """A failing valet read leaves the field unknown and stops retrying
+    until force refresh resets the flag."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="car-123")
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "_get_valet_status", side_effect=APIError("boom")),
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+    assert vehicle.valet_mode_active is None
+    assert vehicle._valet_failed is True
+
+    with (
+        patch.object(api, "get_software_version", return_value=None),
+        patch.object(api, "get_ota_updates", return_value=None),
+        patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "_get_valet_status") as queued,
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+    queued.assert_not_called()
+
+
+def test_get_valet_status_swallows_transport_error():
+    """A non-auth failure on the valet read returns None."""
+    api = _make_hyundai_api()
+    token = _make_token()
+
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=ConnectionError("boom"),
+    ):
+        assert api._get_valet_status(token, _vehicle_with_id()) is None
+
+
+def test_get_valet_status_reraises_auth_error():
+    """An expired token propagates (the caller refreshes and retries)."""
+    api = _make_hyundai_api()
+    token = _make_token()
+
+    with (
+        patch(
+            "hyundai_kia_connect_api.GspaApiEU.requests.get",
+            side_effect=AuthenticationError("expired"),
+        ),
+        pytest.raises(AuthenticationError),
+    ):
+        api._get_valet_status(token, _vehicle_with_id())
 
 
 # ── force_refresh_vehicle_state() — shared poll + Hyundai extras ──

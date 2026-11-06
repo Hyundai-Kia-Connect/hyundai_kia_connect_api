@@ -215,8 +215,8 @@ class Vehicle:
 
     # Cached-failure flags for GSPA query endpoints (reset by force refresh).
     # _ota_checked: True after the first OTA check (no re-check until force
-    # refresh); _valet_failed: pessimistic circuit — True while a valet read
-    # is in flight or after a failure, reset to False on success.
+    # refresh); _valet_failed: True after a failed valet read, so later
+    # polls skip it until force refresh resets it.
     _ota_checked: bool = False
     _valet_failed: bool = False
 

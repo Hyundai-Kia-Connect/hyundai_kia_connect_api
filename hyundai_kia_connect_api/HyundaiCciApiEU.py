@@ -261,31 +261,8 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
         self._update_vehicle_gspa_data(token, vehicle)
 
     def _update_vehicle_gspa_data(self, token: Token, vehicle: Vehicle) -> None:
-        """Populate Vehicle GSPA query fields from server-side cached data.
-
-        These are GET endpoints that read cached data from the GSPA server.
-        They do NOT wake the telematics unit or drain the 12V battery.
-        """
-        try:
-            sw = self.get_software_version(token, vehicle)
-            if sw and isinstance(sw, dict):
-                vehicle.software_version = sw.get("softwareVersion")
-        except Exception:
-            _LOGGER.debug(f"{DOMAIN} - GSPA software_version update failed")
-
-        try:
-            if not vehicle._ota_checked:
-                vehicle._ota_checked = True  # set before call — concurrent workers skip
-                ota = self.get_ota_updates(token, vehicle)
-                if ota and isinstance(ota, dict):
-                    updates = ota.get("otaUpdateList", [])
-                    vehicle.ota_update_available = (
-                        len(updates) > 0 if updates else False
-                    )
-        except Exception:
-            vehicle.ota_update_available = None  # HA convention: unavailable = unknown
-            _LOGGER.debug(f"{DOMAIN} - GSPA ota_updates update failed")
-
+        # Breakdowns are Hyundai CCI-specific; Kia has no live fixture yet.
+        super()._update_vehicle_gspa_data(token, vehicle)
         try:
             bd = self.get_breakdowns(token, vehicle)
             if bd and isinstance(bd, dict):
