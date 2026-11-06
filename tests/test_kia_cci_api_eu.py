@@ -229,6 +229,7 @@ def _force_refresh(api, statuses):
     """Run force_refresh_vehicle_state with the clock and sleep patched."""
     with (
         patch.object(KiaCciApiEU, "prewakeup", return_value={}),
+        patch.object(KiaCciApiEU, "_request_status_upload"),
         patch.object(KiaCciApiEU, "get_stored_status", side_effect=statuses) as status,
         patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
         patch("hyundai_kia_connect_api.GspaApiEU.time", return_value=100.0),
@@ -271,12 +272,14 @@ def test_kia_force_refresh_raises_when_prewakeup_fails():
     api = _make_kia_api()
     with (
         patch.object(KiaCciApiEU, "prewakeup", return_value=None),
+        patch.object(KiaCciApiEU, "_request_status_upload") as upload,
         patch.object(KiaCciApiEU, "get_stored_status") as status,
         patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
         patch("hyundai_kia_connect_api.GspaApiEU.sleep"),
         pytest.raises(APIError),
     ):
         api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    upload.assert_not_called()
     status.assert_not_called()
     parse.assert_not_called()
 
@@ -291,6 +294,7 @@ def test_kia_force_refresh_raises_after_timeout_without_applying():
     stale = _stored(_REQUESTED_AT - 6_000)
     with (
         patch.object(KiaCciApiEU, "prewakeup", return_value={}),
+        patch.object(KiaCciApiEU, "_request_status_upload"),
         patch.object(KiaCciApiEU, "get_stored_status", return_value=stale) as status,
         patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2") as parse,
         patch("hyundai_kia_connect_api.GspaApiEU.time", return_value=100.0),
@@ -301,6 +305,54 @@ def test_kia_force_refresh_raises_after_timeout_without_applying():
     assert status.call_count == attempts
     assert sleep.call_count == attempts
     parse.assert_not_called()
+
+
+def test_kia_force_refresh_requests_status_upload_after_wake():
+    """A Kia Niro EV accepts prewakeup but uploads no new status until
+    update-status is called, so force refresh calls it right after the wake."""
+    api = _make_kia_api()
+    calls = MagicMock()
+    with (
+        patch.object(KiaCciApiEU, "prewakeup", return_value={}) as wake,
+        patch.object(KiaCciApiEU, "_request_status_upload") as upload,
+        patch.object(
+            KiaCciApiEU, "get_stored_status", return_value=_stored(_REQUESTED_AT)
+        ) as status,
+        patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2"),
+        patch("hyundai_kia_connect_api.GspaApiEU.time", return_value=100.0),
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep"),
+    ):
+        calls.attach_mock(wake, "prewakeup")
+        calls.attach_mock(upload, "upload")
+        calls.attach_mock(status, "status")
+        api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    assert [c[0] for c in calls.mock_calls] == ["prewakeup", "upload", "status"]
+
+
+def test_kia_request_status_upload_calls_update_status():
+    """update-status is requested with the remote-vehicles path."""
+    api = _make_kia_api()
+    vehicle = MagicMock()
+    with patch.object(KiaCciApiEU, "_gspa_get") as get:
+        api._request_status_upload(MagicMock(), vehicle)
+    assert get.call_args.args[2] == "status/vehicles/{carId}/update-status"
+    assert get.call_args.kwargs["params"] == {"path": "gspa/v1/remote/vehicles"}
+
+
+def test_kia_request_status_upload_is_best_effort():
+    """A failed upload request is swallowed: the stored-status poll decides."""
+    api = _make_kia_api()
+    with patch.object(KiaCciApiEU, "_gspa_get", side_effect=APIError("400-004")):
+        api._request_status_upload(MagicMock(), MagicMock())
+
+
+def test_kia_request_status_upload_propagates_auth_error():
+    api = _make_kia_api()
+    with (
+        patch.object(KiaCciApiEU, "_gspa_get", side_effect=AuthenticationError("x")),
+        pytest.raises(AuthenticationError),
+    ):
+        api._request_status_upload(MagicMock(), MagicMock())
 
 
 def test_kia_force_refresh_expired_token_raises_before_wake():

@@ -1488,6 +1488,25 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
+    def _request_status_upload(self, token: Token, vehicle: Vehicle) -> None:
+        """Ask the car to upload a fresh status (best effort).
+
+        prewakeup alone does not make every car upload: a Kia Niro EV
+        accepts the wake (202) but keeps the old stored-status until
+        update-status is called.
+        """
+        try:
+            self._gspa_get(
+                token,
+                vehicle,
+                "status/vehicles/{carId}/update-status",
+                params={"path": self.GSPA_REMOTE_VEHICLES_PATH},
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA update-status request failed")
+
     def _apply_stored_status(
         self, token: Token, vehicle: Vehicle, data: dict[str, Any]
     ) -> None:
@@ -1566,6 +1585,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         requested_at = int(time() * 1000)
         if self.prewakeup(token, vehicle) is None:
             raise APIError("GSPA prewakeup failed")
+        self._request_status_upload(token, vehicle)
         attempts = 1 + int(
             (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
             // self.FORCE_REFRESH_POLL_INTERVAL
