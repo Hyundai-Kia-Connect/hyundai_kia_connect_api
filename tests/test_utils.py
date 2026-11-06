@@ -8,6 +8,7 @@ from hyundai_kia_connect_api.utils import (
     ccs2_reservation_time_or_none,
     detect_timezone_for_date,
     float_or_none,
+    get_child_value,
     parse_datetime,
     pressure_or_none,
 )
@@ -168,3 +169,10 @@ def test_parse_datetime_compact_labels_while_gmt_converts():
     assert parse_datetime("Tue, 24 Jun 2025 16:18:10 GMT", tz) == datetime.datetime(
         2025, 6, 24, 18, 18, 10, tzinfo=tz
     )
+
+
+def test_get_child_value():
+    data = {"a": {"b": [{"c": 1}]}}
+    assert get_child_value(data, "a.b.0.c") == 1
+    assert get_child_value(data, "a.x.0.c") is None
+    assert get_child_value(None, "a.b") is None
