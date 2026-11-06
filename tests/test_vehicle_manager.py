@@ -95,3 +95,25 @@ def test_api_calls_before_login_raise_authentication_error(monkeypatch):
     )
     with pytest.raises(AuthenticationError):
         manager.initialize_vehicles()
+
+
+@pytest.mark.parametrize(
+    "method",
+    [
+        "schedule_reservation_charge",
+        "schedule_reservation_hvac",
+        "schedule_reservation_engine",
+    ],
+)
+def test_reservation_calls_before_login_raise_authentication_error(monkeypatch, method):
+    dummy_api = DummyApi()
+    monkeypatch.setattr(
+        VehicleManager,
+        "get_implementation_by_region_brand",
+        lambda *args, **kwargs: dummy_api,
+    )
+    manager = VehicleManager(
+        region=3, brand=1, username="user", password="pass", pin="1234"
+    )
+    with pytest.raises(AuthenticationError):
+        getattr(manager, method)("vehicle-id", None)
