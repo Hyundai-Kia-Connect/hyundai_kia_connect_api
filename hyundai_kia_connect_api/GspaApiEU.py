@@ -1586,8 +1586,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if self.prewakeup(token, vehicle) is None:
             raise APIError("GSPA prewakeup failed")
         self._request_status_upload(token, vehicle)
+        # update-status can take up to its read timeout; keep the total budget.
+        elapsed = time() - requested_at / 1000
         attempts = 1 + int(
-            (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
+            max(
+                0,
+                self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY - elapsed,
+            )
             // self.FORCE_REFRESH_POLL_INTERVAL
         )
         oldest = requested_at - self.FORCE_REFRESH_CLOCK_TOLERANCE_MS

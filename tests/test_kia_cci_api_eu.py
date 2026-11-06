@@ -329,6 +329,32 @@ def test_kia_force_refresh_requests_status_upload_after_wake():
     assert [c[0] for c in calls.mock_calls] == ["prewakeup", "upload", "status"]
 
 
+def test_kia_force_refresh_upload_time_counts_against_budget():
+    """A slow update-status reply shortens the poll so the total stays at
+    FORCE_REFRESH_TIMEOUT."""
+    api = _make_kia_api()
+    stale = _stored(_REQUESTED_AT - 6_000)
+    with (
+        patch.object(KiaCciApiEU, "prewakeup", return_value={}),
+        patch.object(KiaCciApiEU, "_request_status_upload"),
+        patch.object(KiaCciApiEU, "get_stored_status", return_value=stale) as status,
+        patch.object(KiaCciApiEU, "_update_vehicle_properties_ccs2"),
+        # Wake at 100 s, upload request returns at 130 s.
+        patch("hyundai_kia_connect_api.GspaApiEU.time", side_effect=[100.0, 130.0]),
+        patch("hyundai_kia_connect_api.GspaApiEU.sleep"),
+        pytest.raises(APIError),
+    ):
+        api.force_refresh_vehicle_state(MagicMock(), MagicMock())
+    assert status.call_count == 1 + (
+        (
+            KiaCciApiEU.FORCE_REFRESH_TIMEOUT
+            - KiaCciApiEU.FORCE_REFRESH_INITIAL_DELAY
+            - 30
+        )
+        // KiaCciApiEU.FORCE_REFRESH_POLL_INTERVAL
+    )
+
+
 def test_kia_request_status_upload_calls_update_status():
     """update-status is requested with the remote-vehicles path."""
     api = _make_kia_api()
