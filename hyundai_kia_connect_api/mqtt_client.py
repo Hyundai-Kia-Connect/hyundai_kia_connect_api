@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 
 from .const import DOMAIN
 
@@ -85,7 +86,7 @@ class MqttTransport:
             raise ValueError("Broker host not configured. Call configure() first.")
 
         self._client = mqtt.Client(
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,  # type: ignore[attr-defined]
+            callback_api_version=CallbackAPIVersion.VERSION2,
             client_id=self._client_id,
             protocol=mqtt.MQTTv311,
             # Persistent session: the broker replays vss missed while
