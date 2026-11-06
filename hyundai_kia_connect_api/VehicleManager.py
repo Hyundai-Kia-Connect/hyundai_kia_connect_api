@@ -496,6 +496,27 @@ class VehicleManager:
             self._require_token(), self.get_vehicle(vehicle_id), options
         )
 
+    def schedule_reservation_charge(
+        self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
+    ) -> str:
+        return self.api.schedule_reservation_charge(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def schedule_reservation_hvac(
+        self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
+    ) -> str:
+        return self.api.schedule_reservation_hvac(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
+    def schedule_reservation_engine(
+        self, vehicle_id: str, options: ScheduleChargingClimateRequestOptions
+    ) -> str:
+        return self.api.schedule_reservation_engine(
+            self.token, self.get_vehicle(vehicle_id), options
+        )
+
     def start_valet_mode(self, vehicle_id: str) -> str:
         return self.api.valet_mode_action(
             self._require_token(),
