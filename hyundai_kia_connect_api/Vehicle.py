@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .const import (
+    CHARGING_CONNECTOR_LOCK_STATE,
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     ENGINE_TYPES,
@@ -86,6 +87,16 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
+    # Service Hub registration + the receive-only MQTT broker
+    mqtt_push: bool | None = None
+    # device.closeremote.precondition protocol (push metadata hu entry)
+    hvac_close_remote: bool | None = None
+    # device.closeremote.media.vehiclestatus protocol
+    media_close_remote: bool | None = None
+    # vehicle.ota.otaprogress protocol
+    ota_progress: bool | None = None
+    # vehicle.ota.scheduleupdate protocol
+    schedule_update: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -205,6 +216,11 @@ class Vehicle:
     # is in flight or after a failure, reset to False on success.
     _ota_checked: bool = False
     _valet_failed: bool = False
+
+    # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
+    # distinct from Token.mqtt_client_id (the device-level registration id).
+    mqtt_vehicle_id: str | None = None
+    hu_client_id: str | None = None
 
     # Tire Pressure
     tire_pressure_all_warning_is_on: bool | None = None
@@ -416,6 +432,9 @@ class Vehicle:
     # Raw connector-fastening state from the stored status (0 = disconnected,
     # 1 = connected; unknown or unreported = None).
     ev_connector_fastening_state: CONNECTOR_FASTENING_STATE | None = None
+    # Connector lock actuator state; 1 = unlocked says nothing about the
+    # cable, 5 = released and the cable can be pulled (kia_uvo#2069).
+    ev_connector_lock_state: CHARGING_CONNECTOR_LOCK_STATE | None = None
 
     _ev_driving_range: float | None = None
     _ev_driving_range_value: float | None = None

@@ -19,13 +19,14 @@ from typing import Any
 
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
+from .mqtt_service_hub_eu import MqttServiceHubMixin
 from .Token import Token
 from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class KiaCciApiEU(GspaApiEU):
+class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     """Kia EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
@@ -73,6 +74,8 @@ class KiaCciApiEU(GspaApiEU):
     # fields following (VehicleToLoad.DischargeLimitation.SoC 20 -> 30,
     # Setting.CompleteAlarm flags, Reservation.OffPeakTime 12:00-12:30 ->
     # 12:00-13:00). Bearer-only as well.
+    # reservation-hvac live-proven on a PV5 (2026-10-31): 202-000 with
+    # 22/22 Reservation.Departure fields following.
     GSPA_VERIFIED_ENDPOINTS = frozenset(
         {
             "door",
@@ -89,6 +92,7 @@ class KiaCciApiEU(GspaApiEU):
             "discharge-limit",
             "charge-alarm",
             "reservation-charge",
+            "reservation-hvac",
         }
     )
 
@@ -103,6 +107,12 @@ class KiaCciApiEU(GspaApiEU):
     # check_action_status stays gated in this region: outcomes reach the
     # integration through vehicle-status pushes or the cached state read.
     # Observed per command on EV6, EV3, eNiro, I5, Tucson and IONIQ 6.
+
+    # Push (Service Hub) REST base, live-probed on production.
+    SERVICE_HUB_BASE = "egw-svchub-ccs-k-eu.eu-central.hmgmobility.com:31010"
+
+    CCSP_CLIENT_SERVICE_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
+    PUSH_PROVIDER_ID = "3863bdda-b753-4edb-9fbf-38288a353fe1"
 
     # Brand constants (Kia OneApp EU, confirmed on production endpoints).
     ONEAPP_CLIENT_ID = "01b36c86-79e8-486c-8009-15f2ad88d670"
@@ -123,14 +133,15 @@ class KiaCciApiEU(GspaApiEU):
         Unlike the Hyundai implementation, driving info and history are
         not fetched: on Kia these endpoints currently fail server-side
         (confirmed live on a real EV6), so a cached-state update stays
-        limited to stored-status.
+        limited to stored-status plus the GSPA location stored-status
+        fallback for vehicles with no Location node.
         """
         if not (token.access_token or token.exchangeable_token):
             raise APIError("No CCS token — cannot fetch GSPA stored-status")
         data = self.get_stored_status(token, vehicle)
         if not data:
             raise APIError("GSPA stored-status returned no data")
-        self._apply_stored_status(vehicle, data)
+        self._apply_stored_status(token, vehicle, data)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints)

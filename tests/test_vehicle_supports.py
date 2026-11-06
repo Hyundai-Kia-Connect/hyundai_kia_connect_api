@@ -67,11 +67,17 @@ def test_vehicle_supports_not_shared_between_vehicles():
         ),
         (
             lambda: _cci_vehicle(HyundaiCciApiEU),
-            VehicleSupports(window_control=True, valet_mode=True, svm=True),
+            # mqtt_push = the metadata's judgement (this test's parse
+            # runs without it, so the flag stays unknown here).
+            VehicleSupports(
+                window_control=True, valet_mode=True, svm=True, mqtt_push=None
+            ),
         ),
         (
             lambda: _cci_vehicle(KiaCciApiEU),
-            VehicleSupports(window_control=True, valet_mode=True, svm=False),
+            VehicleSupports(
+                window_control=True, valet_mode=True, svm=False, mqtt_push=None
+            ),
         ),
         (
             lambda: _cci_vehicle(GenesisCciApiEU),

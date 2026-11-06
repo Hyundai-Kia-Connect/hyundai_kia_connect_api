@@ -16,6 +16,7 @@ from .const import (
     GEO_LOCATION_PROVIDERS,
     GOOGLE,
     LAMP_MODE,
+    MQTT_PUSH_CONNECTION_STATE,
     OPENSTREETMAP,
     ORDER_STATUS,
     OTP_NOTIFY_TYPE,
@@ -518,6 +519,66 @@ class ApiImpl:
         """Test if token is valid
         Use any dummy request to test if token is still valid"""
         return True
+
+    # Push contract — regions that support push override these
+    # (today: the CCI/EU lineage).
+
+    def get_push_broker_info(self, token: Token) -> dict[str, Any] | None:
+        """MQTT broker config for this region's push infrastructure."""
+        raise NotImplementedError(
+            "get_push_broker_info is not implemented for this region"
+        )
+
+    def register_push_client(self, token: Token) -> dict[str, Any] | None:
+        """Register the device/client with the push infrastructure."""
+        raise NotImplementedError(
+            "register_push_client is not implemented for this region"
+        )
+
+    def register_push_vehicle(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Register this vehicle's protocols with the push infrastructure."""
+        raise NotImplementedError(
+            "register_push_vehicle is not implemented for this region"
+        )
+
+    def get_push_vehicle_identity(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Fetch the vehicle push identity (metadata + push vehicle id)."""
+        raise NotImplementedError(
+            "get_push_vehicle_identity is not implemented for this region"
+        )
+
+    def get_push_connection_state(
+        self, token: Token
+    ) -> MQTT_PUSH_CONNECTION_STATE | None:
+        """Push broker connection state (MQTT_PUSH_CONNECTION_STATE)."""
+        raise NotImplementedError(
+            "get_push_connection_state is not implemented for this region"
+        )
+
+    def get_push_topics(self, token: Token, vehicle: Vehicle) -> list[str]:
+        """Topics to subscribe for this vehicle."""
+        raise NotImplementedError("get_push_topics is not implemented for this region")
+
+    def parse_push_message(self, topic: str, payload: bytes) -> Any:
+        """Parse a raw push delivery into the push-message shape.
+
+        Parse result is duck-typed with these attributes: topic_group,
+        topic_type, vehicle_id (push-level vehicle id), payload (dict),
+        is_status (bool). None = unknown topic schema.
+        """
+        raise NotImplementedError(
+            "parse_push_message is not implemented for this region"
+        )
+
+    def get_push_credentials(self, token: Token) -> tuple[str, str] | None:
+        """Broker credentials for the MQTT connect; None = connect unauthenticated."""
+        raise NotImplementedError(
+            "get_push_credentials is not implemented for this region"
+        )
 
     def check_action_status(
         self,

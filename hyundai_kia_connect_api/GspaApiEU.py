@@ -43,6 +43,7 @@ from .cci_fingerprint import (
 from .const import (
     BRANDS,
     CHARGE_PORT_ACTION,
+    CHARGING_CONNECTOR_LOCK_STATE,
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     DOMAIN,
@@ -241,6 +242,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     CCI_API_URL: str = ""
     CCI_PACKAGE_ID: str = ""
     GSPA_BASE_URL: str = ""
+    # Push (Service Hub) REST base — required on push-capable brand classes.
+    SERVICE_HUB_BASE: str = ""
+
     LOGIN_FORM_HOST: str = ""
     CIPHER_BRAND: str = ""
     REQUEST_ID_HEADER: str = ""
@@ -332,6 +336,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # Control token caching lives on the Token object (control_token /
         # control_token_expiry) — same pattern as ApiImplType1 for the Type1
         # regions.
+
+        # Push (Service Hub) session state — used by MqttServiceHubMixin:
+        # per-request tid from the device/host response headers, and one
+        # requests.Session keeping cookies across the Service Hub calls.
+        self._service_hub_tid: str | None = None
+        self._service_hub_session: requests.Session | None = None
 
         self.session = ApiImplSession()
 
@@ -817,6 +827,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             non_ccs_refresh_token=non_ccs_refresh_token,
             id_token=id_token,
             user_id=token.user_id,
+            # the push connstate poll keys on this id; it must survive the refresh
+            mqtt_client_id=token.mqtt_client_id,
         )
 
     # ------------------------------------------------------------------
@@ -1476,11 +1488,62 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
-    def _apply_stored_status(self, vehicle: Vehicle, data: dict[str, Any]) -> None:
+    def _apply_stored_status(
+        self, token: Token, vehicle: Vehicle, data: dict[str, Any]
+    ) -> None:
         state = data.get("state", {})
         if isinstance(state, dict) and "Vehicle" in state:
             state = state["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
+        # Status tree without a Location node (PV5): the location
+        # stored-status endpoint is the only location source (#1331).
+        if get_child_value(state, "Location.GeoCoord.Latitude") is None:
+            self._update_vehicle_gspa_location(token, vehicle)
+
+    def _get_location_stored_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Get cached location + vehicle status from GSPA (read-only)."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(
+                token, vehicle, "location/vehicles/{carId}/stored-status"
+            )
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
+            return None
+
+    def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
+        """Populate vehicle.location from the GSPA location stored-status.
+
+        Some status trees carry no Location node (confirmed on a PV5,
+        2026-10-27), leaving vehicle.location unset. The endpoint serves
+        the server-cached position {"data": {"coord": {lat, lon, type,
+        alt}, "head", "speed", "time"}} with a UTC ``time`` (wire shape
+        identical to the SVM ``gpsDetail`` block). Read-only — unlike
+        location ``update-status``, which long-polls the car (wake) and
+        reports the car's clock time.
+        """
+        try:
+            data = self._get_location_stored_status(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location fallback read failed")
+            return
+        # _gspa_get already lifts the {"data": ..., "metaInfo": ...} envelope.
+        if not isinstance(data, dict):
+            return
+        coord = data.get("coord")
+        if not isinstance(coord, dict):
+            return
+        latitude = float_or_none(coord.get("lat"))
+        longitude = float_or_none(coord.get("lon"))
+        location_time = _parse_gspa_svm_timestamp(data.get("time"))
+        if latitude is None or longitude is None or location_time is None:
+            _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status: no usable position")
+            return
+        vehicle.location = (latitude, longitude, location_time)
 
     # ------------------------------------------------------------------
     # Force refresh
@@ -1532,7 +1595,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             f"{DOMAIN} - new stored-status "
             f"{(updated - requested_at) / 1000:.1f} s after prewakeup"
         )
-        self._apply_stored_status(vehicle, data)
+        self._apply_stored_status(token, vehicle, data)
 
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)
@@ -1823,11 +1886,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             get_child_value(state, "Green.BatteryManagement.SoH.Ratio")
         ):
             vehicle.ev_battery_soh_percentage = battery_soh
-        # ConnectorFastening.State follows the connector LOCK, not the
-        # cable: plugged-but-idle reads 0, a released lock after a charge
-        # also reads 0 (0 ambiguous; live: Kia EV6 CCI #1495, legacy
-        # kia_uvo#1837). Plug sensor stays unknown; enum carries the state.
-        vehicle.ev_battery_is_plugged_in = None
+        # State 1 proves the cable is in; 0 is ambiguous — unplugged vs
+        # locked only while a session runs (kia_uvo#2069, #1495).
         fastening_raw = get_child_value(
             state, "Green.ChargingInformation.ConnectorFastening.State"
         )
@@ -1845,6 +1905,27 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     fastening_raw,
                 )
                 vehicle.ev_connector_fastening_state = None
+        if (
+            lock_raw := get_child_value(state, "Green.ChargingConnector.LockState")
+        ) is not None:
+            try:
+                vehicle.ev_connector_lock_state = CHARGING_CONNECTOR_LOCK_STATE(
+                    int(lock_raw)
+                )
+            except ValueError:
+                _LOGGER.debug(
+                    "%s - ChargingConnector.LockState %r not in {0: idle, "
+                    "1: unlocked, 2: locked, 3: releasing, 4: locking, "
+                    "5: released}",
+                    DOMAIN,
+                    lock_raw,
+                )
+        vehicle.ev_battery_is_plugged_in = (
+            True
+            if vehicle.ev_connector_fastening_state
+            is CONNECTOR_FASTENING_STATE.CONNECTED
+            else None
+        )
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
@@ -2033,6 +2114,128 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             defrost2 = schedule2_hvac.get("Defrost")
             if defrost2 is not None:
                 vehicle.ev_second_departure_climate_defrost = bool(defrost2)
+
+        # PV5 GSPA departure carriers (issue #1145 run-23 stored-status):
+        # per-day Sun..Sat flags instead of a DaysOfWeek list, Hour/Min
+        # instead of Time, and per-plan Climate at Departure.Climate
+        # (plan 1) and Schedule2.Climate (plan 2, activation at Schedule2
+        # level). Parsed only where the carriers above left the field
+        # unset. Day flags all zero -> None, like the list carrier.
+        schedule1 = get_child_value(state, "Green.Reservation.Departure.Schedule1")
+        if isinstance(schedule1, dict):
+            if vehicle.ev_first_departure_time is None and "Hour" in schedule1:
+                try:
+                    vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
+                        schedule1.get("Hour"), schedule1.get("Min")
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
+            if vehicle.ev_first_departure_days is None:
+                vehicle.ev_first_departure_days = [
+                    i
+                    for i, k in enumerate(
+                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    )
+                    if schedule1.get(k) == 1
+                ] or None
+        schedule2 = get_child_value(state, "Green.Reservation.Departure.Schedule2")
+        if isinstance(schedule2, dict):
+            if vehicle.ev_second_departure_time is None and "Hour" in schedule2:
+                try:
+                    vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
+                        schedule2.get("Hour"), schedule2.get("Min")
+                    )
+                except (TypeError, ValueError):
+                    _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
+            if vehicle.ev_second_departure_days is None:
+                vehicle.ev_second_departure_days = [
+                    i
+                    for i, k in enumerate(
+                        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+                    )
+                    if schedule2.get(k) == 1
+                ] or None
+
+        climate1 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule1.Climate"
+        ) or get_child_value(state, "Green.Reservation.Departure.Climate")
+        climate2 = get_child_value(
+            state, "Green.Reservation.Departure.Schedule2.Climate"
+        )
+        if isinstance(climate1, dict) or isinstance(climate2, dict):
+            # Temperature string without a unit inherits plan 1's unit.
+            default_temp_unit = 0
+            if (
+                isinstance(climate1, dict)
+                and climate1.get("TemperatureUnit") is not None
+            ):
+                default_temp_unit = climate1["TemperatureUnit"]
+
+            def _parse_departure_climate(
+                climate: dict[str, Any],
+                activation: object = None,
+            ) -> tuple[bool | None, bool | None, tuple[float, str | None] | None]:
+                enabled_at = (
+                    activation if activation is not None else climate.get("Activation")
+                )
+                enabled = bool(enabled_at) if enabled_at is not None else None
+                defrost_at = climate.get("Defrost")
+                defrost = bool(defrost_at) if defrost_at is not None else None
+                temp = None
+                temp_val = climate.get("Temperature")
+                if temp_val is not None:
+                    try:
+                        unit_int = climate.get("TemperatureUnit")
+                        if unit_int is None:
+                            unit_int = default_temp_unit
+                        temp = (
+                            float(temp_val),
+                            TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0]),
+                        )
+                    except (ValueError, TypeError):
+                        # "OFF" / non-numeric — leave the field unset.
+                        pass
+                return enabled, defrost, temp
+
+            if isinstance(climate1, dict):
+                enabled, defrost, temp = _parse_departure_climate(climate1)
+                if (
+                    enabled is not None
+                    and vehicle.ev_first_departure_climate_enabled is None
+                ):
+                    vehicle.ev_first_departure_climate_enabled = enabled
+                if (
+                    defrost is not None
+                    and vehicle.ev_first_departure_climate_defrost is None
+                ):
+                    vehicle.ev_first_departure_climate_defrost = defrost
+                if (
+                    temp is not None
+                    and vehicle.ev_first_departure_climate_temperature is None
+                ):
+                    vehicle.ev_first_departure_climate_temperature = temp
+            if isinstance(climate2, dict):
+                sched2_activation = get_child_value(
+                    state, "Green.Reservation.Departure.Schedule2.Activation"
+                )
+                enabled, defrost, temp = _parse_departure_climate(
+                    climate2, sched2_activation
+                )
+                if (
+                    enabled is not None
+                    and vehicle.ev_second_departure_climate_enabled is None
+                ):
+                    vehicle.ev_second_departure_climate_enabled = enabled
+                if (
+                    defrost is not None
+                    and vehicle.ev_second_departure_climate_defrost is None
+                ):
+                    vehicle.ev_second_departure_climate_defrost = defrost
+                if (
+                    temp is not None
+                    and vehicle.ev_second_departure_climate_temperature is None
+                ):
+                    vehicle.ev_second_departure_climate_temperature = temp
 
         # Off-peak charging window — flat CCS2-schema OffPeakTime block
         # (live EV6/PV5 GSPA stored-status + Sportage PHEV CCS2 dump; the
@@ -2759,7 +2962,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
 
         reservInfo carries the app DTO: day list + time object only;
         the schedule on/off is reservHVACflag and climate options live
-        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22)."""
+        in reservHVACSet. Live-proven on a Kia PV5 (2026-10-22; library
+        body end-to-end 2026-10-31)."""
         if options.first_departure is None:
             options.first_departure = (
                 ScheduleChargingClimateRequestOptions.DepartureOptions()

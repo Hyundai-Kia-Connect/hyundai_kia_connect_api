@@ -169,6 +169,17 @@ class CONNECTOR_FASTENING_STATE(IntEnum):
     # unreported or out-of-range value holds as None.
 
 
+class CHARGING_CONNECTOR_LOCK_STATE(IntEnum):
+    IDLE = 0
+    UNLOCKED = 1
+    LOCKED = 2
+    RELEASING = 3
+    LOCKING = 4
+    RELEASED = 5
+    # PV5 GSPA live semantics (kia_uvo#2069): 0 = idle, no cable;
+    # 1 = unlocked (cable state unknown); 3/4 transitional; 5 = released.
+
+
 class SEAT_LOCATION(str, Enum):
     """Driver seat location (GSPA drvSeatLoc wire values)."""
 
@@ -184,3 +195,16 @@ class VALET_MODE_ACTION(Enum):
 class OTP_NOTIFY_TYPE(Enum):
     EMAIL = "EMAIL"
     SMS = "SMS"
+
+
+# Push reconnect backoff timing (capped exponential; overridable in tests).
+MQTT_PUSH_RECONNECT_INITIAL_DELAY: float = 5.0
+MQTT_PUSH_RECONNECT_MAX_DELAY: float = 300.0
+
+
+class MQTT_PUSH_CONNECTION_STATE(str, Enum):
+    """Push broker connection state (push contract wire values)."""
+
+    ONLINE = "ONLINE"
+    OFFLINE = "OFFLINE"
+    UNKNOWN = "UNKNOWN"
