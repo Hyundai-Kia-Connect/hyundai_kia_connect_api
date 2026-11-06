@@ -39,7 +39,7 @@ def get_child_value(data: Any, key: str) -> Any:
             try:
                 value = value[int(x)]
             except Exception:
-                value = None
+                return None
     return value
 
 
