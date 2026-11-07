@@ -1110,28 +1110,6 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
         vehicle.data = state
 
-    def _get_cached_vehicle_state(
-        self, token: Token, vehicle: Vehicle
-    ) -> dict[str, Any]:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id
-        if vehicle.ccu_ccs2_protocol_support == 0:
-            url = url + "/status/latest"
-        else:
-            url = url + "/ccs2/carstatus/latest"
-        response = self.session.get(
-            url,
-            headers=self._get_authenticated_headers(
-                token, vehicle.ccu_ccs2_protocol_support
-            ),
-        ).json()
-        _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
-        _check_response_for_errors(response)
-        if vehicle.ccu_ccs2_protocol_support == 0:
-            response = response["resMsg"]["vehicleStatusInfo"]
-        else:
-            response = response["resMsg"]["state"]["Vehicle"]
-        return cast(dict[str, Any], response)
-
     def _set_cached_location_park(self, token: Token, vehicle: Vehicle) -> None:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/location/park"
 
