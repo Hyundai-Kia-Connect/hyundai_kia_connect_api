@@ -19,7 +19,7 @@ def _eu_api() -> KiaUvoApiEU:
 
 
 def test_unknown_seat_status_code_does_not_raise():
-    data = load_fixture("eu_kia_ev6_2023_with_soc.json")
+    data = load_fixture("updates/responses/eu_kia_ev6_2023_with_soc.json")
     # Unmapped code reported by some vehicles (e.g. Genesis G80 EU -> 15)
     data["vehicleStatus"]["seatHeaterVentState"]["rlSeatHeatState"] = 15
 

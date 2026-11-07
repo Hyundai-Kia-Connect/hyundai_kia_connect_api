@@ -84,7 +84,7 @@ Use captured responses only, such as the `Get Vehicles Response` debug log line,
 - `us_kia_niro_ev_2020_cached.json` — US Kia cached state, no targetSOC
 - `us_kia_niro_ev_2020_force_refresh.json` — US Kia after force refresh, with targetSOC
 - `us_hyundai_ioniq_5_2024_cached.json` — US Hyundai BlueLinkAPI, with targetSOC
-- `eu_kia_ev6_2023_with_soc.json` — EU standard protocol, with targetSOC
+- `eu_kia_ev6_2023_with_soc.json` — EU standard protocol, with targetSOC (`updates/responses/eu_kia_ev6_2023_with_soc.json`, legacy vehicleStatus payload)
 - `eu_kia_ev9_2024_ccs2.json` — EU CCS2 protocol (newer vehicles), with TargetSoC
 - `ca_kia_niro_ev_2022_cached.json` — CA cached status (charge limits via separate call)
 - `au_hyundai_ioniq_5_2023_with_soc.json` — AU with targetSOC
@@ -129,7 +129,7 @@ Tests use helpers from `tests/fixture_helpers.py`:
 - `discover_fixtures("us_kia_")` — finds all fixture files starting with `us_kia_`
 - `load_fixture(filename)` — loads and parses a JSON fixture
 
-To cover a parsing edge case (a missing block, an unusual value), add a small status fixture such as `eu_kia_ev6_unset_timers.json` and an update scenario for it instead of writing a new test.
+To cover a parsing edge case (a missing block, an unusual value), add a small status fixture such as `updates/responses/eu_kia_ev6_unset_timers.json` and an update scenario for it instead of writing a new test.
 
 ## Contributing a Fixture
 

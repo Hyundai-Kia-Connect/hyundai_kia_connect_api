@@ -1,0 +1,19 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia Niro (PE) 2025",
+        "source": "Issue #1546 comment 6672937618 (reporter capture); envelope rewritten in-tree: state.Vehicle references updates/responses/eu_kia_carstatus_niro_2025.json",
+        "description": "GET /ccs2/carstatus/latest envelope as served for a flag-0 car; used by EU update scenarios whose status read switched to the CCS2 endpoint."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "resCode": "0000",
+        "RetCode": "S",
+        "lastUpdateTime": "1793894786761",
+        "state": {
+            "Vehicle": "$fixture:updates/responses/eu_kia_carstatus_niro_2025.json"
+        },
+        "msgId": "MSG-2"
+    },
+    "msgId": "MSG-2"
+}

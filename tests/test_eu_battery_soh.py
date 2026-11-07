@@ -7,7 +7,7 @@ from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.fixture_helpers import load_fixture
 
-FIXTURE_FILE = "eu_kia_ev6_2023_with_soc.json"
+FIXTURE_FILE = "updates/responses/eu_kia_ev6_2023_with_soc.json"
 CCS2_FIXTURE_FILE = "eu_kia_ev6_2024_ccs2_off.json"
 
 
