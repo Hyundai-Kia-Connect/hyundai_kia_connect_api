@@ -312,6 +312,10 @@ class KiaUvoApiCA(ApiImpl):
         resCode / resMsg known values:
         - 0000: no error
         - 7110: OTP Required (MFA verification needed)
+        - 7312: PIN mismatch (verify-PIN, #1565)
+        - 7313: PIN token expired (verify-PIN, #1565)
+        - 7314: PIN authentication failed (verify-PIN, #1565)
+        - 7316: PIN locked (verify-PIN; reset on the vehicle or web)
         - 7401: Wrong credential
         - 7402 / 7530 / 7531 / 7532: Account Locked Out
         - 7403: Authentication expired
@@ -331,6 +335,10 @@ class KiaUvoApiCA(ApiImpl):
             "7404": AuthenticationInvalidCredentialsError,
             "7435": AuthenticationInvalidCredentialsError,  # Account does not exist
             "7603": AuthenticationInvalidCredentialsError,  # Incorrect password
+            "7312": AuthenticationInvalidCredentialsError,  # PIN mismatch
+            "7314": AuthenticationInvalidCredentialsError,  # PIN auth failed
+            "7313": AuthenticationTokenExpiredError,  # PIN token expired
+            "7316": AuthenticationBlockedError,  # PIN locked
             "7402": AuthenticationBlockedError,  # Account locked out (7530-7532)
             "7530": AuthenticationBlockedError,
             "7531": AuthenticationBlockedError,
