@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
 # One response body that every region's success check accepts.
 _RESPONSE_BODY = {
+    "responseHeader": {"responseCode": 0},
     "retCode": "S",
     "resCode": "0000",
     "msgId": "MSG-1",

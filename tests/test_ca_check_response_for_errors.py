@@ -194,3 +194,48 @@ class TestCheckActionStatus:
             }
         )
         assert api.check_action_status(token, vehicle, "t1") is ORDER_STATUS.PENDING
+
+
+class TestGetPinTokenErrors:
+    @pytest.fixture
+    def api(self) -> KiaUvoApiCA:
+        api = KiaUvoApiCA(region=2, brand=2, language="en")
+        api._sessions = MagicMock()
+        return api
+
+    @staticmethod
+    def _pin_response(api: KiaUvoApiCA, payload: dict) -> None:
+        api._sessions.post.return_value.json.return_value = payload
+
+    @pytest.mark.parametrize(
+        "code, expected_class",
+        [
+            ("7403", AuthenticationTokenExpiredError),
+            ("7602", AuthenticationTokenExpiredError),
+            ("7603", AuthenticationInvalidCredentialsError),
+        ],
+    )
+    def test_error_response_raises_typed_exception(self, api, code, expected_class):
+        self._pin_response(
+            api,
+            {
+                "responseHeader": {"responseCode": 1},
+                "error": {"errorCode": code, "errorDesc": "rejected"},
+            },
+        )
+        with pytest.raises(expected_class, match="rejected"):
+            api._get_pin_token(
+                Token(username="u", password="p", pin="1234"), Vehicle(id="v1")
+            )
+
+    def test_success_returns_pauth(self, api):
+        self._pin_response(
+            api,
+            {"responseHeader": {"responseCode": 0}, "result": {"pAuth": "PT"}},
+        )
+        assert (
+            api._get_pin_token(
+                Token(username="u", password="p", pin="1234"), Vehicle(id="v1")
+            )
+            == "PT"
+        )

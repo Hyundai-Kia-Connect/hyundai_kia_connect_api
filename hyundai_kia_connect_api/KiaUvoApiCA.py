@@ -1232,9 +1232,10 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
-        _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response.json()}")
-        result = response.json()["result"]
-        return cast(str, result["pAuth"])
+        response_json = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response_json}")
+        self._check_response_for_errors(response_json)
+        return cast(str, response_json["result"]["pAuth"])
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION
