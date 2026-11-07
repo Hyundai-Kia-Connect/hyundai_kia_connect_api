@@ -1,0 +1,36 @@
+{
+    "_fixture_meta": {
+        "vehicles": "Kona 2025 (EV assumed, flag 1 assumed)",
+        "source": "kia_uvo discussion #1909 comment 19460046 reply thread (Bluhme1 raw attachment, Denmark, 2026-11-07): the CCS2 status body of the reporter's car",
+        "follow_up_sources": "vehicle read: updates/responses/eu_kia_carstatus_kona_2025.json; location/park and drvhistory: not captured",
+        "not_captured": [
+            "GET /vehicles/VEHICLE-1/location/park",
+            "POST /vehicles/VEHICLE-1/drvhistory"
+        ],
+        "status_read_source": "GET /ccs2/carstatus/latest is flag-independent (issue #1546); this scenario pins the parser on the richest captured tree: ConnectedService, Version and Offset nodes present alongside Location",
+        "description": "Reported car is a Kona 2025 from Denmark. The vehicle profile flag and engine type are assumed (EV, flag 1) until the reporter confirms the probe summary; the status read body is the real capture."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 1
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": "$fixture:updates/responses/eu_kia_carstatus_kona_2025.json"
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "status": 503,
+            "body": null
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": {
+            "status": 503,
+            "body": null
+        }
+    }
+}
