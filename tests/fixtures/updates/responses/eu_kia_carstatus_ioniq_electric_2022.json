@@ -1,0 +1,274 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Hyundai IONIQ Electric 2022",
+        "source": "kia_uvo discussion #1909 comment 19459240 (jskacel raw dump, 2026-11-07), scrubbed by the eu_status_raw_dump.py gist plus Altitude echo",
+        "description": "GET /ccs2/carstatus/latest envelope served to a flag-0 pre-ccNC car: sparse tree with a Location node."
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "resCode": "0000",
+        "ServiceNo": "RVS-K",
+        "RetCode": "S",
+        "lastUpdateTime": "1794049046295",
+        "state": {
+            "Vehicle": {
+                "Chassis": {
+                    "Axle": {
+                        "Row1": {
+                            "Left": {
+                                "Tire": {
+                                    "PressureLow": 0
+                                }
+                            },
+                            "Right": {
+                                "Tire": {
+                                    "PressureLow": 0
+                                }
+                            }
+                        },
+                        "Row2": {
+                            "Left": {
+                                "Tire": {
+                                    "PressureLow": 0
+                                }
+                            },
+                            "Right": {
+                                "Tire": {
+                                    "PressureLow": 0
+                                }
+                            }
+                        },
+                        "Tire": {
+                            "PressureLow": 0
+                        }
+                    }
+                },
+                "Cabin": {
+                    "HVAC": {
+                        "Row1": {
+                            "Driver": {
+                                "Temperature": {
+                                    "Value": "17.0",
+                                    "Unit": 0
+                                },
+                                "Blower": {
+                                    "SpeedLevel": 0
+                                }
+                            }
+                        },
+                        "Temperature": {
+                            "RangeType": 0
+                        }
+                    },
+                    "SteeringWheel": {
+                        "Heat": {
+                            "State": 0
+                        }
+                    },
+                    "Door": {
+                        "Row1": {
+                            "Driver": {
+                                "Open": 0,
+                                "Lock": 0
+                            },
+                            "Passenger": {
+                                "Open": 0,
+                                "Lock": 0
+                            }
+                        },
+                        "Row2": {
+                            "Left": {
+                                "Open": 0,
+                                "Lock": 0
+                            },
+                            "Right": {
+                                "Lock": 0,
+                                "Open": 0
+                            }
+                        }
+                    }
+                },
+                "Electronics": {
+                    "PowerSupply": {
+                        "Accessory": 0,
+                        "Ignition3": 1
+                    },
+                    "AutoCut": {
+                        "BatteryPreWarning": 0
+                    },
+                    "Battery": {
+                        "Level": 90,
+                        "SensorReliability": 0
+                    }
+                },
+                "RemoteControl": {
+                    "SleepMode": 0
+                },
+                "Drivetrain": {
+                    "FuelSystem": {
+                        "DTE": {
+                            "EV": 206,
+                            "Total": 206,
+                            "Unit": 1
+                        }
+                    },
+                    "Transmission": {
+                        "ParkingPosition": 0
+                    },
+                    "Odometer": 52521.5
+                },
+                "Service": {
+                    "ConnectedCar": {
+                        "RemoteControl": {
+                            "WaitingTime": 168,
+                            "Available": 1
+                        }
+                    }
+                },
+                "Body": {
+                    "Trunk": {
+                        "Open": 0
+                    },
+                    "Lights": {
+                        "TailLamp": {
+                            "Alert": 0
+                        },
+                        "DischargeAlert": {
+                            "State": 0
+                        },
+                        "Hazard": {
+                            "Alert": 0
+                        }
+                    },
+                    "Windshield": {
+                        "Rear": {
+                            "Defog": {
+                                "State": 0
+                            }
+                        },
+                        "Front": {
+                            "Defog": {
+                                "State": 0
+                            }
+                        }
+                    },
+                    "Hood": {
+                        "Open": 0
+                    }
+                },
+                "DrivingReady": 0,
+                "Green": {
+                    "Reservation": {
+                        "OffPeakTime": {
+                            "StartHour": 21,
+                            "StartMin": 0,
+                            "Mode": 3,
+                            "EndHour": 0,
+                            "EndMin": 50
+                        },
+                        "Departure": {
+                            "Climate": {
+                                "Temperature": "22.0",
+                                "Defrost": 1,
+                                "TemperatureUnit": 0,
+                                "Activation": 1
+                            },
+                            "Schedule2": {
+                                "Thu": 1,
+                                "Min": 0,
+                                "Tue": 0,
+                                "Hour": 17,
+                                "Sat": 0,
+                                "Wed": 0,
+                                "Enable": 0,
+                                "Fri": 0,
+                                "Sun": 0,
+                                "Mon": 0
+                            },
+                            "Climate2": {
+                                "Temperature": "OFF",
+                                "Defrost": 0,
+                                "TemperatureUnit": 0,
+                                "Activation": 0
+                            },
+                            "Schedule1": {
+                                "Thu": 1,
+                                "Min": 20,
+                                "Tue": 0,
+                                "Hour": 7,
+                                "Wed": 0,
+                                "Sat": 0,
+                                "Enable": 1,
+                                "Fri": 0,
+                                "Mon": 0,
+                                "Sun": 0
+                            }
+                        }
+                    },
+                    "ChargingInformation": {
+                        "EstimatedTime": {
+                            "Quick": 1,
+                            "Standard": 1,
+                            "ICCB": 2
+                        },
+                        "Charging": {
+                            "State": 0,
+                            "RemainTimeUnit": 1,
+                            "RemainTime": 1
+                        },
+                        "TargetSoC": {
+                            "Quick": 80,
+                            "Standard": 80
+                        },
+                        "SequenceDetails": 501,
+                        "DTE": {
+                            "TargetSoC": {
+                                "Quick": 206,
+                                "Standard": 206
+                            }
+                        },
+                        "ExpectedTime": {
+                            "StartHour": 19,
+                            "StartMin": 59,
+                            "EndHour": 19,
+                            "EndDay": 9,
+                            "StartDay": 9,
+                            "EndMin": 59
+                        },
+                        "SequenceSubcode": -1,
+                        "ConnectorFastening": {
+                            "State": 0
+                        }
+                    },
+                    "BatteryManagement": {
+                        "BatteryRemain": {
+                            "Ratio": 79
+                        }
+                    }
+                },
+                "Date": "20261107105726.270",
+                "Location": {
+                    "Speed": "<REDACTED>",
+                    "GeoCoord": {
+                        "Type": 0,
+                        "Latitude": "<REDACTED>",
+                        "Longitude": "<REDACTED>",
+                        "Altitude": "<REDACTED>"
+                    },
+                    "TimeStamp": {
+                        "Sec": 51,
+                        "Min": 53,
+                        "Year": 2026,
+                        "Hour": 9,
+                        "Mon": 11,
+                        "Day": 6
+                    },
+                    "Date": "20261106095351.000",
+                    "Offset": 1
+                }
+            }
+        }
+    },
+    "msgId": "59434250-dab2-11f1-9a34-6f4aad0779fc"
+}

@@ -1,0 +1,36 @@
+{
+    "_fixture_meta": {
+        "vehicles": "IONIQ Electric 2022 (EV)",
+        "source": "kia_uvo discussion #1909 comment 19459240 (jskacel raw dump, 2026-11-07): the CCS2 status body of a flag-0 pre-ccNC car",
+        "follow_up_sources": "vehicle read: updates/responses/eu_kia_carstatus_ioniq_electric_2022.json; location/park and drvhistory: not captured for this car",
+        "not_captured": [
+            "GET /vehicles/VEHICLE-1/location/park",
+            "POST /vehicles/VEHICLE-1/drvhistory"
+        ],
+        "status_read_source": "GET /ccs2/carstatus/latest is now flag-independent (issue #1546); this scenario pins the sparse-tree parse on a pre-ccNC car whose tree carries a Location node",
+        "description": "Flag-0 pre-ccNC EV read through the CCS2 endpoint; identifiers, coordinates and altitude replaced."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": "$fixture:updates/responses/eu_kia_carstatus_ioniq_electric_2022.json"
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "status": 503,
+            "body": null
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": {
+            "status": 503,
+            "body": null
+        }
+    }
+}
