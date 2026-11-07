@@ -488,16 +488,11 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
 
     @_retry_on_device_id_error
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
-        url = self.SPA_API_URL + "vehicles/" + vehicle.id
-        is_ccs2 = vehicle.ccu_ccs2_protocol_support != 0
+        # The vendor app reads cached status from the CCS2 endpoint for every car (issue #1546).
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus/latest"
         _LOGGER.debug(
             f"{DOMAIN} - CCU CCS Support: {vehicle.ccu_ccs2_protocol_support}"
         )
-
-        if is_ccs2:
-            url += "/ccs2/carstatus/latest"
-        else:
-            url += "/status/latest"
 
         response = self.session.get(
             url,
@@ -509,13 +504,8 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _LOGGER.debug(f"{DOMAIN} - get_cached_vehicle_status response: {response}")
         _check_response_for_errors(response)
 
-        if vehicle.ccu_ccs2_protocol_support == 0:
-            self._update_vehicle_properties(
-                vehicle, response["resMsg"]["vehicleStatusInfo"]
-            )
-        else:
-            state = response["resMsg"]["state"]["Vehicle"]
-            self._update_vehicle_properties_ccs2(vehicle, state)
+        state = response["resMsg"]["state"]["Vehicle"]
+        self._update_vehicle_properties_ccs2(vehicle, state)
 
         # The status response embeds a stale cached location.
         # Override it with the more current /location/park endpoint.
