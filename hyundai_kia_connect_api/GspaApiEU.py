@@ -1344,17 +1344,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     ) -> ORDER_STATUS:
         """Poll a GSPA action's status.
 
-        GET /gspa/v1/status/vehicles/{carId}/update-status
-            ?path=gspa/v1/remote/vehicles
+        GET /gspa/v1/status/vehicles/{carId}/update-status (no query
+        argument, as the EU apps send it)
         Response: {"metaInfo": {"retCode": "S"}, "data": {"pollingState":
         "WAIT" | "SUCCESS" | "FAILURE" | "TIMEOUT"}}. Any transport/parse
         error or non-success retCode is reported as PENDING (caller re-polls).
         """
-        url = (
-            self.CCSP_API_URL
-            + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
-            + f"?path={self.GSPA_REMOTE_VEHICLES_PATH}"
-        )
+        url = self.CCSP_API_URL + f"/gspa/v1/status/vehicles/{vehicle.id}/update-status"
         self._validate_ccs_token(token)
         headers = self._get_authenticated_headers(
             token, vehicle.ccu_ccs2_protocol_support or 0
@@ -1504,6 +1500,20 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
 
+    def _request_status_upload(self, token: Token, vehicle: Vehicle) -> None:
+        """Ask the car to upload a fresh status (best effort).
+
+        prewakeup alone does not make every car upload: a Kia Niro EV
+        accepts the wake (202) but keeps the old stored-status until
+        update-status is called.
+        """
+        try:
+            self._gspa_get(token, vehicle, "status/vehicles/{carId}/update-status")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA update-status request failed")
+
     def _apply_stored_status(
         self, token: Token, vehicle: Vehicle, data: dict[str, Any]
     ) -> None:
@@ -1582,8 +1592,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         requested_at = int(time() * 1000)
         if self.prewakeup(token, vehicle) is None:
             raise APIError("GSPA prewakeup failed")
+        self._request_status_upload(token, vehicle)
+        # update-status can take up to its read timeout; keep the total budget.
+        elapsed = time() - (requested_at / 1000)
         attempts = 1 + int(
-            (self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY)
+            max(
+                0,
+                self.FORCE_REFRESH_TIMEOUT - self.FORCE_REFRESH_INITIAL_DELAY - elapsed,
+            )
             // self.FORCE_REFRESH_POLL_INTERVAL
         )
         oldest = requested_at - self.FORCE_REFRESH_CLOCK_TOLERANCE_MS
