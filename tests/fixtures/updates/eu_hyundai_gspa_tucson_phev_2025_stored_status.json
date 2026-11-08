@@ -2,7 +2,10 @@
     "_fixture_meta": {
         "status": "captured in kia_uvo discussion #1909; eu_hyundai_gspa_tucson_phev_2025_stored_status",
         "follow_up_sources": "none",
-        "not_captured": [],
+        "not_captured": [
+            "gspa driving-info/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
+            "gspa driving-history/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)"
+        ],
         "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Hyundai Tucson PHEV 2025, ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (schrolf 17.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (schrolf 17.10)"
     },
@@ -13,7 +16,7 @@
     "vehicle": {
         "id": "VEHICLE-1",
         "VIN": "TESTVIN0000000001",
-        "engine_type": "ICE",
+        "engine_type": "PHEV",
         "ccu_ccs2_protocol_support": 2
     },
     "responses": {
@@ -478,6 +481,14 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "GET /gspa/v1/driving-info/vehicles/VEHICLE-1": {
+            "status": 503,
+            "body": null
+        },
+        "GET /gspa/v1/driving-history/vehicles/VEHICLE-1": {
+            "status": 503,
+            "body": null
         },
         "GET /gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns": {
             "body": {

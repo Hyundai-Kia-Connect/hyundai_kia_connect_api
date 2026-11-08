@@ -2008,7 +2008,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
                 ],
             )
-        fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
+        fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.ICE")
         if fuel_dte is not None:
             vehicle.fuel_driving_range = (
                 float(fuel_dte),
@@ -2019,6 +2019,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 vehicle.total_driving_range,
                 vehicle.total_driving_range_unit,
             )
+        elif vehicle.engine_type == ENGINE_TYPES.PHEV:
+            # DTE.Total includes the ICE range; DTE.EV is electric-only.
+            ev_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.EV")
+            if ev_dte is not None:
+                vehicle.ev_driving_range = (
+                    float(ev_dte),
+                    vehicle.total_driving_range_unit,
+                )
 
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "Green.ChargingInformation.Charging.RemainTime"),
