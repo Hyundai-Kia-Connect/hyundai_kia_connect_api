@@ -657,6 +657,46 @@ class ApiImplType1(ApiImpl):
             )
         vehicle.data = state
 
+    def _wake_and_read_ccs2_state(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any]:
+        """Wake a CCS2 car, wait for its upload, return the fresh /latest snapshot.
+
+        GET /ccs2/carstatus only queues the wake ({retCode, resCode, msgId}).
+        A car that doesn't upload in time leaves the old snapshot in /latest,
+        so its Date is compared to the one before the wake (as BR does).
+        """
+        headers = self._get_authenticated_headers(
+            token, vehicle.ccu_ccs2_protocol_support
+        )
+        trigger_url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/ccs2/carstatus"
+        latest_url = trigger_url + "/latest"
+
+        def read_latest() -> tuple[dict[str, Any], dt.datetime | None]:
+            response = self.session.get(latest_url, headers=headers).json()
+            _LOGGER.debug(
+                f"{DOMAIN} - Force refresh CCS2 vehicle status response: {response}"
+            )
+            _check_response_for_errors(response)
+            state = response["resMsg"]["state"]["Vehicle"]
+            date = get_child_value(state, "Date")
+            return state, parse_datetime(date, dt.UTC) if date else None
+
+        _, before = read_latest()
+        _check_response_for_errors(
+            self.session.get(trigger_url, headers=headers).json()
+        )
+        # A reachable EU CCS2 car uploads ~20 s after the wake.
+        sleep(25)
+        state, reported = read_latest()
+        # Without a baseline Date freshness can't be judged; apply as before.
+        if before is not None and (reported is None or reported <= before):
+            raise RequestTimeoutError(
+                f"Vehicle did not report a new status within 25 s after the "
+                f"wake; last status from {before}"
+            )
+        return state
+
     def _update_vehicle_properties_ccs2(
         self, vehicle: Vehicle, state: dict[str, Any]
     ) -> None:
