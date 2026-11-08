@@ -60,9 +60,11 @@ from .utils import (
     bool_or_none,
     ccs2_reservation_time_or_none,
     flag_or_none,
+    float_or_none,
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    int_or_none,
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
@@ -718,6 +720,12 @@ class ApiImplType1(ApiImpl):
             vehicle.steering_wheel_heater_is_on = False
         elif steer_wheel_heat == 1:
             vehicle.steering_wheel_heater_is_on = True
+        vehicle.steering_wheel_heat_step = int_or_none(
+            get_child_value(state, "Cabin.SteeringWheel.Heat.RemoteControl.Step")
+        )
+        vehicle.windshield_front_heater_is_on = bool_or_none(
+            get_child_value(state, "Body.Windshield.Front.Heat.State")
+        )
 
         defrost_rear_is_on = get_child_value(state, "Body.Windshield.Rear.Defog.State")
         if defrost_rear_is_on in [0, 2]:
@@ -775,6 +783,9 @@ class ApiImplType1(ApiImpl):
         )
         vehicle.turn_signal_right_rear = get_child_value(
             state, "Body.Lights.Rear.Right.TurnSignal.Warning"
+        )
+        vehicle.hazard_lights_on = bool_or_none(
+            get_child_value(state, "Body.Lights.Hazard.Alert")
         )
 
         vehicle.front_left_door_is_open = get_child_value(
@@ -922,6 +933,15 @@ class ApiImplType1(ApiImpl):
             get_child_value(
                 state, "Drivetrain.InternalCombustionEngine.OilLevelWarning"
             )
+        )
+        vehicle.transmission_condition = get_child_value(
+            state, "Drivetrain.Transmission.ParkingPosition"
+        )
+        vehicle.gear_position = int_or_none(
+            get_child_value(state, "Drivetrain.Transmission.GearPosition")
+        )
+        vehicle.auto_cut_battery_prewarning_on = bool_or_none(
+            get_child_value(state, "Electronics.AutoCut.BatteryPreWarning")
         )
         # 12V auxiliary battery fault warning. None when unreported.
         vehicle.battery_auxiliary_fail_warning_is_on = bool_or_none(
@@ -1131,6 +1151,18 @@ class ApiImplType1(ApiImpl):
         vehicle.ev_v2l_discharge_limit = get_child_value(
             state, "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.SoC"
         )
+        vehicle.ev_v2l_discharge_remain_time = int_or_none(
+            get_child_value(
+                state,
+                "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.RemainTime",
+            )
+        )
+        vehicle.ev_v2l_discharge_dte = int_or_none(
+            get_child_value(
+                state,
+                "Green.Electric.SmartGrid.VehicleToLoad.DischargeLimitation.DTE",
+            )
+        )
         vehicle.ev_target_range_charge_AC = (
             get_child_value(
                 state,
@@ -1321,8 +1353,26 @@ class ApiImplType1(ApiImpl):
         vehicle.fuel_level_is_low = get_child_value(
             state, "Drivetrain.FuelSystem.LowFuelWarning"
         )
+        # Unit enum differs per powertrain, so values and unit stay raw.
+        fuel_economy = get_child_value(
+            state, "Drivetrain.FuelSystem.AverageFuelEconomy"
+        )
+        if isinstance(fuel_economy, dict):
+            vehicle.average_fuel_economy_accumulated = float_or_none(
+                fuel_economy.get("Accumulated")
+            )
+            vehicle.average_fuel_economy_drive = float_or_none(
+                fuel_economy.get("Drive")
+            )
+            vehicle.average_fuel_economy_after_refuel = float_or_none(
+                fuel_economy.get("AfterRefuel")
+            )
+            vehicle.average_fuel_economy_unit = int_or_none(fuel_economy.get("Unit"))
         vehicle.air_control_is_on = get_child_value(
             state, "Cabin.HVAC.Row1.Driver.Blower.SpeedLevel"
+        )
+        vehicle.air_cleaning_is_on = bool_or_none(
+            get_child_value(state, "Cabin.HVAC.Vent.AirCleaning.Indicator")
         )
         vehicle.smart_key_battery_warning_is_on = bool(
             get_child_value(state, "Electronics.FOB.LowBattery")
