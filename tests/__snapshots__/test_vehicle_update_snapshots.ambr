@@ -10565,7 +10565,7 @@
       'front_right_door_is_open': 0,
       'front_right_seat_status': 'Off',
       'front_right_window_is_open': False,
-      'fuel_driving_range': None,
+      'fuel_driving_range': 551.0,
       'fuel_level': 100,
       'fuel_level_is_low': 0,
       'gear_position': None,
