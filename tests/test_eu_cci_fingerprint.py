@@ -4,6 +4,7 @@ per-brand token-exchange paths, and the signed token-refresh (live-verified
 require the X-Fingerprint identity headers; the legacy domain/api routes
 run as fallbacks only on the gate's own rejection codes (9035/9036/9037)."""
 
+import datetime as dt
 import json
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
@@ -13,6 +14,10 @@ import pytest
 from hyundai_kia_connect_api.cci_fingerprint import (
     build_fp_headers,
     compute_x_fingerprint,
+)
+from hyundai_kia_connect_api.const import (
+    CCI_TOKEN_REFRESH_MARGIN_SECONDS,
+    CCI_TOKEN_ROTATION_FLOOR_SECONDS,
 )
 from hyundai_kia_connect_api.KiaUvoApiEU import KiaUvoApiEU
 
@@ -336,6 +341,35 @@ def test_region1_ccs_exchange_falls_back_to_legacy(mock_post):
     legacy_headers = mock_post.call_args_list[1].kwargs["headers"]
     assert legacy_headers.get("X-Fingerprint") is None
     assert legacy_headers["authorization"] == "Bearer cci-at"
+
+
+# ── CCS token-exchange rotation margin (#1446) ──────────────────
+
+
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_ccs_exchange_rotates_before_expiry(mock_post):
+    """#1446: the server rejects the access token on the auth endpoints
+    ~5-6 min before its exp while the token test still passes, so
+    valid_until is pulled in by CCI_TOKEN_REFRESH_MARGIN_SECONDS."""
+    mock_post.return_value = _resp(200, '{"accessToken":"ccs-at","expiresTime":3600}')
+    before = dt.datetime.now(dt.UTC)
+    _ccs_token, valid_until = _eu_api(brand=2)._exchange_ccs_token(
+        "dev-1", "Bearer cci-at", "non-ccs-token", "ex-at"
+    )
+    after = dt.datetime.now(dt.UTC)
+    offset = dt.timedelta(seconds=3600 - CCI_TOKEN_REFRESH_MARGIN_SECONDS)
+    assert before + offset <= valid_until <= after + offset
+
+
+@patch("hyundai_kia_connect_api.KiaUvoApiEU.requests.post")
+def test_region1_ccs_exchange_tiny_ttl_is_floored(mock_post):
+    """An expiresTime below the margin must not yield a past valid_until."""
+    mock_post.return_value = _resp(200, '{"accessToken":"ccs-at","expiresTime":200}')
+    after = dt.datetime.now(dt.UTC)
+    _ccs_token, valid_until = _eu_api(brand=2)._exchange_ccs_token(
+        "dev-1", "Bearer cci-at", "non-ccs-token", "ex-at"
+    )
+    assert valid_until >= after + dt.timedelta(seconds=CCI_TOKEN_ROTATION_FLOOR_SECONDS)
 
 
 def test_gspa_pin_fp_primary_signed_over_body():

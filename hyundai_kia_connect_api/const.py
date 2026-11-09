@@ -38,6 +38,16 @@ REGIONS = {
 
 LOGIN_TOKEN_LIFETIME = datetime.timedelta(hours=23)
 
+# The CCI server starts rejecting the access token on the auth endpoints
+# (measured on /auth/v1/pin, HTTP 401 code 9030) up to ~6 min before its
+# exp (issue #1446), while the token-test endpoint still passes, so the
+# CCS valid_until is pulled in by this margin to let
+# check_and_refresh_token beat the rejection window.
+CCI_TOKEN_REFRESH_MARGIN_SECONDS = 360
+# Floor for the same rotation: a pathological TTL below the margin must
+# not yield a past valid_until and spin the refresh loop.
+CCI_TOKEN_ROTATION_FLOOR_SECONDS = 300
+
 LENGTH_KILOMETERS = "km"
 LENGTH_MILES = "mi"
 DISTANCE_UNITS = {

@@ -21,7 +21,12 @@ from .cci_fingerprint import (
     compute_x_fingerprint,
     is_gate_rejection,
 )
-from .const import BRANDS, DOMAIN
+from .const import (
+    BRANDS,
+    CCI_TOKEN_REFRESH_MARGIN_SECONDS,
+    CCI_TOKEN_ROTATION_FLOOR_SECONDS,
+    DOMAIN,
+)
 from .exceptions import (
     AuthenticationCciTokenExchangeError,
     AuthenticationCcsTokenExchangeError,
@@ -238,9 +243,10 @@ class CciAuthMixin:
         # regions (Hyundai/Kia).
         expires_in = data.get("expiresTime")
         if expires_in:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
-                seconds=int(expires_in)
-            )
+            ttl = int(expires_in) - CCI_TOKEN_REFRESH_MARGIN_SECONDS
         else:
-            ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3600)
+            ttl = 3600 - CCI_TOKEN_REFRESH_MARGIN_SECONDS
+        ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+            seconds=max(ttl, CCI_TOKEN_ROTATION_FLOOR_SECONDS)
+        )
         return ccs_token, ccs_valid_until
