@@ -2499,7 +2499,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         if total_regen is not None:
             vehicle.total_power_regenerated = float(total_regen)
 
-        if vehicle._ev_estimated_current_charge_duration is not None:
+        # Charging.State 0 or a disconnected connector block a stale
+        # RemainTime (kia_uvo #2094).
+        if get_child_value(state, "Green.ChargingInformation.Charging.State") == 0 or (
+            get_child_value(state, "Green.ChargingInformation.ConnectorFastening.State")
+            == 0
+        ):
+            vehicle.ev_battery_is_charging = False
+        elif vehicle._ev_estimated_current_charge_duration is not None:
             if vehicle._ev_estimated_current_charge_duration == 0:
                 vehicle.ev_battery_is_charging = False
             elif vehicle._ev_estimated_current_charge_duration > 0:
