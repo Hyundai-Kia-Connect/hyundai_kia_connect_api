@@ -9,7 +9,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from hyundai_kia_connect_api.const import DISTANCE_UNITS, ENGINE_TYPES
+from hyundai_kia_connect_api.const import (
+    CCI_TOKEN_REFRESH_MARGIN_SECONDS,
+    DISTANCE_UNITS,
+    ENGINE_TYPES,
+)
 from hyundai_kia_connect_api.exceptions import (
     APIError,
     AuthenticationBlockedError,
@@ -302,10 +306,13 @@ def test_login_with_password_success():
     assert info["non_ccs_token"] == "nonccs"
     assert info["id_token"] == "id-tok"
     # expiresTime is a TTL in seconds (86400 = 24h), so valid_until is ~24h
-    # from now — not an epoch in 1970.
+    # from now — not an epoch in 1970 — pulled in by the #1446 refresh
+    # margin.
     now = dt.datetime.now(dt.UTC)
     assert info["valid_until"] > now
-    assert (info["valid_until"] - now).total_seconds() == pytest.approx(86400, abs=5)
+    assert (info["valid_until"] - now).total_seconds() == pytest.approx(
+        86400 - CCI_TOKEN_REFRESH_MARGIN_SECONDS, abs=5
+    )
 
 
 def test_hyundai_constants_set_correctly():
