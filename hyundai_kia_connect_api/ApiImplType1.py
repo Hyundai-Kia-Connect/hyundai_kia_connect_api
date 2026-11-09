@@ -1207,9 +1207,12 @@ class ApiImplType1(ApiImpl):
         )
 
         # Green.Reservation.OffPeakTime — off-peak charging window + priority mode.
-        # Mode 0 = off, 2 = target-priority (off-peak tariffs prioritized),
-        # 3 = time-priority (charge only during off-peak). 1 is reserved/unused.
-        # When the block is absent (HEV / unconfigured EV) all fields stay None —
+        # Wire enum: 0 = manual charge, 1 = undefined, 2 = target-priority
+        # (off-peak tariffs prioritized), 3 = time-priority (charge only
+        # during off-peak). Ecosystem clients treat every mode other than
+        # 2/3 as scheduling off, so 1 maps like 0 (kia_uvo #2089: legacy
+        # EU and BR CCS2 payloads ship 1). When the block is absent (HEV /
+        # unconfigured EV) all fields stay None —
         # do NOT synthesise dt.time(0,0), which would create phantom time
         # entities downstream and collide with a legitimate midnight window.
         # The 31:70 "unconfigured" sentinel (#1269) is handled silently by
@@ -1229,7 +1232,7 @@ class ApiImplType1(ApiImpl):
                 vehicle.ev_off_peak_end_time = None
 
             mode = off_peak.get("Mode")
-            if mode == 0:
+            if mode in (0, 1):
                 vehicle.ev_schedule_charge_enabled = False
                 vehicle.ev_off_peak_charge_only_enabled = None
             elif mode == 2:

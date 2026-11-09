@@ -324,7 +324,7 @@
       'ev_power_consumption_air_conditioning': None,
       'ev_power_consumption_battery_cooling': None,
       'ev_power_consumption_battery_heater': None,
-      'ev_schedule_charge_enabled': None,
+      'ev_schedule_charge_enabled': False,
       'ev_second_departure_climate_defrost': None,
       'ev_second_departure_climate_enabled': None,
       'ev_second_departure_climate_temperature': None,
