@@ -11,6 +11,7 @@ from .const import (
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
     ENGINE_TYPES,
+    FUEL_ECONOMY_UNITS,
     PRESSURE_UNITS,
     PressureUnit,
 )
@@ -322,7 +323,8 @@ class Vehicle:
     ev_charge_expected_end_time: datetime.time | None = None
 
     # Average fuel economy (Drivetrain.FuelSystem.AverageFuelEconomy);
-    # values raw, Unit enum not translated (differs per powertrain).
+    # values raw, the *_unit properties translate Unit for the DYNAMIC_UNIT
+    # pattern.
     average_fuel_economy_accumulated: float | None = None
     average_fuel_economy_drive: float | None = None
     average_fuel_economy_after_refuel: float | None = None
@@ -565,6 +567,18 @@ class Vehicle:
     @property
     def tire_pressure_rear_right_unit(self) -> str | None:
         return self._tire_pressure_unit_label()
+
+    @property
+    def average_fuel_economy_accumulated_unit(self) -> str | None:
+        return FUEL_ECONOMY_UNITS.get(self.average_fuel_economy_unit)
+
+    @property
+    def average_fuel_economy_drive_unit(self) -> str | None:
+        return FUEL_ECONOMY_UNITS.get(self.average_fuel_economy_unit)
+
+    @property
+    def average_fuel_economy_after_refuel_unit(self) -> str | None:
+        return FUEL_ECONOMY_UNITS.get(self.average_fuel_economy_unit)
 
     @property
     def next_service_distance(self) -> float | None:
