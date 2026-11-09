@@ -306,16 +306,33 @@ class TestCCS2LocationTimestampNone:
         assert ts.hour == 14 and ts.minute == 0 and ts.second == 0
 
 
-def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle):
-    """Unknown OffPeakTime.Mode (e.g. reserved 1) -> attrs None, no crash."""
+def test_ccs2_undefined_off_peak_mode_maps_to_off(ccs2_api, vehicle):
+    """OffPeakTime.Mode 1 = undefined (kia_uvo #2089: legacy EU payload
+    ships it) -> mapped like 0, matching client behaviour for modes
+    other than 2/3."""
     data = load_fixture("eu_kia_ev6_2024_ccs2_off.json")
     data = json.loads(json.dumps(data))  # deep copy
     data["Green"]["Reservation"]["OffPeakTime"]["Mode"] = 1
     ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_schedule_charge_enabled is False
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+    assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
+
+
+def test_ccs2_unknown_off_peak_mode_is_graceful(ccs2_api, vehicle, caplog):
+    """An OffPeakTime.Mode outside 0/1/2/3 -> attrs None, no crash."""
+    data = load_fixture("eu_kia_ev6_2024_ccs2_off.json")
+    data = json.loads(json.dumps(data))  # deep copy
+    data["Green"]["Reservation"]["OffPeakTime"]["Mode"] = 5
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hyundai_kia_connect_api"):
+        ccs2_api._update_vehicle_properties_ccs2(vehicle, data)
     assert vehicle.ev_schedule_charge_enabled is None
     assert vehicle.ev_off_peak_charge_only_enabled is None
     # window still parsed even if Mode unknown
     assert vehicle.ev_off_peak_start_time == dt.time(22, 30)
+    assert "unknown CCS2 OffPeakTime.Mode: 5" in caplog.text
 
 
 def test_ccs2_off_peak_sentinel_31_70_is_none_silent(ccs2_api, vehicle, caplog):

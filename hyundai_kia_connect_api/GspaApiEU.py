@@ -2308,9 +2308,9 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # Off-peak charging window — flat CCS2-schema OffPeakTime block
         # (live EV6/PV5 GSPA stored-status + Sportage PHEV CCS2 dump; the
         # nested "OffPeakPower.*" variants appear in no captured payload).
-        # Mode 0 = off, 2 = target-priority, 3 = time-priority (kia_uvo
-        # #1304/#1269 lineage). When the block is absent all fields stay
-        # None — do NOT synthesise dt.time(0,0) (phantom midnight window).
+        # Mode enum as on the ApiImplType1 OffPeakTime branch (same wire
+        # schema): 1 = undefined maps like 0. Absent block stays None —
+        # no synthesised dt.time(0,0) (phantom midnight window).
         # ccs2_reservation_time_or_none handles the 31:70 sentinel silently.
         off_peak = get_child_value(state, "Green.Reservation.OffPeakTime")
         if off_peak:
@@ -2327,7 +2327,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 vehicle.ev_off_peak_end_time = None
 
             mode = off_peak.get("Mode")
-            if mode == 0:
+            if mode in (0, 1):
                 vehicle.ev_schedule_charge_enabled = False
                 vehicle.ev_off_peak_charge_only_enabled = None
             elif mode == 2:

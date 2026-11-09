@@ -115,6 +115,34 @@ def test_ccs2_parser_flat_schema_paths(api: KiaCciApiEU, vehicle: Vehicle) -> No
     assert vehicle.headlamp_status == 0
 
 
+def test_ccs2_parser_offpeak_mode_undefined_maps_off(
+    api: KiaCciApiEU, vehicle: Vehicle
+) -> None:
+    """GSPA path: OffPeakTime.Mode 1 = undefined -> mapped like 0 (off),
+    same wire schema as the ApiImplType1 branch."""
+    import datetime as dt
+
+    state = {
+        "Green": {
+            "Reservation": {
+                "OffPeakTime": {
+                    "StartHour": 22,
+                    "StartMin": 0,
+                    "EndHour": 1,
+                    "EndMin": 30,
+                    "Mode": 1,
+                },
+            },
+        },
+    }
+    api._update_vehicle_properties_ccs2(vehicle, state)
+
+    assert vehicle.ev_off_peak_start_time == dt.time(22, 0)
+    assert vehicle.ev_off_peak_end_time == dt.time(1, 30)
+    assert vehicle.ev_schedule_charge_enabled is False
+    assert vehicle.ev_off_peak_charge_only_enabled is None
+
+
 def test_ccs2_parser_offpeak_absent_stays_none(
     api: KiaCciApiEU, vehicle: Vehicle
 ) -> None:
