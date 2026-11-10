@@ -130,3 +130,66 @@ def test_bluelink_odometer_uses_highest_valid_value(
     bluelink_api._update_vehicle_properties(vehicle, state)
 
     assert vehicle.odometer == expected
+
+
+# Captures from 2026 Santa Fe Hybrid, kia_uvo #2009: the boolean fields stay 0
+# and only *OpenLevel moves (1 vented, 2 partial, 3 full).
+@pytest.mark.parametrize(
+    ("window_open", "expected"),
+    [
+        (
+            {
+                "frontLeft": 0,
+                "frontRight": 0,
+                "backLeft": 0,
+                "backRight": 0,
+                "flOpenLevel": 0,
+                "frOpenLevel": 0,
+                "blOpenLevel": 0,
+                "brOpenLevel": 0,
+            },
+            (False, False, False, False),
+        ),
+        (
+            {
+                "frontLeft": 0,
+                "frontRight": 0,
+                "backLeft": 0,
+                "backRight": 0,
+                "flOpenLevel": 1,
+                "frOpenLevel": 2,
+                "blOpenLevel": 0,
+                "brOpenLevel": 0,
+            },
+            (True, True, False, False),
+        ),
+        (
+            {
+                "frontLeft": 0,
+                "frontRight": 0,
+                "backLeft": 0,
+                "backRight": 0,
+                "flOpenLevel": 3,
+                "frOpenLevel": 0,
+                "blOpenLevel": 0,
+                "brOpenLevel": 0,
+            },
+            (True, False, False, False),
+        ),
+    ],
+)
+def test_bluelink_window_open_level(bluelink_api, vehicle, window_open, expected):
+    bluelink_api._update_vehicle_properties(
+        vehicle, {"vehicleStatus": {"windowOpen": window_open}}
+    )
+    assert (
+        vehicle.front_left_window_is_open,
+        vehicle.front_right_window_is_open,
+        vehicle.back_left_window_is_open,
+        vehicle.back_right_window_is_open,
+    ) == expected
+
+
+def test_bluelink_window_unknown_without_window_block(bluelink_api, vehicle):
+    bluelink_api._update_vehicle_properties(vehicle, {"vehicleStatus": {}})
+    assert vehicle.front_left_window_is_open is None
