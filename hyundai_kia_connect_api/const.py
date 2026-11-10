@@ -58,6 +58,22 @@ DISTANCE_UNITS = {
     3: LENGTH_MILES,
 }
 
+# AverageFuelEconomy.Unit display label (CCS SDK FuelEconomyUnit enum; the
+# app maps one enum for every powertrain, 1/5/8 are per-100km units).
+FUEL_ECONOMY_UNITS = {
+    None: None,
+    0: "km/L",
+    1: "L/100km",
+    2: "MPG",
+    3: "MPG (UK)",
+    4: "km/kWh",
+    5: "kWh/100km",
+    6: "mi/kWh",
+    7: "km/kg",
+    8: "kg/100km",
+    9: "MPGe",
+}
+
 TEMPERATURE_C = "°C"
 TEMPERATURE_F = "°F"
 TEMPERATURE_UNITS = {None: None, 0: TEMPERATURE_C, 1: TEMPERATURE_F}
