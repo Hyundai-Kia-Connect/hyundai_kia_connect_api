@@ -53,6 +53,7 @@ from .utils import (
     normalize_battery_soc,
     parse_datetime,
     pressure_or_none,
+    window_is_open,
 )
 from .Vehicle import (
     DailyDrivingStats,
@@ -697,17 +698,25 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             if get_child_value(state, "vehicleStatus.tirePressure") is not None
             else None
         )
-        vehicle.front_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontLeft"
+        vehicle.front_left_window_is_open = window_is_open(
+            state,
+            "vehicleStatus.windowOpen.frontLeft",
+            "vehicleStatus.windowOpen.flOpenLevel",
         )
-        vehicle.front_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.frontRight"
+        vehicle.front_right_window_is_open = window_is_open(
+            state,
+            "vehicleStatus.windowOpen.frontRight",
+            "vehicleStatus.windowOpen.frOpenLevel",
         )
-        vehicle.back_left_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backLeft"
+        vehicle.back_left_window_is_open = window_is_open(
+            state,
+            "vehicleStatus.windowOpen.backLeft",
+            "vehicleStatus.windowOpen.blOpenLevel",
         )
-        vehicle.back_right_window_is_open = get_child_value(
-            state, "vehicleStatus.windowOpen.backRight"
+        vehicle.back_right_window_is_open = window_is_open(
+            state,
+            "vehicleStatus.windowOpen.backRight",
+            "vehicleStatus.windowOpen.brOpenLevel",
         )
         vehicle.is_locked = get_child_value(state, "vehicleStatus.doorLock")
         vehicle.front_left_door_is_open = get_child_value(

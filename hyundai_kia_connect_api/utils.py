@@ -46,10 +46,11 @@ def get_child_value(data: Any, key: str) -> Any:
 def window_is_open(
     state: dict[str, Any], open_key: str, open_level_key: str
 ) -> bool | None:
-    """Whether a CCS2 window is open (fully open or vented).
+    """Whether a window is open (fully open or vented).
 
     CCS2 status exposes ``Open`` (fully-open flag) and ``OpenLevel`` (vent
-    level). A vented window reports ``Open=0`` with ``OpenLevel>0``; that must
+    level); Hyundai USA exposes ``frontLeft`` and ``flOpenLevel`` the same way.
+    A vented window reports ``Open=0`` with ``OpenLevel>0``; that must
     be treated as open, not closed (see issue #1215). Returns ``None`` when
     both fields are absent so callers can distinguish "unknown" from "closed".
     """
