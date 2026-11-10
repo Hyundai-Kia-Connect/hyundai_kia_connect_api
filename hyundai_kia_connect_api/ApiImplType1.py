@@ -1898,7 +1898,7 @@ class ApiImplType1(ApiImpl):
                 self.temperature_range.index(options.set_temp)
             )
 
-            payload = {
+            payload: dict[str, Any] = {
                 "action": "start",
                 "hvacType": 0,
                 "options": {
@@ -1909,6 +1909,25 @@ class ApiImplType1(ApiImpl):
                 "tempCode": hex_set_temp,
                 "unit": "C",
             }
+            # The legacy options block also carries the per-seat and wheel
+            # levels (*SeatOptCmd / wheelHeating) when passed; the app sends
+            # them beside heating1 on the same endpoint. kia_uvo #1570.
+            options_map: dict[str, Any] = payload["options"]
+            if options.steering_wheel is not None:
+                options_map["wheelHeating"] = options.steering_wheel
+            if options.side_rear_mirror_heating is not None:
+                options_map["sideRearMirrorHeating"] = options.side_rear_mirror_heating
+            seat_cmds = {}
+            for seat, level in (
+                ("drvSeatOptCmd", options.front_left_seat),
+                ("astSeatOptCmd", options.front_right_seat),
+                ("rlSeatOptCmd", options.rear_left_seat),
+                ("rrSeatOptCmd", options.rear_right_seat),
+            ):
+                if level is not None:
+                    seat_cmds[seat] = level
+            if seat_cmds:
+                options_map["seatHeaterVentCMD"] = seat_cmds
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
             response = self.session.post(
                 url,

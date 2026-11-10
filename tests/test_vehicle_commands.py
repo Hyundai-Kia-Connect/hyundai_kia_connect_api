@@ -173,3 +173,60 @@ def test_vehicle_command(
     assert isinstance(action_id, str)
     assert action_id
     assert {"action_id": action_id, "requests": sent_requests} == snapshot
+
+
+@pytest.mark.parametrize(
+    "impl, seat_options",
+    [
+        (
+            "eu_kia",
+            ClimateRequestOptions(
+                set_temp=21,
+                duration=10,
+                climate=True,
+                heating=0,
+                front_left_seat=3,
+                front_right_seat=2,
+                rear_left_seat=1,
+                steering_wheel=1,
+            ),
+        ),
+    ],
+)
+@pytest.mark.parametrize("command", ["start_climate"])
+def test_legacy_climate_seat_options(
+    impl: str,
+    seat_options: ClimateRequestOptions,
+    command: str,
+    sent_requests: list[dict[str, Any]],
+    snapshot: SnapshotAssertion,
+) -> None:
+    region, brand, ccs2, *_ = IMPLEMENTATIONS[impl]
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, region), _key(BRANDS, brand), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    vehicle = Vehicle(
+        id="VEHICLE-ID",
+        VIN="VIN0000000000000",
+        year=2024,
+        engine_type=ENGINE_TYPES.HEV,
+        ccu_ccs2_protocol_support=ccs2,
+    )
+    api.start_climate(token, vehicle, seat_options)
+    body = sent_requests[-1]["body"]
+    assert body["options"]["seatHeaterVentCMD"] == {
+        "drvSeatOptCmd": 3,
+        "astSeatOptCmd": 2,
+        "rlSeatOptCmd": 1,
+    }
+    assert body["options"]["wheelHeating"] == 1
+    assert {"requests": sent_requests} == snapshot

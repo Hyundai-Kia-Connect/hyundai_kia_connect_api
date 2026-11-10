@@ -1,4 +1,31 @@
 # serializer version: 1
+# name: test_legacy_climate_seat_options[start_climate-eu_kia-seat_options0]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 2,
+              'drvSeatOptCmd': 3,
+              'rlSeatOptCmd': 1,
+            }),
+            'wheelHeating': 1,
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
 # name: test_vehicle_command[au_hyundai-lock]
   dict({
     'action_id': 'MSG-1',
