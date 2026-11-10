@@ -1735,20 +1735,6 @@
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
       }),
       dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
-      dict({
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/driving-info/vehicles/VEHICLE-1',
@@ -2001,20 +1987,6 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
-      }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
       dict({
         'json': None,
@@ -2473,6 +2445,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -2521,20 +2494,6 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
-      }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
       dict({
         'json': None,
@@ -2789,20 +2748,6 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
-      }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
       dict({
         'json': None,
@@ -3063,20 +3008,6 @@
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
       }),
       dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
-      dict({
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/driving-info/vehicles/VEHICLE-1',
@@ -3331,20 +3262,6 @@
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
       }),
       dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
-      dict({
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/device-info/vehicles/VEHICLE-1/software-version',
@@ -3353,6 +3270,16 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/mru/vehicles/VEHICLE-1/ota-updates',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/valet/vehicles/VEHICLE-1/status',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns',
       }),
     ]),
     'vehicle': dict({
@@ -3363,8 +3290,11 @@
       'air_temperature': None,
       'auto_cut_battery_prewarning_on': False,
       'average_fuel_economy_accumulated': None,
+      'average_fuel_economy_accumulated_unit': None,
       'average_fuel_economy_after_refuel': None,
+      'average_fuel_economy_after_refuel_unit': None,
       'average_fuel_economy_drive': None,
+      'average_fuel_economy_drive_unit': None,
       'average_fuel_economy_unit': None,
       'back_left_door_is_locked': True,
       'back_left_door_is_open': 0,
@@ -3416,6 +3346,7 @@
       'ev_charging_current': None,
       'ev_charging_power': None,
       'ev_connector_fastening_state': None,
+      'ev_connector_lock_state': None,
       'ev_driving_range': None,
       'ev_driving_range_unit': None,
       'ev_estimated_current_charge_duration': None,
@@ -3523,7 +3454,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': False,
       'supports': dict({
-        'climate_duration_setting': False,
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -3577,20 +3508,6 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.hyundai.com/gspa/v1/location/vehicles/VEHICLE-1/stored-status',
-      }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'GCM',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
       dict({
         'json': None,
@@ -3870,11 +3787,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.hyundai.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -4343,6 +4255,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -4577,6 +4490,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -5050,6 +4964,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -5117,11 +5032,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -5659,11 +5569,6 @@
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
       }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -6191,11 +6096,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -6732,11 +6632,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -7282,11 +7177,6 @@
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
       }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -7830,11 +7720,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -8380,11 +8265,6 @@
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
       }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -8921,11 +8801,6 @@
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
       }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -9454,11 +9329,6 @@
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
       }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -9968,20 +9838,6 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
       }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'APNS',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -10219,20 +10075,6 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
       }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'APNS',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -10455,20 +10297,6 @@
         'json': None,
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/status/vehicles/VEHICLE-1/stored-status',
-      }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'APNS',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({
@@ -10714,20 +10542,6 @@
         'method': 'GET',
         'url': 'https://gspa-ccs-eu.kia.com/gspa/v1/location/vehicles/VEHICLE-1/stored-status',
       }),
-      dict({
-        'json': dict({
-          'pushRegId': '<uuid>',
-          'pushType': 'APNS',
-          'uuid': '<uuid>',
-        }),
-        'method': 'POST',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/notifications/register',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
-      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -10907,6 +10721,7 @@
       'stop_lamp_right': 0,
       'sunroof_is_open': None,
       'supports': dict({
+        'climate_duration_setting': None,
         'hvac_close_remote': None,
         'media_close_remote': None,
         'mqtt_push': None,
@@ -11202,11 +11017,6 @@
         }),
         'method': 'POST',
         'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/drvhistory',
-      }),
-      dict({
-        'json': None,
-        'method': 'GET',
-        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-1/profile',
       }),
     ]),
     'vehicle': dict({

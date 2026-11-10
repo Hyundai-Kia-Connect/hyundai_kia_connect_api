@@ -9,7 +9,7 @@
             "gspa mru/vehicles/{carId}/ota-updates (answered 503; update path logs and continues)",
             "legacy-SPA notifications/register response (deviceId envelope rebuilt from the legacy parser shape)"
         ],
-        "description": "GSPA stored-status + legacy-SPA vehicle profile for the climate-duration capability: profile option block has no clmtCtrlOption key (Santa Fe HEV 2026) -> supports.climate_duration_setting = False, mirroring the app's == 1 gate. Coordinates zeroed, VIN replaced with a placeholder.",
+        "description": "GSPA stored-status scenario for the Santa Fe HEV 2026 (own-vehicle live probe; coordinates zeroed, VIN placeholder). The legacy-SPA profile capture lives in updates/responses/eu_hyundai_gspa_santa_fe_2026_hev_profile.json and is exercised by the parse_vehicle_profile tests \u2014 profile option block has no clmtCtrlOption key (HEV) so the flag stays False per the app's == 1 gate.",
         "source": "own-vehicle live probe (READ-ONLY, 2026-11-04), scripts/probe_profile_clmtoption_live.py"
     },
     "implementation": {
@@ -30,20 +30,6 @@
                 "metaInfo": {
                     "retCode": "S",
                     "resCode": "200-000"
-                }
-            }
-        },
-        "GET /api/v1/spa/vehicles/VEHICLE-1/profile": {
-            "status": 200,
-            "body": "$fixture:updates/responses/eu_hyundai_gspa_santa_fe_2026_hev_profile.json"
-        },
-        "POST /api/v1/spa/notifications/register": {
-            "status": 200,
-            "body": {
-                "retCode": "S",
-                "resCode": "0000",
-                "resMsg": {
-                    "deviceId": "spa-device-0001"
                 }
             }
         },

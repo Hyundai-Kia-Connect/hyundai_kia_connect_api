@@ -18,7 +18,7 @@ import logging
 import re
 import uuid
 from time import sleep, time
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -34,7 +34,6 @@ from .ApiImpl import (
 )
 from .ApiImplType1 import _check_response_for_errors
 from .cci_auth import CciAuthMixin
-from .KiaUvoApiEU import parse_profile_climate_duration
 
 if TYPE_CHECKING:
     from .gspa.cipher_keys import GspaCipher
@@ -98,6 +97,7 @@ from .utils import (
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
+    parse_vehicle_profile_duration,
     pressure_or_none,
 )
 from .Vehicle import Vehicle
@@ -128,10 +128,8 @@ SUPPORTED_LANGUAGES_LIST = [
     "pt",
 ]
 
-# Legacy-SPA (prd.eu-ccapi.*) profile-read parameters per brand:
-# (ccsp-service-id, app-id, CFB stamp key, push type, base url with port).
-# Same values KiaUvoApiEU derives in __init__; used by get_vehicle_profile,
-# whose token/headers must be legacy not CCI (Hyundai-Kia-Connect/kia_uvo#2063).
+# Legacy-SPA ccapi:8080 identity per brand; the same values KiaUvoApiEU
+# derives in __init__ (kia_uvo#2063 is why the profile read uses them).
 LEGACY_PROFILE_APPS: dict[str, tuple[str, str, bytes, str, str]] = {
     BRAND_KIA: (
         "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a",
@@ -1558,19 +1556,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # stored-status endpoint is the only location source (#1331).
         if get_child_value(state, "Location.GeoCoord.Latitude") is None:
             self._update_vehicle_gspa_location(token, vehicle)
-        if not vehicle._profile_checked:
-            vehicle._profile_checked = True
-            try:
-                profile = self.get_vehicle_profile(token, vehicle)
-            except Exception:
-                _LOGGER.debug(f"{DOMAIN} - vehicle profile failed")
-            else:
-                if profile is not None:
-                    parse_profile_climate_duration(vehicle, profile)
 
-    def get_vehicle_profile(
-        self, token: Token, vehicle: Vehicle
-    ) -> dict[str, Any] | None:
+    def parse_vehicle_profile(self, token: Token, vehicle: Vehicle) -> None:
         """Legacy-SPA vehicle profile — the only source of clmtCtrlOption.
 
         Served with a legacy-SPA device id (registered lazily on
@@ -1579,7 +1566,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         """
         params = LEGACY_PROFILE_APPS.get(BRANDS[self.brand])
         if params is None:
-            return None
+            return
         response = self.session.get(
             "https://" + params[4] + "/api/v1/spa/vehicles/" + vehicle.id + "/profile",
             headers=self._get_legacy_profile_headers(token, vehicle, params),
@@ -1588,10 +1575,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(
                 f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
             )
-            return None
-        data = response.json()
-        _check_response_for_errors(data)
-        return cast(dict[str, Any] | None, data.get("resMsg"))
+            return
+        profile = response.json()
+        _check_response_for_errors(profile)
+        parse_vehicle_profile_duration(vehicle, profile.get("resMsg"))
 
     def _get_legacy_profile_headers(
         self, token: Token, vehicle: Vehicle, params: tuple[str, str, bytes, str, str]

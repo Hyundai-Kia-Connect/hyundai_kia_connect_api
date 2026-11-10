@@ -92,8 +92,7 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
-    # Integration only (kia_uvo): the remote-climate duration selector.
-    # From legacy-SPA profile option.clmtCtrlOption == 1.
+    # From the legacy-SPA profile option: clmtCtrlOption == 1.
     climate_duration_setting: bool | None = None
     # Service Hub registration + the receive-only MQTT broker
     mqtt_push: bool | None = None
