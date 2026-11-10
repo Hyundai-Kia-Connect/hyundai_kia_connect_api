@@ -295,6 +295,10 @@ class ApiImplType1(ApiImpl):
             vehicle.last_updated_at = parse_datetime(
                 get_child_value(state, "status.time"), self.data_timezone
             )
+        elif get_child_value(state, "vehicleLocation.time"):
+            vehicle.last_updated_at = parse_datetime(
+                get_child_value(state, "vehicleLocation.time"), self.data_timezone
+            )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
 
@@ -670,6 +674,16 @@ class ApiImplType1(ApiImpl):
             date = parse_datetime(get_child_value(state, "Date"), dt.UTC)
             vehicle.last_updated_at = (
                 date.astimezone(self.data_timezone) if date else None
+            )
+        elif get_child_value(state, "Location.TimeStamp.Year"):
+            vehicle.last_updated_at = dt.datetime(
+                year=int(get_child_value(state, "Location.TimeStamp.Year")),
+                month=int(get_child_value(state, "Location.TimeStamp.Mon")),
+                day=int(get_child_value(state, "Location.TimeStamp.Day")),
+                hour=int(get_child_value(state, "Location.TimeStamp.Hour")),
+                minute=int(get_child_value(state, "Location.TimeStamp.Min")),
+                second=int(get_child_value(state, "Location.TimeStamp.Sec")),
+                tzinfo=self.data_timezone,
             )
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
