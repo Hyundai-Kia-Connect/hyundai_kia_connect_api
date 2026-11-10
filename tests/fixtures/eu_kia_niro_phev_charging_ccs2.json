@@ -1,0 +1,239 @@
+{
+    "_fixture_meta": {
+        "region": "Europe",
+        "brand": "Kia",
+        "endpoint": "GET /vehicles/{id}/ccs2/carstatus/latest (cached, #1546)",
+        "vehicles": "Kia Niro PHEV, ccu_ccs2_protocol_support 0",
+        "source": "kia_uvo#2094 comment 15:09 2026-11-09 (ragnarlotus attachment, active charging session)",
+        "description": "Charging shape: Charging.State 1, SequenceDetails 8/sub 1 (SlowCharging per app), Fastening 1, RemainTime 70 identical to the unplugged capture. Location.TimeStamp redacted by the reporter and dropped here (location timestamp None)."
+    },
+    "DrivingReady": 0,
+    "Location": {
+        "GeoCoord": {
+            "Latitude": "**REDACTED**",
+            "Longitude": "**REDACTED**",
+            "Type": 0,
+            "Altitude": 0
+        },
+        "Speed": {
+            "Value": 0,
+            "Unit": 0
+        },
+        "Date": "20261108171826.000",
+        "Offset": 1
+    },
+    "Body": {
+        "Windshield": {
+            "Front": {
+                "Defog": {
+                    "State": 0
+                }
+            },
+            "Rear": {
+                "Defog": {
+                    "State": 0
+                }
+            }
+        },
+        "Hood": {
+            "Open": 0
+        },
+        "Lights": {
+            "DischargeAlert": {
+                "State": 0
+            },
+            "TailLamp": {
+                "Alert": 0
+            },
+            "Hazard": {
+                "Alert": 0
+            }
+        },
+        "Trunk": {
+            "Open": 0
+        }
+    },
+    "Cabin": {
+        "SteeringWheel": {
+            "Heat": {
+                "State": 2
+            }
+        },
+        "HVAC": {
+            "Row1": {
+                "Driver": {
+                    "Temperature": {
+                        "Value": "LO",
+                        "Unit": 0
+                    },
+                    "Blower": {
+                        "SpeedLevel": 0
+                    }
+                }
+            },
+            "Temperature": {
+                "RangeType": 0
+            }
+        },
+        "Door": {
+            "Row2": {
+                "Right": {
+                    "Open": 0,
+                    "Lock": 0
+                },
+                "Left": {
+                    "Open": 0,
+                    "Lock": 0
+                }
+            },
+            "Row1": {
+                "Passenger": {
+                    "Open": 0,
+                    "Lock": 0
+                },
+                "Driver": {
+                    "Open": 0,
+                    "Lock": 0
+                }
+            }
+        }
+    },
+    "Chassis": {
+        "Axle": {
+            "Tire": {
+                "PressureLow": 0
+            },
+            "Row1": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                }
+            }
+        }
+    },
+    "Drivetrain": {
+        "Transmission": {
+            "ParkingPosition": 0
+        },
+        "FuelSystem": {
+            "DTE": {
+                "EV": 25,
+                "Unit": 1,
+                "ICE": 507,
+                "Total": 532
+            },
+            "LowFuelWarning": 0
+        },
+        "Odometer": 56241.4
+    },
+    "Electronics": {
+        "PowerSupply": {
+            "Ignition3": 1,
+            "Accessory": 0
+        },
+        "Battery": {
+            "Level": 90,
+            "SensorReliability": 0
+        },
+        "AutoCut": {
+            "BatteryPreWarning": 0
+        }
+    },
+    "Green": {
+        "Reservation": {
+            "OffPeakTime": {
+                "Mode": 3,
+                "EndMin": 10,
+                "EndHour": 1,
+                "StartMin": 0,
+                "StartHour": 1
+            },
+            "Departure": {
+                "Schedule2": {
+                    "Min": 0,
+                    "Hour": 0,
+                    "Sun": 1,
+                    "Sat": 0,
+                    "Fri": 0,
+                    "Thu": 0,
+                    "Wed": 0,
+                    "Tue": 0,
+                    "Mon": 0,
+                    "Enable": 0
+                },
+                "Schedule1": {
+                    "Min": 10,
+                    "Hour": 1,
+                    "Sun": 1,
+                    "Sat": 1,
+                    "Fri": 1,
+                    "Thu": 1,
+                    "Wed": 1,
+                    "Tue": 1,
+                    "Mon": 1,
+                    "Enable": 1
+                }
+            }
+        },
+        "BatteryManagement": {
+            "BatteryRemain": {
+                "Ratio": 54
+            },
+            "BatteryConditioning": 0
+        },
+        "ChargingInformation": {
+            "ExpectedTime": {
+                "EndMin": 0,
+                "EndHour": 0,
+                "EndDay": 9,
+                "StartMin": 0,
+                "StartHour": 0,
+                "StartDay": 9
+            },
+            "Charging": {
+                "RemainTime": 70,
+                "State": 1,
+                "RemainTimeUnit": 1
+            },
+            "SequenceDetails": 8,
+            "SequenceSubcode": 1,
+            "ConnectorFastening": {
+                "State": 1
+            },
+            "EstimatedTime": {
+                "ICCB": 140,
+                "Standard": 90
+            }
+        }
+    },
+    "Service": {
+        "ConnectedCar": {
+            "RemoteControl": {
+                "Available": 1,
+                "WaitingTime": 168
+            }
+        }
+    },
+    "RemoteControl": {
+        "SleepMode": 0
+    },
+    "Date": "20261109145539.260"
+}
