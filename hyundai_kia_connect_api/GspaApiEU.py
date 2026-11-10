@@ -1988,12 +1988,18 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     DOMAIN,
                     lock_raw,
                 )
-        vehicle.ev_battery_is_plugged_in = (
-            True
-            if vehicle.ev_connector_fastening_state
-            is CONNECTOR_FASTENING_STATE.CONNECTED
-            else None
-        )
+        if vehicle.ev_connector_fastening_state is CONNECTOR_FASTENING_STATE.CONNECTED:
+            vehicle.ev_battery_is_plugged_in = True
+        elif (
+            vehicle.ev_connector_fastening_state
+            is CONNECTOR_FASTENING_STATE.DISCONNECTED
+            and vehicle.ev_connector_lock_state is CHARGING_CONNECTOR_LOCK_STATE.IDLE
+        ):
+            # Fastening 0 means the cable is out only when the connector
+            # lock reports idle; locked-idle plugs read 0 too (#2099).
+            vehicle.ev_battery_is_plugged_in = False
+        else:
+            vehicle.ev_battery_is_plugged_in = None
         charging_door_state = get_child_value(state, "Green.ChargingDoor.State")
         if charging_door_state in [0, 2]:
             vehicle.ev_charge_port_door_is_open = False
