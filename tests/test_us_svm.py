@@ -116,6 +116,17 @@ def test_parse_svm_response_malformed_image_size_segment():
     assert details.image_sizes is None
 
 
+def test_parse_svm_response_garbage_image_bytes_no_crash():
+    from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import parse_svm_response
+
+    image = b"\xff\xd8\xff\xe0fakejpg"
+    response = _make_svm_response(image, "2026-06-23T12:34:56Z")
+    response["svmDetails"][0]["svmDetail"]["svmImage"] = "!!!not-base64!!!"
+    details = parse_svm_response(response, dt.UTC)
+
+    assert details.image_bytes == b""
+
+
 def test_parse_svm_response_valid_angle_of_view_when_present():
     from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import parse_svm_response
 

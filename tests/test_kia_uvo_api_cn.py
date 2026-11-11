@@ -253,6 +253,18 @@ class TestAirTempSentinel:
         api._update_vehicle_properties(vehicle, self._state(hex_code))
         assert vehicle.air_temperature == api.temperature_range[idx]
 
+    def test_unparsable_air_temp_logs_not_raises(
+        self, api: KiaUvoApiCN, vehicle: Vehicle, caplog
+    ):
+        import logging
+
+        # non-hex values hit the ValueError handler in the shared legacy
+        # parser (ApiImplType1) — must be skipped, not crash
+        with caplog.at_level(logging.DEBUG, logger="hyundai_kia_connect_api"):
+            api._update_vehicle_properties(vehicle, self._state("ZZ"))
+        assert vehicle.air_temperature is None
+        assert "Unparsable airTemp value: ZZ" in caplog.text
+
 
 # ---------------------------------------------------------------------------
 # login() Token lifetime (regression: old code faked a 30-day LOGIN_TOKEN_LIFETIME)

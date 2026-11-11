@@ -12,6 +12,7 @@ import pytest
 
 from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.const import PressureUnit
+from hyundai_kia_connect_api.KiaCciApiEU import KiaCciApiEU
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from tests.fixture_helpers import (
     discover_fixtures,
@@ -367,6 +368,62 @@ def test_ccs2_off_peak_sentinel_31_70_is_none_silent(ccs2_api, vehicle, caplog):
     assert vehicle.ev_second_departure_time is None  # Schedule2 31:70 sentinel
     # No malformed-block warning for the known sentinel.
     assert "malformed" not in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Malformed Green.Reservation blocks — legacy Type1 and GSPA CCI parser must
+# both warn and continue (never raise) on junk in numeric time fields.
+# ---------------------------------------------------------------------------
+
+
+def _type1_parser() -> ApiImplType1:
+    api = ApiImplType1.__new__(ApiImplType1)
+    api.data_timezone = None
+    api.temperature_range = [x * 0.5 for x in range(28, 60)]
+    return api
+
+
+def _cci_parser() -> KiaCciApiEU:
+    return KiaCciApiEU(9, 1, "en")
+
+
+@pytest.fixture(params=[_type1_parser, _cci_parser], ids=["type1", "cci"])
+def parser_api(request):
+    return request.param()
+
+
+def test_ccs2_malformed_schedule_times_swallow_not_raise(parser_api, vehicle, caplog):
+    data = json.loads(json.dumps(load_fixture("eu_kia_ev9_2024_ccs2.json")))
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Hour"] = "abc"
+    data["Green"]["Reservation"]["Departure"]["Schedule1"]["Min"] = 0
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Hour"] = "abc"
+    data["Green"]["Reservation"]["Departure"]["Schedule2"]["Min"] = 0
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hyundai_kia_connect_api"):
+        parser_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_first_departure_time is None
+    assert vehicle.ev_second_departure_time is None
+    assert "CCS2 Schedule1 time malformed" in caplog.text
+    assert "CCS2 Schedule2 time malformed" in caplog.text
+
+
+def test_ccs2_malformed_off_peak_time_swallow_not_raise(parser_api, vehicle, caplog):
+    data = json.loads(json.dumps(load_fixture("eu_kia_ev9_2024_ccs2.json")))
+    data["Green"]["Reservation"]["OffPeakTime"] = {
+        "StartHour": "abc",
+        "StartMin": 0,
+        "EndHour": 22,
+        "EndMin": 30,
+        "Mode": 0,
+    }
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="hyundai_kia_connect_api"):
+        parser_api._update_vehicle_properties_ccs2(vehicle, data)
+    assert vehicle.ev_off_peak_start_time is None
+    assert vehicle.ev_off_peak_end_time is None
+    assert "OffPeakTime malformed" in caplog.text
 
 
 def test_schedule_charging_off_peak_flag_only(ccs2_api, vehicle):
