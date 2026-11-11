@@ -165,7 +165,7 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
                         distance_unit=vehicle.odometer_unit,
                     )
                     daily_stats.append(processed)
-                except (KeyError, ValueError):
+                except KeyError, ValueError:
                     continue
             if daily_stats:
                 vehicle.daily_stats = daily_stats

@@ -5,8 +5,6 @@ metadata semantics, the DeviceRemote/OTA family) stays in the region
 classes. See hyundai_kia_connect_api#1332.
 """
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from typing import Any, cast
@@ -80,7 +78,7 @@ def decode_payload(payload: bytes) -> dict[str, Any]:
     """Decode a delivery payload: JSON, raw-hex fallback for non-JSON."""
     try:
         return cast(dict[str, Any], json.loads(payload.decode("utf-8")))
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except json.JSONDecodeError, UnicodeDecodeError:
         return {"raw": payload.hex()}
 
 

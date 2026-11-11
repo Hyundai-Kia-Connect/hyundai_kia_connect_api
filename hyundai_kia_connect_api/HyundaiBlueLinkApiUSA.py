@@ -146,7 +146,7 @@ def parse_svm_response(response: dict[str, Any], timezone: dt.tzinfo) -> SVMDeta
     image_b64 = detail.get("svmImage", "")
     try:
         image_bytes = base64.b64decode(image_b64) if image_b64 else b""
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         image_bytes = b""
 
     captured_at_raw = get_child_value(detail, "gpsDetail.time")
@@ -154,7 +154,7 @@ def parse_svm_response(response: dict[str, Any], timezone: dt.tzinfo) -> SVMDeta
     if captured_at_raw:
         try:
             captured_at = parse_datetime(captured_at_raw, timezone)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             _LOGGER.debug("Unable to parse SVM capture timestamp: %s", captured_at_raw)
 
     image_size, image_sizes = _parse_image_sizes(detail.get("imageSize"))

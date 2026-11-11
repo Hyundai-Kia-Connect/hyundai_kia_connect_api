@@ -6,8 +6,6 @@ read are gone. The updates snapshot scenario pins the parsed vehicle; these
 tests pin the call order, the per-flag protocol header and the propagation.
 """
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 from typing import Any, cast

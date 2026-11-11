@@ -12,8 +12,6 @@ To update snapshots after an intentional change::
     pytest tests/test_vehicle_update_snapshots.py --snapshot-update
 """
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 from typing import TYPE_CHECKING, Any

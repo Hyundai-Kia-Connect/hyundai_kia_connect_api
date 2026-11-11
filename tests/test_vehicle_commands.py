@@ -10,8 +10,6 @@ To update snapshots after an intentional change::
     pytest tests/test_vehicle_commands.py --snapshot-update
 """
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 from collections.abc import Callable

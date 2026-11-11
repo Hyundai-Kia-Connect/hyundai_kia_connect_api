@@ -50,7 +50,7 @@ class Token:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Token":
+    def from_dict(cls, data: dict[str, Any]) -> Token:
         """Create a Token instance from a dict."""
         # Parse datetimes from ISO strings
         valid_until = data.get("valid_until", dt.datetime.min)

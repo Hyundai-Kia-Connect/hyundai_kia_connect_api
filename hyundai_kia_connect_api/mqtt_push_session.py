@@ -4,8 +4,6 @@ Holds the receive-only MQTT transport, the started vehicle ids, callbacks and
 the reconnect loop; speaks to the region API only through the push contract.
 """
 
-from __future__ import annotations
-
 import logging
 import threading
 from collections.abc import Callable
@@ -117,7 +115,7 @@ class MqttPushSession:
         self._client = client
         try:
             client.connect()
-        except (ValueError, OSError):
+        except ValueError, OSError:
             # Programming-level failure — propagate, do not retry;
             # roll the vehicle id and the transport back.
             self._client = None

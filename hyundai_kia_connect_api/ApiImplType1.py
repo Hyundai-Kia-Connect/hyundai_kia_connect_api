@@ -335,7 +335,7 @@ class ApiImplType1(ApiImpl):
                         )
                     ],
                 )
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 _LOGGER.debug(f"{DOMAIN} - Unparsable airTemp value: {air_temp_value}")
         vehicle.defrost_is_on = get_child_value(state, "status.defrost")
         steer_wheel_heat = get_child_value(state, "status.steerWheelHeat")
@@ -1246,7 +1246,7 @@ class ApiImplType1(ApiImpl):
                 vehicle.ev_off_peak_end_time = ccs2_reservation_time_or_none(
                     off_peak.get("EndHour"), off_peak.get("EndMin")
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
                 vehicle.ev_off_peak_start_time = None
                 vehicle.ev_off_peak_end_time = None
@@ -1282,7 +1282,7 @@ class ApiImplType1(ApiImpl):
                 vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
                     schedule1.get("Hour"), schedule1.get("Min")
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
             vehicle.ev_first_departure_days = [
                 i
@@ -1294,7 +1294,7 @@ class ApiImplType1(ApiImpl):
                 vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
                     schedule2.get("Hour"), schedule2.get("Min")
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
             vehicle.ev_second_departure_days = [
                 i
@@ -1338,7 +1338,7 @@ class ApiImplType1(ApiImpl):
                         unit_int = default_temp_unit
                     unit_str = TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0])
                     temp = (temp_float, unit_str)
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
             return enabled, defrost, temp
 

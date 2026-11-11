@@ -6,8 +6,6 @@ before any token exchange and Home Assistant only saw a generic auth error.
 A current Android Chrome string is accepted (see #1397).
 """
 
-from __future__ import annotations
-
 from typing import Any, ClassVar
 from unittest.mock import patch
 

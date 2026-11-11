@@ -32,7 +32,7 @@ China support was rewritten in 2026 against the current China Bluelink iOS app (
 - Push device registration uses ``pushType: APNS`` (not GCM) and requires a ``providerDeviceId`` field.
 - Control-command latency is high (1-2 minutes to reach SUCCESS); consumers should use generous polling timeouts.
 
-Python 3.12 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
+Python 3.14 or newer is required to use this package. Vehicle manager is the key class that is called to manage the vehicle lists.  One vehicle manager should be used per login. Key data points required to instantiate vehicle manager are::
 
     region: int
     brand: int,

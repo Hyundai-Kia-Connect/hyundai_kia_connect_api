@@ -8,8 +8,6 @@ REQUEST_ID_HEADER, DEVICE_ID_HEADER.  Login, token refresh, X-Stamp
 computation, and GSPA GET helpers live here.
 """
 
-from __future__ import annotations
-
 import base64
 import datetime as dt
 import hashlib
@@ -139,13 +137,13 @@ def _parse_gspa_svm_timestamp(value: Any) -> dt.datetime | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         try:
             seconds = int(value)
-        except (TypeError, ValueError, OverflowError):
+        except TypeError, ValueError, OverflowError:
             return None
         if seconds > 1e12:  # epoch ms — checked by magnitude, not by field name
             seconds //= 1000
         try:
             return dt.datetime.fromtimestamp(seconds, tz=dt.UTC)
-        except (OverflowError, OSError, ValueError):
+        except OverflowError, OSError, ValueError:
             return None
     if isinstance(value, str):
         if len(value) == 14 and value.isdigit():
@@ -212,7 +210,7 @@ def parse_svm_detail(detail: dict[str, Any]) -> SVMDetails:
     image_b64 = detail.get("svmImage") or ""
     try:
         image_bytes = base64.b64decode(image_b64) if image_b64 else b""
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         image_bytes = b""
 
     image_size, image_sizes = _parse_image_sizes(detail.get("imageSize"))
@@ -2203,7 +2201,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     vehicle.ev_first_departure_time = ccs2_reservation_time_or_none(
                         schedule1.get("Hour"), schedule1.get("Min")
                     )
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     _LOGGER.warning("%s - CCS2 Schedule1 time malformed", DOMAIN)
             if vehicle.ev_first_departure_days is None:
                 vehicle.ev_first_departure_days = [
@@ -2220,7 +2218,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                     vehicle.ev_second_departure_time = ccs2_reservation_time_or_none(
                         schedule2.get("Hour"), schedule2.get("Min")
                     )
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     _LOGGER.warning("%s - CCS2 Schedule2 time malformed", DOMAIN)
             if vehicle.ev_second_departure_days is None:
                 vehicle.ev_second_departure_days = [
@@ -2267,7 +2265,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                             float(temp_val),
                             TEMPERATURE_UNITS.get(unit_int, TEMPERATURE_UNITS[0]),
                         )
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         # "OFF" / non-numeric — leave the field unset.
                         pass
                 return enabled, defrost, temp
@@ -2328,7 +2326,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 vehicle.ev_off_peak_end_time = ccs2_reservation_time_or_none(
                     off_peak.get("EndHour"), off_peak.get("EndMin")
                 )
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 _LOGGER.warning("%s - CCS2 OffPeakTime malformed: %s", DOMAIN, off_peak)
                 vehicle.ev_off_peak_start_time = None
                 vehicle.ev_off_peak_end_time = None
