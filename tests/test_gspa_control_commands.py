@@ -786,6 +786,38 @@ def test_schedule_charging_and_climate_body_shape():
     assert call.kwargs["headers"]["Authorization"] == "Bearer ccs-token"
 
 
+def test_schedule_charging_and_climate_fills_unchanged_from_vehicle():
+    """None option fields resolve from vehicle state, not blank defaults."""
+    options = ScheduleChargingClimateRequestOptions()
+    options.off_peak_charge_only_enabled = True
+    api = _make_api()
+    token = _make_token()
+    vehicle = _make_vehicle()
+    vehicle.ev_schedule_charge_enabled = True
+    vehicle.ev_off_peak_start_time = dt.time(22, 30)
+    vehicle.ev_off_peak_end_time = dt.time(6, 0)
+    vehicle.ev_first_departure_enabled = True
+    vehicle.ev_first_departure_time = dt.time(7, 5)
+    vehicle.ev_first_departure_days = [1]
+    with (
+        patch("hyundai_kia_connect_api.GspaApiEU.requests.post") as post,
+        patch.object(HyundaiCciApiEU, "_get_control_token") as get_ct,
+    ):
+        get_ct.return_value = ("Bearer ctrl-token-abc", 4_000_000_000)
+        post.return_value = MagicMock(status_code=200, json=lambda: ENVELOPE)
+        HyundaiCciApiEU.schedule_charging_and_climate(api, token, vehicle, options)
+    body = post.call_args.kwargs["json"]
+    assert body["reservFlag"] == 1
+    assert body["offPeakPowerInfo"]["offPeakPowerFlag"] == 2
+    start = body["offPeakPowerInfo"]["offPeakPowerTime1"]["starttime"]
+    assert start == {"time": "1030", "timeSection": 1}
+    assert "offPeakPowerTime2" not in body["offPeakPowerInfo"]
+    info1 = body["reservChargeInfo"]["reservChargeInfo1"]
+    assert info1["reservChargeSet"] is True
+    assert info1["reservInfo"]["day"] == [1]
+    assert info1["reservInfo"]["time"] == {"time": "0705", "timeSection": 0}
+
+
 def test_control_command_rc_not_0000_raises_api_error():
     api = _make_api()
     token = _make_token()
