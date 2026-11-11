@@ -371,7 +371,7 @@ def test_ccs2_off_peak_sentinel_31_70_is_none_silent(ccs2_api, vehicle, caplog):
 
 
 # ---------------------------------------------------------------------------
-# Malformed Green.Reservation blocks — legacy Type1 and GSPA CCI parser must
+# Malformed Green.Reservation blocks: legacy Type1 and GSPA CCI parsers must
 # both warn and continue (never raise) on junk in numeric time fields.
 # ---------------------------------------------------------------------------
 

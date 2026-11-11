@@ -1115,12 +1115,12 @@ def test_refresh_cci_token_carries_mqtt_client_id():
     assert result.mqtt_client_id == "reg-client-id"
 
 
-# ── _update_vehicle_driving_history() — 30-day stats ──────────
+# ── _update_vehicle_driving_history() (30-day stats) ──────────
 
 
 def test_driving_history_malformed_day_is_skipped():
     """A day entry without drivingDate raises KeyError and is skipped,
-    not propagated — one bad row must not nuke the whole 30-day list."""
+    not propagated: one bad row must not nuke the whole 30-day list."""
     api = HyundaiCciApiEU(9, 2, "en")
     vehicle = Vehicle(id="test-id")
     state = {

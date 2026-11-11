@@ -259,7 +259,7 @@ class TestAirTempSentinel:
         import logging
 
         # non-hex values hit the ValueError handler in the shared legacy
-        # parser (ApiImplType1) — must be skipped, not crash
+        # parser (ApiImplType1): skipped, not crash
         with caplog.at_level(logging.DEBUG, logger="hyundai_kia_connect_api"):
             api._update_vehicle_properties(vehicle, self._state("ZZ"))
         assert vehicle.air_temperature is None

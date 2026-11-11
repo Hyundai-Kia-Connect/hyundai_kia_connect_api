@@ -174,8 +174,7 @@ def test_svm_timestamp_iso_and_garbage():
 
 def test_svm_timestamp_non_finite_and_out_of_range():
     # int(float) raises for nan (ValueError) and inf (OverflowError);
-    # fromtimestamp() raises for seconds past the datetime range. All
-    # must yield None.
+    # fromtimestamp() raises for seconds past the datetime range.
     assert _parse_gspa_svm_timestamp(float("nan")) is None
     assert _parse_gspa_svm_timestamp(float("inf")) is None
     assert _parse_gspa_svm_timestamp(253402300800) is None
