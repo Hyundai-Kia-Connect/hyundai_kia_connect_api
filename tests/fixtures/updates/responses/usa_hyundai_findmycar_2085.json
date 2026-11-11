@@ -1,0 +1,21 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/rcs/rfc/findMyCar",
+        "source": "Get Vehicle Location debug log in kia_uvo #2085 (2026 Ioniq 5 EV)",
+        "description": "Real response; coordinates replaced."
+    },
+    "head": 350,
+    "coord": {
+        "alt": 0.0,
+        "lon": 13.405,
+        "type": 0,
+        "lat": 52.52
+    },
+    "time": "2026-11-07T22:43:51Z",
+    "speed": {
+        "unit": 1,
+        "value": 0
+    }
+}

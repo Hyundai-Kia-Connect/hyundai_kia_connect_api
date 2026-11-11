@@ -1,0 +1,41 @@
+{
+    "_fixture_meta": {
+        "status": "updates/responses/usa_hyundai_vehicle_status_2085.json (Hyundai Ioniq 5 2026)",
+        "follow_up_sources": "evTripDetails, findMyCar: kia_uvo #2085",
+        "not_captured": [],
+        "description": "2026 Ioniq 5 EV from kia_uvo #2085. The US status payload carries no SoH field anywhere, pinning ev_battery_soh_percentage as None (sensor unknown)."
+    },
+    "implementation": {
+        "region": "USA",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV"
+    },
+    "responses": {
+        "GET /ac/v2/enrollment/details/user": {
+            "body": {
+                "enrolledVehicleDetails": [
+                    {
+                        "vehicleDetails": {
+                            "$fixture": "us_hyundai_ioniq_5_2024_cached.json#vehicleDetails",
+                            "regid": "VEHICLE-1",
+                            "vin": "TESTVIN0000000001"
+                        }
+                    }
+                ]
+            }
+        },
+        "GET /ac/v2/rcs/rvs/vehicleStatus": {
+            "body": "$fixture:updates/responses/usa_hyundai_vehicle_status_2085.json"
+        },
+        "GET /ac/v2/ts/alerts/maintenance/evTripDetails": {
+            "body": "$fixture:updates/responses/usa_hyundai_evtripdetails_2085.json"
+        },
+        "GET /ac/v2/rcs/rfc/findMyCar": {
+            "body": "$fixture:updates/responses/usa_hyundai_findmycar_2085.json"
+        }
+    }
+}

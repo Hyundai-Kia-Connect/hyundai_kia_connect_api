@@ -1,0 +1,279 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/rcs/rvs/vehicleStatus",
+        "source": "get_vehicle_status response debug log in kia_uvo #2085 (2026 Ioniq 5 EV)",
+        "description": "Real EV response; identifiers and coordinates replaced. Contains no SoH field anywhere in evStatus - the US status payload is the shape that keeps ev_battery_soh_percentage unknown."
+    },
+    "locationAccessInfo": "1",
+    "hataTID": "XXX",
+    "vehicleStatus": {
+        "dateTime": "2026-11-07T22:43:02Z",
+        "acc": true,
+        "fuelLevel": 0,
+        "defrostStatus": "false",
+        "transCond": true,
+        "tirePressure": {
+            "datetimeRearLeft": "2026-11-03T19:45:57Z",
+            "datetimeRearRight": "2026-11-03T19:45:57Z",
+            "tirePressureFrontLeft": 34,
+            "tirePressureFrontRight": 35,
+            "datetimeFrontLeft": "2026-11-03T19:45:57Z",
+            "datetimeFrontRight": "2026-11-03T19:45:57Z",
+            "tirePressureRearLeft": 36,
+            "tirePressureRearRight": 35
+        },
+        "doorLockStatus": "false",
+        "doorOpen": {
+            "frontRight": 0,
+            "frontLeft": 1,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "washerFluidStatus": false,
+        "battery": {
+            "powerAutoCutMode": 2,
+            "batSignalReferenceValue": {
+                "batWarning": 65
+            },
+            "batSoc": 81,
+            "batState": 0,
+            "sjbDeliveryMode": 2
+        },
+        "seatHeaterVentInfo": {
+            "rlSeatHeatState": 2,
+            "drvSeatHeatState": 2,
+            "rrSeatHeatState": 2,
+            "astSeatHeatState": 2
+        },
+        "hazardStatus": 0,
+        "vehicleLocation": {
+            "coord": {
+                "alt": 0.0,
+                "lon": 13.405,
+                "type": 0.0,
+                "lat": 52.52
+            }
+        },
+        "ign3": true,
+        "ignitionStatus": "true",
+        "lowFuelLight": false,
+        "sideBackWindowHeat": 0,
+        "dte": {
+            "unit": 3,
+            "value": 104
+        },
+        "engine": true,
+        "hoodOpen": false,
+        "breakOilStatus": false,
+        "airConditionStatus": "true",
+        "windowOpen": {
+            "frontRight": 0,
+            "frOpenLevel": 0,
+            "flOpenLevel": 0,
+            "brOpenLevel": 0,
+            "blOpenLevel": 0,
+            "frontLeft": 0,
+            "backLeft": 0,
+            "backRight": 0
+        },
+        "smartKeyBatteryWarning": false,
+        "steerWheelHeat": 0,
+        "tailLampStatus": 0,
+        "trunkOpen": false,
+        "doorLock": false,
+        "odometer": 1871,
+        "airCtrlOn": true,
+        "airTemp": {
+            "unit": 1,
+            "hvacTempType": 1,
+            "value": "73"
+        },
+        "evStatus": {
+            "valueDiff": 0,
+            "remainTime2": {
+                "etc3": {
+                    "unit": 0,
+                    "value": 280
+                },
+                "etc2": {
+                    "unit": 1,
+                    "value": 2740
+                },
+                "atc": {
+                    "unit": 1,
+                    "value": 0
+                },
+                "etc1": {
+                    "unit": 1,
+                    "value": 23
+                }
+            },
+            "batteryPlugin": 0,
+            "remainTime": [
+                {
+                    "unit": 1,
+                    "value": 0
+                }
+            ],
+            "v2G": false,
+            "wirelessCharging": false,
+            "timeDiff": 0,
+            "batteryCharge": false,
+            "batteryStatus": 35,
+            "disChargeRemaintime": 0,
+            "batteryDisChargePlugin": 0,
+            "batteryPrecondition": false,
+            "batteryDisCharge": false,
+            "drvDistance": [
+                {
+                    "rangeByFuel": {
+                        "totalAvailableRange": {
+                            "unit": 3,
+                            "value": 104
+                        },
+                        "evModeRange": {
+                            "unit": 3,
+                            "value": 104
+                        }
+                    },
+                    "type": 0
+                }
+            ],
+            "dischargingLimit": 20,
+            "reservChargeInfos": {
+                "targetSOClist": [
+                    {
+                        "dte": {
+                            "rangeByFuel": {
+                                "evModeRange": {
+                                    "unit": 2,
+                                    "value": 425
+                                }
+                            },
+                            "type": 2
+                        },
+                        "plugType": 0,
+                        "targetSOClevel": 80
+                    },
+                    {
+                        "dte": {
+                            "rangeByFuel": {
+                                "evModeRange": {
+                                    "unit": 2,
+                                    "value": 485
+                                }
+                            },
+                            "type": 2
+                        },
+                        "plugType": 1,
+                        "targetSOClevel": 90
+                    }
+                ],
+                "ect": {
+                    "start": {
+                        "time": {
+                            "timeSection": 0,
+                            "time": "0000"
+                        },
+                        "day": 7
+                    },
+                    "end": {
+                        "time": {
+                            "timeSection": 1,
+                            "time": "19630"
+                        },
+                        "day": 7
+                    }
+                },
+                "reservChargeInfo": {
+                    "dateTime": "2026/11/07T14:43:54Z",
+                    "reservChargeInfoDetail": {
+                        "reservChargeSet": false,
+                        "reservFatcSet": {
+                            "defrost": false,
+                            "airTemp": {
+                                "unit": 0,
+                                "value": "OFF"
+                            },
+                            "airCtrl": 0
+                        },
+                        "reservInfo": {
+                            "time": {
+                                "timeSection": 0,
+                                "time": "0000"
+                            },
+                            "day": [0, 1, 2, 3, 4, 5, 6]
+                        }
+                    }
+                },
+                "reservFlag": 0,
+                "reserveChargeInfo2": {
+                    "reservChargeInfoDetail": {
+                        "reservChargeSet": false,
+                        "reservFatcSet": {
+                            "defrost": false,
+                            "airTemp": null,
+                            "airCtrl": 0
+                        },
+                        "reservInfo": {
+                            "time": {
+                                "timeSection": 0,
+                                "time": "0000"
+                            },
+                            "day": [0, 1, 2, 3, 4, 5, 6]
+                        }
+                    }
+                },
+                "offpeakPowerInfo": {
+                    "offPeakPowerFlag": 0,
+                    "offPeakPowerTime1": {
+                        "startTime": {
+                            "timeSection": 0,
+                            "time": "0000"
+                        },
+                        "endTime": {
+                            "timeSection": 0,
+                            "time": "0000"
+                        }
+                    }
+                }
+            },
+            "chargePortDoorOpen": 2
+        },
+        "lampWireStatus": {
+            "headLamp": {
+                "rightBifuncLamp": false,
+                "headLampStatus": false,
+                "leftLowLamp": false,
+                "rightHighLamp": false,
+                "leftBifuncLamp": false,
+                "leftHighLamp": false,
+                "rightLowLamp": false
+            },
+            "stopLamp": {
+                "rightLamp": false,
+                "stopLampStatus": false,
+                "leftLamp": false
+            },
+            "turnSignalLamp": {
+                "rightRearLamp": false,
+                "turnSignalLampStatus": false,
+                "rightFrontLamp": false,
+                "leftRearLamp": false,
+                "leftFrontLamp": false
+            }
+        },
+        "sleepModeCheck": true,
+        "defrost": false,
+        "tirePressureLamp": {
+            "tirePressureWarningLampRearLeft": 0,
+            "tirePressureWarningLampFrontLeft": 0,
+            "tirePressureWarningLampFrontRight": 0,
+            "tirePressureWarningLampAll": 0,
+            "tirePressureWarningLampRearRight": 0
+        },
+        "trunkOpenStatus": "false"
+    }
+}
