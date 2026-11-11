@@ -1,0 +1,131 @@
+{
+    "_fixture_meta": {
+        "region": "US",
+        "brand": "Hyundai",
+        "endpoint": "GET ac/v2/ts/alerts/maintenance/evTripDetails",
+        "source": "get_ev_trip_details response debug log in kia_uvo #2085 (2026 Ioniq 5 EV)",
+        "description": "Real response."
+    },
+    "tripdetails": [
+        {
+            "distance": 0,
+            "odometer": {
+                "value": 1871.5072
+            },
+            "accessories": 90,
+            "totalused": 257,
+            "realtotalpwrcsp": 0,
+            "regen": 173,
+            "avgspeed": {
+                "unit": 1,
+                "value": 11.0
+            },
+            "maxspeed": {
+                "unit": 1,
+                "value": 33.0
+            },
+            "climate": 55,
+            "drivetrain": 112,
+            "startdate": "2026-11-03 15:35:31.0",
+            "mileagetime": {
+                "unit": 3,
+                "value": 262.0
+            },
+            "duration": {
+                "unit": 3,
+                "value": 618
+            },
+            "batterycare": 0
+        },
+        {
+            "distance": 1,
+            "odometer": {
+                "value": 1870.6373
+            },
+            "accessories": 90,
+            "totalused": 440,
+            "realtotalpwrcsp": 0,
+            "regen": 322,
+            "avgspeed": {
+                "unit": 1,
+                "value": 24.0
+            },
+            "maxspeed": {
+                "unit": 1,
+                "value": 41.0
+            },
+            "climate": 30,
+            "drivetrain": 320,
+            "startdate": "2026-11-03 15:23:10.0",
+            "mileagetime": {
+                "unit": 3,
+                "value": 267.0
+            },
+            "duration": {
+                "unit": 3,
+                "value": 548
+            },
+            "batterycare": 0
+        },
+        {
+            "distance": 1,
+            "odometer": {
+                "value": 1868.8354
+            },
+            "accessories": 30,
+            "totalused": 360,
+            "realtotalpwrcsp": 0,
+            "regen": 337,
+            "avgspeed": {
+                "unit": 1,
+                "value": 22.0
+            },
+            "maxspeed": {
+                "unit": 1,
+                "value": 43.0
+            },
+            "climate": 26,
+            "drivetrain": 304,
+            "startdate": "2026-11-03 14:58:29.0",
+            "mileagetime": {
+                "unit": 3,
+                "value": 248.0
+            },
+            "duration": {
+                "unit": 3,
+                "value": 282
+            },
+            "batterycare": 0
+        },
+        {
+            "distance": 5,
+            "odometer": {
+                "value": 1867.2197
+            },
+            "accessories": 70,
+            "totalused": 1458,
+            "realtotalpwrcsp": 1,
+            "regen": 509,
+            "avgspeed": {
+                "unit": 1,
+                "value": 37.0
+            },
+            "maxspeed": {
+                "unit": 1,
+                "value": 72.0
+            },
+            "climate": 20,
+            "drivetrain": 1368,
+            "startdate": "2026-10-31 13:50:28.0",
+            "mileagetime": {
+                "unit": 3,
+                "value": 534.0
+            },
+            "duration": {
+                "unit": 3,
+                "value": 599
+            },
+            "batterycare": 0
+        }
+    ]
+}
