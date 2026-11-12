@@ -9,6 +9,8 @@ for Genesis EU (exchange and token-refresh answer 200; a wrong signature
 answers 9036, a missing X-Fingerprint answers 9035).
 """
 
+from __future__ import annotations
+
 import hashlib
 import hmac
 import json
@@ -83,7 +85,7 @@ def is_gate_rejection(status_code: int, body: str | bytes) -> bool:
         return False
     try:
         return json.loads(body).get("code") in _GATE_REJECTION_CODES
-    except ValueError, AttributeError:
+    except (ValueError, AttributeError):
         return False
 
 

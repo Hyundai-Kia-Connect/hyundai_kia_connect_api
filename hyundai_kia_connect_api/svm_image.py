@@ -19,6 +19,8 @@ request must fail loud. JPEG encoding is quality 100, 4:4:4 so the car's
 JPEG stays the only lossy generation.
 """
 
+from __future__ import annotations
+
 import io
 import math
 from dataclasses import dataclass

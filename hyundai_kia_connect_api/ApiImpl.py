@@ -134,7 +134,7 @@ class ScheduleChargingClimateRequestOptions:
     defrost: bool | None = None
 
     @classmethod
-    def from_vehicle(cls, vehicle: Vehicle) -> ScheduleChargingClimateRequestOptions:
+    def from_vehicle(cls, vehicle: Vehicle) -> "ScheduleChargingClimateRequestOptions":
         """Options representing the vehicle's current schedule settings.
 
         Unknown vehicle state falls back to the documented defaults

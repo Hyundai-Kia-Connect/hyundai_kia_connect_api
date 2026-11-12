@@ -5,6 +5,8 @@ Region-specific response parsing lives in the region API classes
 holds only what works for all regions.
 """
 
+from __future__ import annotations
+
 import datetime as dt
 from dataclasses import dataclass
 from typing import Any

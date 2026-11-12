@@ -13,6 +13,8 @@ that could not be confirmed leave the corresponding ``Vehicle`` fields
 unknown (``None``).
 """
 
+from __future__ import annotations
+
 import logging
 import uuid
 from typing import TYPE_CHECKING, Any

@@ -104,11 +104,11 @@ def _deprecated_supports_alias(alias: str, item: str) -> property:
     """Map a legacy flat ``vehicle.<alias>`` attribute onto ``vehicle.supports``."""
     message = f"Vehicle.{alias} is deprecated; use Vehicle.supports.{item} instead"
 
-    def getter(self: Vehicle) -> Any:
+    def getter(self: "Vehicle") -> Any:
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         return getattr(self.supports, item)
 
-    def setter(self: Vehicle, value: Any) -> None:
+    def setter(self: "Vehicle", value: Any) -> None:
         warnings.warn(message, DeprecationWarning, stacklevel=2)
         setattr(self.supports, item, value)
 
@@ -857,7 +857,7 @@ class Vehicle:
             self._ev_first_departure_climate_temperature = (
                 float(val) if val is not None else None
             )
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             self._ev_first_departure_climate_temperature = None
         if unit is not None:
             self._ev_first_departure_climate_temperature_unit = unit
@@ -883,7 +883,7 @@ class Vehicle:
             self._ev_second_departure_climate_temperature = (
                 float(val) if val is not None else None
             )
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             self._ev_second_departure_climate_temperature = None
         if unit is not None:
             self._ev_second_departure_climate_temperature_unit = unit

@@ -33,7 +33,7 @@ repos:
       hooks:
           - id: pyupgrade
             args:
-                - --py314-plus
+                - --py313-plus
     - repo: https://github.com/adrienverge/yamllint.git
       rev: v1.38.0
       hooks:
@@ -53,7 +53,7 @@ repos:
           - id: python-typing-update
             stages: [manual]
             args:
-                - --py314-plus
+                - --py313-plus
                 - --force
                 - --keep-updates
             files: ^(/.+)?[^/]+\.py$
