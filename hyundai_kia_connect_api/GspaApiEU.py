@@ -72,6 +72,9 @@ from .exceptions import (
     ConsentRequiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
     ServiceTemporaryUnavailable,
     UnsupportedControlError,
 )
@@ -298,6 +301,19 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         "4004": (DuplicateRequestError, "GSPA duplicate"),
         "403": (AuthenticationError, "GSPA auth/stamp"),
         "404": (UnsupportedControlError, "GSPA not supported"),
+        "401-001": (
+            AuthenticationTokenExpiredError,
+            "GSPA access token invalid",
+        ),
+        "408-000": (RequestTimeoutError, "GSPA request timeout"),
+        "429-003": (RateLimitingError, "GSPA hourly request limit"),
+        "429-004": (RateLimitingError, "GSPA daily request limit"),
+        "409-000": (
+            DuplicateRequestError,
+            "GSPA OTA update duplicate request",
+        ),
+        "404-003": (NoDataFound, "GSPA no data found"),
+        "404-004": (NoDataFound, "GSPA data not found"),
     }
 
     # Endpoints authenticated with standard GSPA headers (bearer) instead of
@@ -972,9 +988,16 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         Classification (HTTP status / resCode / rc -> typed exception):
           401                       -> AuthenticationError
           "400-004"/"4004"          -> DuplicateRequestError (queued duplicate)
+          "401-001"                 -> AuthenticationTokenExpiredError
           resCode "403-*"           -> AuthenticationError (stamp/auth failure)
           "no update info" in msg   -> APIError (no pending OTA — business state)
+          "404-003"/"404-004"       -> NoDataFound
           resCode "404-*"           -> UnsupportedControlError
+          "408-000"                 -> RequestTimeoutError
+          "409-000"                 -> DuplicateRequestError
+          "429-003"/"429-004"       -> RateLimitingError (hard quota windows:
+                                      the transient 429 bursts stay
+                                      vehicle-scoped APIError)
           5xx HTTP / resCode "5-*"  -> ServiceTemporaryUnavailable
           else                      -> APIError with the raw server message
 
