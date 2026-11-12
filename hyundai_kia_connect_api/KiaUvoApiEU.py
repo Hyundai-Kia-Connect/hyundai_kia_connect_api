@@ -1120,7 +1120,10 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
 
-            location = response["resMsg"]
+            # Some accounts nest the park location under resMsg.gpsDetail
+            # (Hyundai-Kia-Connect/kia_uvo#2109); GET /location handles
+            # both shapes the same way (#1301).
+            location = response["resMsg"].get("gpsDetail") or response["resMsg"]
             if location and get_child_value(location, "coord.lat"):
                 vehicle.location = (
                     get_child_value(location, "coord.lat"),

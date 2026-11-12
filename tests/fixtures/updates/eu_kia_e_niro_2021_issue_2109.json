@@ -1,0 +1,35 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2021 e-Niro (EV)",
+        "source": "kia_uvo #2109 comment 6834497268: cached status with a stale embedded Location while /location/park returns the fresh location nested under resMsg.gpsDetail",
+        "follow_up_sources": "location/park: updates/responses/eu_location_park_nested_2109.json; remaining reads re-used from the #867 scenario for the same chain",
+        "not_captured": [],
+        "description": "Force-refresh and cached-read chain from one car; identifiers and coordinates replaced."
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Kia"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "body": "$fixture:updates/responses/eu_location_park_nested_2109.json"
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": [
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_alltime_867.json"
+            },
+            {
+                "body": "$fixture:updates/responses/eu_drvhistory_30d_867.json"
+            }
+        ],
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": "$fixture:updates/responses/eu_kia_carstatus_latest_ccs2.json"
+        }
+    }
+}
