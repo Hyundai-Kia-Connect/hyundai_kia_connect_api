@@ -198,3 +198,17 @@ def test_combo_returns_none_when_poll_fails():
         ],
     ):
         assert api.poll_location_with_stored_time(_token(), _vehicle()) is None
+
+
+def test_poll_returns_none_on_client_timeout():
+    """A car that never answers hangs the request until the read
+    timeout fires; the poll reports None instead of raising."""
+    import requests as requests_module
+
+    api = _api()
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=requests_module.exceptions.ReadTimeout("timed out"),
+    ):
+        assert api.poll_location_update_status(_token(), _vehicle()) is None
+        assert api.poll_location_with_stored_time(_token(), _vehicle()) is None
