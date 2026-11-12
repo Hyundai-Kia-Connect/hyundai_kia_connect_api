@@ -97,7 +97,7 @@ signatures, `Vehicle` attributes) can break kia_uvo.
 
 ```bash
 pip install -e .[image] pytest syrupy
-pytest                       # full suite; CI runs Python 3.12–3.14
+pytest                       # full suite; CI runs Python 3.13–3.15
 pre-commit run --all-files   # ruff, ruff-format, codespell, pyupgrade, mypy --strict, prettier
 ```
 

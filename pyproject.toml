@@ -1,5 +1,5 @@
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 # ruff 0.16 expanded the default rule set (59 -> 413). We adopt the new
