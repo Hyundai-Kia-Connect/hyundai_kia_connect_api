@@ -1,0 +1,31 @@
+{
+    "_fixture_meta": {
+        "region": "EU",
+        "endpoint": "GET spa/vehicles/{id}/location/park",
+        "source": "kia_uvo #2109 comment 6834497268: resMsg.gpsDetail-nested shape (e-Niro 2021 account); coordinates replaced",
+        "not_captured": ["drvDistance"]
+    },
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "gpsDetail": {
+            "coord": {
+                "lat": 52.52,
+                "lon": 13.405,
+                "alt": 0,
+                "type": 0
+            },
+            "head": 127,
+            "speed": {
+                "value": 0,
+                "unit": 0
+            },
+            "accuracy": {
+                "hdop": 0,
+                "pdop": 0
+            },
+            "time": "20261112201904"
+        }
+    },
+    "msgId": "MSG-1"
+}
