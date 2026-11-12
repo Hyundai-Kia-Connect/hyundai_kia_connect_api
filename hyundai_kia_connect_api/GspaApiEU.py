@@ -1552,7 +1552,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         holds the connection until the car answers (observed 11-53 s,
         sleeping car live-probed 2026-11-12), so the request timeout
         mirrors the app's 140 s. ``time`` in the response is the CAR's
-        clock (observed +1 h on a DST-stuck car) and is returned raw —
+        clock (observed +1 h on a DST-stuck car) and is returned raw;
         do not convert. ``speed.value == 511`` is the no-GPS-fix
         sentinel (0x1FF): the car answered without a fix and the
         coordinates are last known. Location calls inside the
@@ -1601,6 +1601,36 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             "speed": speed_value,
             "gps_fix": speed_value != 511,
         }
+
+    def poll_location_with_stored_time(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Location poll plus the server-cached UTC freshness stamp.
+
+        Wakes the car with the ``update-status`` long-poll (see
+        :meth:`poll_location_update_status`), then carries the
+        server-cached UTC stamp from the cheap ``stored-status`` read.
+        Order matters: the stored read goes BEFORE the poll, because a
+        location call inside the ~60 s window after the poll answers
+        403-006 / 400-004 and this method would lose the stamp. The
+        poll's own ``time`` is the car's clock and is returned as
+        ``time_raw`` only; the parseable, UTC ``time`` field is the
+        pre-poll server stamp (the server cache catches up with the
+        fresh location on the next cheap read).
+
+        Returns the poll dict extended with ``time`` (naive-parsed UTC
+        server stamp, or None when the stored read failed).
+        """
+        baseline = self._get_location_stored_status(token, vehicle)
+        poll = self.poll_location_update_status(token, vehicle)
+        if not isinstance(poll, dict):
+            return None
+        stamp = None
+        if isinstance(baseline, dict):
+            stamp = _parse_gspa_svm_timestamp(baseline.get("time"))
+        result = dict(poll)
+        result["time"] = stamp
+        return result
 
     def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
         """Populate vehicle.location from the GSPA location stored-status.

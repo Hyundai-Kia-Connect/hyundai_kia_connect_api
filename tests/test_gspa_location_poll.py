@@ -93,7 +93,7 @@ def test_poll_reports_gps_fix_when_speed_is_valid():
 
 def test_poll_returns_none_on_duplicate_window_rejection():
     """403-006 invalid request id (read/poll inside the duplicate
-    window) returns None instead of raising — live capture, probe
+    window) returns None instead of raising. Live capture: probe
     gspa_location_probe_sleep.json."""
     api = _api()
     resp = MagicMock(status_code=403)
@@ -110,7 +110,7 @@ def test_poll_returns_none_on_duplicate_window_rejection():
 
 
 def test_poll_returns_none_on_duplicated_request():
-    """400-004 Duplicated request (second poll inside the window) —
+    """400-004 Duplicated request (second poll inside the window);
     live capture, probe gspa_location_probe4_force.json."""
     api = _api()
     resp = MagicMock(status_code=400)
@@ -133,3 +133,68 @@ def test_poll_returns_none_without_coordinates():
     resp.json.return_value = {"data": {"head": 270}, "metaInfo": {"retCode": "S"}}
     with patch("hyundai_kia_connect_api.GspaApiEU.requests.get", return_value=resp):
         assert api.poll_location_update_status(_token(), _vehicle()) is None
+
+
+def test_combo_stored_time_precedes_poll_and_merges():
+    """The stored read goes before the poll (a location call inside the
+    ~60 s post-poll window is rejected) and the UTC stamp rides on the
+    poll payload. Calls: stored (baseline), poll (wake)."""
+    api = _api()
+    baseline = {
+        "data": {
+            "coord": {"lat": 52.51, "lon": 13.40, "type": 0, "alt": 0.0},
+            "head": 270,
+            "speed": {"value": 0, "unit": 0},
+            "time": "20261112210001.384",
+        },
+        "metaInfo": {"retCode": "S", "resCode": "200-000"},
+    }
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=[
+            _resp(200, baseline),
+            _resp(200, POLL_BODY),
+        ],
+    ) as mock_get:
+        result = api.poll_location_with_stored_time(_token(), _vehicle())
+
+    urls = [call_[0][0] for call_ in mock_get.call_args_list]
+    assert urls[0].endswith("/stored-status")
+    assert urls[1].endswith("/update-status")
+    assert result == {
+        "latitude": 52.52,
+        "longitude": 13.405,
+        "time_raw": "20261112225947",
+        "speed": 511.0,
+        "gps_fix": False,
+        "time": dt.datetime(2026, 11, 12, 21, 0, 1, 384000, tzinfo=dt.UTC),
+    }
+
+
+def _resp(status_code: int, body: dict) -> MagicMock:
+    resp = MagicMock(status_code=status_code)
+    resp.json.return_value = body
+    return resp
+
+
+def test_combo_returns_none_when_poll_fails():
+    api = _api()
+    baseline = {"data": {}, "metaInfo": {"retCode": "S"}}
+    with patch(
+        "hyundai_kia_connect_api.GspaApiEU.requests.get",
+        side_effect=[
+            _resp(200, baseline),
+            _resp(
+                400,
+                {
+                    "data": {},
+                    "metaInfo": {
+                        "retCode": "F",
+                        "resCode": "400-004",
+                        "message": "Duplicated request",
+                    },
+                },
+            ),
+        ],
+    ):
+        assert api.poll_location_with_stored_time(_token(), _vehicle()) is None
