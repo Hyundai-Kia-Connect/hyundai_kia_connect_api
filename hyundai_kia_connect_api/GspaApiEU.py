@@ -1391,6 +1391,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         vehicle: Vehicle,
         endpoint: str,
         params: dict[str, Any] | None = None,
+        timeout: tuple[float, float] = (5, 30),
     ) -> dict[str, Any] | None:
         """GET from a GSPA endpoint (X-Stamp gated).
 
@@ -1405,7 +1406,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             token, vehicle.ccu_ccs2_protocol_support or 0
         )
 
-        response = requests.get(url, headers=headers, params=params, timeout=(5, 30))
+        response = requests.get(url, headers=headers, params=params, timeout=timeout)
         if response.status_code == 401:
             raise AuthenticationError("GSPA: Token expired or invalid")
         try:
@@ -1541,6 +1542,65 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA location stored-status failed")
             return None
+
+    def poll_location_update_status(
+        self, token: Token, vehicle: Vehicle
+    ) -> dict[str, Any] | None:
+        """Location poll: the app's long-poll wake endpoint.
+
+        GET /gspa/v1/location/vehicles/{carId}/update-status; the server
+        holds the connection until the car answers (observed 11-53 s,
+        sleeping car live-probed 2026-11-12), so the request timeout
+        mirrors the app's 140 s. ``time`` in the response is the CAR's
+        clock (observed +1 h on a DST-stuck car) and is returned raw —
+        do not convert. ``speed.value == 511`` is the no-GPS-fix
+        sentinel (0x1FF): the car answered without a fix and the
+        coordinates are last known. Location calls inside the
+        duplicate window (the ~60 s after another location read or
+        poll) answer 403-006 / 400-004 "Duplicated request"; those
+        return None. Auth failures still raise AuthenticationError.
+
+        Returns ``{"latitude", "longitude", "time_raw", "speed",
+        "gps_fix"}`` or None when the car or the endpoint does not
+        answer.
+        """
+        self._validate_ccs_token(token)
+        try:
+            data = self._gspa_get(
+                token,
+                vehicle,
+                "location/vehicles/{carId}/update-status",
+                timeout=(5, 145),
+            )
+        except AuthenticationError:
+            raise
+        except APIError as e:
+            # 403-006 / 400-004: duplicate window, see the docstring.
+            _LOGGER.debug(f"{DOMAIN} - location poll rejected: {e}")
+            return None
+        except requests.exceptions.RequestException as e:
+            _LOGGER.debug(f"{DOMAIN} - location poll failed: {e}")
+            return None
+        if not isinstance(data, dict):
+            return None
+        coord = data.get("coord")
+        if not isinstance(coord, dict):
+            return None
+        speed = data.get("speed")
+        if not isinstance(speed, dict):
+            speed = {}
+        speed_value = float_or_none(speed.get("value"))
+        latitude = float_or_none(coord.get("lat"))
+        longitude = float_or_none(coord.get("lon"))
+        if latitude is None or longitude is None:
+            return None
+        return {
+            "latitude": latitude,
+            "longitude": longitude,
+            "time_raw": data.get("time"),
+            "speed": speed_value,
+            "gps_fix": speed_value != 511,
+        }
 
     def _update_vehicle_gspa_location(self, token: Token, vehicle: Vehicle) -> None:
         """Populate vehicle.location from the GSPA location stored-status.
