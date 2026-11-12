@@ -1353,7 +1353,9 @@ class KiaUvoApiCA(ApiImpl):
                         }
                     )
             else:
-                if vehicle.model == "IONIQ 9":
+                # CA vhcllst reports this model with and without a space
+                # ("IONIQ9" in the Hyundai-Kia-Connect/kia_uvo#2110 dump).
+                if vehicle.model in ("IONIQ 9", "IONIQ9"):
                     payload["remoteControl"] = climate_settings
                     payload["remoteControl"].update(
                         {

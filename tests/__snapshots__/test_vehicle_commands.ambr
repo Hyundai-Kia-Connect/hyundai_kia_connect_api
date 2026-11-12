@@ -1,4 +1,78 @@
 # serializer version: 1
+# name: test_ca_hyundai_ioniq9_ev_climate_payload[start_climate-IONIQ 9]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'remoteControl': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_hyundai_ioniq9_ev_climate_payload[start_climate-IONIQ9]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'remoteControl': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
 # name: test_legacy_climate_seat_options[start_climate-eu_kia-seat_options0]
   dict({
     'requests': list([
