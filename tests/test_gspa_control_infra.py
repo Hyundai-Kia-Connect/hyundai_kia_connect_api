@@ -13,6 +13,9 @@ from hyundai_kia_connect_api.exceptions import (
     AuthenticationTokenExpiredError,
     DuplicateRequestError,
     InvalidAPIResponseError,
+    NoDataFound,
+    RateLimitingError,
+    RequestTimeoutError,
     ServiceTemporaryUnavailable,
     UnsupportedControlError,
 )
@@ -531,3 +534,45 @@ def test_post_for_data_2xx_business_error():
             api._gspa_post_for_data(
                 _make_token(), _make_vehicle(), "reservation-hvac", {}
             )
+
+
+def test_raise_gspa_error_token_expired_mapping():
+    """401-001 (invalid access token) raises the token-expired auth
+    error so callers re-login instead of treating it as a business
+    failure."""
+    with pytest.raises(AuthenticationTokenExpiredError):
+        _make_api()._raise_gspa_error(200, {"rc": "401-001", "msg": "token invalid"})
+    # a bare HTTP 401 stays the generic auth error (HTTP branch wins).
+    with pytest.raises(AuthenticationError, match="token expired or invalid"):
+        _make_api()._raise_gspa_error(401, {})
+
+
+def test_raise_gspa_error_timeout_and_rate_limit_mappings():
+    """408-000 -> RequestTimeoutError; the hard quota window codes
+    (429-003 hourly / 429-004 daily) -> RateLimitingError. The
+    transient 429 bursts stay inside the vehicle-scoped APIError path:
+    an account-wide 2 h pause for a momentary burst would be a much
+    bigger blast radius."""
+    api = _make_api()
+    with pytest.raises(RequestTimeoutError):
+        api._raise_gspa_error(408, {"rc": "408-000", "msg": "timeout"})
+    for rc in ("429-003", "429-004"):
+        with pytest.raises(RateLimitingError):
+            api._raise_gspa_error(429, {"rc": rc, "msg": "slow down"})
+    with pytest.raises(APIError):
+        api._raise_gspa_error(429, {"rc": "429-000", "msg": "burst"})
+
+
+def test_raise_gspa_error_duplicate_and_no_data_mappings():
+    """409-000 (OTA duplicate request) -> DuplicateRequestError;
+    404-003/404-004 win over the "404" prefix and raise NoDataFound."""
+    api = _make_api()
+    with pytest.raises(DuplicateRequestError):
+        api._raise_gspa_error(409, {"rc": "409-000", "msg": "already queued"})
+    with pytest.raises(NoDataFound):
+        api._raise_gspa_error(404, {"rc": "404-003", "msg": "no data"})
+    with pytest.raises(NoDataFound):
+        api._raise_gspa_error(404, {"rc": "404-004", "msg": "not found"})
+    # the generic 404-* prefix arm stays UnsupportedControlError.
+    with pytest.raises(UnsupportedControlError):
+        api._raise_gspa_error(404, {"rc": "404-099", "msg": "other 404"})
