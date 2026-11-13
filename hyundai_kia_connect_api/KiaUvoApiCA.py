@@ -661,6 +661,7 @@ class KiaUvoApiCA(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.EV
             elif entry["fuelKindCode"] == "P":
                 entry_engine_type = ENGINE_TYPES.PHEV
+            gen_type = entry.get("genType") or ""
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
@@ -670,6 +671,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
+                generation=int(gen_type[1:]) if gen_type[1:].isdigit() else None,
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = False
@@ -1326,7 +1328,7 @@ class KiaUvoApiCA(ApiImpl):
                 },
             }
             if BRANDS[self.brand] == BRAND_KIA:
-                if vehicle.name == "EV9":
+                if vehicle.generation == 3 or vehicle.name == "EV9":
                     payload["remoteControl"] = climate_settings
                     payload["remoteControl"].update(
                         {
@@ -1353,9 +1355,7 @@ class KiaUvoApiCA(ApiImpl):
                         }
                     )
             else:
-                # CA vhcllst reports this model with and without a space
-                # ("IONIQ9" in the Hyundai-Kia-Connect/kia_uvo#2110 dump).
-                if vehicle.model in ("IONIQ 9", "IONIQ9"):
+                if vehicle.generation == 3:
                     payload["remoteControl"] = climate_settings
                     payload["remoteControl"].update(
                         {

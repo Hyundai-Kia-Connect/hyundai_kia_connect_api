@@ -1,5 +1,42 @@
 # serializer version: 1
-# name: test_ca_hyundai_ioniq9_ev_climate_payload[start_climate-IONIQ 9]
+# name: test_ca_ev_climate_payload_by_generation[Hyundai-1]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'hvacInfo': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_ev_climate_payload_by_generation[Hyundai-3]
   dict({
     'requests': list([
       dict({
@@ -36,7 +73,7 @@
     ]),
   })
 # ---
-# name: test_ca_hyundai_ioniq9_ev_climate_payload[start_climate-IONIQ9]
+# name: test_ca_ev_climate_payload_by_generation[Hyundai-None]
   dict({
     'requests': list([
       dict({
@@ -45,6 +82,80 @@
         }),
         'method': 'POST',
         'url': 'https://mybluelink.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'hvacInfo': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://mybluelink.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_ev_climate_payload_by_generation[Kia-1]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'hvacInfo': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_ev_climate_payload_by_generation[Kia-3]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
       }),
       dict({
         'body': dict({
@@ -68,7 +179,44 @@
           }),
         }),
         'method': 'POST',
-        'url': 'https://mybluelink.ca/tods/api/evc/rfon',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rfon',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_ev_climate_payload_by_generation[Kia-None]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'hvacInfo': dict({
+            'airCtrl': 1,
+            'airTemp': dict({
+              'hvacTempType': 1,
+              'unit': 0,
+              'value': '0EH',
+            }),
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'astSeatOptCmd': 0,
+              'drvSeatOptCmd': 0,
+              'rlSeatOptCmd': 0,
+              'rrSeatOptCmd': 0,
+            }),
+          }),
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/evc/rfon',
       }),
     ]),
   })
