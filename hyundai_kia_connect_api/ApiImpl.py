@@ -607,8 +607,7 @@ class ApiImpl:
     ) -> None:
         if vehicle.location_latitude and vehicle.location_longitude:
             if (
-                vehicle.geocode
-                and vehicle.location_latitude == vehicle._geocode_latitude
+                vehicle.location_latitude == vehicle._geocode_latitude
                 and vehicle.location_longitude == vehicle._geocode_longitude
             ):  # previous coordinates are the same, so keep last valid vehicle.geocode
                 _LOGGER.debug(f"{DOMAIN} - Keeping last geocode location")
