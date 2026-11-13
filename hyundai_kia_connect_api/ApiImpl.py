@@ -633,6 +633,8 @@ class ApiImpl:
                 except JSONDecodeError:
                     _LOGGER.warning(f"{DOMAIN} - failed geocode openstreetmap")
                     vehicle.geocode = None
+                    vehicle._geocode_latitude = None
+                    vehicle._geocode_longitude = None
                 else:
                     vehicle.geocode = (
                         get_child_value(response, "display_name"),
@@ -661,6 +663,8 @@ class ApiImpl:
                     except Exception as ex:
                         _LOGGER.warning(f"{DOMAIN} - failed geocode Google: {ex}")
                         vehicle.geocode = None
+                        vehicle._geocode_latitude = None
+                        vehicle._geocode_longitude = None
 
     def lock_action(
         self, token: Token, vehicle: Vehicle, action: VEHICLE_LOCK_ACTION

@@ -102,6 +102,59 @@ def test_nominatim_email_is_url_encoded(monkeypatch, username) -> None:
     assert query["lat"] == ["10.0"] and query["lon"] == ["20.0"]
 
 
+def _osm_named(name):
+    response = MagicMock()
+    response.json.return_value = {"display_name": name, "address": {}}
+    return response
+
+
+def _osm_invalid_json():
+    response = MagicMock()
+    response.json.side_effect = requests.exceptions.JSONDecodeError("x", "", 0)
+    return response
+
+
+def test_failed_lookup_is_retried_at_previous_coordinates(monkeypatch) -> None:
+    vehicle = Vehicle(id="vehicle-1")
+    manager = _manager(monkeypatch, [vehicle])
+
+    with patch("hyundai_kia_connect_api.ApiImpl.requests.get") as get:
+        for lat, response in [
+            (10.0, _osm_named("A")),
+            (11.0, _osm_invalid_json()),
+            (10.0, _osm_named("A")),
+        ]:
+            vehicle.location = (lat, 20.0, WHEN)
+            get.return_value = response
+            manager.update_all_vehicles_with_cached_state()
+
+    assert get.call_count == 3
+    assert vehicle.geocode == ("A", {})
+
+
+def test_failed_google_lookup_is_retried_at_previous_coordinates(
+    monkeypatch,
+) -> None:
+    vehicle = Vehicle(id="vehicle-1")
+    manager = _manager(monkeypatch, [vehicle])
+    manager.geocode_provider = 2
+    manager.geocode_api_key = "test-key"
+    geolocator = MagicMock()
+    geolocator.reverse.side_effect = [
+        ("A", "A address"),
+        Exception("x"),
+        ("A", "A address"),
+    ]
+
+    with patch("hyundai_kia_connect_api.ApiImpl.GoogleV3", return_value=geolocator):
+        for lat in (10.0, 11.0, 10.0):
+            vehicle.location = (lat, 20.0, WHEN)
+            manager.update_all_vehicles_with_cached_state()
+
+    assert geolocator.reverse.call_count == 3
+    assert vehicle.geocode == ("A", "A address")
+
+
 def test_empty_geocode_result_is_not_requested_again(monkeypatch) -> None:
     vehicle = Vehicle(id="vehicle-1")
     vehicle.location = (10.0, 20.0, WHEN)
