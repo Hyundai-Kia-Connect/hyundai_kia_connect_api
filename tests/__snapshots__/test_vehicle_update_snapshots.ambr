@@ -138,7 +138,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -361,7 +360,6 @@
       'fuel_level': 20,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -626,7 +624,6 @@
       'fuel_level': None,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -973,7 +970,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -1310,7 +1306,6 @@
       'fuel_level': 83,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -1626,7 +1621,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -1880,7 +1874,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -2134,7 +2127,6 @@
       'fuel_level': None,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -2387,7 +2379,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -2641,7 +2632,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -2899,7 +2889,6 @@
       'fuel_level': None,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -3153,7 +3142,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -3418,7 +3406,6 @@
       'fuel_level': 95,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -3954,7 +3941,6 @@
       'fuel_level': 42,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -4189,7 +4175,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -4428,7 +4413,6 @@
       'fuel_level': None,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -4663,7 +4647,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -5199,7 +5182,6 @@
       'fuel_level': 42,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -5735,7 +5717,6 @@
       'fuel_level': 42,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -6263,7 +6244,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -6799,7 +6779,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -7335,7 +7314,6 @@
       'fuel_level': 42,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -7879,7 +7857,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -8423,7 +8400,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -8967,7 +8943,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -9503,7 +9478,6 @@
       'fuel_level': 42,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -10031,7 +10005,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -10559,7 +10532,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -10796,7 +10768,6 @@
       'fuel_level': None,
       'fuel_level_is_low': None,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -11019,7 +10990,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -11258,7 +11228,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -11492,7 +11461,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -11720,7 +11688,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': 0,
       'gear_position': 0,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -12258,7 +12225,6 @@
       'fuel_level': None,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -12786,7 +12752,6 @@
       'fuel_level': 100,
       'fuel_level_is_low': 0,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -13024,7 +12989,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -13306,7 +13270,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -13555,7 +13518,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -13804,7 +13766,6 @@
       'fuel_level': 0,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -14042,7 +14003,6 @@
       'fuel_level': None,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -14275,7 +14235,6 @@
       'fuel_level': 60,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,
@@ -14523,7 +14482,6 @@
       'fuel_level': None,
       'fuel_level_is_low': False,
       'gear_position': None,
-      'gen_type': None,
       'generation': None,
       'geocode': list([
         None,

@@ -670,7 +670,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
-                gen_type=entry.get("genType"),
+                generation=entry.get("genType"),
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = False
@@ -1326,7 +1326,7 @@ class KiaUvoApiCA(ApiImpl):
                     "hvacTempType": 1,
                 },
             }
-            if vehicle.gen_type == "G3":
+            if vehicle.generation == "G3":
                 payload["remoteControl"] = climate_settings
                 payload["remoteControl"].update(
                     {
