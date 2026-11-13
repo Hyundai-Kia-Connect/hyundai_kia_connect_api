@@ -153,3 +153,20 @@ def test_failed_google_lookup_is_retried_at_previous_coordinates(
 
     assert geolocator.reverse.call_count == 3
     assert vehicle.geocode == ("A", "A address")
+
+
+def test_empty_geocode_result_is_not_requested_again(monkeypatch) -> None:
+    vehicle = Vehicle(id="vehicle-1")
+    vehicle.location = (10.0, 20.0, WHEN)
+    manager = _manager(monkeypatch, [vehicle])
+    response = MagicMock()
+    response.json.return_value = {}
+
+    with patch(
+        "hyundai_kia_connect_api.ApiImpl.requests.get", return_value=response
+    ) as get:
+        manager.update_all_vehicles_with_cached_state()
+        manager.update_all_vehicles_with_cached_state()
+
+    assert get.call_count == 1
+    assert vehicle.geocode == (None, None)
