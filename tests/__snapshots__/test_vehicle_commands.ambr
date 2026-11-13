@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: test_ca_ev_climate_payload_by_generation[Hyundai-1]
+# name: test_ca_ev_climate_payload_by_gen_type[Hyundai-G1]
   dict({
     'requests': list([
       dict({
@@ -36,7 +36,7 @@
     ]),
   })
 # ---
-# name: test_ca_ev_climate_payload_by_generation[Hyundai-3]
+# name: test_ca_ev_climate_payload_by_gen_type[Hyundai-G3]
   dict({
     'requests': list([
       dict({
@@ -73,7 +73,7 @@
     ]),
   })
 # ---
-# name: test_ca_ev_climate_payload_by_generation[Hyundai-None]
+# name: test_ca_ev_climate_payload_by_gen_type[Hyundai-None]
   dict({
     'requests': list([
       dict({
@@ -110,7 +110,7 @@
     ]),
   })
 # ---
-# name: test_ca_ev_climate_payload_by_generation[Kia-1]
+# name: test_ca_ev_climate_payload_by_gen_type[Kia-G1]
   dict({
     'requests': list([
       dict({
@@ -147,7 +147,7 @@
     ]),
   })
 # ---
-# name: test_ca_ev_climate_payload_by_generation[Kia-3]
+# name: test_ca_ev_climate_payload_by_gen_type[Kia-G3]
   dict({
     'requests': list([
       dict({
@@ -184,7 +184,7 @@
     ]),
   })
 # ---
-# name: test_ca_ev_climate_payload_by_generation[Kia-None]
+# name: test_ca_ev_climate_payload_by_gen_type[Kia-None]
   dict({
     'requests': list([
       dict({

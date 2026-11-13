@@ -128,6 +128,8 @@ class Vehicle:
     ccu_ccs2_protocol_support: int | None = None
     # Hyundai USA:
     generation: int | None = None
+    # Canada vhcllst genType, e.g. "G3":
+    gen_type: str | None = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
     supports: VehicleSupports = field(default_factory=VehicleSupports)

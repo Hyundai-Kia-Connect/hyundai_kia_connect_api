@@ -175,11 +175,11 @@ def test_vehicle_command(
     assert {"action_id": action_id, "requests": sent_requests} == snapshot
 
 
-@pytest.mark.parametrize("generation", [3, 1, None])
+@pytest.mark.parametrize("gen_type", ["G3", "G1", None])
 @pytest.mark.parametrize("brand", [BRAND_HYUNDAI, BRAND_KIA])
-def test_ca_ev_climate_payload_by_generation(
+def test_ca_ev_climate_payload_by_gen_type(
     brand: str,
-    generation: int | None,
+    gen_type: str | None,
     sent_requests: list[dict[str, Any]],
     snapshot: SnapshotAssertion,
 ) -> None:
@@ -201,14 +201,14 @@ def test_ca_ev_climate_payload_by_generation(
         year=2027,
         model="IONIQ9",
         engine_type=ENGINE_TYPES.EV,
-        generation=generation,
+        gen_type=gen_type,
     )
     COMMANDS["start_climate"](api, token, vehicle)
     body = sent_requests[-1]["body"]
     assert sent_requests[-1]["url"].endswith("evc/rfon")
     expected, other = (
         ("remoteControl", "hvacInfo")
-        if generation == 3
+        if gen_type == "G3"
         else ("hvacInfo", "remoteControl")
     )
     assert expected in body

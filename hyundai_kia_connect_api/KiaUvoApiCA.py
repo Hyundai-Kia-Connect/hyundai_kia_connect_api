@@ -661,7 +661,6 @@ class KiaUvoApiCA(ApiImpl):
                 entry_engine_type = ENGINE_TYPES.EV
             elif entry["fuelKindCode"] == "P":
                 entry_engine_type = ENGINE_TYPES.PHEV
-            gen_type = entry.get("genType") or ""
             vehicle: Vehicle = Vehicle(
                 id=entry["vehicleId"],
                 name=entry["nickName"],
@@ -671,7 +670,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
-                generation=int(gen_type[1:]) if gen_type[1:].isdigit() else None,
+                gen_type=entry.get("genType"),
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = False
@@ -1327,60 +1326,32 @@ class KiaUvoApiCA(ApiImpl):
                     "hvacTempType": 1,
                 },
             }
-            if BRANDS[self.brand] == BRAND_KIA:
-                if vehicle.generation == 3 or vehicle.name == "EV9":
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
+            if vehicle.gen_type == "G3":
+                payload["remoteControl"] = climate_settings
+                payload["remoteControl"].update(
+                    {
+                        "igniOnDuration": options.duration,
+                        "seatHeaterVentCMD": {
+                            "drvSeatOptCmd": options.front_left_seat,
+                            "astSeatOptCmd": options.front_right_seat,
+                            "rlSeatOptCmd": options.rear_left_seat,
+                            "rrSeatOptCmd": options.rear_right_seat,
+                        },
+                    }
+                )
             else:
-                if vehicle.generation == 3:
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
+                payload["hvacInfo"] = climate_settings
+                payload["hvacInfo"].update(
+                    {
+                        "igniOnDuration": options.duration,
+                        "seatHeaterVentCMD": {
+                            "drvSeatOptCmd": options.front_left_seat,
+                            "astSeatOptCmd": options.front_right_seat,
+                            "rlSeatOptCmd": options.rear_left_seat,
+                            "rrSeatOptCmd": options.rear_right_seat,
+                        },
+                    }
+                )
         else:
             payload = {
                 "setting": {
