@@ -599,8 +599,8 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         # /location/park serves a few seconds later. Sent right after the wake
         # above, it fails with a duplicate request. Its own time field is not
         # used: UTC on some cars, local time on a PV5 in Finland.
-        self._get_location(token, vehicle)
-        sleep(10)
+        if self._get_location(token, vehicle) is not None:
+            sleep(10)
         self._set_cached_location_park(token, vehicle)
 
     def _update_vehicle_properties(

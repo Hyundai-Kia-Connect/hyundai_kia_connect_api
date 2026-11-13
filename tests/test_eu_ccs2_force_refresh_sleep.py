@@ -100,14 +100,21 @@ def test_force_refresh_continues_when_location_wake_fails(eu_api, ccs2_vehicle):
             }
         return resp
 
+    sleep_calls = []
+
     with (
         patch.object(eu_api.session, "get", side_effect=mock_get),
-        patch("hyundai_kia_connect_api.KiaUvoApiEU.sleep"),
+        patch(
+            "hyundai_kia_connect_api.KiaUvoApiEU.sleep",
+            side_effect=lambda s: sleep_calls.append(s),
+        ),
     ):
         eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
 
     eu_api._update_vehicle_properties_ccs2.assert_called_once()
     eu_api._set_cached_location_park.assert_called_once_with(token, ccs2_vehicle)
+    # no wait for a fix that was not requested
+    assert sleep_calls == [25]
 
 
 def test_force_refresh_does_not_read_resMsg_from_wake_endpoint(eu_api, ccs2_vehicle):
