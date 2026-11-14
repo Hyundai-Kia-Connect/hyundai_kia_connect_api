@@ -2,4 +2,4 @@ requests
 certifi>=2026.10.23
 tzdata>=2026.6
 pycryptodome>=3.24.1,<4
-paho-mqtt>=2.1.0,<3
+paho-mqtt>=2.2.0,<3
