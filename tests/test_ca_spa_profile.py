@@ -36,9 +36,9 @@ def test_api_headers_profile() -> None:
         "Cache-Control",
         "Accept",
         "Accept-Language",
-        "brand",
     ):
         assert dropped not in h, dropped
+    assert h["brand"] == "H"
 
 
 def test_kia_profile_is_legacy_portal() -> None:
@@ -139,6 +139,7 @@ _EXPECTED_PROFILE_KEYS = {
     "Accept-Encoding",
     "Content-Type",
     "from",
+    "brand",
     "offset",
     "language",
     "client_id",
@@ -203,6 +204,18 @@ def test_offset_east_coast() -> None:
     assert offset_from_tz(_at(-5 * 60)) == "-5"
 
 
+def test_vrfypin_header_shape() -> None:
+    """vrfypin like the apps: accessToken only, no vehicleId (issue #1568)."""
+    api = _api()
+    api._sessions = _HeaderCaptureSession()
+    token = Token(username="u", password="p", pin="1234", access_token="AT")
+    api._get_pin_token(token)
+    sent = api._sessions.captured[0]
+    assert sent["accessToken"] == "AT"
+    assert "vehicleId" not in sent
+    assert "pAuth" not in sent
+
+
 def test_offset_pacific_and_half_zone_truncate_toward_zero() -> None:
     assert offset_from_tz(_at(-8 * 60)) == "-8"
     assert offset_from_tz(_at(-3 * 60 - 30)) == "-3"  # St. John's, Java trunc
@@ -236,7 +249,7 @@ def _capture_api_calls(monkeypatch, brand: int) -> tuple[KiaUvoApiCA, MagicMock]
             return resp
 
     api._sessions = Cap()
-    monkeypatch.setattr(KiaUvoApiCA, "_get_pin_token", lambda self, tok, veh: "PT")
+    monkeypatch.setattr(KiaUvoApiCA, "_get_pin_token", lambda self, tok: "PT")
     return api, api._sessions
 
 
