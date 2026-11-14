@@ -1323,7 +1323,9 @@ class KiaUvoApiCA(ApiImpl):
                 "airTemp": {
                     "value": hex_set_temp,
                     "unit": 0,
-                    "hvacTempType": 1,
+                    "hvacTempType": vehicle.hvac_temp_type
+                    if vehicle.hvac_temp_type is not None
+                    else 1,
                 },
             }
             if vehicle.generation == "G3":
