@@ -310,6 +310,35 @@ def test_ca_command_response_without_envelope_passes(
     assert action_id
 
 
+def test_ca_command_response_null_header_passes(
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, REGION_CANADA), _key(BRANDS, BRAND_HYUNDAI), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    vehicle = Vehicle(
+        id="VEHICLE-ID",
+        VIN="VIN0000000000000",
+        year=2027,
+        model="IONIQ9",
+        engine_type=ENGINE_TYPES.EV,
+    )
+    _sent, body_holder = command_response
+    body_holder["body"] = {"responseHeader": None, "result": {"foo": "bar"}}
+    action_id = COMMANDS["start_climate"](api, token, vehicle)
+    assert isinstance(action_id, str)
+    assert action_id
+
+
 @pytest.mark.parametrize(
     "impl, seat_options",
     [

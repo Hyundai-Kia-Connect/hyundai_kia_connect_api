@@ -372,7 +372,7 @@ class KiaUvoApiCA(ApiImpl):
         Only a present responseHeader with responseCode 1 is a rejection (the
         15109 class); older shapes without the envelope keep working.
         """
-        if "responseHeader" not in response:
+        if not response.get("responseHeader"):
             return
         self._check_response_for_errors(response)
 
