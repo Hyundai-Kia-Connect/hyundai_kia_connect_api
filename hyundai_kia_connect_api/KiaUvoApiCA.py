@@ -670,6 +670,7 @@ class KiaUvoApiCA(ApiImpl):
                 engine_type=entry_engine_type,
                 timezone=self.data_timezone,
                 dtc_count=entry["dtcCount"],
+                generation=entry.get("genType"),
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = False
@@ -1325,62 +1326,32 @@ class KiaUvoApiCA(ApiImpl):
                     "hvacTempType": 1,
                 },
             }
-            if BRANDS[self.brand] == BRAND_KIA:
-                if vehicle.name == "EV9":
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
+            if vehicle.generation == "G3":
+                payload["remoteControl"] = climate_settings
+                payload["remoteControl"].update(
+                    {
+                        "igniOnDuration": options.duration,
+                        "seatHeaterVentCMD": {
+                            "drvSeatOptCmd": options.front_left_seat,
+                            "astSeatOptCmd": options.front_right_seat,
+                            "rlSeatOptCmd": options.rear_left_seat,
+                            "rrSeatOptCmd": options.rear_right_seat,
+                        },
+                    }
+                )
             else:
-                # CA vhcllst reports this model with and without a space
-                # ("IONIQ9" in the Hyundai-Kia-Connect/kia_uvo#2110 dump).
-                if vehicle.model in ("IONIQ 9", "IONIQ9"):
-                    payload["remoteControl"] = climate_settings
-                    payload["remoteControl"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
-                else:
-                    payload["hvacInfo"] = climate_settings
-                    payload["hvacInfo"].update(
-                        {
-                            "igniOnDuration": options.duration,
-                            "seatHeaterVentCMD": {
-                                "drvSeatOptCmd": options.front_left_seat,
-                                "astSeatOptCmd": options.front_right_seat,
-                                "rlSeatOptCmd": options.rear_left_seat,
-                                "rrSeatOptCmd": options.rear_right_seat,
-                            },
-                        }
-                    )
+                payload["hvacInfo"] = climate_settings
+                payload["hvacInfo"].update(
+                    {
+                        "igniOnDuration": options.duration,
+                        "seatHeaterVentCMD": {
+                            "drvSeatOptCmd": options.front_left_seat,
+                            "astSeatOptCmd": options.front_right_seat,
+                            "rlSeatOptCmd": options.rear_left_seat,
+                            "rrSeatOptCmd": options.rear_right_seat,
+                        },
+                    }
+                )
         else:
             payload = {
                 "setting": {

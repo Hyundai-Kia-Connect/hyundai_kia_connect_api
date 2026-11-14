@@ -175,16 +175,16 @@ def test_vehicle_command(
     assert {"action_id": action_id, "requests": sent_requests} == snapshot
 
 
-@pytest.mark.parametrize("model", ["IONIQ 9", "IONIQ9"])
-@pytest.mark.parametrize("command", ["start_climate"])
-def test_ca_hyundai_ioniq9_ev_climate_payload(
-    model: str,
-    command: str,
+@pytest.mark.parametrize("generation", ["G3", "G1", None])
+@pytest.mark.parametrize("brand", [BRAND_HYUNDAI, BRAND_KIA])
+def test_ca_ev_climate_payload_by_generation(
+    brand: str,
+    generation: str | None,
     sent_requests: list[dict[str, Any]],
     snapshot: SnapshotAssertion,
 ) -> None:
     api = VehicleManager.get_implementation_by_region_brand(
-        _key(REGIONS, REGION_CANADA), _key(BRANDS, BRAND_HYUNDAI), "en"
+        _key(REGIONS, REGION_CANADA), _key(BRANDS, brand), "en"
     )
     token = Token(
         username="user",
@@ -199,14 +199,20 @@ def test_ca_hyundai_ioniq9_ev_climate_payload(
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
         year=2027,
-        model=model,
+        model="IONIQ9",
         engine_type=ENGINE_TYPES.EV,
+        generation=generation,
     )
-    COMMANDS[command](api, token, vehicle)
+    COMMANDS["start_climate"](api, token, vehicle)
     body = sent_requests[-1]["body"]
     assert sent_requests[-1]["url"].endswith("evc/rfon")
-    assert "remoteControl" in body
-    assert "hvacInfo" not in body
+    expected, other = (
+        ("remoteControl", "hvacInfo")
+        if generation == "G3"
+        else ("hvacInfo", "remoteControl")
+    )
+    assert expected in body
+    assert other not in body
     assert {"requests": sent_requests} == snapshot
 
 

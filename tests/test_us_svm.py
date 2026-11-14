@@ -203,7 +203,7 @@ def _make_vehicle():
         name="Ioniq 5",
         model="IONIQ 5",
         VIN="KM8XXXX",
-        generation=3,
+        generation="3",
         key="test-key",
         timezone=dt.timezone(dt.timedelta(hours=-5)),
     )

@@ -1249,7 +1249,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 registration_date=entry["enrollmentDate"],
                 timezone=self.data_timezone,
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
-                generation=int(entry.get("vehicleGeneration", "2")),
+                generation=entry.get("vehicleGeneration", "2"),
             )
             vehicle.supports.window_control = False
             vehicle.supports.valet_mode = False
@@ -1375,7 +1375,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 "heating1": int(options.heating),
             }
             # Older vehicles do not support seat heater vent info or duration
-            if vehicle.generation == 3:
+            if vehicle.generation == "3":
                 data["igniOnDuration"] = options.duration
                 data["seatHeaterVentInfo"] = {
                     "drvSeatHeatState": options.front_left_seat,
