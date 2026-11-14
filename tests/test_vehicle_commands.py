@@ -137,8 +137,8 @@ def sent_requests() -> Any:
 def command_response() -> Any:
     """Patch Session.request to answer every call with a chosen JSON body.
 
-    Yields (sent_requests, body_holder): assign the wanted canned response to
-    ``body_holder["body"]`` before calling the command.
+    Yields (sent, holder): assign the wanted canned response to
+    ``holder["body"]`` before calling the command.
     """
     sent: list[dict[str, Any]] = []
     holder: dict[str, Any] = {"body": {}}

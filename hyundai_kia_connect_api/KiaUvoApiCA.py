@@ -367,11 +367,7 @@ class KiaUvoApiCA(ApiImpl):
             )
 
     def _check_command_response(self, response: dict[str, Any]) -> None:
-        """Raise on a rejected command POST; tolerate legacy envelope-less bodies.
-
-        Only a present responseHeader with responseCode 1 is a rejection (the
-        15109 class); older shapes without the envelope keep working.
-        """
+        """Raise on a rejected command POST; tolerate envelope-less bodies."""
         if not response.get("responseHeader"):
             return
         self._check_response_for_errors(response)
