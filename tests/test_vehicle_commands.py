@@ -216,6 +216,37 @@ def test_ca_ev_climate_payload_by_generation(
     assert {"requests": sent_requests} == snapshot
 
 
+@pytest.mark.parametrize("hvac_temp_type, expected", [(None, 1), (0, 0), (3, 3)])
+def test_ca_ev_climate_hvac_temp_type(
+    hvac_temp_type: int | None,
+    expected: int,
+    sent_requests: list[dict[str, Any]],
+) -> None:
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, REGION_CANADA), _key(BRANDS, BRAND_HYUNDAI), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    vehicle = Vehicle(
+        id="VEHICLE-ID",
+        VIN="VIN0000000000000",
+        year=2027,
+        model="IONIQ9",
+        engine_type=ENGINE_TYPES.EV,
+        hvac_temp_type=hvac_temp_type,
+    )
+    COMMANDS["start_climate"](api, token, vehicle)
+    body = sent_requests[-1]["body"]
+    assert body["hvacInfo"]["airTemp"]["hvacTempType"] == expected
+
+
 @pytest.mark.parametrize(
     "impl, seat_options",
     [
