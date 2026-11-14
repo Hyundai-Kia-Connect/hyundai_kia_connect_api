@@ -1,0 +1,182 @@
+{
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "vinInfo": [
+            {
+                "basic": {
+                    "vin": "TESTVIN0000000001",
+                    "modelName": "SANTA FE",
+                    "modelYear": "2026",
+                    "modelType": "HV",
+                    "brand": "H",
+                    "country": "pl",
+                    "protocolType": 1,
+                    "ccuCCS2ProtocolSupport": 1,
+                    "ecuOtaUpdateSupport": 1,
+                    "ecuRemoteOTAUpdateSupport": 0
+                },
+                "device": {
+                    "simStatus": "A",
+                    "simStartDate": "30012026",
+                    "simEndDate": "30012036",
+                    "headUnitType": "04",
+                    "naviApplied": 1,
+                    "headUnitModelName": "MX5AH.SCBMC.EU",
+                    "privacySettingSupport": 1,
+                    "webManualUrl": "http://webmanual.hyundai.com/ccNC/AVNT/EUR/Polish/index.html",
+                    "compPeriodEndYn": "N",
+                    "currentHeadUnitVersion": "MX5.EUR.ccNC.001.002.260312",
+                    "platform": "ccNC"
+                },
+                "option": {
+                    "airControlType": "1",
+                    "drvSeatLoc": "L",
+                    "remoteControl": "0",
+                    "heating1": "1",
+                    "heatingFrontWindow": "0",
+                    "strgWhlHeatOption": 2,
+                    "heatingSteeringWheel": "1",
+                    "heatingSideMirror": "1",
+                    "heatingRearWindow": "1",
+                    "lightOnlyAvailable": 1,
+                    "hornLightAvailable": 1,
+                    "hvacTempType": "1",
+                    "remoteControlWaitingTime": 336,
+                    "windowSafetyOption2": 3,
+                    "svmOptionInfo": 1,
+                    "remoteAirCtrlControlOption": 1,
+                    "seatHeaterVent": {
+                        "flSeatHeat": 6,
+                        "frSeatHeat": 6,
+                        "rlSeatHeat": 2,
+                        "rrSeatHeat": 2
+                    },
+                    "evAlarmOptionInfo": 0,
+                    "sunRoofOption": 1,
+                    "digitalKey2": 3,
+                    "remoteHeatControl": "2",
+                    "airPurifierOption": 0,
+                    "dvrsOption": 0,
+                    "ignCtrlOption": 0
+                },
+                "serviceOption": {
+                    "batteryWarningService": 1,
+                    "scheduleLinkService": 1,
+                    "centerUserProfileOption": 4,
+                    "finalDestinationNoti": 1,
+                    "valetServiceOption": 1,
+                    "notificationSupport": 1,
+                    "nTrackDataSupport": 0,
+                    "remoteValetActOption": 1,
+                    "alertServiceOption": 1,
+                    "mediaStreamingService": [4, 6],
+                    "mediaStreamingSelectionOption": 1,
+                    "idleAlertSettingService": 1,
+                    "engineIdleTimeNotification": 1,
+                    "dvrsOption": 0,
+                    "send2CarOptionInfo": 10,
+                    "speedEventSupport": 1
+                },
+                "batteryType": {
+                    "mainbatteryType": 0,
+                    "auxbatteryType": 2
+                },
+                "detailInfo": {
+                    "saleCarmdlCd": "HK",
+                    "bodyType": "3",
+                    "inColor": "RXG",
+                    "outColor": "A2B",
+                    "saleCarmdlEnNm": "SANTA FE"
+                },
+                "dtcCategory": [
+                    {
+                        "ecuIdx": "ABS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ACU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ADAS_DRV",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ADAS_PRK",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ADAS_PRK_Master",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "BMS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "CCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "EMS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "EPB",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ESC",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "FR_CMR",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "FR_RDR",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "HCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ICU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "LKAS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "MCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "MDPS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "RR_C_RDR",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "SCC",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "TCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "TPMS",
+                        "factoryValue": 1
+                    }
+                ]
+            }
+        ]
+    },
+    "msgId": "91e71070-d862-11f1-9a34-da65605c7567"
+}

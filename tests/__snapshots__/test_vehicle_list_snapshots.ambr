@@ -19,6 +19,7 @@
         'model': 'KONA EV',
         'name': 'Kona VÉ',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -38,6 +39,7 @@
         'id': 'VEHICLE-2',
         'name': 'KONA EV',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -58,6 +60,7 @@
         'model': 'KONA EV',
         'name': 'KONA EV',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -92,6 +95,7 @@
         'model': 'Sportage',
         'name': 'Sportage',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -126,6 +130,7 @@
         'name': '库斯途',
         'registration_date': '2025-07-13 20:12:40.283',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -160,6 +165,7 @@
         'name': 'NO_Ioniq',
         'registration_date': '2025-01-10 16:51:44.886',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -180,6 +186,7 @@
         'name': 'IONIQ 5',
         'registration_date': '2021-09-04 14:07:51.955',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -200,6 +207,7 @@
         'name': 'KONA',
         'registration_date': '2022-12-02 19:21:05.307',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -234,6 +242,7 @@
         'name': '2023 IONIQ 5',
         'registration_date': '20230929',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -253,6 +262,7 @@
         'name': '2024 PALISADE',
         'registration_date': '20230825',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -273,6 +283,7 @@
         'name': '2020 IONIQ ELECTRIC',
         'registration_date': '20201102',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
@@ -308,6 +319,7 @@
         'model': 'EV6',
         'name': 'My EV6',
         'supports': dict({
+          'climate_duration_setting': None,
           'hvac_close_remote': None,
           'media_close_remote': None,
           'mqtt_push': None,
