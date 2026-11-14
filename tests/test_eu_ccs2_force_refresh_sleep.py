@@ -31,7 +31,7 @@ def ccs2_vehicle() -> Vehicle:
 
 
 def test_force_refresh_wakes_sleeps_reads_latest_and_applies(eu_api, ccs2_vehicle):
-    """wake /ccs2/carstatus (ack) -> sleep(25) -> read /latest -> apply + location."""
+    """wake /ccs2/carstatus (ack) -> sleep(25) -> read /latest -> apply -> location."""
     token = SimpleNamespace(access_token="t", device_id="d")
     get_urls = []
 
@@ -41,6 +41,12 @@ def test_force_refresh_wakes_sleeps_reads_latest_and_applies(eu_api, ccs2_vehicl
         if url.endswith("/ccs2/carstatus") and not url.endswith("/latest"):
             # wake endpoint: async ack envelope, NO resMsg
             resp.json.return_value = {"retCode": "S", "resCode": "0000", "msgId": "m1"}
+        elif url.endswith("/location"):
+            resp.json.return_value = {
+                "retCode": "S",
+                "resCode": "0000",
+                "resMsg": {"coord": {"lat": 1.0, "lon": 2.0}, "time": "20260724140000"},
+            }
         else:
             # /latest: cached snapshot with state.Vehicle
             resp.json.return_value = {
@@ -61,17 +67,54 @@ def test_force_refresh_wakes_sleeps_reads_latest_and_applies(eu_api, ccs2_vehicl
     ):
         eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
 
-    # wake + /latest read (2 GETs, distinct URLs)
-    assert len(get_urls) == 2
+    # wake, /latest read, then the location request once the wake is done
+    assert len(get_urls) == 3
     assert get_urls[0].endswith("/ccs2/carstatus")
     assert get_urls[1].endswith("/ccs2/carstatus/latest")
-    # slept once, 25s
-    assert sleep_calls == [25]
+    assert get_urls[2].endswith("/location")
+    # 25 s for the status, 10 s for /location/park to serve the new fix
+    assert sleep_calls == [25, 10]
     # applied the /latest state + refreshed location
     eu_api._update_vehicle_properties_ccs2.assert_called_once()
     applied_state = eu_api._update_vehicle_properties_ccs2.call_args[0][1]
     assert applied_state == {"Date": "20260724120000.000"}
     eu_api._set_cached_location_park.assert_called_once_with(token, ccs2_vehicle)
+    # the position comes from /location/park, not from GET /location's clock
+    assert ccs2_vehicle.location_last_updated_at is None
+
+
+def test_force_refresh_continues_when_location_wake_fails(eu_api, ccs2_vehicle):
+    """A failed GET /location must not stop the status refresh."""
+    token = SimpleNamespace(access_token="t", device_id="d")
+
+    def mock_get(url, headers=None):
+        resp = MagicMock()
+        if url.endswith("/ccs2/carstatus") and not url.endswith("/latest"):
+            resp.json.return_value = {"retCode": "S", "resCode": "0000", "msgId": "m1"}
+        elif url.endswith("/location"):
+            resp.json.side_effect = ValueError("not JSON")
+        else:
+            resp.json.return_value = {
+                "retCode": "S",
+                "resMsg": {"state": {"Vehicle": {"Date": "20260724120000.000"}}},
+            }
+        return resp
+
+    sleep_calls = []
+
+    with (
+        patch.object(eu_api.session, "get", side_effect=mock_get),
+        patch(
+            "hyundai_kia_connect_api.KiaUvoApiEU.sleep",
+            side_effect=lambda s: sleep_calls.append(s),
+        ),
+    ):
+        eu_api._force_refresh_vehicle_state_ccs2(token, ccs2_vehicle)
+
+    eu_api._update_vehicle_properties_ccs2.assert_called_once()
+    eu_api._set_cached_location_park.assert_called_once_with(token, ccs2_vehicle)
+    # no wait for a fix that was not requested
+    assert sleep_calls == [25]
 
 
 def test_force_refresh_does_not_read_resMsg_from_wake_endpoint(eu_api, ccs2_vehicle):
