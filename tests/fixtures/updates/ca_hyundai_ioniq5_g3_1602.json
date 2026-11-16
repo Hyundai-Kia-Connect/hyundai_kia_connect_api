@@ -1,0 +1,48 @@
+{
+    "_fixture_meta": {
+        "vehicles": "2026 IONIQ 5 (EV, genType G3)",
+        "source": "ca2110_gate_check.py read-only --dump posted by emckibben on Hyundai-Kia-Connect/hyundai_kia_connect_api#1602 (comment 6888133078); one dump, one car, kia_uvo 4.1.0-beta.5 / lib 5.3.1",
+        "follow_up_sources": "vrfypin/fndmcr/nxtsvc/selsoc/gtmvrlst/gtmvrrpt bodies reused from same-region fixtures (ca_vrfypin, ca_fndmcr, ca_nxtsvc, ca_selsoc, ca_gtmvrlst, ca_gtmvrrpt), the same cross-car reuse the kona scenario documents",
+        "not_captured": [
+            "POST alerts/maintenance/evTripDetails (no capture with a body)"
+        ],
+        "description": "G3 cached status carrying hvacTempType in both reservChargeInfo forms; identifiers and coordinates scrubbed by the dump script."
+    },
+    "implementation": {
+        "region": "Canada",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "year": 2026
+    },
+    "responses": {
+        "POST /tods/api/lstvhclsts": {
+            "body": "$fixture:updates/responses/ca_hyundai_lstvhclsts_1602.json"
+        },
+        "POST /tods/api/vrfypin": {
+            "body": "$fixture:updates/responses/ca_vrfypin.json"
+        },
+        "POST /tods/api/nxtsvc": {
+            "body": "$fixture:updates/responses/ca_nxtsvc.json"
+        },
+        "POST /tods/api/fndmcr": {
+            "body": "$fixture:updates/responses/ca_fndmcr.json"
+        },
+        "POST /tods/api/evc/selsoc": {
+            "body": "$fixture:updates/responses/ca_selsoc.json"
+        },
+        "POST /tods/api/alerts/maintenance/evTripDetails": {
+            "status": 503,
+            "body": null
+        },
+        "POST /tods/api/gtmvrlst": {
+            "body": "$fixture:updates/responses/ca_gtmvrlst.json"
+        },
+        "POST /tods/api/gtmvrrpt": {
+            "body": "$fixture:updates/responses/ca_gtmvrrpt.json"
+        }
+    }
+}
