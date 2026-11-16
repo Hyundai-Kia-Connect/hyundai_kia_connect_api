@@ -29,6 +29,7 @@ from hyundai_kia_connect_api.const import (
     LENGTH_KILOMETERS,
     LENGTH_MILES,
 )
+from hyundai_kia_connect_api.GspaApiEU import GspaApiEU
 from hyundai_kia_connect_api.utils import parse_distance_unit, refine_dte_distance
 from hyundai_kia_connect_api.Vehicle import Vehicle
 
@@ -175,3 +176,54 @@ class TestApiImplType1Dte:
         del state["Drivetrain"]["FuelSystem"]["DTE"]["Total"]
         vehicle = self._parse(api, state)
         assert vehicle.total_driving_range is None
+
+
+GSPA_STATE = {
+    "Drivetrain": {"FuelSystem": {"DTE": {"Unit": 1, "Total": 450, "Fuel": 90}}},
+    "Electronics": {"Battery": {"Level": 62}},
+    "Green": {
+        "ChargingInformation": {"DTE": {"TargetSoC": {"Standard": 300, "Quick": 320}}}
+    },
+}
+
+
+class TestGspaDte:
+    @pytest.fixture
+    def api(self):
+        import datetime
+
+        api = GspaApiEU.__new__(GspaApiEU)
+        api.data_timezone = datetime.UTC
+        return api
+
+    def _parse(self, api, state, engine_type=ENGINE_TYPES.EV):
+        vehicle = Vehicle(id="test-id")
+        vehicle.engine_type = engine_type
+        api._update_vehicle_properties_ccs2(vehicle, state)
+        return vehicle
+
+    def test_gspa_unknown_unit_70_does_not_raise_and_clears_ranges(self, api, caplog):
+        vehicle = self._parse(api, _dte_state(GSPA_STATE, Unit=70, Total=250))
+        assert vehicle.total_driving_range is None
+        assert vehicle.ev_target_range_charge_AC is None
+        assert vehicle.ev_target_range_charge_DC is None
+        assert vehicle.car_battery_percentage == 62
+        assert "70" in caplog.text
+
+    def test_gspa_valid_unit_1_keeps_ranges(self, api):
+        vehicle = self._parse(api, GSPA_STATE)
+        assert vehicle.total_driving_range == 450.0
+        assert vehicle.total_driving_range_unit == LENGTH_KILOMETERS
+        assert vehicle.fuel_driving_range == 90.0
+
+    def test_gspa_total_sentinel_4095(self, api):
+        vehicle = self._parse(api, _dte_state(GSPA_STATE, Total=4095))
+        assert vehicle.total_driving_range is None
+        assert vehicle.fuel_driving_range == 90.0
+
+    def test_gspa_valid_then_unknown_clears_stale(self, api):
+        keep = self._parse(api, GSPA_STATE)
+        assert keep.total_driving_range == 450.0
+        stale = self._parse(api, _dte_state(GSPA_STATE, Unit=999))
+        assert stale.total_driving_range is None
+        assert stale.ev_target_range_charge_AC is None
