@@ -194,10 +194,9 @@ def normalize_battery_soc(
 def parse_distance_unit(raw: Any) -> str | None:
     """Map a wire distance-unit code to a length unit, or None (#1606).
 
-    The vendor apps (BlueLink 2.0.26 -> OneApp EU 1.5.x) default any
-    unmapped unit code to km; here an unmapped code instead means the
-    distance cannot be interpreted, so it yields None. None and 0 are
-    known "unspecified" codes (silent)."""
+    The vendor apps default an unmapped unit code to km; here an unmapped
+    code instead means the distance cannot be interpreted, so ranges are
+    reported unknown. None and 0 are known "unspecified" codes (silent)."""
     unit = DISTANCE_UNITS.get(raw)
     if unit is None and raw not in DISTANCE_UNITS:
         _LOGGER.warning(
@@ -210,10 +209,10 @@ def parse_distance_unit(raw: Any) -> str | None:
 def refine_dte_distance(value: Any, *, ev: bool = False) -> float | None:
     """Drop 12-bit DTE sentinels and out-of-domain values.
 
-    The vendor apps treat 4095 as an invalid total/ICE DTE and 1023 as an
-    invalid EV-only DTE (12-bit CAN field), clamped to 0..4094, and display
-    0 or "--". Here a sentinel becomes None so automations never ingest a
-    fake 0 km range (#1606)."""
+    Vendor apps treat 4095 (total/ICE) and 1023 (EV-only) as invalid
+    readings from the car's 12-bit DTE field and display 0 or "--";
+    here a sentinel becomes unknown: a fake 0 km range is worse for
+    automations than a missing one (#1606)."""
     dte = float_or_none(value)
     if dte is None:
         return None

@@ -2050,7 +2050,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             vehicle.fuel_driving_range = (fuel_dte, dte_unit)
         elif dte_unit is None:
             vehicle.fuel_driving_range = (None, None)
-        # (fuel value missing with a known unit keeps the previous "skip")
+        # missing fuel value with a known unit keeps the previous reading
         if vehicle.engine_type == ENGINE_TYPES.EV:
             vehicle.ev_driving_range = (
                 vehicle.total_driving_range,

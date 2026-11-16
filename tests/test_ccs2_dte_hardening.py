@@ -1,21 +1,13 @@
 """Tests for DTE distance hardening in the EU CCS2 parsers (#1606).
 
-A EU backend change started shipping an unmapped DTE unit code (70) in
-``Drivetrain.FuelSystem.DTE.Unit``; the unguarded ``DISTANCE_UNITS[...]``
-lookups raised KeyError and aborted the whole vehicle update, leaving the
-kia_uvo integration in setup_retry.
+An unmapped DTE unit code (70) started arriving from the EU backend;
+the bare DISTANCE_UNITS lookups raised KeyError and aborted the whole
+vehicle update, leaving the kia_uvo integration in setup_retry.
 
-The vendor apps never crash on unknown units: every generation maps
-unmapped codes to km (OneApp EU 1.5.x ``DistanceUnit.convert1Km2Mile`` =
-1->Km, 2->Mile, else->Km; BlueLink 2.0.26 ``f.a`` = unit 3 -> mi, else ->
-km). We deviate on purpose: an unmapped code means the distance cannot be
-interpreted, so ranges become unknown instead of a guessed unit.
-
-The 12-bit DTE sentinels (4095 for total/ICE, 1023 for EV-only) are
-treated as invalid readings by the same apps (zeroed for display, "--"
-in BlueLink 2.0.26); the library turned them into real ranges. A
-sentinel here becomes unknown too: a fake "0 km" range is worse for
-automations than a missing one.
+Every vendor app generation treats unmapped units as km and zeroes the
+12-bit DTE sentinels (4095 total/ICE, 1023 EV) for display. The parsers
+instead report an unmapped unit or a sentinel as unknown: a guessed
+unit or a fake 0 km range is worse for automations than a missing one.
 """
 
 import logging
