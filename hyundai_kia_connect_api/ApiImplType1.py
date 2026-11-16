@@ -1125,6 +1125,8 @@ class ApiImplType1(ApiImpl):
             # PHEV reports the electric-only range separately in DTE.EV
             # (DTE.Total includes the ICE range). HEV/ICE have no plug and no
             # EV-only range, so ev_driving_range stays None for them.
+            # An invalid total invalidates the whole DTE family for this
+            # poll, so the EV/ICE slots are gated on it too.
             ev_range = refine_dte_distance(
                 get_child_value(state, "Drivetrain.FuelSystem.DTE.EV"), ev=True
             )

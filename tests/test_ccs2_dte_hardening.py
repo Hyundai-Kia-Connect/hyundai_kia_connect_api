@@ -219,3 +219,50 @@ class TestGspaDte:
         stale = self._parse(api, _dte_state(GSPA_STATE, Unit=999))
         assert stale.total_driving_range is None
         assert stale.ev_target_range_charge_AC is None
+
+
+class TestGspaDteSentinel:
+    @pytest.fixture
+    def api(self):
+        import datetime
+
+        api = GspaApiEU.__new__(GspaApiEU)
+        api.data_timezone = datetime.UTC
+        return api
+
+    @pytest.fixture
+    def vehicle(self):
+        vehicle = Vehicle(id="test-id")
+        vehicle.engine_type = ENGINE_TYPES.EV
+        return vehicle
+
+    def test_gspa_fuel_sentinel_4095_clears_stale(self, api, vehicle):
+        api._update_vehicle_properties_ccs2(vehicle, _dte_state(GSPA_STATE, Fuel=550))
+        assert vehicle.fuel_driving_range == 550.0
+        api._update_vehicle_properties_ccs2(vehicle, _dte_state(GSPA_STATE, Fuel=4095))
+        assert vehicle.fuel_driving_range is None
+
+    def test_gspa_missing_fuel_clears(self, api, vehicle):
+        api._update_vehicle_properties_ccs2(vehicle, GSPA_STATE)
+        assert vehicle.fuel_driving_range == 90.0
+        api._update_vehicle_properties_ccs2(vehicle, _dte_state(GSPA_STATE, Fuel=None))
+        assert vehicle.fuel_driving_range is None
+
+
+class TestPhevMissingTotal:
+    @pytest.fixture
+    def api(self):
+        api = ApiImplType1.__new__(ApiImplType1)
+        api.data_timezone = None
+        api.temperature_range = [x * 0.5 for x in range(28, 60)]
+        return api
+
+    def test_phev_missing_total_clears_ev_and_fuel(self, api):
+        vehicle = Vehicle(id="test-id")
+        vehicle.engine_type = ENGINE_TYPES.PHEV
+        state = _dte_state(PHEV_STATE)
+        del state["Drivetrain"]["FuelSystem"]["DTE"]["Total"]
+        api._update_vehicle_properties_ccs2(vehicle, state)
+        assert vehicle.total_driving_range is None
+        assert vehicle.ev_driving_range is None
+        assert vehicle.fuel_driving_range is None

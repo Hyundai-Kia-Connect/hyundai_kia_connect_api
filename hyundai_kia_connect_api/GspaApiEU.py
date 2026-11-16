@@ -2046,11 +2046,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         fuel_dte = refine_dte_distance(
             get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
         )
-        if fuel_dte is not None and dte_unit is not None:
-            vehicle.fuel_driving_range = (fuel_dte, dte_unit)
-        elif dte_unit is None:
-            vehicle.fuel_driving_range = (None, None)
-        # missing fuel value with a known unit keeps the previous reading
+        # an invalid or missing fuel reading clears the stale value too
+        vehicle.fuel_driving_range = (
+            (fuel_dte, dte_unit)
+            if fuel_dte is not None and dte_unit is not None
+            else (None, None)
+        )
         if vehicle.engine_type == ENGINE_TYPES.EV:
             vehicle.ev_driving_range = (
                 vehicle.total_driving_range,
