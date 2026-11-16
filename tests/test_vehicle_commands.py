@@ -38,7 +38,7 @@ from hyundai_kia_connect_api.const import (
     REGIONS,
     VEHICLE_LOCK_ACTION,
 )
-from hyundai_kia_connect_api.exceptions import UnsupportedControlError
+from hyundai_kia_connect_api.exceptions import APIError, UnsupportedControlError
 from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
 from hyundai_kia_connect_api.VehicleManager import VehicleManager
@@ -281,9 +281,10 @@ def test_ca_start_climate_rejection_raises(
         COMMANDS["start_climate"](api, token, vehicle)
 
 
-def test_ca_command_response_without_envelope_passes(
+def test_ca_command_response_without_envelope_raises(
     command_response: tuple[list[dict[str, Any]], dict[str, Any]],
 ) -> None:
+    """Shape per the shared method's pinned contract: a missing envelope raises."""
     api = VehicleManager.get_implementation_by_region_brand(
         _key(REGIONS, REGION_CANADA), _key(BRANDS, BRAND_HYUNDAI), "en"
     )
@@ -305,9 +306,8 @@ def test_ca_command_response_without_envelope_passes(
     )
     _sent, body_holder = command_response
     body_holder["body"] = {"result": {"foo": "bar"}}
-    action_id = COMMANDS["start_climate"](api, token, vehicle)
-    assert isinstance(action_id, str)
-    assert action_id
+    with pytest.raises(APIError):
+        COMMANDS["start_climate"](api, token, vehicle)
 
 
 def test_ca_command_response_null_header_passes(
