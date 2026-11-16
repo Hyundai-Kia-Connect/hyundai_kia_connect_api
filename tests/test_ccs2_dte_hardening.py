@@ -20,12 +20,17 @@ automations than a missing one.
 
 import logging
 
+import pytest
+
+from hyundai_kia_connect_api.ApiImplType1 import ApiImplType1
 from hyundai_kia_connect_api.const import (
     DISTANCE_UNITS,
+    ENGINE_TYPES,
     LENGTH_KILOMETERS,
     LENGTH_MILES,
 )
 from hyundai_kia_connect_api.utils import parse_distance_unit, refine_dte_distance
+from hyundai_kia_connect_api.Vehicle import Vehicle
 
 
 class TestParseDistanceUnit:
@@ -76,3 +81,97 @@ class TestRefineDteDistance:
 
     def test_none(self):
         assert refine_dte_distance(None) is None
+
+
+EV_STATE = {
+    "Drivetrain": {"FuelSystem": {"DTE": {"Unit": 1, "Total": 450}}},
+    "Electronics": {"Battery": {"Level": 62}},
+    "Green": {
+        "ChargingInformation": {"DTE": {"TargetSoC": {"Standard": 300, "Quick": 320}}}
+    },
+}
+
+PHEV_STATE = {
+    "Drivetrain": {
+        "FuelSystem": {"DTE": {"Unit": 1, "Total": 600, "EV": 47, "ICE": 551}}
+    },
+    "Electronics": {"Battery": {"Level": 62}},
+}
+
+
+def _dte_state(base, **dte_overrides):
+    """Deep-copied status with Drivetrain.FuelSystem.DTE overrides."""
+    import copy
+
+    state = copy.deepcopy(base)
+    state["Drivetrain"]["FuelSystem"]["DTE"].update(dte_overrides)
+    return state
+
+
+class TestApiImplType1Dte:
+    @pytest.fixture
+    def api(self):
+        api = ApiImplType1.__new__(ApiImplType1)
+        api.data_timezone = None
+        api.temperature_range = [x * 0.5 for x in range(28, 60)]
+        return api
+
+    def _parse(self, api, state, engine_type=ENGINE_TYPES.EV):
+        vehicle = Vehicle(id="test-id")
+        vehicle.engine_type = engine_type
+        api._update_vehicle_properties_ccs2(vehicle, state)
+        return vehicle
+
+    def test_unknown_unit_70_does_not_raise_and_clears_ranges(self, api, caplog):
+        vehicle = self._parse(api, _dte_state(EV_STATE, Unit=70, Total=250))
+        assert vehicle.total_driving_range is None
+        assert vehicle.ev_target_range_charge_AC is None
+        assert vehicle.ev_target_range_charge_DC is None
+        assert vehicle.car_battery_percentage == 62
+        assert "70" in caplog.text
+
+    def test_unspecified_unit_0_clears_ranges_without_warning(self, api, caplog):
+        with caplog.at_level(logging.WARNING):
+            vehicle = self._parse(api, _dte_state(EV_STATE, Unit=0, Total=250))
+        assert vehicle.total_driving_range is None
+        assert "Unknown distance unit" not in caplog.text
+
+    def test_valid_unit_keeps_ranges(self, api):
+        vehicle = self._parse(api, EV_STATE)
+        assert vehicle.total_driving_range == 450.0
+        assert vehicle.total_driving_range_unit == LENGTH_KILOMETERS
+        assert vehicle.ev_target_range_charge_AC == 300.0
+        assert vehicle.ev_target_range_charge_DC == 320.0
+
+    def test_valid_then_unknown_unit_clears_stale_ranges(self, api):
+        keep = self._parse(api, EV_STATE)
+        assert keep.total_driving_range == 450.0
+        stale = self._parse(api, _dte_state(EV_STATE, Unit=999))
+        assert stale.total_driving_range is None
+        assert stale.ev_target_range_charge_AC is None
+
+    def test_phev_ev_sentinel_1023(self, api):
+        vehicle = self._parse(
+            api,
+            _dte_state(PHEV_STATE, EV=1023),
+            engine_type=ENGINE_TYPES.PHEV,
+        )
+        assert vehicle.total_driving_range == 600.0
+        assert vehicle.ev_driving_range is None
+        assert vehicle.fuel_driving_range == 551.0
+
+    def test_phev_ice_sentinel_4095(self, api):
+        vehicle = self._parse(
+            api,
+            _dte_state(PHEV_STATE, Total=4095, ICE=4095),
+            engine_type=ENGINE_TYPES.PHEV,
+        )
+        assert vehicle.total_driving_range is None
+        assert vehicle.fuel_driving_range is None
+        assert vehicle.ev_driving_range is None
+
+    def test_missing_total_no_longer_raises(self, api):
+        state = _dte_state(EV_STATE)
+        del state["Drivetrain"]["FuelSystem"]["DTE"]["Total"]
+        vehicle = self._parse(api, state)
+        assert vehicle.total_driving_range is None
