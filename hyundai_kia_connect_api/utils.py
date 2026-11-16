@@ -7,6 +7,8 @@ from collections.abc import Sequence
 from enum import IntEnum
 from typing import Any
 
+from .const import DISTANCE_UNITS
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -187,6 +189,40 @@ def normalize_battery_soc(
         )
         return None
     return int(value)
+
+
+def parse_distance_unit(raw: Any) -> str | None:
+    """Map a wire distance-unit code to a length unit, or None (#1606).
+
+    The vendor apps (BlueLink 2.0.26 -> OneApp EU 1.5.x) default any
+    unmapped unit code to km; here an unmapped code instead means the
+    distance cannot be interpreted, so it yields None. None and 0 are
+    known "unspecified" codes (silent)."""
+    unit = DISTANCE_UNITS.get(raw)
+    if unit is None and raw not in DISTANCE_UNITS:
+        _LOGGER.warning(
+            "Unknown distance unit %r; reporting affected ranges as unknown",
+            raw,
+        )
+    return unit
+
+
+def refine_dte_distance(value: Any, *, ev: bool = False) -> float | None:
+    """Drop 12-bit DTE sentinels and out-of-domain values.
+
+    The vendor apps treat 4095 as an invalid total/ICE DTE and 1023 as an
+    invalid EV-only DTE (12-bit CAN field), clamped to 0..4094, and display
+    0 or "--". Here a sentinel becomes None so automations never ingest a
+    fake 0 km range (#1606)."""
+    dte = float_or_none(value)
+    if dte is None:
+        return None
+    if dte == 4095 or (ev and dte == 1023):
+        _LOGGER.warning("DTE sentinel value %s treated as unknown", dte)
+        return None
+    if dte < 0 or dte > 4094:
+        return None
+    return dte
 
 
 def normalize_battery_soh(value: Any) -> Any:
