@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 from urllib.parse import urlparse
@@ -36,6 +37,20 @@ if TYPE_CHECKING:
 UPDATES_DIR = FIXTURES_DIR / "updates"
 SCENARIOS = sorted(p.stem for p in UPDATES_DIR.glob("*.json"))
 REF = "$fixture"
+
+# Request bodies may carry per-call ids (legacy-SPA device registration).
+_UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
+
+
+def _stable(value: Any) -> Any:
+    """Replace uuid-shaped strings in recorded requests with a placeholder."""
+    if isinstance(value, str):
+        return _UUID.sub("<uuid>", value)
+    if isinstance(value, dict):
+        return {k: _stable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_stable(v) for v in value]
+    return value
 
 
 def _key(mapping: dict[int, str], value: str) -> int:
@@ -108,7 +123,13 @@ def test_vehicle_update(scenario: str, snapshot: SnapshotAssertion) -> None:
         self: requests.Session, method: str, url: str, **kwargs: Any
     ) -> requests.Response:
         path = urlparse(url).path
-        sent.append({"method": method.upper(), "url": url, "json": kwargs.get("json")})
+        sent.append(
+            {
+                "method": method.upper(),
+                "url": url,
+                "json": _stable(kwargs.get("json")),
+            }
+        )
         matches = [
             k
             for k in pending

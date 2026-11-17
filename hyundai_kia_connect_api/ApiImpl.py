@@ -507,6 +507,10 @@ class ApiImpl:
         Required for Kia USA as key is session specific"""
         return
 
+    def parse_vehicle_profile(self, token: Token, vehicle: Vehicle) -> None:
+        """Update the vehicle from its region vehicle profile, where supported."""
+        return
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Get cached vehicle data and update Vehicle instance with it"""
         raise NotImplementedError(

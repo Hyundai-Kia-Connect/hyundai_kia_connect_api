@@ -47,6 +47,12 @@ class KiaUvoApiAU(ApiImplType1):
 
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfoDetail"
 
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        vehicle = super()._vehicle_from_spa_entry(entry)
+        # The AU backend applies ignitionDuration (kia_uvo#2063 reporter log).
+        vehicle.supports.climate_duration_setting = True
+        return vehicle
+
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
         self.brand = brand

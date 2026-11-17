@@ -55,6 +55,7 @@ from .utils import (
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
+    parse_vehicle_profile_duration,
 )
 from .Vehicle import (
     Vehicle,
@@ -532,6 +533,24 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def parse_vehicle_profile(self, token: Token, vehicle: Vehicle) -> None:
+        """Legacy-SPA vehicle profile — the only source of clmtCtrlOption."""
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/profile"
+        response = self.session.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        if response.status_code != 200:
+            _LOGGER.debug(
+                f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
+            )
+            return
+        profile = response.json()
+        _check_response_for_errors(profile)
+        parse_vehicle_profile_duration(vehicle, profile.get("resMsg"))
 
     @_retry_on_device_id_error
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:

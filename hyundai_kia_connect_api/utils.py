@@ -5,7 +5,10 @@ import logging
 import re
 from collections.abc import Sequence
 from enum import IntEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -331,3 +334,16 @@ def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime 
             )
 
     return None
+
+
+def parse_vehicle_profile_duration(vehicle: "Vehicle", profile: Any) -> None:
+    """Set ``vehicle.supports.climate_duration_setting`` from a profile payload.
+
+    The app gates the remote-climate duration picker on option
+    ``clmtCtrlOption == 1``; an absent key means unsupported.
+    """
+    entries = profile.get("vinInfo") if isinstance(profile, dict) else None
+    option = entries[0].get("option", {}) if entries else {}
+    if not isinstance(option, dict):
+        return
+    vehicle.supports.climate_duration_setting = option.get("clmtCtrlOption") == 1
