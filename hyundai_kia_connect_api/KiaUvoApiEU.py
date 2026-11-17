@@ -595,6 +595,12 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         _check_response_for_errors(response)
         state = response["resMsg"]["state"]["Vehicle"]
         self._update_vehicle_properties_ccs2(vehicle, state)
+        # GET /location asks the awake car for a fresh GPS fix, which
+        # /location/park serves a few seconds later. Sent right after the wake
+        # above, it fails with a duplicate request. Its own time field is not
+        # used: UTC on some cars, local time on a PV5 in Finland.
+        if self._get_location(token, vehicle) is not None:
+            sleep(10)
         self._set_cached_location_park(token, vehicle)
 
     def _update_vehicle_properties(
