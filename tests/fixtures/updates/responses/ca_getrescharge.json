@@ -1,0 +1,24 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "GET tods/api/v2/rc/ev/getrescharge",
+        "source": "Live read on a 2027 Kia EV5 (kiaconnect.ca, genType G3), 2026-11-17, right after a reschargeset that set 'charge only 20:00 to 16:00'",
+        "description": "Real response."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "reservFlag": 1,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {
+            "time": "0800",
+            "timeSection": 1
+        },
+        "reservEndTime": {
+            "time": "0400",
+            "timeSection": 1
+        }
+    }
+}
