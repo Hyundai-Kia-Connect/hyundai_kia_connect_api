@@ -28,6 +28,8 @@ from .ApiImpl import (
     _vehicle_temperature_unit,
 )
 from .const import (
+    BRAND_HYUNDAI,
+    BRANDS,
     CHARGING_CONNECTOR_LOCK_STATE,
     CONNECTOR_FASTENING_STATE,
     DISTANCE_UNITS,
@@ -1094,6 +1096,18 @@ class ApiImplType1(ApiImpl):
         ):
             # Fastening 0 means the cable is out only when the connector
             # lock reports idle; locked-idle plugs read 0 too (#2099).
+            vehicle.ev_battery_is_plugged_in = False
+        elif (
+            vehicle.ev_connector_fastening_state
+            is CONNECTOR_FASTENING_STATE.DISCONNECTED
+            and lock_raw is None
+            and get_child_value(state, "Green.ChargingInformation.Charging.State") == 0
+            and BRANDS.get(getattr(self, "brand", 0)) == BRAND_HYUNDAI
+        ):
+            # Hyundai EU legacy CCS2 omits Green.ChargingConnector; on this
+            # platform Fastening 0 tracks the cable (Tucson PHEV, #1613).
+            # Kia reads 0 for a plugged idle connector (Hyundai-Kia-Connect/
+            # kia_uvo#1495), so the Hyundai brand gate stays.
             vehicle.ev_battery_is_plugged_in = False
         else:
             vehicle.ev_battery_is_plugged_in = None

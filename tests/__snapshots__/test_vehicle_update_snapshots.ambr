@@ -4334,7 +4334,7 @@
       'ev_battery_chiller_rpm': None,
       'ev_battery_heating_state': None,
       'ev_battery_is_charging': False,
-      'ev_battery_is_plugged_in': None,
+      'ev_battery_is_plugged_in': False,
       'ev_battery_pack_voltage': None,
       'ev_battery_percentage': 79,
       'ev_battery_precondition_enabled': None,
