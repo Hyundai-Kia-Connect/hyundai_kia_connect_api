@@ -104,6 +104,23 @@ If geolocation is required you can also allow this by running::
 
 This will populate the address of the vehicle in the vehicle instance.
 
+Remote climate options
+----------------------
+
+``start_climate`` takes seat, steering wheel, heating and mirror values through
+``ClimateRequestOptions``. Which body field carries the rear-window and mirror
+heating depends on the vehicle path:
+
+- EU CCS2 and EU GSPA vehicles: the ``heating`` option (1, 2 or 4) sends
+  ``sideRearMirrorHeating: 1``; 0 and 3 leave it off. Confirmed by single-field
+  tests in issue #1398.
+- Legacy EU (pre-CCS2) and other regions: the ``heating`` option sends
+  ``heating1``, as before. On the legacy EU path an explicit
+  ``side_rear_mirror_heating`` can also be sent in the same request.
+
+An explicit ``side_rear_mirror_heating`` value takes precedence over the
+``heating`` mapping.
+
 MQTT push (Europe CCI/GSPA)
 ---------------------------
 
