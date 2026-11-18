@@ -100,6 +100,50 @@ def test_socks_proxies_are_left_to_requests_own_manager(monkeypatch):
     assert base_calls == [(url, {})]
 
 
+def _context_from_mock(monkeypatch, version, attrs):
+    """Build create_session_ticket_context around a controllable fake context.
+
+    The real SSLContext cannot simulate "no set_groups" on Python 3.15: the
+    method is a C descriptor on _ssl._SSLContext, and deleting the class-level
+    entry only removes a shadowing attribute while the descriptor stays
+    reachable through the MRO. A spec'd mock makes the capability explicit.
+    """
+    context = MagicMock(spec=attrs)
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.KiaUvoApiCA.create_urllib3_context",
+        lambda **kwargs: context,
+    )
+    monkeypatch.setattr(ssl, "OPENSSL_VERSION_INFO", version)
+    return context
+
+
+def test_pq_openssl_pins_groups_via_set_groups(monkeypatch):
+    context = _context_from_mock(
+        monkeypatch, (3, 5, 4), ["options", "set_groups", "set_ecdh_curve"]
+    )
+
+    create_session_ticket_context()
+
+    context.set_groups.assert_called_once_with("X25519")
+    context.set_ecdh_curve.assert_not_called()
+
+
+def test_pq_openssl_on_python_314_falls_back_to_set_ecdh_curve(monkeypatch):
+    context = _context_from_mock(monkeypatch, (3, 5, 4), ["options", "set_ecdh_curve"])
+
+    create_session_ticket_context()
+
+    context.set_ecdh_curve.assert_called_once_with("X25519")
+
+
+def test_openssl_without_pq_default_leaves_groups_alone(monkeypatch):
+    context = _context_from_mock(monkeypatch, (3, 4, 3), ["options", "set_ecdh_curve"])
+
+    create_session_ticket_context()
+
+    context.set_ecdh_curve.assert_not_called()
+
+
 def _html_block_response():
     response = requests.Response()
     response.status_code = 403

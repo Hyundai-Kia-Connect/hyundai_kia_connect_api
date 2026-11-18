@@ -79,9 +79,21 @@ def create_session_ticket_context() -> ssl.SSLContext:
     Python 3.14 / OpenSSL 3.5 (Home Assistant 2026.10) that ClientHello is
     classified as a bot and v2/login answers 403 with an HTML block page.
     This context keeps tickets enabled and is let through.
+
+    OpenSSL 3.5+ also offers a hybrid post-quantum X25519MLKEM768 key share
+    in that ClientHello by default, which Cloudflare scores as a bot even
+    with tickets enabled (Hyundai-Kia-Connect/kia_uvo#2119); on
+    those builds the key exchange groups are pinned to X25519. Python 3.15
+    exposes that as set_groups; 3.14 does the same through set_ecdh_curve,
+    which OpenSSL applies to the TLS 1.3 group list as well.
     """
     context = create_urllib3_context()
     context.options &= ~ssl.OP_NO_TICKET
+    if ssl.OPENSSL_VERSION_INFO >= (3, 5):
+        if hasattr(context, "set_groups"):
+            context.set_groups("X25519")
+        else:
+            context.set_ecdh_curve("X25519")
     return context
 
 
