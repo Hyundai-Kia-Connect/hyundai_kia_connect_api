@@ -100,41 +100,48 @@ def test_socks_proxies_are_left_to_requests_own_manager(monkeypatch):
     assert base_calls == [(url, {})]
 
 
-def _patch_groups(monkeypatch, version):
+def _context_from_mock(monkeypatch, version, attrs):
+    """Build create_session_ticket_context around a controllable fake context.
+
+    The real SSLContext cannot simulate "no set_groups" on Python 3.15: the
+    method is a C descriptor on _ssl._SSLContext, and deleting the class-level
+    entry only removes a shadowing attribute while the descriptor stays
+    reachable through the MRO. A spec'd mock makes the capability explicit.
+    """
+    context = MagicMock(spec=attrs)
+    monkeypatch.setattr(
+        "hyundai_kia_connect_api.KiaUvoApiCA.create_urllib3_context",
+        lambda **kwargs: context,
+    )
     monkeypatch.setattr(ssl, "OPENSSL_VERSION_INFO", version)
-    set_groups = MagicMock()
-    set_ecdh = MagicMock()
-    monkeypatch.setattr(ssl.SSLContext, "set_groups", set_groups, raising=False)
-    monkeypatch.setattr(ssl.SSLContext, "set_ecdh_curve", set_ecdh, raising=False)
-    return set_groups, set_ecdh
+    return context
 
 
 def test_pq_openssl_pins_groups_via_set_groups(monkeypatch):
-    set_groups, set_ecdh = _patch_groups(monkeypatch, (3, 5, 4))
+    context = _context_from_mock(
+        monkeypatch, (3, 5, 4), ["options", "set_groups", "set_ecdh_curve"]
+    )
 
     create_session_ticket_context()
 
-    set_groups.assert_called_once_with("X25519")
-    set_ecdh.assert_not_called()
+    context.set_groups.assert_called_once_with("X25519")
+    context.set_ecdh_curve.assert_not_called()
 
 
 def test_pq_openssl_on_python_314_falls_back_to_set_ecdh_curve(monkeypatch):
-    _set_groups, set_ecdh = _patch_groups(monkeypatch, (3, 5, 4))
-
-    monkeypatch.delattr(ssl.SSLContext, "set_groups", raising=False)
+    context = _context_from_mock(monkeypatch, (3, 5, 4), ["options", "set_ecdh_curve"])
 
     create_session_ticket_context()
 
-    set_ecdh.assert_called_once_with("X25519")
+    context.set_ecdh_curve.assert_called_once_with("X25519")
 
 
 def test_openssl_without_pq_default_leaves_groups_alone(monkeypatch):
-    set_groups, set_ecdh = _patch_groups(monkeypatch, (3, 4, 3))
+    context = _context_from_mock(monkeypatch, (3, 4, 3), ["options", "set_ecdh_curve"])
 
     create_session_ticket_context()
 
-    set_groups.assert_not_called()
-    set_ecdh.assert_not_called()
+    context.set_ecdh_curve.assert_not_called()
 
 
 def _html_block_response():
