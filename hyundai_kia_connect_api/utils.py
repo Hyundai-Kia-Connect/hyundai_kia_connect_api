@@ -7,6 +7,8 @@ from collections.abc import Sequence
 from enum import IntEnum
 from typing import Any
 
+from .const import DISTANCE_UNITS
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -187,6 +189,39 @@ def normalize_battery_soc(
         )
         return None
     return int(value)
+
+
+def parse_distance_unit(raw: Any) -> str | None:
+    """Map a wire distance-unit code to a length unit, or None (#1606).
+
+    The vendor apps default an unmapped unit code to km; here an unmapped
+    code instead means the distance cannot be interpreted, so ranges are
+    reported unknown. None and 0 are known "unspecified" codes (silent)."""
+    unit = DISTANCE_UNITS.get(raw)
+    if unit is None and raw not in DISTANCE_UNITS:
+        _LOGGER.warning(
+            "Unknown distance unit %r; reporting affected ranges as unknown",
+            raw,
+        )
+    return unit
+
+
+def refine_dte_distance(value: Any, *, ev: bool = False) -> float | None:
+    """Drop 12-bit DTE sentinels and out-of-domain values.
+
+    Vendor apps treat 4095 (total/ICE) and 1023 (EV-only) as invalid
+    readings from the car's 12-bit DTE field and display 0 or "--";
+    here a sentinel becomes unknown: a fake 0 km range is worse for
+    automations than a missing one (#1606)."""
+    dte = float_or_none(value)
+    if dte is None:
+        return None
+    if dte == 4095 or (ev and dte == 1023):
+        _LOGGER.warning("DTE sentinel value %s treated as unknown", dte)
+        return None
+    if dte < 0 or dte > 4094:
+        return None
+    return dte
 
 
 def normalize_battery_soh(value: Any) -> Any:

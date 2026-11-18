@@ -68,7 +68,9 @@ from .utils import (
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
+    parse_distance_unit,
     pressure_or_none,
+    refine_dte_distance,
     window_is_open,
 )
 from .Vehicle import (
@@ -1101,19 +1103,16 @@ class ApiImplType1(ApiImpl):
         elif charging_door_state == 1:
             vehicle.ev_charge_port_door_is_open = True
 
+        dte_unit = parse_distance_unit(
+            get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
+        )
+        dte_total = refine_dte_distance(
+            get_child_value(state, "Drivetrain.FuelSystem.DTE.Total")
+        )
         vehicle.total_driving_range = (
-            float(
-                get_child_value(
-                    state,
-                    "Drivetrain.FuelSystem.DTE.Total",
-                )
-            ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "Drivetrain.FuelSystem.DTE.Unit",
-                )
-            ],
+            (dte_total, dte_unit)
+            if dte_total is not None and dte_unit is not None
+            else (None, None)
         )
 
         if vehicle.engine_type == ENGINE_TYPES.EV:
@@ -1126,18 +1125,32 @@ class ApiImplType1(ApiImpl):
             # PHEV reports the electric-only range separately in DTE.EV
             # (DTE.Total includes the ICE range). HEV/ICE have no plug and no
             # EV-only range, so ev_driving_range stays None for them.
-            ev_range = get_child_value(state, "Drivetrain.FuelSystem.DTE.EV")
-            if ev_range is not None:
-                vehicle.ev_driving_range = (
-                    float(ev_range),
-                    vehicle.total_driving_range_unit,
+            # An invalid total invalidates the whole DTE family for this
+            # poll, so the EV/ICE slots are gated on it too.
+            ev_range = refine_dte_distance(
+                get_child_value(state, "Drivetrain.FuelSystem.DTE.EV"), ev=True
+            )
+            vehicle.ev_driving_range = (
+                (ev_range, vehicle.total_driving_range_unit)
+                if (
+                    ev_range is not None
+                    and dte_unit is not None
+                    and vehicle.total_driving_range is not None
                 )
-            fuel_range = get_child_value(state, "Drivetrain.FuelSystem.DTE.ICE")
-            if fuel_range is not None:
-                vehicle.fuel_driving_range = (
-                    float(fuel_range),
-                    vehicle.total_driving_range_unit,
+                else (None, None)
+            )
+            fuel_range = refine_dte_distance(
+                get_child_value(state, "Drivetrain.FuelSystem.DTE.ICE")
+            )
+            vehicle.fuel_driving_range = (
+                (fuel_range, vehicle.total_driving_range_unit)
+                if (
+                    fuel_range is not None
+                    and dte_unit is not None
+                    and vehicle.total_driving_range is not None
                 )
+                else (None, None)
+            )
 
         vehicle.washer_fluid_warning_is_on = get_child_value(
             state, "Body.Windshield.Front.WasherFluid.LevelLow"
@@ -1184,28 +1197,26 @@ class ApiImplType1(ApiImpl):
             )
         )
         vehicle.ev_target_range_charge_AC = (
-            get_child_value(
-                state,
-                "Green.ChargingInformation.DTE.TargetSoC.Standard",
-            ),
-            DISTANCE_UNITS[
+            (
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",
-                )
-            ],
+                    "Green.ChargingInformation.DTE.TargetSoC.Standard",
+                ),
+                dte_unit,
+            )
+            if dte_unit is not None
+            else (None, None)
         )
         vehicle.ev_target_range_charge_DC = (
-            get_child_value(
-                state,
-                "Green.ChargingInformation.DTE.TargetSoC.Quick",
-            ),
-            DISTANCE_UNITS[
+            (
                 get_child_value(
                     state,
-                    "Drivetrain.FuelSystem.DTE.Unit",
-                )
-            ],
+                    "Green.ChargingInformation.DTE.TargetSoC.Quick",
+                ),
+                dte_unit,
+            )
+            if dte_unit is not None
+            else (None, None)
         )
         vehicle.ev_first_departure_enabled = bool(
             get_child_value(state, "Green.Reservation.Departure.Schedule1.Enable")

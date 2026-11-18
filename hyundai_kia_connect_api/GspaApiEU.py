@@ -98,7 +98,9 @@ from .utils import (
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
+    parse_distance_unit,
     pressure_or_none,
+    refine_dte_distance,
 )
 from .Vehicle import Vehicle
 
@@ -2030,20 +2032,26 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         elif charging_door_state == 1:
             vehicle.ev_charge_port_door_is_open = True
 
-        dte_total = get_child_value(state, "Drivetrain.FuelSystem.DTE.Total")
-        if dte_total is not None:
-            vehicle.total_driving_range = (
-                float(dte_total),
-                DISTANCE_UNITS[
-                    get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
-                ],
-            )
-        fuel_dte = get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
-        if fuel_dte is not None:
-            vehicle.fuel_driving_range = (
-                float(fuel_dte),
-                vehicle.total_driving_range_unit,
-            )
+        dte_unit = parse_distance_unit(
+            get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")
+        )
+        dte_total = refine_dte_distance(
+            get_child_value(state, "Drivetrain.FuelSystem.DTE.Total")
+        )
+        vehicle.total_driving_range = (
+            (dte_total, dte_unit)
+            if dte_total is not None and dte_unit is not None
+            else (None, None)
+        )
+        fuel_dte = refine_dte_distance(
+            get_child_value(state, "Drivetrain.FuelSystem.DTE.Fuel")
+        )
+        # an invalid or missing fuel reading clears the stale value too
+        vehicle.fuel_driving_range = (
+            (fuel_dte, dte_unit)
+            if fuel_dte is not None and dte_unit is not None
+            else (None, None)
+        )
         if vehicle.engine_type == ENGINE_TYPES.EV:
             vehicle.ev_driving_range = (
                 vehicle.total_driving_range,
@@ -2130,12 +2138,22 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             get_child_value(state, "Green.Electric.SmartGrid.VehicleToLoad.Mode")
         )
         vehicle.ev_target_range_charge_AC = (
-            get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Standard"),
-            DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+            (
+                get_child_value(
+                    state, "Green.ChargingInformation.DTE.TargetSoC.Standard"
+                ),
+                dte_unit,
+            )
+            if dte_unit is not None
+            else (None, None)
         )
         vehicle.ev_target_range_charge_DC = (
-            get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Quick"),
-            DISTANCE_UNITS[get_child_value(state, "Drivetrain.FuelSystem.DTE.Unit")],
+            (
+                get_child_value(state, "Green.ChargingInformation.DTE.TargetSoC.Quick"),
+                dte_unit,
+            )
+            if dte_unit is not None
+            else (None, None)
         )
         departure1_enable = get_child_value(
             state, "Green.Reservation.Departure.Schedule1.Enable"
