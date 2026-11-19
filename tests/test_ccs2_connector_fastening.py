@@ -47,17 +47,19 @@ def vehicle() -> Vehicle:
     return Vehicle(id="test-id")
 
 
-def test_reported_state_populates_enum_plug_on_state_1(parser_api, state, vehicle):
+def test_reported_state_populates_enum_plug_on_state_1(state, vehicle):
     # EV9 fixture: fastening 0 (ambiguous -> unknown); then 1 (cable in,
-    # also true when the car locks only during a session).
-    parser_api._update_vehicle_properties_ccs2(vehicle, state)
+    # also true when the car locks only during a session). Type1 only: the
+    # CCI arms are pinned by gspa stored-status snapshots (fastening 0/1,
+    # both brands).
+    _type1_api()._update_vehicle_properties_ccs2(vehicle, state)
     assert (
         vehicle.ev_connector_fastening_state is CONNECTOR_FASTENING_STATE.DISCONNECTED
     )
     assert vehicle.ev_battery_is_plugged_in is None
 
     state["Green"]["ChargingInformation"].update({"ConnectorFastening": {"State": 1}})
-    parser_api._update_vehicle_properties_ccs2(vehicle, state)
+    _type1_api()._update_vehicle_properties_ccs2(vehicle, state)
     assert vehicle.ev_connector_fastening_state is CONNECTOR_FASTENING_STATE.CONNECTED
     assert vehicle.ev_battery_is_plugged_in is True
 
