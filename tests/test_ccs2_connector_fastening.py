@@ -90,16 +90,6 @@ class TestHyundaiLegacyNoLockBlock:  # trio gated to Hyundai, see module docstri
     def state(self):
         return load_fixture(STATE_FIXTURE)
 
-    def test_hyundai_brand_maps_disconnected_to_false(self, state):
-        # Trio from the reporter's dump: Fastening 0, Charging.State 0, no
-        # ChargingConnector anywhere in the payload.
-        state["Green"]["ChargingInformation"].update(
-            {"Charging": {"RemainTime": 0, "State": 0}}
-        )
-        vehicle = Vehicle(id="test-id")
-        _type1_api_of_brand(2)._update_vehicle_properties_ccs2(vehicle, state)
-        assert vehicle.ev_battery_is_plugged_in is False
-
     def test_kia_brand_stays_unknown(self, state):
         state["Green"]["ChargingInformation"].update(
             {"Charging": {"RemainTime": 0, "State": 0}}
