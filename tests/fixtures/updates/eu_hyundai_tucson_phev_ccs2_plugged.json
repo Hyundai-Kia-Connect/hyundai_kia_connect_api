@@ -1,0 +1,36 @@
+{
+    "_fixture_meta": {
+        "vehicles": "Tucson PHEV, Hyundai EU (pre-ccNC)",
+        "source": "hyundai_kia_connect_api #1613 comment 7007824974 (matomatusov debug captures, 2026-11-19): cached CCS2 status bodies of one Tucson overnight, cable out / cable in with no session",
+        "follow_up_sources": "location/park and drvhistory: not captured in the reporter's log",
+        "not_captured": [
+            "GET /vehicles/VEHICLE-1/location/park",
+            "POST /vehicles/VEHICLE-1/drvhistory"
+        ],
+        "description": "regression pair for #1613: Fastening 0 + Charging.State 0 with no Green.ChargingConnector maps the plug False on Hyundai; the plugged body pins Fastening 1 -> True on the same car"
+    },
+    "implementation": {
+        "region": "Europe",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000004",
+        "engine_type": "PHEV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /vehicles/VEHICLE-1/ccs2/carstatus/latest": {
+            "body": {
+                "$fixture": "updates/responses/eu_hyundai_carstatus_tucson_phev_plugged.json"
+            }
+        },
+        "GET /vehicles/VEHICLE-1/location/park": {
+            "status": 503,
+            "body": null
+        },
+        "POST /vehicles/VEHICLE-1/drvhistory": {
+            "status": 503
+        }
+    }
+}
