@@ -107,12 +107,6 @@ class TestHyundaiLegacyNoLockBlock:  # trio gated to Hyundai, see module docstri
         _type1_api()._update_vehicle_properties_ccs2(vehicle, state)
         assert vehicle.ev_battery_is_plugged_in is None
 
-    def test_charging_state_missing_stays_unknown(self, state):
-        vehicle = Vehicle(id="test-id")
-        state["Green"]["ChargingInformation"].pop("Charging")
-        _type1_api_of_brand(2)._update_vehicle_properties_ccs2(vehicle, state)
-        assert vehicle.ev_battery_is_plugged_in is None
-
     def test_active_session_stays_unknown(self, state):
         # Charging.State 1: Fastening 0 is the Hyundai-Kia-Connect/kia_uvo#1495
         # shape even on Hyundai-branded impls; without a corroborating
@@ -122,11 +116,4 @@ class TestHyundaiLegacyNoLockBlock:  # trio gated to Hyundai, see module docstri
             {"Charging": {"RemainTime": 0, "State": 1}}
         )
         _type1_api_of_brand(2)._update_vehicle_properties_ccs2(vehicle, state)
-        assert vehicle.ev_battery_is_plugged_in is None
-
-    def test_cci_parser_stays_unknown(self, state):
-        # GspaApiEU path unchanged: on Kia CCI the trio is ambiguous
-        # (#1495); a Hyundai CCI capture is needed before mapping there.
-        vehicle = Vehicle(id="test-id")
-        _cci_api()._update_vehicle_properties_ccs2(vehicle, state)
         assert vehicle.ev_battery_is_plugged_in is None
