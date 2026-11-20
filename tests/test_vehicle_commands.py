@@ -21,7 +21,11 @@ from unittest.mock import patch
 import pytest
 import requests
 
-from hyundai_kia_connect_api.ApiImpl import ApiImpl, ClimateRequestOptions
+from hyundai_kia_connect_api.ApiImpl import (
+    ApiImpl,
+    ClimateRequestOptions,
+    ScheduleChargingClimateRequestOptions,
+)
 from hyundai_kia_connect_api.const import (
     BRAND_HYUNDAI,
     BRAND_KIA,
@@ -271,3 +275,68 @@ def test_legacy_climate_seat_options(
     }
     assert body["options"]["wheelHeating"] == 1
     assert {"requests": sent_requests} == snapshot
+
+
+def _ca_kia_ev() -> tuple[ApiImpl, Token, Vehicle]:
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, REGION_CANADA), _key(BRANDS, BRAND_KIA), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    vehicle = Vehicle(
+        id="VEHICLE-ID", VIN="VIN0000000000000", year=2027, engine_type=ENGINE_TYPES.EV
+    )
+    return api, token, vehicle
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ScheduleChargingClimateRequestOptions(
+            charging_enabled=True,
+            off_peak_start_time=dt.time(20, 0),
+            off_peak_end_time=dt.time(16, 0),
+            off_peak_charge_only_enabled=True,
+        ),
+        ScheduleChargingClimateRequestOptions(
+            charging_enabled=True,
+            off_peak_start_time=dt.time(0, 0),
+            off_peak_end_time=dt.time(12, 30),
+            off_peak_charge_only_enabled=False,
+        ),
+        # Only the flag: the window and mode come from the vehicle.
+        ScheduleChargingClimateRequestOptions(charging_enabled=False),
+    ],
+    ids=["window", "midnight_noon", "disable_keeps_window"],
+)
+def test_ca_schedule_charge_payload(
+    options: ScheduleChargingClimateRequestOptions,
+    sent_requests: list[dict[str, Any]],
+    snapshot: SnapshotAssertion,
+) -> None:
+    api, token, vehicle = _ca_kia_ev()
+    vehicle.ev_schedule_charge_enabled = True
+    vehicle.ev_off_peak_charge_only_enabled = True
+    vehicle.ev_off_peak_start_time = dt.time(20, 0)
+    vehicle.ev_off_peak_end_time = dt.time(16, 0)
+    assert api.schedule_charging_and_climate(token, vehicle, options) == "TX-1"
+    assert sent_requests[-1]["url"].endswith("v2/rc/ev/reschargeset")
+    assert {"requests": sent_requests} == snapshot
+
+
+def test_ca_schedule_rejects_climate_scope(
+    sent_requests: list[dict[str, Any]],
+) -> None:
+    api, token, vehicle = _ca_kia_ev()
+    with pytest.raises(NotImplementedError):
+        api.schedule_charging_and_climate(
+            token, vehicle, ScheduleChargingClimateRequestOptions(climate_enabled=True)
+        )
+    assert sent_requests == []

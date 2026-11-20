@@ -221,6 +221,96 @@
     ]),
   })
 # ---
+# name: test_ca_schedule_charge_payload[disable_keeps_window]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'offpeakPowerFlag': 1,
+          'pin': '1234',
+          'reservEndTime': dict({
+            'time': '0400',
+            'timeSection': 1,
+          }),
+          'reservFlag': 0,
+          'reservStartTime': dict({
+            'time': '0800',
+            'timeSection': 1,
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reschargeset',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_schedule_charge_payload[midnight_noon]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'offpeakPowerFlag': 2,
+          'pin': '1234',
+          'reservEndTime': dict({
+            'time': '1230',
+            'timeSection': 1,
+          }),
+          'reservFlag': 1,
+          'reservStartTime': dict({
+            'time': '1200',
+            'timeSection': 0,
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reschargeset',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_schedule_charge_payload[window]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'offpeakPowerFlag': 1,
+          'pin': '1234',
+          'reservEndTime': dict({
+            'time': '0400',
+            'timeSection': 1,
+          }),
+          'reservFlag': 1,
+          'reservStartTime': dict({
+            'time': '0800',
+            'timeSection': 1,
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reschargeset',
+      }),
+    ]),
+  })
+# ---
 # name: test_legacy_climate_seat_options[start_climate-eu_kia-seat_options0]
   dict({
     'requests': list([

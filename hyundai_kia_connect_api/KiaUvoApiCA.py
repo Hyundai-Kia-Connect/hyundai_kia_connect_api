@@ -20,7 +20,15 @@ from urllib3.poolmanager import PoolManager, ProxyManager
 from urllib3.util.ssl_ import create_urllib3_context
 
 # Try to fix hyundai/cloudflare
-from .ApiImpl import ApiImpl, ApiImplSession, ClimateRequestOptions, OTPRequest
+from .ApiImpl import (
+    ApiImpl,
+    ApiImplSession,
+    ClimateRequestOptions,
+    OTPRequest,
+    ScheduleChargingClimateRequestOptions,
+    _fill_schedule_options_from_vehicle,
+    _schedule_charging_scopes,
+)
 from .const import (
     BRAND_GENESIS,
     BRAND_HYUNDAI,
@@ -69,6 +77,25 @@ CA_TIMEZONES = [
         "Pacific",
     ]
 ]
+
+
+def _reservation_time(value: Any) -> dt.time | None:
+    """{"time": "%I%M", "timeSection": 0 am / 1 pm}; "0000" is the never-set value."""
+    raw = str(get_child_value(value, "time") or "")
+    if len(raw) != 4 or not raw.isdigit() or raw == "0000":
+        return None
+    hour, minute = int(raw[:2]), int(raw[2:])
+    if not 1 <= hour <= 12 or minute > 59:
+        return None
+    pm = get_child_value(value, "timeSection") == 1
+    return dt.time(hour % 12 + (12 if pm else 0), minute)
+
+
+def _reservation_time_body(value: dt.time) -> dict[str, Any]:
+    return {
+        "time": value.strftime("%I%M"),
+        "timeSection": 1 if value >= dt.time(12, 0) else 0,
+    }
 
 
 def create_session_ticket_context() -> ssl.SSLContext:
@@ -726,6 +753,7 @@ class KiaUvoApiCA(ApiImpl):
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
+            self._update_charge_schedule(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -790,6 +818,7 @@ class KiaUvoApiCA(ApiImpl):
             charge = self._get_charge_limits(token, vehicle)
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
+            self._update_charge_schedule(token, vehicle)
 
     def _update_maintenance_report(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch the newest monthly maintenance report when a new one appears.
@@ -1571,6 +1600,68 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
         return response_headers["transactionId"]
+
+    def _update_charge_schedule(self, token: Token, vehicle: Vehicle) -> None:
+        url = self.API_URL + "v2/rc/ev/getrescharge"
+        headers = self.API_HEADERS.copy()
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        response = self.sessions.get(url, headers=headers)
+        if not response.ok:
+            _LOGGER.debug(f"{DOMAIN} - getrescharge failed: {response.text}")
+            return
+        response_json = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received getrescharge response {response_json}")
+        if get_child_value(response_json, "responseHeader.responseCode") != 0:
+            return  # not every CA EV offers a charge schedule; keep the update
+        result = response_json.get("result") or {}
+        flag = result.get("reservFlag")
+        vehicle.ev_schedule_charge_enabled = None if flag is None else flag == 1
+        # Flat-body enum, as on the EU EV5-appMode path: 1 = off-peak only
+        mode = result.get("offpeakPowerFlag")
+        vehicle.ev_off_peak_charge_only_enabled = (
+            True if mode == 1 else False if mode == 2 else None
+        )
+        vehicle.ev_off_peak_start_time = _reservation_time(
+            result.get("reservStartTime")
+        )
+        vehicle.ev_off_peak_end_time = _reservation_time(result.get("reservEndTime"))
+
+    def schedule_charging_and_climate(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        options: ScheduleChargingClimateRequestOptions,
+    ) -> str:
+        """Set the charge window (v2/rc/ev/reschargeset); departures are not supported."""
+        charge_active, climate_active = _schedule_charging_scopes(options)
+        if climate_active:
+            raise NotImplementedError("Departure/climate schedules are not supported")
+        if not charge_active:
+            raise ValueError("no schedule changes requested")
+        _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
+        start, end = options.off_peak_start_time, options.off_peak_end_time
+        assert start is not None and end is not None
+        url = self.API_URL + "v2/rc/ev/reschargeset"
+        headers = self.API_HEADERS.copy()
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        payload = {
+            "reservFlag": 1 if options.charging_enabled else 0,
+            "offpeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
+            "reservStartTime": _reservation_time_body(start),
+            "reservEndTime": _reservation_time_body(end),
+            "pin": token.pin,
+        }
+        _LOGGER.debug(
+            f"{DOMAIN} - Planned reschargeset payload {self._mask_sensitive_data(payload)}"
+        )
+        response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
+        response_json = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received reschargeset response {response_json}")
+        self._check_response_for_errors(response_json)
+        return response.headers["transactionId"]
 
     def _mask_sensitive_data(self, data: dict[str, Any] | str) -> dict[str, Any] | str:
         """Create a copy of data with sensitive fields masked for logging."""
