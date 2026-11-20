@@ -50,6 +50,7 @@ from .exceptions import (
     AuthenticationInvalidCredentialsError,
     AuthenticationTokenExpiredError,
     InvalidAPIResponseError,
+    UnsupportedControlError,
 )
 from .Token import Token
 from .utils import (
@@ -345,6 +346,7 @@ class KiaUvoApiCA(ApiImpl):
         """Checks for errors in the API response.
 
         If an error is found, an exception is raised.
+        A null responseHeader passes through unchecked; a missing one raises.
         retCode known values:
         - S: success
         - F: failure
@@ -385,7 +387,10 @@ class KiaUvoApiCA(ApiImpl):
             "7403": AuthenticationTokenExpiredError,  # Expired - triggers re-login
             "7602": AuthenticationTokenExpiredError,  # Access token deleted
             "7549": AuthenticationError,  # Portal login captcha challenge
+            "15109": UnsupportedControlError,  # Command body rejected for the vehicle
         }
+        if response.get("responseHeader") is None and "responseHeader" in response:
+            return
         response_code = response.get("responseHeader", {}).get("responseCode")
         if response_code is None:
             raise APIError(f"Unexpected response shape: {response}")
@@ -1309,6 +1314,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received lock_action response {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def start_climate(
@@ -1420,6 +1426,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
@@ -1439,6 +1446,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_climate response: {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def check_action_status(
@@ -1513,6 +1521,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_charge response {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def stop_charge(self, token: Token, vehicle: Vehicle) -> str:
@@ -1529,6 +1538,7 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received stop_charge response {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def _update_vehicle_properties_charge(
@@ -1599,6 +1609,7 @@ class KiaUvoApiCA(ApiImpl):
         response_headers = response.headers
         response = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received set_charge_limits response {response}")
+        self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
     def _update_charge_schedule(self, token: Token, vehicle: Vehicle) -> None:
