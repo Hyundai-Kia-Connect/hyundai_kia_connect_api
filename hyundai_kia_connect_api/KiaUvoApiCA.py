@@ -967,17 +967,21 @@ class KiaUvoApiCA(ApiImpl):
         vehicle.side_mirror_heater_is_on = get_child_value(
             state, "status.sideMirrorHeat"
         )
+        # lstvhclsts reports seats under seatHeaterVentInfo keyed driver/assist;
+        # Canada is LHD, so driver is front left.
+        seat_info = get_child_value(state, "status.seatHeaterVentInfo") or {}
+        seat_state = get_child_value(state, "status.seatHeaterVentState") or {}
         vehicle.front_left_seat_status = SEAT_STATUS.get(
-            get_child_value(state, "status.seatHeaterVentState.flSeatHeatState")
+            seat_info.get("drvSeatHeatState", seat_state.get("flSeatHeatState"))
         )
         vehicle.front_right_seat_status = SEAT_STATUS.get(
-            get_child_value(state, "status.seatHeaterVentState.frSeatHeatState")
+            seat_info.get("astSeatHeatState", seat_state.get("frSeatHeatState"))
         )
         vehicle.rear_left_seat_status = SEAT_STATUS.get(
-            get_child_value(state, "status.seatHeaterVentState.rlSeatHeatState")
+            seat_info.get("rlSeatHeatState", seat_state.get("rlSeatHeatState"))
         )
         vehicle.rear_right_seat_status = SEAT_STATUS.get(
-            get_child_value(state, "status.seatHeaterVentState.rrSeatHeatState")
+            seat_info.get("rrSeatHeatState", seat_state.get("rrSeatHeatState"))
         )
         # Additional status fields observed in logs (exposed as binary sensors)
         vehicle.accessory_on = get_child_value(state, "status.acc")
