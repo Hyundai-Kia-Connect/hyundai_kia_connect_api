@@ -6,6 +6,8 @@ updates:
       # Check for updates once a week
       schedule:
           interval: "weekly"
+      # Raising a floor past HA's pinned version makes the library uninstallable (kia_uvo#2134).
+      versioning-strategy: increase-if-necessary
       ignore:
           # 4.x breaks imports on HA installs that already ship 3.x (kia_uvo#2012).
           - dependency-name: "pycryptodome"
