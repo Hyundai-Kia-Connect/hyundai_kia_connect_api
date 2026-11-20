@@ -142,7 +142,8 @@ def command_response() -> Any:
     """Patch Session.request to answer every call with a chosen JSON body.
 
     Yields (sent, holder): assign the wanted canned response to
-    ``holder["body"]`` before calling the command.
+    ``holder["body"]`` before calling the command, or a list of responses
+    to answer successive command calls in order.
     """
     sent: list[dict[str, Any]] = []
     holder: dict[str, Any] = {"body": {}}
@@ -155,7 +156,12 @@ def command_response() -> Any:
             payload = json.loads(kwargs["data"])
         sent.append({"method": method.upper(), "url": url, "body": payload})
         # vrfypin must succeed so the flow reaches the command itself.
-        answer = _RESPONSE_BODY if "vrfypin" in url else holder["body"]
+        if "vrfypin" in url:
+            answer = _RESPONSE_BODY
+        elif isinstance(holder["body"], list):
+            answer = holder["body"].pop(0)
+        else:
+            answer = holder["body"]
         response = requests.Response()
         response.status_code = 200
         response.url = url
@@ -234,7 +240,7 @@ def test_ca_ev_climate_payload_by_generation(
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
         year=2027,
-        model="IONIQ9",
+        model="KONA EV",
         engine_type=ENGINE_TYPES.EV,
         generation=generation,
     )
@@ -283,6 +289,138 @@ def test_ca_start_climate_rejection_raises(
     body_holder["body"] = _CA_REJECTION
     with pytest.raises(UnsupportedControlError, match="15109"):
         COMMANDS["start_climate"](api, token, vehicle)
+
+
+# Hyundai Canada's answer to the remoteControl body, captured from a 2022 Kona EV
+# (Hyundai-Kia-Connect/kia_uvo#2133) and a 2024 IONIQ 6 (#1611), both genType G3.
+_CA_REJECTION_6452 = {
+    "error": {
+        "errorCode": "6452",
+        "errorDesc": (
+            "We apologize, but your request could not be processed. Please try"
+            " again. If the issue persists, contact Customer Support in the"
+            ' "Help" section.'
+        ),
+    },
+    "responseHeader": {"responseCode": 1},
+}
+
+
+def _ca_ev(
+    brand: str, generation: str | None, model: str = "KONA EV"
+) -> tuple[ApiImpl, Token, Vehicle]:
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, REGION_CANADA), _key(BRANDS, brand), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    vehicle = Vehicle(
+        id="VEHICLE-ID",
+        VIN="VIN0000000000000",
+        year=2022,
+        model=model,
+        engine_type=ENGINE_TYPES.EV,
+        generation=generation,
+    )
+    return api, token, vehicle
+
+
+def _climate_bodies(sent: list[dict[str, Any]]) -> list[str]:
+    return [
+        next(k for k in ("remoteControl", "hvacInfo") if k in r["body"])
+        for r in sent
+        if r["url"].endswith("evc/rfon")
+    ]
+
+
+@pytest.mark.parametrize("brand", [BRAND_HYUNDAI, BRAND_KIA])
+def test_ca_g3_climate_falls_back_to_hvac_info_on_6452(
+    brand: str,
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    api, token, vehicle = _ca_ev(brand, "G3")
+    sent, body_holder = command_response
+    body_holder["body"] = [_CA_REJECTION_6452, _RESPONSE_BODY, _RESPONSE_BODY]
+
+    assert COMMANDS["start_climate"](api, token, vehicle) == "TX-1"
+    # The vehicle is remembered: the next start goes straight to hvacInfo.
+    assert COMMANDS["start_climate"](api, token, vehicle) == "TX-1"
+
+    assert _climate_bodies(sent) == ["remoteControl", "hvacInfo", "hvacInfo"]
+    # The retry gets its own pin token.
+    assert sum(r["url"].endswith("vrfypin") for r in sent) == 3
+    assert body_holder["body"] == []
+
+
+def test_ca_g3_climate_failed_fallback_is_not_remembered(
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    api, token, vehicle = _ca_ev(BRAND_HYUNDAI, "G3")
+    sent, body_holder = command_response
+    body_holder["body"] = [_CA_REJECTION_6452, _CA_REJECTION, _RESPONSE_BODY]
+
+    with pytest.raises(UnsupportedControlError, match="15109"):
+        COMMANDS["start_climate"](api, token, vehicle)
+    COMMANDS["start_climate"](api, token, vehicle)
+
+    assert _climate_bodies(sent) == ["remoteControl", "hvacInfo", "remoteControl"]
+
+
+@pytest.mark.parametrize(
+    "generation, rejection, error",
+    [
+        ("G1", _CA_REJECTION_6452, APIError),
+        (None, _CA_REJECTION_6452, APIError),
+        ("G3", _CA_REJECTION, UnsupportedControlError),
+    ],
+)
+def test_ca_climate_rejection_without_fallback_raises(
+    generation: str | None,
+    rejection: dict[str, Any],
+    error: type[Exception],
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    """Only a 6452 on remoteControl is retried; every other rejection raises as before."""
+    api, token, vehicle = _ca_ev(BRAND_HYUNDAI, generation)
+    sent, body_holder = command_response
+    body_holder["body"] = rejection
+
+    with pytest.raises(error):
+        COMMANDS["start_climate"](api, token, vehicle)
+
+    assert len(_climate_bodies(sent)) == 1
+
+
+@pytest.mark.parametrize(
+    "brand, model, generation",
+    [
+        (BRAND_HYUNDAI, "IONIQ9", None),
+        (BRAND_HYUNDAI, "IONIQ 9", "G3"),
+        (BRAND_KIA, "EV5", "G3"),
+        (BRAND_KIA, "EV9", None),
+    ],
+)
+def test_ca_remote_control_models_skip_the_fallback(
+    brand: str,
+    model: str,
+    generation: str | None,
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    api, token, vehicle = _ca_ev(brand, generation, model)
+    sent, body_holder = command_response
+    body_holder["body"] = _CA_REJECTION_6452
+
+    with pytest.raises(APIError):
+        COMMANDS["start_climate"](api, token, vehicle)
+
+    assert _climate_bodies(sent) == ["remoteControl"]
 
 
 def test_ca_command_response_without_envelope_raises(

@@ -239,6 +239,11 @@ class RetrySession(ApiImplSession):
         raise last_exception
 
 
+# EVs whose climate body is remoteControl: they reject hvacInfo with 15109
+# (Hyundai-Kia-Connect/kia_uvo#2110). Matched on the model without spaces.
+_CA_REMOTE_CONTROL_CLIMATE_MODELS = frozenset({"EV5", "EV9", "IONIQ9"})
+
+
 _CA_APP_HEADERS: dict[str, str | None] = {
     # App-shaped profile, myHyundai CA 2.0.47 HACCRequestHeader (Hyundai-Kia-Connect/kia_uvo#2054)
     "User-Agent": "okhttp/4.12.0",
@@ -302,6 +307,8 @@ class KiaUvoApiCA(ApiImpl):
         # Cached device_id. Seeded from the persisted Token by refresh_access_token
         # (so re-login reuses it), or computed once from MAC+hostname on first login.
         self._device_id: str | None = None
+        # G3 EVs that rejected the remoteControl climate body and accepted hvacInfo.
+        self._hvac_info_climate_ids: set[str] = set()
 
     @property
     def API_HEADERS(self) -> dict[str, str | None]:
@@ -1359,46 +1366,41 @@ class KiaUvoApiCA(ApiImpl):
             hex_set_temp = get_index_into_hex_temp(
                 self.temperature_range_c_old.index(options.set_temp)
             )
+        # Other G3 EVs try remoteControl first; some (Kona EV, IONIQ 6)
+        # reject it with 6452 and accept hvacInfo.
+        fallback = False
         if vehicle.engine_type == ENGINE_TYPES.EV:
+            model = (vehicle.model or "").replace(" ", "").upper()
+            if model in _CA_REMOTE_CONTROL_CLIMATE_MODELS:
+                body_key = "remoteControl"
+            elif (
+                vehicle.generation == "G3"
+                and vehicle.id not in self._hvac_info_climate_ids
+            ):
+                body_key = "remoteControl"
+                fallback = True
+            else:
+                body_key = "hvacInfo"
             payload: dict[str, Any] = {
                 "pin": token.pin,
-            }
-            climate_settings = {
-                "airCtrl": int(options.climate),
-                "defrost": options.defrost,
-                "heating1": options.heating,
-                "airTemp": {
-                    "value": hex_set_temp,
-                    "unit": 0,
-                    "hvacTempType": 1,
+                body_key: {
+                    "airCtrl": int(options.climate),
+                    "defrost": options.defrost,
+                    "heating1": options.heating,
+                    "airTemp": {
+                        "value": hex_set_temp,
+                        "unit": 0,
+                        "hvacTempType": 1,
+                    },
+                    "igniOnDuration": options.duration,
+                    "seatHeaterVentCMD": {
+                        "drvSeatOptCmd": options.front_left_seat,
+                        "astSeatOptCmd": options.front_right_seat,
+                        "rlSeatOptCmd": options.rear_left_seat,
+                        "rrSeatOptCmd": options.rear_right_seat,
+                    },
                 },
             }
-            if vehicle.generation == "G3":
-                payload["remoteControl"] = climate_settings
-                payload["remoteControl"].update(
-                    {
-                        "igniOnDuration": options.duration,
-                        "seatHeaterVentCMD": {
-                            "drvSeatOptCmd": options.front_left_seat,
-                            "astSeatOptCmd": options.front_right_seat,
-                            "rlSeatOptCmd": options.rear_left_seat,
-                            "rrSeatOptCmd": options.rear_right_seat,
-                        },
-                    }
-                )
-            else:
-                payload["hvacInfo"] = climate_settings
-                payload["hvacInfo"].update(
-                    {
-                        "igniOnDuration": options.duration,
-                        "seatHeaterVentCMD": {
-                            "drvSeatOptCmd": options.front_left_seat,
-                            "astSeatOptCmd": options.front_right_seat,
-                            "rlSeatOptCmd": options.rear_left_seat,
-                            "rrSeatOptCmd": options.rear_right_seat,
-                        },
-                    }
-                )
         else:
             payload = {
                 "setting": {
@@ -1417,17 +1419,30 @@ class KiaUvoApiCA(ApiImpl):
                 },
                 "pin": token.pin,
             }
+        response_headers, response = self._post_start_climate(url, headers, payload)
+        error = response.get("error")
+        retry = (
+            fallback and isinstance(error, dict) and error.get("errorCode") == "6452"
+        )
+        if retry:
+            payload["hvacInfo"] = payload.pop("remoteControl")
+            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            response_headers, response = self._post_start_climate(url, headers, payload)
+        self._check_response_for_errors(response)
+        if retry:
+            self._hvac_info_climate_ids.add(vehicle.id)
+        return response_headers["transactionId"]
+
+    def _post_start_climate(
+        self, url: str, headers: dict[str, Any], payload: dict[str, Any]
+    ) -> tuple[requests.structures.CaseInsensitiveDict[str], dict[str, Any]]:
         _LOGGER.debug(
             f"{DOMAIN} - Planned start_climate payload {self._mask_sensitive_data(payload)}"
         )
-
         response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
-        response_headers = response.headers
-        response = response.json()
-
-        _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
-        self._check_response_for_errors(response)
-        return response_headers["transactionId"]
+        body: dict[str, Any] = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received start_climate response {body}")
+        return response.headers, body
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if vehicle.engine_type == ENGINE_TYPES.EV:
