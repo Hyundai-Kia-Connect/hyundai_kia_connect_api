@@ -193,3 +193,19 @@ def test_bluelink_window_open_level(bluelink_api, vehicle, window_open, expected
 def test_bluelink_window_unknown_without_window_block(bluelink_api, vehicle):
     bluelink_api._update_vehicle_properties(vehicle, {"vehicleStatus": {}})
     assert vehicle.front_left_window_is_open is None
+
+
+def test_bluelink_trip_without_distance_does_not_abort_update(bluelink_api, vehicle):
+    """Since 2026-11-19 some evTripDetails records omit `distance` (#1623)."""
+    trip = {
+        "startdate": "2026-11-19 17:25:00.0",
+        "mileagetime": {"value": 600},
+        "duration": {"value": 900},
+        "avgspeed": {"value": 30.0},
+        "maxspeed": {"value": 55},
+    }
+    bluelink_api._update_vehicle_properties(
+        vehicle, {"evTripDetails": {"tripdetails": [trip]}}
+    )
+    assert vehicle.daily_stats[0].distance is None
+    assert vehicle.data["filled_trips"][0].distance is None
