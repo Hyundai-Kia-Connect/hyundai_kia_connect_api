@@ -302,6 +302,8 @@ class KiaUvoApiCA(ApiImpl):
         # Cached device_id. Seeded from the persisted Token by refresh_access_token
         # (so re-login reuses it), or computed once from MAC+hostname on first login.
         self._device_id: str | None = None
+        # G3 EVs that rejected the remoteControl climate body and accepted hvacInfo.
+        self._hvac_info_climate_ids: set[str] = set()
 
     @property
     def API_HEADERS(self) -> dict[str, str | None]:
@@ -1373,7 +1375,10 @@ class KiaUvoApiCA(ApiImpl):
                     "hvacTempType": 1,
                 },
             }
-            if vehicle.generation == "G3":
+            if (
+                vehicle.generation == "G3"
+                and vehicle.id not in self._hvac_info_climate_ids
+            ):
                 payload["remoteControl"] = climate_settings
                 payload["remoteControl"].update(
                     {
@@ -1426,6 +1431,26 @@ class KiaUvoApiCA(ApiImpl):
         response = response.json()
 
         _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
+        error = response.get("error")
+        if (
+            "remoteControl" in payload
+            and isinstance(error, dict)
+            and error.get("errorCode") == "6452"
+        ):
+            # Some G3 EVs (Kona EV, IONIQ 6) reject remoteControl with 6452
+            # but accept the legacy hvacInfo body.
+            _LOGGER.debug(f"{DOMAIN} - remoteControl rejected, retrying with hvacInfo")
+            payload["hvacInfo"] = payload.pop("remoteControl")
+            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            response = self.sessions.post(
+                url, headers=headers, data=json.dumps(payload)
+            )
+            response_headers = response.headers
+            response = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Received start_climate response {response}")
+            self._check_response_for_errors(response)
+            self._hvac_info_climate_ids.add(vehicle.id)
+            return response_headers["transactionId"]
         self._check_response_for_errors(response)
         return response_headers["transactionId"]
 
