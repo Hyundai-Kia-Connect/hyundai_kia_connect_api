@@ -57,6 +57,7 @@ from .utils import (
     get_child_value,
     get_hex_temp_into_index,
     get_index_into_hex_temp,
+    int_or_none,
     normalize_battery_soc,
     offset_from_tz,
     parse_datetime,
@@ -878,6 +879,22 @@ class KiaUvoApiCA(ApiImpl):
         _LOGGER.debug(
             f"{DOMAIN} - Current Vehicle Last Updated: {vehicle.last_updated_at}"
         )
+        hvac_temp_type = int_or_none(
+            get_child_value(
+                state,
+                "status.evStatus.reservChargeInfos.reservChargeInfo.reservChargeInfoDetail."
+                "reservFatcSet.airTemp.hvacTempType",
+            )
+        )
+        if hvac_temp_type is None:
+            hvac_temp_type = int_or_none(
+                get_child_value(
+                    state,
+                    "status.evStatus.reservChargeInfos.reserveChargeInfo2.reservChargeInfoDetail."
+                    "reservFatcSet.airTemp.hvacTempType",
+                )
+            )
+        vehicle.hvac_temp_type = hvac_temp_type
         # Converts temp to usable number. Currently only support celsius.
         # Future to do is check unit in case the care itself is set to F.
         if (
@@ -1364,7 +1381,9 @@ class KiaUvoApiCA(ApiImpl):
                 "airTemp": {
                     "value": hex_set_temp,
                     "unit": 0,
-                    "hvacTempType": 1,
+                    "hvacTempType": vehicle.hvac_temp_type
+                    if vehicle.hvac_temp_type is not None
+                    else 1,
                 },
             }
             if vehicle.generation == "G3":

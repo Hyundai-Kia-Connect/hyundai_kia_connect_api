@@ -127,6 +127,11 @@ class Vehicle:
     # EU or Type 1 version:
     ccu_ccs2_protocol_support: int | None = None
     generation: str | None = None
+    # Canada vehicle status (cached and forced refresh): evStatus.
+    # reservChargeInfos[*].reservChargeInfoDetail.reservFatcSet.airTemp
+    # .hvacTempType. Selects the temperature table the car accepts in
+    # command bodies.
+    hvac_temp_type: int | None = None
     # Not part of the API, enabled in our library for scanning.
     enabled: bool = True
     supports: VehicleSupports = field(default_factory=VehicleSupports)
