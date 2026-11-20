@@ -901,7 +901,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 hhmmss=yyyymmdd_hhmmss,
                 drive_time=int(drive_time / 60),  # convert seconds to minutes
                 idle_time=int(idle_time / 60),  # convert seconds to minutes
-                distance=float(trip["distance"]),
+                distance=float_or_none(get_child_value(trip, "distance")),
                 avg_speed=get_child_value(trip["avgspeed"], "value"),
                 max_speed=int(get_child_value(trip["maxspeed"], "value")),
             )
