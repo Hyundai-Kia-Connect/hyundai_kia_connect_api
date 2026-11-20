@@ -240,7 +240,7 @@ def test_ca_ev_climate_payload_by_generation(
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
         year=2027,
-        model="IONIQ9",
+        model="KONA EV",
         engine_type=ENGINE_TYPES.EV,
         generation=generation,
     )
@@ -306,7 +306,9 @@ _CA_REJECTION_6452 = {
 }
 
 
-def _ca_ev(brand: str, generation: str | None) -> tuple[ApiImpl, Token, Vehicle]:
+def _ca_ev(
+    brand: str, generation: str | None, model: str = "KONA EV"
+) -> tuple[ApiImpl, Token, Vehicle]:
     api = VehicleManager.get_implementation_by_region_brand(
         _key(REGIONS, REGION_CANADA), _key(BRANDS, brand), "en"
     )
@@ -323,7 +325,7 @@ def _ca_ev(brand: str, generation: str | None) -> tuple[ApiImpl, Token, Vehicle]
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
         year=2022,
-        model="KONA EV",
+        model=model,
         engine_type=ENGINE_TYPES.EV,
         generation=generation,
     )
@@ -394,6 +396,31 @@ def test_ca_climate_rejection_without_fallback_raises(
         COMMANDS["start_climate"](api, token, vehicle)
 
     assert len(_climate_bodies(sent)) == 1
+
+
+@pytest.mark.parametrize(
+    "brand, model, generation",
+    [
+        (BRAND_HYUNDAI, "IONIQ9", None),
+        (BRAND_HYUNDAI, "IONIQ 9", "G3"),
+        (BRAND_KIA, "EV5", "G3"),
+        (BRAND_KIA, "EV9", None),
+    ],
+)
+def test_ca_remote_control_models_skip_the_fallback(
+    brand: str,
+    model: str,
+    generation: str | None,
+    command_response: tuple[list[dict[str, Any]], dict[str, Any]],
+) -> None:
+    api, token, vehicle = _ca_ev(brand, generation, model)
+    sent, body_holder = command_response
+    body_holder["body"] = _CA_REJECTION_6452
+
+    with pytest.raises(APIError):
+        COMMANDS["start_climate"](api, token, vehicle)
+
+    assert _climate_bodies(sent) == ["remoteControl"]
 
 
 def test_ca_command_response_without_envelope_raises(
