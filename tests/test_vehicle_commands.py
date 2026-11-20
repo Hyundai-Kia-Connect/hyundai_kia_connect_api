@@ -291,7 +291,7 @@ def test_ca_start_climate_rejection_raises(
         COMMANDS["start_climate"](api, token, vehicle)
 
 
-# Hyundai Canada's answer to the remoteControl body, captured from a 2020 Kona EV
+# Hyundai Canada's answer to the remoteControl body, captured from a 2022 Kona EV
 # (Hyundai-Kia-Connect/kia_uvo#2133) and a 2024 IONIQ 6 (#1611), both genType G3.
 _CA_REJECTION_6452 = {
     "error": {
@@ -322,7 +322,7 @@ def _ca_ev(brand: str, generation: str | None) -> tuple[ApiImpl, Token, Vehicle]
     vehicle = Vehicle(
         id="VEHICLE-ID",
         VIN="VIN0000000000000",
-        year=2020,
+        year=2022,
         model="KONA EV",
         engine_type=ENGINE_TYPES.EV,
         generation=generation,
