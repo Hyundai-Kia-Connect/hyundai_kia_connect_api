@@ -21,6 +21,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
+class TripPoint:
+    """One GPS point of a trip's trail"""
+
+    hhmmss: str | None = None  # local time
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+@dataclass
 class TripInfo:
     """Trip Info"""
 
@@ -36,6 +45,8 @@ class TripInfo:
     hard_braking_count: int | None = None
     rapid_acceleration_count: int | None = None
     excessive_speed_count: int | None = None
+    # Trip detail GPS trail (IN), a point about every 10 s. None where not reported.
+    gps_trail: list[TripPoint] | None = None
 
 
 @dataclass
