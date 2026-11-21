@@ -209,8 +209,16 @@ variable:
 
 ::
 
-    pip install hyundai_kia_connect_api
+    pip install "hyundai_kia_connect_api[dashboard]"
     roadbook
+
+After the first successful sign-in it offers to save the login, so later runs
+start straight away. Region, brand and username go in
+``~/.config/roadbook/login.json`` (readable only by you). The password and PIN
+go in your system's password store (macOS Keychain, Windows Credential Manager,
+Secret Service on Linux) through ``keyring``, which the ``[dashboard]`` extra
+installs. They are never written to a plain file. ``roadbook --forget`` deletes
+the saved login.
 
 It serves the page on ``127.0.0.1`` until you press Ctrl+C, and the page's
 Refresh button fetches new data through it (at most once a minute; it never

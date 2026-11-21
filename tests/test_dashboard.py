@@ -223,3 +223,52 @@ def test_server_serves_page_and_limits_refresh(monkeypatch) -> None:
 
 def test_saved_page_has_no_refresh_url() -> None:
     assert "const REFRESH_URL = null;" in dashboard.render({})
+
+
+class FakeKeyring:
+    def __init__(self) -> None:
+        self.store: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, account: str) -> str | None:
+        return self.store.get((service, account))
+
+    def set_password(self, service: str, account: str, secret: str) -> None:
+        self.store[(service, account)] = secret
+
+    def delete_password(self, service: str, account: str) -> None:
+        del self.store[(service, account)]
+
+
+def test_saved_login_keeps_secrets_out_of_the_file(monkeypatch, tmp_path) -> None:
+    from hyundai_kia_connect_api import saved_login
+
+    kr = FakeKeyring()
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(saved_login, "_keyring", lambda: kr)
+
+    assert saved_login.save("India", "Kia", "me@example.com", "s3cret", "1234")
+    text = saved_login.path().read_text()
+    assert "s3cret" not in text and "1234" not in text
+    assert saved_login.path().stat().st_mode & 0o777 == 0o600
+    assert saved_login.load() == {
+        "region": "India",
+        "brand": "Kia",
+        "username": "me@example.com",
+        "password": "s3cret",
+        "pin": "1234",
+    }
+    assert saved_login.forget()
+    assert saved_login.load() == {} and kr.store == {}
+
+
+def test_saved_login_without_keyring_saves_no_secrets(monkeypatch, tmp_path) -> None:
+    from hyundai_kia_connect_api import saved_login
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(saved_login, "_keyring", lambda: None)
+    assert not saved_login.save("India", "Kia", "me@example.com", "s3cret", "1234")
+    assert saved_login.load() == {
+        "region": "India",
+        "brand": "Kia",
+        "username": "me@example.com",
+    }

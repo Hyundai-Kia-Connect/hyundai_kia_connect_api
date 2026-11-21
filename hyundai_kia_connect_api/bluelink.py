@@ -470,6 +470,19 @@ def _ask_choice(label: str, choices: list[str]) -> str:
 def _ask_missing(args: argparse.Namespace) -> None:
     """Prompt in a terminal for whatever the flags and env vars didn't give."""
     interactive = args.func is cmd_dashboard and sys.stdin.isatty()
+    args.prompted = False
+    if interactive:
+        from . import saved_login
+
+        saved = saved_login.load()
+        if saved and args.username in (None, "", saved.get("username")):
+            for name in ("region", "brand", "username", "password", "pin"):
+                if not getattr(args, name) and saved.get(name):
+                    setattr(args, name, saved[name])
+            if saved.get("password"):
+                print(
+                    f"Using the saved login for {saved['username']} (roadbook --forget to clear it)"
+                )
     if args.region is None:
         regions = sorted(const.REGIONS.values())
         args.region = (
@@ -484,10 +497,35 @@ def _ask_missing(args: argparse.Namespace) -> None:
         return
     if not args.username:
         args.username = input("Username (email or phone): ").strip()
+        args.prompted = True
     if not args.password:
         args.password = getpass.getpass("Password: ")
+        args.prompted = True
     if not args.pin:
         args.pin = getpass.getpass("PIN: ").strip()
+        args.prompted = True
+
+
+def _offer_to_save(args: argparse.Namespace) -> None:
+    """After a successful sign-in, offer to skip the questions next time."""
+    if not getattr(args, "prompted", False):
+        return
+    from . import saved_login
+
+    answer = input("Save these details for next time? [Y/n]: ").strip().lower()
+    if answer not in ("", "y", "yes"):
+        return
+    secret_saved = saved_login.save(
+        args.region, args.brand, args.username, args.password, args.pin
+    )
+    where = saved_login.path()
+    if secret_saved:
+        print(
+            f"Saved. Password and PIN are in your system's password store; the rest is in {where}."
+        )
+    else:
+        print(f"Saved region, brand and username in {where}.")
+        print("To save the password and PIN too, install keyring: pip install keyring")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -565,6 +603,9 @@ def main(argv: list[str] | None = None) -> int:
         "--months", type=int, default=3, help="Months of trip history to fetch"
     )
     parser_dashboard.add_argument(
+        "--forget", action="store_true", help="Delete the saved login and exit"
+    )
+    parser_dashboard.add_argument(
         "--open",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -572,6 +613,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
+    if getattr(args, "forget", False):
+        from . import saved_login
+
+        print("Saved login deleted." if saved_login.forget() else "No saved login.")
+        return 0
     _ask_missing(args)
     for name in ("username", "password", "pin"):
         if not getattr(args, name):
@@ -596,6 +642,8 @@ def main(argv: list[str] | None = None) -> int:
         _progress(f"Signing in to {args.brand} ({args.region})")
     vm.check_and_refresh_token()
     if dashboard_run:
+        print("\r\033[K" if sys.stdout.isatty() else "", end="")
+        _offer_to_save(args)
         _progress("Reading your cars' latest status")
     vm.update_all_vehicles_with_cached_state()
     result: int = args.func(vm, args)
