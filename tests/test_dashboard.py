@@ -162,3 +162,64 @@ def test_top_level_login_options_still_work(monkeypatch, tmp_path) -> None:
     ]
     assert bluelink.main(args) == 0
     assert (RecordingManager.seen["region"], RecordingManager.seen["brand"]) == (1, 2)
+
+
+def _request(url: str, method: str = "GET", host: str | None = None) -> tuple[int, str]:
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(
+        url, method=method, data=b"" if method == "POST" else None
+    )
+    if host:
+        req.add_header("Host", host)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, resp.read().decode()
+    except urllib.error.HTTPError as err:
+        return err.code, ""
+
+
+def test_server_serves_page_and_limits_refresh(monkeypatch) -> None:
+    import threading
+
+    builds: list[int] = []
+
+    def build() -> dict[str, Any]:
+        builds.append(1)
+        return {"n": len(builds)}
+
+    server, url = dashboard.make_server(build)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        status, page = _request(url)
+        assert (
+            status == 200
+            and '"n":1' in page
+            and f'"{url[len("http://127.0.0.1:") :].split("/", 1)[1]}refresh"'.replace(
+                '"', ""
+            )
+            in page
+        )
+
+        # Within the minimum interval a refresh returns the cached data.
+        status, body = _request(url + "refresh", "POST")
+        assert (
+            status == 200
+            and json.loads(body)["data"] == {"n": 1}
+            and json.loads(body)["wait"] > 0
+        )
+
+        monkeypatch.setattr(dashboard, "MIN_REFRESH_SECONDS", 0)
+        assert json.loads(_request(url + "refresh", "POST")[1])["data"] == {"n": 2}
+
+        # Wrong token or another Host header (DNS rebinding) gets nothing.
+        assert _request(url.rsplit("/", 2)[0] + "/wrong/")[0] == 404
+        assert _request(url, host="evil.example:80")[0] == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_saved_page_has_no_refresh_url() -> None:
+    assert "const REFRESH_URL = null;" in dashboard.render({})

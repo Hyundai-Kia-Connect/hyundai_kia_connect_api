@@ -400,20 +400,30 @@ def cmd_dashboard(
 ) -> int:
     from . import dashboard
 
-    data = {
-        "generated_at": datetime.datetime.now(),
-        "region": args.region,
-        "brand": args.brand,
-        "vehicles": [
-            {
-                **vehicle_to_dict(v),
-                "trip_history": dashboard.collect_trips(vm, v.id, args.months),
-            }
-            for v in vm.vehicles.values()
-        ],
-    }
+    def build() -> dict[str, Any]:
+        if built:  # the first build reuses the state main() just fetched
+            vm.check_and_refresh_token()
+            vm.update_all_vehicles_with_cached_state()
+        built.append(True)
+        return {
+            "generated_at": datetime.datetime.now(),
+            "region": args.region,
+            "brand": args.brand,
+            "vehicles": [
+                {
+                    **vehicle_to_dict(v),
+                    "trip_history": dashboard.collect_trips(vm, v.id, args.months),
+                }
+                for v in vm.vehicles.values()
+            ],
+        }
+
+    built: list[bool] = []
+    if not args.output:
+        dashboard.serve(build, open_browser=args.open)
+        return 0
     path = Path(args.output).resolve()
-    path.write_text(dashboard.render(data), encoding="utf-8")
+    path.write_text(dashboard.render(build()), encoding="utf-8")
     print(f"Dashboard written to {path}")
     print("It contains your VIN and locations. Don't share the file.")
     if args.open:
@@ -520,7 +530,9 @@ def main(argv: list[str] | None = None) -> int:
     parser_dashboard.set_defaults(func=cmd_dashboard)
     add_login_args(parser_dashboard, defaults=False)
     parser_dashboard.add_argument(
-        "--output", default="roadbook.html", help="HTML file to write"
+        "--output",
+        help="Write the page to this HTML file and exit, instead of serving it "
+        "locally with a working Refresh button",
     )
     parser_dashboard.add_argument(
         "--months", type=int, default=3, help="Months of trip history to fetch"

@@ -904,7 +904,12 @@ input::placeholder{color:var(--ink3)}
 <section style="border-radius: 12px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); overflow: hidden">
 <h2 class="cond" style="margin: 0; padding: 14px 18px 4px; font-size: 24px; font-weight: 700">Endpoints behind them · India</h2>
 <p class="mono" style="margin: 0; padding: 0 18px 12px; color: var(--ink3); border-bottom: 2px solid var(--ink)">https://prd.in-ccapi.kia.connected-car.io:8080 (Kia) · prd.in-ccapi.hyundai.connected-car.io:8080 (Hyundai)</p>
-<sc-for list="{{endpoints}}" as="ep"><div style="display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding: 11px 18px; border-bottom: 1px solid var(--line)"><span class="mono" style="flex: none; min-width: 50px; text-align: center; padding: 3px 7px; border-radius: 4px; font-weight: 700; background: {{ep.bg}}; color: {{ep.fg}}">{{ep.m}}</span><code class="mono" style="flex: 1 1 320px; font-size: 13.5px; font-weight: 600; word-break: break-all">{{ep.p}}</code><span style="flex: 1 1 260px; color: var(--ink2); font-size: 14px">{{ep.d}}</span></div></sc-for>
+<sc-for list="{{endpoints}}" as="ep"><details style="border-bottom: 1px solid var(--line)"><summary style="display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding: 11px 18px; cursor: pointer; list-style: none"><span class="mono" style="flex: none; min-width: 50px; text-align: center; padding: 3px 7px; border-radius: 4px; font-weight: 700; background: {{ep.bg}}; color: {{ep.fg}}">{{ep.m}}</span><code class="mono" style="flex: 1 1 320px; font-size: 13.5px; font-weight: 600; word-break: break-all">{{ep.p}}</code><span style="flex: 1 1 220px; color: var(--ink2); font-size: 14px">{{ep.d}}</span><span style="flex: none; font-size: 13px; font-weight: 600; color: var(--brandText)">JSON</span></summary>
+<div class="ep-grid" style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; padding: 0 18px 14px">
+<div style="min-width: 0"><div style="font-size: 12.5px; font-weight: 600; color: var(--ink3); margin-bottom: 4px">Request</div><pre class="mono" style="margin: 0; padding: 10px 12px; border-radius: 6px; background: var(--surface2); white-space: pre-wrap; word-break: break-word; line-height: 1.5">{{ep.req}}</pre></div>
+<div style="min-width: 0"><div style="font-size: 12.5px; font-weight: 600; color: var(--ink3); margin-bottom: 4px">Sample response</div><pre class="mono" style="margin: 0; padding: 10px 12px; border-radius: 6px; background: var(--surface2); white-space: pre-wrap; word-break: break-word; line-height: 1.5; max-height: 260px; overflow: auto">{{ep.res}}</pre></div>
+</div></details></sc-for>
+<p style="margin: 0; padding: 10px 18px 14px; font-size: 13px; color: var(--ink3)">Samples are shortened, with IDs and coordinates replaced by "…". Every response is wrapped as {"retCode": "S", "resCode": "0000", "resMsg": …, "msgId": "…"}.</p>
 </section>
 </sc-if>
 <div role="note" style="display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 10px; background: var(--warnBg); color: var(--warnText); box-shadow: inset 0 0 0 1px var(--warn)"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" style="flex: none"><path d="M12 4l9.5 16h-19z M12 10v4 M12 17v.5" style="fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round"></path></svg><div><strong>This dashboard only reads.</strong> The library can also lock, unlock and start the car, but those calls move the real car, so this page never makes them. It also skips force-refresh, which wakes the car and drains its 12V battery.</div></div>
@@ -950,6 +955,7 @@ input::placeholder{color:var(--ink3)}
 </template>
 <script>
 const DATA = __DASHBOARD_DATA__;
+const REFRESH_URL = __DASHBOARD_REFRESH_URL__;
 </script>
 <script>
 var IC={
@@ -1102,6 +1108,7 @@ var RT = (function () {
         onBeforeElUpdated: function (from, to) {
           if (from.hasAttribute("data-keep")) return false;
           if (from === document.activeElement && from.tagName === "INPUT") to.value = from.value;
+          if (from.tagName === "DETAILS" && from.open) to.setAttribute("open", "");
           return true;
         }
       });
@@ -1473,7 +1480,7 @@ Roadbook.prototype.renderVals = function () {
       shadow: on ? "0 1px 2px rgba(0,0,0,.15)" : "none", pick: function () { set({ theme: t[0] }); setPref("theme", t[0]); } }; });
   var cars = CARS.map(function (c, i) { return { nick: c.nick, model: c.model, fuelLabel: c.fuelLabel, sil: c.sil, sync: when(c.updated), on: i === S.car ? "true" : "false",
     pick: function () { set({ car: i, menu: false, sel: null }); } }; });
-  var dataAt = when(DATA.generated_at);
+  var dataAt = when(DATA.generated_at), syncLabel = S.syncing ? "Refreshing…" : (REFRESH_URL ? "Live · data from " : "Data from ") + dataAt;
 
   // hero cluster
   var ga0 = 150, ga1 = 390, frac = (car.pct || 0) / 100, cx = 100, cy = 96, R = 78, ticks = "";
@@ -1709,11 +1716,18 @@ Roadbook.prototype.renderVals = function () {
     ["update_month_trip_info(vehicle_id, \"YYYYMM\")", "Lists the days with trips, once per month fetched."],
     ["update_day_trip_info(vehicle_id, \"YYYYMMDD\")", "Reads each day's trips. In India this adds each trip's detail and GPS trail."]].map(function (c, i) { return { n: i + 1, call: c[0], what: c[1] }; });
   var METH = { GET: ["var(--okBg)", "var(--okText)"], POST: ["rgba(29,111,224,.13)", "var(--s1)"], PUT: ["var(--warnBg)", "var(--warnText)"] };
-  var endpoints = [["POST", "/api/v1/user/signin", "Sign in with username and password"], ["POST", "/api/v1/user/oauth2/token", "Get or refresh tokens"],
-    ["GET", "/api/v1/spa/vehicles", "Cars on the account"], ["GET", "/api/v1/spa/vehicles/{id}/status/latest", "Last status the car sent"],
-    ["GET", "/api/v1/spa/vehicles/{id}/location/park", "Parked GPS position"], ["GET", "/api/v1/spa/vehicles/{id}/setting/alert/maintenance", "Odometer and service intervals"],
-    ["POST", "/api/v1/spa/vehicles/{id}/tripinfo", "Month or day trip summary"], ["POST", "/api/v1/spa/vehicles/{id}/tripinfo/detail", "One trip: events and GPS trail"]]
-    .map(function (e) { return { m: e[0], p: e[1], d: e[2], bg: METH[e[0]][0], fg: METH[e[0]][1] }; });
+  var J = function (o) { return typeof o === "string" ? o : JSON.stringify(o, null, 2); };
+  var endpoints = [
+    ["POST", "/api/v1/user/signin", "Sign in with username and password", { email: "…", password: "…" }, { redirectUrl: "…/api/v1/user/oauth2/redirect?code=…&state=test" }],
+    ["POST", "/api/v1/user/oauth2/token", "Get or refresh tokens", "grant_type=refresh_token&refresh_token=…", { token_type: "Bearer", access_token: "…", refresh_token: "…", expires_in: 86400 }],
+    ["GET", "/api/v1/spa/vehicles", "Cars on the account", "(no body)", { resMsg: { vehicles: [{ vehicleId: "…", vin: "…", vehicleName: "Carens", nickname: "…", type: "GN", year: "2022", ccuCCS2ProtocolSupport: 0 }] } }],
+    ["GET", "/api/v1/spa/vehicles/{id}/status/latest", "Last status the car sent", "(no body)", { resMsg: { doorLock: true, engine: false, fuelLevel: 70, dte: { value: 427, unit: 1 }, doorOpen: { frontLeft: 0, frontRight: 0, backLeft: 0, backRight: 0 }, trunkOpen: false, tirePressureLamp: { tirePressureLampAll: 0 }, time: "20261121102320" } }],
+    ["GET", "/api/v1/spa/vehicles/{id}/location/park", "Parked GPS position", "(no body)", { resMsg: { coord: { lat: "…", lon: "…", alt: "…", type: 0 }, speed: { value: 0, unit: 0 }, time: "20261121102317" } }],
+    ["GET", "/api/v1/spa/vehicles/{id}/setting/alert/maintenance", "Odometer and service intervals", "(no body)", { resMsg: { odometer: 15299, mainList: [{ itemId: "Engine oil", enable: true, items: { distValue: 10000, termValue: 12 } }] } }],
+    ["POST", "/api/v1/spa/vehicles/{id}/tripinfo", "Month or day trip summary", { tripPeriodType: 0, setTripMonth: "202611" }, { resMsg: { tripDayList: [{ tripDayInMonth: "20261112", tripCntDay: 6 }], tripDist: 596, tripDrvTime: 709, tripAvgSpeed: 40.2, tripMaxSpeed: 174 } }],
+    ["POST", "/api/v1/spa/vehicles/{id}/tripinfo/detail", "One trip: events and GPS trail", { tripPeriodType: 1, setTripDay: "20261112", setServiceTID: 20261112163222, tripStartTime: "20261112163222", tripEndTime: "20261112203022" },
+      { resMsg: { tripInfo: { tripDist: 184, tripDrvTime: 202, tripMaxSpeed: 144, tripHardBreakingTime: 1, tripRapidAccelationTime: 1, tripExcessiveSpeedTime: 3, tripList: [{ tripTime: "163450", lat: "…", lon: "…" }, "… one point every 10 s"] } } }]]
+    .map(function (e) { return { m: e[0], p: e[1], d: e[2], req: J(e[3]), res: J(e[4]), bg: METH[e[0]][0], fg: METH[e[0]][1] }; });
   var glossary = [["Range", "Distance the car estimates it can drive on the fuel or charge left."], ["Odometer", "Total distance the car has driven."],
     ["Hard braking", "Times the car braked sharply on a trip, as counted by the car."], ["Rapid acceleration", "Times the car sped up sharply."], ["Overspeed", "Times the car went over the speed threshold the car uses."],
     ["Idle time", "Minutes the engine ran while the car stood still."], ["In Park", "The transmission reports P."], ["Not reported", "Your car or region doesn't send this value, so the page leaves it blank."]]
@@ -1724,10 +1738,12 @@ Roadbook.prototype.renderVals = function () {
 
   return {
     themeClass: "t-" + resolved, isApp: true, tabs: tabs, themes: themes, car: Object.assign({}, car, { range: car.range == null ? "–" : D(car.range) }), cars: cars,
-    syncDot: "var(--brand)", syncText: "Data from " + dataAt, syncLabel: "Data from " + dataAt, syncSpin: "", syncBtn: S.copied ? "Copied: run it in a terminal" : "Refresh",
-    syncNow: function () { copy("roadbook"); }, menuOpen: !!S.menu, menuExpanded: S.menu ? "true" : "false", toggleMenu: function () { set({ menu: !self.state.menu }); },
+    syncDot: S.syncError ? "var(--bad)" : S.syncing ? "var(--warn)" : "var(--brand)", syncText: syncLabel, syncLabel: syncLabel, syncSpin: S.syncing ? "spin" : "",
+    syncBtn: S.syncing ? "Refreshing…" : S.copied ? "Copied: run it in a terminal" : "Refresh", syncNow: refresh, menuOpen: !!S.menu, menuExpanded: S.menu ? "true" : "false", toggleMenu: function () { set({ menu: !self.state.menu }); },
     openSettings: function () { set({ sheet: true }); }, sheetOpen: !!S.sheet, closeSheet: function () { set({ sheet: false }); }, settings: settings,
-    banners: [], isSyncing: false, syncSteps: [], isLoading: false,
+    banners: S.syncError ? [{ role: "alert", ic: IC.warn, title: "Refresh failed.", body: S.syncError + " Showing data from " + dataAt + ".", bg: "var(--badBg)", fg: "var(--badText)", ring: "var(--bad)" }]
+      : S.syncWait ? [{ role: "status", ic: IC.info, title: "Already up to date.", body: "The car's servers limit how often data can be read. Try again in " + S.syncWait + " s.", bg: "var(--neuBg)", fg: "var(--ink2)", ring: "var(--line2)" }] : [],
+    isSyncing: false, syncSteps: [], isLoading: false,
     showOverview: tab === "overview", showTimeline: tab === "timeline", showCar: tab === "car", showData: tab === "data", showApi: tab === "api", showHelp: tab === "help",
     u: { dUnit: dU, odo: car.odo == null ? "–" : nf(D(car.odo)) + " " + dU, evRange: ev.range, batTemp: "–" }, hero: hero, mapClass: S.mapView === "sat" ? "sat" : "",
     mapCredit: S.mapView === "sat" ? "Imagery © Esri" : "© OpenStreetMap · OpenFreeMap",
@@ -1751,6 +1767,20 @@ Roadbook.prototype.renderVals = function () {
     // for the imperative parts
     _heroTrip: heroTrip, _selTrip: tab === "timeline" ? selTrip : null, _car: car, _theme: resolved
   };
+
+  // With the local server running (roadbook), Refresh fetches new data; a saved file can only copy the command.
+  function refresh() {
+    if (!REFRESH_URL) { copy("roadbook"); return; }
+    if (self.state.syncing) return;
+    set({ syncing: true, syncError: null, syncWait: 0 });
+    fetch(REFRESH_URL, { method: "POST" }).then(function (r) { if (!r.ok) throw new Error("The Roadbook server answered " + r.status + "."); return r.json(); }).then(function (res) {
+      var fresh = res.data.generated_at !== DATA.generated_at;
+      Object.keys(DATA).forEach(function (k) { delete DATA[k]; });
+      Object.assign(DATA, res.data);
+      CARS = DATA.vehicles.map(prepCar);
+      set({ syncing: false, syncError: res.error, syncWait: !fresh && !res.error ? res.wait : 0 });
+    }, function () { set({ syncing: false, syncError: "Roadbook isn't running. Start it again with the roadbook command." }); });
+  }
 
   function copy(text) {
     var done = function () { set({ copied: true }); setTimeout(function () { set({ copied: false }); }, 2500); };
