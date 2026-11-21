@@ -167,11 +167,11 @@ class KiaUvoApiIN(ApiImplType1):
 
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
-        _LOGGER.error(f"Getting maintenance alert from {url}")
+        _LOGGER.debug(f"Getting maintenance alert from {url}")
         response = self.session.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
-        _LOGGER.error(response)
+        _LOGGER.debug(response)
         _check_response_for_errors(response)
         return cast(dict[str, Any], response["resMsg"])
 
@@ -485,7 +485,7 @@ class KiaUvoApiIN(ApiImplType1):
                     token, vehicle.ccu_ccs2_protocol_support
                 ),
             ).json()
-            _LOGGER.error(f"{DOMAIN} - _get_location response: {response}")
+            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return cast(dict[str, Any], response["resMsg"])
         except Exception:
