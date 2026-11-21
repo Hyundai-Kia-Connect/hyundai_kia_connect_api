@@ -1246,7 +1246,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                 VIN=entry["vin"],
                 engine_type=entry_engine_type,
                 model=entry["modelCode"],
-                registration_date=entry["enrollmentDate"],
+                registration_date=entry.get("enrollmentDate"),
                 timezone=self.data_timezone,
                 enabled=entry.get("enrollmentStatus") != "CANCELLED",
                 generation=entry.get("vehicleGeneration", "2"),
