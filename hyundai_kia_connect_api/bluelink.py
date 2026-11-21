@@ -12,6 +12,7 @@ import os
 import sys
 import textwrap
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -402,21 +403,29 @@ def cmd_dashboard(
 
     def build() -> dict[str, Any]:
         if built:  # the first build reuses the state main() just fetched
+            _progress("Refreshing status")
             vm.check_and_refresh_token()
             vm.update_all_vehicles_with_cached_state()
         built.append(True)
-        return {
+        data = {
             "generated_at": datetime.datetime.now(),
             "region": args.region,
             "brand": args.brand,
             "vehicles": [
                 {
                     **vehicle_to_dict(v),
-                    "trip_history": dashboard.collect_trips(vm, v.id, args.months),
+                    "trip_history": dashboard.collect_trips(
+                        vm,
+                        v.id,
+                        args.months,
+                        _car_progress(v.name),
+                    ),
                 }
                 for v in vm.vehicles.values()
             ],
         }
+        _progress("Done", end=True)
+        return data
 
     built: list[bool] = []
     if not args.output:
@@ -429,6 +438,24 @@ def cmd_dashboard(
     if args.open:
         webbrowser.open(path.as_uri())
     return 0
+
+
+_SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+_spin_step = [0]
+
+
+def _progress(msg: str, end: bool = False) -> None:
+    """One status line that updates in place in a terminal."""
+    if not sys.stdout.isatty():
+        print(msg, flush=True)
+        return
+    _spin_step[0] += 1
+    mark = "✓" if end else _SPIN[_spin_step[0] % len(_SPIN)]
+    print(f"\r\033[K{mark} {msg}", end="\n" if end else "", flush=True)
+
+
+def _car_progress(name: str | None) -> Callable[[str], None]:
+    return lambda msg: _progress(f"{name}: {msg}")
 
 
 def _ask_choice(label: str, choices: list[str]) -> str:
@@ -564,7 +591,12 @@ def main(argv: list[str] | None = None) -> int:
         geocode_api_enable=True,
         geocode_api_use_email=True,
     )
+    dashboard_run = args.func is cmd_dashboard
+    if dashboard_run:
+        _progress(f"Signing in to {args.brand} ({args.region})")
     vm.check_and_refresh_token()
+    if dashboard_run:
+        _progress("Reading your cars' latest status")
     vm.update_all_vehicles_with_cached_state()
     result: int = args.func(vm, args)
     return result

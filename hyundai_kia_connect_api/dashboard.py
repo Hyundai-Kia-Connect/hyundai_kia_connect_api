@@ -43,7 +43,12 @@ def _months_back(today: dt.date, count: int) -> list[str]:
     return months
 
 
-def collect_trips(vm: VehicleManager, vehicle_id: str, months: int) -> list[Any]:
+def collect_trips(
+    vm: VehicleManager,
+    vehicle_id: str,
+    months: int,
+    progress: Callable[[str], None] | None = None,
+) -> list[Any]:
     """Month summaries with every day's trips, newest month first.
 
     Regions without trip info return an empty list.
@@ -60,9 +65,13 @@ def collect_trips(vm: VehicleManager, vehicle_id: str, months: int) -> list[Any]
         if month is None:
             continue
         days = []
-        for day in month.day_list:
+        for n, day in enumerate(month.day_list, 1):
             if day.yyyymmdd is None:
                 continue
+            if progress:
+                progress(
+                    f"trips for {yyyymm[:4]}-{yyyymm[4:]}, day {n} of {len(month.day_list)}"
+                )
             try:
                 vm.update_day_trip_info(vehicle_id, day.yyyymmdd)
             except (NotImplementedError, HyundaiKiaException) as err:

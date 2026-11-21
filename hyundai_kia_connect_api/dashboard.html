@@ -83,6 +83,13 @@ input::placeholder{color:var(--ink3)}
 .rb-bw .maplibregl-canvas{filter:grayscale(1) contrast(1.05)}
 .maplibregl-ctrl-attrib{font-size:11px}
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+/* The tabs get their own full-width row once the header can't fit them beside the controls. */
+@media (max-width:1240px){
+.top-in{grid-template-columns:minmax(0,1fr) auto!important;row-gap:2px!important}
+.tabs-row{grid-column:1/-1!important;order:3;justify-self:stretch!important;overflow-x:auto!important;margin:0 -8px!important}
+}
+/* On phones the row can still overflow: fade the edge so it reads as scrollable. */
+@media (max-width:760px){.tabs-row{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}}
 </style>
 </head>
 <body>
@@ -1340,6 +1347,7 @@ function player(el, trip, mapEl, units) {
     '<button class="btn" data-a="play" style="display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-radius:8px;background:var(--brand);color:var(--onBrand);font-weight:700"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path data-ic d="M7 5v14l11-7z" style="fill:currentColor"></path></svg><span data-lbl>Replay drive</span></button>' +
     '<div role="group" aria-label="Replay speed" style="display:flex;padding:3px;border-radius:8px;background:var(--inset)">' + [1, 4, 16].map(function (k) { return '<button class="btn" data-spd="' + k + '" aria-pressed="' + (k === spd) + '" style="height:38px;padding:0 12px;border-radius:6px;font-weight:600">' + k + "×</button>"; }).join("") + "</div>" +
     '<div class="cond tnum" aria-live="off" data-read style="margin-left:auto;font-size:22px;font-weight:700"></div></div>' +
+    '<p data-hint class="tnum" style="margin:-4px 0 12px;font-size:13px;color:var(--ink3)"></p>' +
     '<h2 class="cond" style="margin:0 0 6px;font-size:24px;font-weight:700">Speed over time <span style="font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink3)">from GPS points · hover or drag to scrub</span></h2>' +
     '<div data-box class="chart-box" style="position:relative;height:260px;touch-action:none;cursor:crosshair">' +
     '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" width="100%" height="100%" style="position:absolute;inset:0;overflow:visible" role="img" aria-label="Speed over time for this trip, coloured by speed band">' +
@@ -1378,17 +1386,34 @@ function player(el, trip, mapEl, units) {
       var last = performance.now();
       (function tick(now) {
         if (!playing) return;
-        var secs = (now - last) / 1000 * (T / 40) * pref("replaySpeed", 1); last = now;
+        var secs = (now - last) / 1000 * 60 * pref("replaySpeed", 1); last = now;
         var target = pts[pos | 0][2] + secs;
         while (pos < n - 1 && pts[(pos | 0) + 1][2] <= target) pos++;
         show(pos);
+        follow(pts[pos | 0], now);
         if (pos >= n - 1) { setPlay(false); return; }
         raf = requestAnimationFrame(tick);
       })(last);
     } else cancelAnimationFrame(raf);
   }
+  var followAt = 0;
+  function follow(p, now) {
+    var m = mapEl && mapEl._m;
+    if (!m || now - followAt < 450) return;
+    followAt = now;
+    m.map.easeTo({ center: [p[1], p[0]], duration: 450, easing: function (k) { return k; } });
+  }
+  function left() {  // real seconds to play the whole trip at the chosen speed
+    var r = Math.round(T / (60 * pref("replaySpeed", 1)));
+    return r < 60 ? Math.max(1, r) + " s" : Math.floor(r / 60) + " min " + pad(r % 60) + " s";
+  }
   q("[data-a=play]").onclick = function () { setPlay(!playing); };
-  el.querySelectorAll("[data-spd]").forEach(function (b) { b.onclick = function () { setPref("replaySpeed", +b.dataset.spd); el.querySelectorAll("[data-spd]").forEach(function (o) { o.setAttribute("aria-pressed", o === b); o.style.background = o === b ? "var(--surface)" : "transparent"; o.style.boxShadow = o === b ? "0 1px 2px rgba(0,0,0,.15)" : "none"; }); }; if (+b.dataset.spd === spd) b.click(); });
+  function mark(b) { el.querySelectorAll("[data-spd]").forEach(function (o) { o.setAttribute("aria-pressed", o === b); o.style.background = o === b ? "var(--surface)" : "transparent"; o.style.boxShadow = o === b ? "0 1px 2px rgba(0,0,0,.15)" : "none"; }); }
+  el.querySelectorAll("[data-spd]").forEach(function (b) {
+    b.onclick = function () { setPref("replaySpeed", +b.dataset.spd); mark(b); hint(); if (!playing) setPlay(true); };
+    if (+b.dataset.spd === spd) mark(b);
+  });
+  function hint() { var k = pref("replaySpeed", 1); q("[data-hint]").textContent = k + "× plays " + k + (k > 1 ? " minutes" : " minute") + " of driving per second · this trip takes about " + left(); }
   box.onpointermove = function (e) { if (playing) return; pos = idxAt(e.clientX); show(pos); };
   box.onpointerdown = function (e) { setPlay(false); try { box.setPointerCapture(e.pointerId); } catch (x) {} pos = idxAt(e.clientX); show(pos); };
   scrub.oninput = function () { setPlay(false); pos = +scrub.value; show(pos); };
@@ -1400,6 +1425,7 @@ function player(el, trip, mapEl, units) {
   });
   el._stop = function () { setPlay(false); };
   show(0);
+  pos = 0; hint();
   if (window.__rbAutoplay) { window.__rbAutoplay = false; setPlay(true); }
 }
 
@@ -1742,7 +1768,7 @@ Roadbook.prototype.renderVals = function () {
     syncBtn: S.syncing ? "Refreshing…" : S.copied ? "Copied: run it in a terminal" : "Refresh", syncNow: refresh, menuOpen: !!S.menu, menuExpanded: S.menu ? "true" : "false", toggleMenu: function () { set({ menu: !self.state.menu }); },
     openSettings: function () { set({ sheet: true }); }, sheetOpen: !!S.sheet, closeSheet: function () { set({ sheet: false }); }, settings: settings,
     banners: S.syncError ? [{ role: "alert", ic: IC.warn, title: "Refresh failed.", body: S.syncError + " Showing data from " + dataAt + ".", bg: "var(--badBg)", fg: "var(--badText)", ring: "var(--bad)" }]
-      : S.syncWait ? [{ role: "status", ic: IC.info, title: "Already up to date.", body: "The car's servers limit how often data can be read. Try again in " + S.syncWait + " s.", bg: "var(--neuBg)", fg: "var(--ink2)", ring: "var(--line2)" }] : [],
+      : S.syncWait >= 10 ? [{ role: "status", ic: IC.info, title: "Already up to date.", body: "The car's servers limit how often data can be read. Try again in " + S.syncWait + " s.", bg: "var(--neuBg)", fg: "var(--ink2)", ring: "var(--line2)" }] : [],
     isSyncing: false, syncSteps: [], isLoading: false,
     showOverview: tab === "overview", showTimeline: tab === "timeline", showCar: tab === "car", showData: tab === "data", showApi: tab === "api", showHelp: tab === "help",
     u: { dUnit: dU, odo: car.odo == null ? "–" : nf(D(car.odo)) + " " + dU, evRange: ev.range, batTemp: "–" }, hero: hero, mapClass: S.mapView === "sat" ? "sat" : "",
