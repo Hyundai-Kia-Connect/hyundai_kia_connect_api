@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 from hyundai_kia_connect_api.const import ENGINE_TYPES
 from hyundai_kia_connect_api.KiaUvoApiIN import KiaUvoApiIN
 from hyundai_kia_connect_api.Token import Token
-from hyundai_kia_connect_api.Vehicle import Vehicle
+from hyundai_kia_connect_api.Vehicle import TripPoint, Vehicle
 
 OK = {"retCode": "S", "resCode": "0000"}
 
@@ -65,7 +65,11 @@ def _detail_response(start: str, dist: int, hard_braking: int = 0) -> dict:
                 "tripExcessiveSpeedTime": 2,
                 "tripStartTime": start,
                 "tripEndTime": start,
-                "tripList": [{"tripTime": "201854", "lat": 0, "lon": 0}],
+                "tripList": [
+                    {"tripTime": "201854", "lat": 0, "lon": 0},
+                    {"tripTime": "201904", "lat": 0.0018, "lon": 0.0009},
+                    {"tripTime": "201914"},
+                ],
             }
         },
     }
@@ -136,6 +140,11 @@ def test_kia_ice_day_trips_use_detail_with_behaviour_counts():
     assert newest.hard_braking_count == 3
     assert newest.rapid_acceleration_count == 1
     assert newest.excessive_speed_count == 2
+    # Points without coordinates are dropped; 0 is a real coordinate.
+    assert newest.gps_trail == [
+        TripPoint(hhmmss="201854", latitude=0.0, longitude=0.0),
+        TripPoint(hhmmss="201904", latitude=0.0018, longitude=0.0009),
+    ]
     assert [t.hhmmss for t in info.trip_list] == ["201503", "081707"]
 
 

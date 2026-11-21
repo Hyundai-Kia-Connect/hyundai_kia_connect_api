@@ -37,6 +37,7 @@ setup(
     extras_require={
         "google": ["geopy>=2.2.0"],
         "image": ["Pillow>=10.0.0", "numpy>=1.26.0"],
+        "dashboard": ["keyring>=24"],
     },
     license="MIT license",
     long_description=long_description,
@@ -47,7 +48,10 @@ setup(
         include=["hyundai_kia_connect_api", "hyundai_kia_connect_api.*"]
     ),
     entry_points={
-        "console_scripts": ["bluelink = hyundai_kia_connect_api.bluelink:main"]
+        "console_scripts": [
+            "bluelink = hyundai_kia_connect_api.bluelink:main",
+            "roadbook = hyundai_kia_connect_api.bluelink:roadbook",
+        ]
     },
     test_suite="tests",
     tests_require=test_requirements,

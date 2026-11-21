@@ -29,9 +29,15 @@ from .const import (
 )
 from .exceptions import AuthenticationError
 from .Token import Token
-from .utils import get_child_value, get_hex_temp_into_index, get_index_into_hex_temp
+from .utils import (
+    float_or_none,
+    get_child_value,
+    get_hex_temp_into_index,
+    get_index_into_hex_temp,
+)
 from .Vehicle import (
     TripInfo,
+    TripPoint,
     Vehicle,
 )
 
@@ -161,11 +167,11 @@ class KiaUvoApiIN(ApiImplType1):
 
     def _get_maintenance_alert(self, token: Token, vehicle: Vehicle) -> dict[str, Any]:
         url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/setting/alert/maintenance"
-        _LOGGER.error(f"Getting maintenance alert from {url}")
+        _LOGGER.debug(f"Getting maintenance alert from {url}")
         response = self.session.get(
             url, headers=self._get_authenticated_headers(token)
         ).json()
-        _LOGGER.error(response)
+        _LOGGER.debug(response)
         _check_response_for_errors(response)
         return cast(dict[str, Any], response["resMsg"])
 
@@ -479,7 +485,7 @@ class KiaUvoApiIN(ApiImplType1):
                     token, vehicle.ccu_ccs2_protocol_support
                 ),
             ).json()
-            _LOGGER.error(f"{DOMAIN} - _get_location response: {response}")
+            _LOGGER.debug(f"{DOMAIN} - _get_location response: {response}")
             _check_response_for_errors(response)
             return cast(dict[str, Any], response["resMsg"])
         except Exception:
@@ -621,6 +627,15 @@ class KiaUvoApiIN(ApiImplType1):
             hard_braking_count=tripinfo.get("tripHardBreakingTime"),
             rapid_acceleration_count=tripinfo.get("tripRapidAccelationTime"),
             excessive_speed_count=tripinfo.get("tripExcessiveSpeedTime"),
+            gps_trail=[
+                TripPoint(
+                    hhmmss=point.get("tripTime"),
+                    latitude=float_or_none(point.get("lat")),
+                    longitude=float_or_none(point.get("lon")),
+                )
+                for point in tripinfo.get("tripList") or []
+                if point.get("lat") is not None and point.get("lon") is not None
+            ],
         )
 
         if len(self._trip_detail_cache) >= TRIP_DETAIL_CACHE_SIZE:

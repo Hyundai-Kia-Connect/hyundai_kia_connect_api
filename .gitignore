@@ -12,3 +12,9 @@ __pycache__/
 coverage.xml
 # Created by the prettier pre-commit hook
 node_modules/
+
+# Dashboard output: contains the VIN and GPS trail
+roadbook*.html
+roadbook-*.csv
+roadbook-*.json
+bluelink-dashboard.html
