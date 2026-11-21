@@ -198,3 +198,22 @@ state to a JSON file. Example usage:
 
 Environment variables BLUELINK_XXX can be used to provide a default value for
 the corresponding --xxx argument.
+
+Dashboard
+---------
+
+``bluelink dashboard`` builds a single HTML page with your cars' status,
+location and trip history, and opens it in your browser. Run it in a terminal
+and it asks for any region, brand, username, password or PIN you didn't pass
+as a flag or environment variable:
+
+::
+
+    pip install hyundai_kia_connect_api
+    bluelink dashboard
+
+Options: ``--months 3`` sets how many months of trips to fetch (regions without
+trip info skip this), ``--output bluelink-dashboard.html`` sets the file, and
+``--no-open`` skips opening the browser. The page loads its map from public
+servers but keeps your data in the file. The file contains your VIN and
+locations, so don't share it.

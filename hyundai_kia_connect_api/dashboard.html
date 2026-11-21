@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bluelink Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#eef0f3;--surface:#fff;--ink:#13161b;--ink2:#4a525d;--line:rgba(19,22,27,.1);--accent:#0d6b4e;--bad:#c4321f;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--surface:#161a21;--ink:#eef1f5;--ink2:#a3acb8;--line:rgba(255,255,255,.1);--accent:#34b386;--bad:#ff7a66;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px max(16px,env(safe-area-inset-left)) 64px}
+h1{margin:0 0 4px;font-size:28px}h2{margin:32px 0 12px;font-size:20px}h3{margin:0 0 8px;font-size:15px}
+.muted{color:var(--ink2);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{padding:6px 4px;border-top:1px solid var(--line);text-align:left;vertical-align:top;word-break:break-word}
+th{color:var(--ink2);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+#map{height:320px;border-radius:14px}
+details pre{max-height:400px;overflow:auto;font-size:12px}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;background:var(--accent);color:var(--surface);font-size:12px;font-weight:600}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script>
+// Placeholder layout: renders every section generically so any region works.
+const DATA = __DASHBOARD_DATA__;
+const esc = s => String(s ?? "–").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const label = k => k.replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+const show = v => Array.isArray(v) ? v.filter(x => x != null).join(" ") || "–" : typeof v === "object" && v ? JSON.stringify(v) : v;
+const hm = s => s ? `${s.slice(0, 2)}:${s.slice(2, 4)}` : "–";
+const day = s => s ? `${s.slice(6, 8)}/${s.slice(4, 6)}/${s.slice(0, 4)}` : "–";
+
+function section(name, obj) {
+  const rows = Object.entries(obj || {}).filter(([, v]) => v != null && !(Array.isArray(v) && v.every(x => x == null)));
+  if (!rows.length) return "";
+  return `<div class="card"><h3>${esc(label(name))}</h3><table>${rows.map(([k, v]) =>
+    `<tr><th>${esc(label(k))}</th><td class="n">${esc(show(v))}</td></tr>`).join("")}</table></div>`;
+}
+
+function trips(history) {
+  const rows = (history || []).flatMap(m => m.days).flatMap(d => (d.trip_list || []).map(t => ({d: d.yyyymmdd, ...t})));
+  if (!rows.length) return `<p class="muted">No trip history from this region, or no trips in the months fetched.</p>`;
+  return `<div class="card scroll"><table><thead><tr><th>Day</th><th>Start</th><th>End</th><th class="n">km</th>
+    <th class="n">Drive min</th><th class="n">Idle min</th><th class="n">Avg</th><th class="n">Max</th>
+    <th class="n">Hard brake</th><th class="n">Rapid accel</th><th class="n">Overspeed</th></tr></thead><tbody>${
+    rows.map(t => `<tr><td>${day(t.d)}</td><td>${hm(t.hhmmss)}</td><td>${hm(t.end_hhmmss)}</td>
+      <td class="n">${esc(t.distance)}</td><td class="n">${esc(t.drive_time)}</td><td class="n">${esc(t.idle_time)}</td>
+      <td class="n">${esc(t.avg_speed)}</td><td class="n">${esc(t.max_speed)}</td><td class="n">${esc(t.hard_braking_count)}</td>
+      <td class="n">${esc(t.rapid_acceleration_count)}</td><td class="n">${esc(t.excessive_speed_count)}</td></tr>`).join("")
+  }</tbody></table></div>`;
+}
+
+const app = document.getElementById("app");
+app.innerHTML = `<h1>Your cars</h1><p class="muted">${esc(DATA.brand)} · ${esc(DATA.region)} · generated ${esc(DATA.generated_at)}</p>` +
+  DATA.vehicles.map((v, i) => {
+    const {debug, trip_history, ...sections} = v;
+    return `<h2>${esc(v.identification.name)} <span class="tag">${esc(v.identification.model)}</span></h2>
+      <div id="map${i}" class="card" style="height:320px;padding:0"></div>
+      <div class="grid" style="margin-top:12px">${Object.entries(sections).map(([k, o]) => section(k, o)).join("")}</div>
+      <h2>Trips</h2>${trips(trip_history)}
+      <h2>Raw data</h2><details class="card"><summary>Everything the API returned</summary><pre>${esc(JSON.stringify(debug, null, 2))}</pre></details>`;
+  }).join("");
+
+DATA.vehicles.forEach((v, i) => {
+  const [lon, lat] = v.location.location || [];  // the library orders this pair longitude first
+  const el = document.getElementById("map" + i);
+  if (lat == null || typeof L === "undefined") { el.innerHTML = `<p class="muted" style="padding:16px">No location.</p>`; return; }
+  const map = L.map(el).setView([lat, lon], 15);
+  // Esri tiles load from file:// pages; OpenStreetMap's servers refuse requests without a Referer.
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom: 19, attribution: "Tiles © Esri"}).addTo(map);
+  L.marker([lat, lon]).addTo(map).bindPopup(`Parked · ${esc(v.location.location_last_updated_at)}`);
+});
+</script>
+</body>
+</html>

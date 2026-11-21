@@ -5,11 +5,14 @@
 import argparse
 import dataclasses
 import datetime
+import getpass
 import json
 import logging
 import os
 import sys
 import textwrap
+import webbrowser
+from pathlib import Path
 from typing import Any
 
 import hyundai_kia_connect_api
@@ -392,6 +395,64 @@ def cmd_info(
     return 0
 
 
+def cmd_dashboard(
+    vm: hyundai_kia_connect_api.VehicleManager, args: argparse.Namespace
+) -> int:
+    from . import dashboard
+
+    data = {
+        "generated_at": datetime.datetime.now(),
+        "region": args.region,
+        "brand": args.brand,
+        "vehicles": [
+            {
+                **vehicle_to_dict(v),
+                "trip_history": dashboard.collect_trips(vm, v.id, args.months),
+            }
+            for v in vm.vehicles.values()
+        ],
+    }
+    path = Path(args.output).resolve()
+    path.write_text(dashboard.render(data), encoding="utf-8")
+    print(f"Dashboard written to {path}")
+    print("It contains your VIN and locations. Don't share the file.")
+    if args.open:
+        webbrowser.open(path.as_uri())
+    return 0
+
+
+def _ask_choice(label: str, choices: list[str]) -> str:
+    for i, choice in enumerate(choices, 1):
+        print(f"  {i}. {choice}")
+    while True:
+        answer = input(f"{label} [1-{len(choices)}]: ").strip()
+        if answer.isdigit() and 1 <= int(answer) <= len(choices):
+            return choices[int(answer) - 1]
+
+
+def _ask_missing(args: argparse.Namespace) -> None:
+    """Prompt in a terminal for whatever the flags and env vars didn't give."""
+    interactive = args.func is cmd_dashboard and sys.stdin.isatty()
+    if args.region is None:
+        regions = sorted(const.REGIONS.values())
+        args.region = (
+            _ask_choice("Region", regions) if interactive else const.REGION_CANADA
+        )
+    if args.brand is None:
+        brands = sorted(const.BRANDS.values())
+        args.brand = (
+            _ask_choice("Brand", brands) if interactive else const.BRAND_HYUNDAI
+        )
+    if not interactive:
+        return
+    if not args.username:
+        args.username = input("Username (email or phone): ").strip()
+    if not args.password:
+        args.password = getpass.getpass("Password: ")
+    if not args.pin:
+        args.pin = getpass.getpass("PIN: ").strip()
+
+
 def main() -> int:
     default_username = os.environ.get("BLUELINK_USERNAME", "")
     default_password = os.environ.get("BLUELINK_PASSWORD", "")
@@ -406,13 +467,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
     parser.add_argument(
         "--region",
-        default=os.environ.get("BLUELINK_REGION", const.REGION_CANADA),
+        default=os.environ.get("BLUELINK_REGION"),
         choices=sorted(const.REGIONS.values()),
         help="Car's region, use env var BLUELINK_REGION",
     )
     parser.add_argument(
         "--brand",
-        default=os.environ.get("BLUELINK_BRAND", const.BRAND_HYUNDAI),
+        default=os.environ.get("BLUELINK_BRAND"),
         choices=sorted(const.BRANDS.values()),
         help="Car's brand, use env var BLUELINK_BRAND",
     )
@@ -420,20 +481,17 @@ def main() -> int:
         "--username",
         default=default_username,
         help="Bluelink account username, use env var BLUELINK_USERNAME",
-        required=not default_username,
     )
     parser.add_argument(
         "--password",
         default=default_password,
         help="Bluelink account password, use env var BLUELINK_PASSWORD",
-        required=not default_password,
     )
     parser.add_argument(
         "--pin",
         type=str,
         default=default_pin,
         help="Bluelink account pin, use env var BLUELINK_PIN",
-        required=not default_pin,
     )
     parser.add_argument("-v", "--verbose", action=argparse.BooleanOptionalAction)
     subparsers = parser.add_subparsers(help="Commands", required=True)
@@ -447,7 +505,30 @@ def main() -> int:
         help="Save data to file as JSON",
     )
 
+    parser_dashboard = subparsers.add_parser(
+        "dashboard",
+        help="Builds an HTML dashboard of your cars and trips and opens it. "
+        "Asks for any login details not given.",
+    )
+    parser_dashboard.set_defaults(func=cmd_dashboard)
+    parser_dashboard.add_argument(
+        "--output", default="bluelink-dashboard.html", help="HTML file to write"
+    )
+    parser_dashboard.add_argument(
+        "--months", type=int, default=3, help="Months of trip history to fetch"
+    )
+    parser_dashboard.add_argument(
+        "--open",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Open the dashboard in a browser",
+    )
+
     args = parser.parse_args()
+    _ask_missing(args)
+    for name in ("username", "password", "pin"):
+        if not getattr(args, name):
+            parser.error(f"--{name} is required (or set BLUELINK_{name.upper()})")
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.ERROR)
 
     # Reverse lookup.
