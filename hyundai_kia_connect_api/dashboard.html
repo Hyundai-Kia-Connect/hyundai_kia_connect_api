@@ -83,12 +83,13 @@ input::placeholder{color:var(--ink3)}
 .rb-bw .maplibregl-canvas{filter:grayscale(1) contrast(1.05)}
 .maplibregl-ctrl-attrib{font-size:11px}
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-/* The tabs get their own full-width row once the header can't fit them beside the controls. */
-@media (max-width:1240px){
-.top-in{grid-template-columns:minmax(0,1fr) auto!important;row-gap:2px!important}
+/* Tabs always get their own row: beside the car menu and controls they got clipped
+   at many widths, depending on the car's name. */
+.top-in{grid-template-columns:minmax(0,1fr) auto!important;row-gap:0!important}
 .tabs-row{grid-column:1/-1!important;order:3;justify-self:stretch!important;overflow-x:auto!important;margin:0 -8px!important}
-}
 /* On phones the row can still overflow: fade the edge so it reads as scrollable. */
+/* Phones: keep the road icon, drop the wordmark, and let the car name shorten instead of running under the buttons. */
+@media (max-width:760px){[aria-label="Roadbook"]>.cond{display:none}.top-in>div:first-child{min-width:0}.top-in>div:first-child>div:nth-child(2){min-width:0;flex:1 1 auto}.top-in [aria-haspopup]{min-width:0;max-width:100%!important}}
 @media (max-width:760px){.tabs-row{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}}
 </style>
 </head>
