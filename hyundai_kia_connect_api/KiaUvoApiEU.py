@@ -31,7 +31,6 @@ from .const import (
     BRAND_KIA,
     BRANDS,
     CHARGE_PORT_ACTION,
-    DISTANCE_UNITS,
     DOMAIN,
     ENGINE_TYPES,
     SEAT_STATUS,
@@ -50,6 +49,7 @@ from .exceptions import (
 )
 from .Token import Token
 from .utils import (
+    distance_with_unit,
     get_child_value,
     get_hex_temp_into_index,
     normalize_battery_soc,
@@ -607,14 +607,9 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         else:
             vehicle.last_updated_at = dt.datetime.now(self.data_timezone)
         if get_child_value(state, "odometer.value"):
-            vehicle.odometer = (
+            vehicle.odometer = distance_with_unit(
                 get_child_value(state, "odometer.value"),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "odometer.unit",
-                    )
-                ],
+                get_child_value(state, "odometer.unit"),
             )
         vehicle.car_battery_percentage = normalize_battery_soc(
             get_child_value(state, "vehicleStatus.battery.batSoc")
@@ -788,7 +783,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
             is not None
         ):
-            vehicle.total_driving_range = (
+            vehicle.total_driving_range = distance_with_unit(
                 round(
                     float(
                         get_child_value(
@@ -798,12 +793,10 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     ),
                     1,
                 ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
-                    )
-                ],
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.totalAvailableRange.unit",
+                ),
             )
         if (
             get_child_value(
@@ -812,7 +805,7 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
             is not None
         ):
-            vehicle.ev_driving_range = (
+            vehicle.ev_driving_range = distance_with_unit(
                 round(
                     float(
                         get_child_value(
@@ -822,12 +815,10 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                     ),
                     1,
                 ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
-                    )
-                ],
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.evModeRange.unit",
+                ),
             )
         vehicle.ev_estimated_current_charge_duration = (
             get_child_value(state, "vehicleStatus.evStatus.remainTime2.atc.value"),
@@ -865,53 +856,44 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
             )
             is not None
         ):
-            vehicle.fuel_driving_range = (
+            vehicle.fuel_driving_range = distance_with_unit(
                 get_child_value(
                     state,
                     "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.value",
                 ),
-                DISTANCE_UNITS[
-                    get_child_value(
-                        state,
-                        "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
-                    )
-                ],
+                get_child_value(
+                    state,
+                    "vehicleStatus.evStatus.drvDistance.0.rangeByFuel.gasModeRange.unit",
+                ),
             )
         elif get_child_value(
             state,
             "vehicleStatus.dte.value",
         ):
-            vehicle.fuel_driving_range = (
-                get_child_value(
-                    state,
-                    "vehicleStatus.dte.value",
-                ),
-                DISTANCE_UNITS[get_child_value(state, "vehicleStatus.dte.unit")],
+            vehicle.fuel_driving_range = distance_with_unit(
+                get_child_value(state, "vehicleStatus.dte.value"),
+                get_child_value(state, "vehicleStatus.dte.unit"),
             )
 
-        vehicle.ev_target_range_charge_AC = (
+        vehicle.ev_target_range_charge_AC = distance_with_unit(
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.value",
             ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
-                )
-            ],
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.1.dte.rangeByFuel.totalAvailableRange.unit",
+            ),
         )
-        vehicle.ev_target_range_charge_DC = (
+        vehicle.ev_target_range_charge_DC = distance_with_unit(
             get_child_value(
                 state,
                 "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.value",
             ),
-            DISTANCE_UNITS[
-                get_child_value(
-                    state,
-                    "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
-                )
-            ],
+            get_child_value(
+                state,
+                "vehicleStatus.evStatus.reservChargeInfos.targetSOClist.0.dte.rangeByFuel.totalAvailableRange.unit",
+            ),
         )
         vehicle.ev_first_departure_enabled = get_child_value(
             state,
