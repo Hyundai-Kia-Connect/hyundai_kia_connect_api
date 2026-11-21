@@ -453,7 +453,7 @@ def _ask_missing(args: argparse.Namespace) -> None:
         args.pin = getpass.getpass("PIN: ").strip()
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     default_username = os.environ.get("BLUELINK_USERNAME", "")
     default_password = os.environ.get("BLUELINK_PASSWORD", "")
     default_pin = None
@@ -464,35 +464,42 @@ def main() -> int:
             print("Invalid BLUELINK_PIN environment variable", file=sys.stderr)
             return 1
 
+    def add_login_args(p: argparse.ArgumentParser, defaults: bool) -> None:
+        def d(value: Any) -> Any:
+            # Subcommand copies stay unset so they don't override the top-level values.
+            return value if defaults else argparse.SUPPRESS
+
+        p.add_argument(
+            "--region",
+            default=d(os.environ.get("BLUELINK_REGION")),
+            choices=sorted(const.REGIONS.values()),
+            help="Car's region, use env var BLUELINK_REGION",
+        )
+        p.add_argument(
+            "--brand",
+            default=d(os.environ.get("BLUELINK_BRAND")),
+            choices=sorted(const.BRANDS.values()),
+            help="Car's brand, use env var BLUELINK_BRAND",
+        )
+        p.add_argument(
+            "--username",
+            default=d(default_username),
+            help="Bluelink account username, use env var BLUELINK_USERNAME",
+        )
+        p.add_argument(
+            "--password",
+            default=d(default_password),
+            help="Bluelink account password, use env var BLUELINK_PASSWORD",
+        )
+        p.add_argument(
+            "--pin",
+            type=str,
+            default=d(default_pin),
+            help="Bluelink account pin, use env var BLUELINK_PIN",
+        )
+
     parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-    parser.add_argument(
-        "--region",
-        default=os.environ.get("BLUELINK_REGION"),
-        choices=sorted(const.REGIONS.values()),
-        help="Car's region, use env var BLUELINK_REGION",
-    )
-    parser.add_argument(
-        "--brand",
-        default=os.environ.get("BLUELINK_BRAND"),
-        choices=sorted(const.BRANDS.values()),
-        help="Car's brand, use env var BLUELINK_BRAND",
-    )
-    parser.add_argument(
-        "--username",
-        default=default_username,
-        help="Bluelink account username, use env var BLUELINK_USERNAME",
-    )
-    parser.add_argument(
-        "--password",
-        default=default_password,
-        help="Bluelink account password, use env var BLUELINK_PASSWORD",
-    )
-    parser.add_argument(
-        "--pin",
-        type=str,
-        default=default_pin,
-        help="Bluelink account pin, use env var BLUELINK_PIN",
-    )
+    add_login_args(parser, defaults=True)
     parser.add_argument("-v", "--verbose", action=argparse.BooleanOptionalAction)
     subparsers = parser.add_subparsers(help="Commands", required=True)
     parser_info = subparsers.add_parser(
@@ -511,8 +518,9 @@ def main() -> int:
         "Asks for any login details not given.",
     )
     parser_dashboard.set_defaults(func=cmd_dashboard)
+    add_login_args(parser_dashboard, defaults=False)
     parser_dashboard.add_argument(
-        "--output", default="bluelink-dashboard.html", help="HTML file to write"
+        "--output", default="roadbook.html", help="HTML file to write"
     )
     parser_dashboard.add_argument(
         "--months", type=int, default=3, help="Months of trip history to fetch"
@@ -524,7 +532,7 @@ def main() -> int:
         help="Open the dashboard in a browser",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     _ask_missing(args)
     for name in ("username", "password", "pin"):
         if not getattr(args, name):
@@ -548,6 +556,11 @@ def main() -> int:
     vm.update_all_vehicles_with_cached_state()
     result: int = args.func(vm, args)
     return result
+
+
+def roadbook() -> int:
+    """`roadbook [options]`: the same as `bluelink dashboard [options]`."""
+    return main(["dashboard", *sys.argv[1:]])
 
 
 if __name__ == "__main__":

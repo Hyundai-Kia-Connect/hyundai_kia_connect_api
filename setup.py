@@ -47,7 +47,10 @@ setup(
         include=["hyundai_kia_connect_api", "hyundai_kia_connect_api.*"]
     ),
     entry_points={
-        "console_scripts": ["bluelink = hyundai_kia_connect_api.bluelink:main"]
+        "console_scripts": [
+            "bluelink = hyundai_kia_connect_api.bluelink:main",
+            "roadbook = hyundai_kia_connect_api.bluelink:roadbook",
+        ]
     },
     test_suite="tests",
     tests_require=test_requirements,

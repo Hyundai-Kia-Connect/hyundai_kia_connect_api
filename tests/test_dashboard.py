@@ -5,7 +5,7 @@ import datetime as dt
 import json
 import re
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
 from hyundai_kia_connect_api import bluelink, const, dashboard
 from hyundai_kia_connect_api.exceptions import APIError
@@ -90,3 +90,75 @@ def test_missing_region_and_brand_keep_old_defaults_without_terminal() -> None:
     )
     bluelink._ask_missing(args)
     assert (args.region, args.brand) == (const.REGION_CANADA, const.BRAND_HYUNDAI)
+
+
+class RecordingManager:
+    """Stands in for VehicleManager so the CLI runs without the API."""
+
+    seen: ClassVar[dict[str, Any]] = {}
+
+    def __init__(self, **kwargs: Any) -> None:
+        RecordingManager.seen = kwargs
+        self.vehicles: dict[str, Any] = {}
+
+    def check_and_refresh_token(self) -> None:
+        pass
+
+    def update_all_vehicles_with_cached_state(self) -> None:
+        pass
+
+
+def test_roadbook_takes_login_options_after_the_command(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        bluelink.hyundai_kia_connect_api, "VehicleManager", RecordingManager
+    )
+    out = tmp_path / "car.html"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "roadbook",
+            "--region",
+            "India",
+            "--brand",
+            "Kia",
+            "--username",
+            "u",
+            "--password",
+            "p",
+            "--pin",
+            "1234",
+            "--no-open",
+            "--output",
+            str(out),
+        ],
+    )
+    assert bluelink.roadbook() == 0
+    assert RecordingManager.seen["region"] == 6
+    assert RecordingManager.seen["brand"] == 1
+    assert RecordingManager.seen["pin"] == "1234"
+    assert out.read_text(encoding="utf-8").startswith("<!doctype html>")
+
+
+def test_top_level_login_options_still_work(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        bluelink.hyundai_kia_connect_api, "VehicleManager", RecordingManager
+    )
+    out = tmp_path / "car.html"
+    args = [
+        "--region",
+        "Europe",
+        "--brand",
+        "Hyundai",
+        "--username",
+        "u",
+        "--password",
+        "p",
+        "--pin",
+        "1",
+        "dashboard",
+        "--no-open",
+        "--output",
+        str(out),
+    ]
+    assert bluelink.main(args) == 0
+    assert (RecordingManager.seen["region"], RecordingManager.seen["brand"]) == (1, 2)
