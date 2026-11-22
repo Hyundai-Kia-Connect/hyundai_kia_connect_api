@@ -132,6 +132,13 @@ def _safe_parse_json(
     return cast(dict[str, Any], response.json())
 
 
+def _add_trip_distance(total: float | None, distance: float | None) -> float | None:
+    """Add a trip distance to a running total; a missing distance adds nothing."""
+    if distance is None:
+        return total
+    return distance if total is None else total + distance
+
+
 def parse_svm_response(response: dict[str, Any], timezone: dt.tzinfo) -> SVMDetails:
     """Parse a getSVMDetails response into SVMDetails.
 
@@ -962,7 +969,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     month_trip_info_count += 1
                     summary.drive_time += trip.drive_time
                     summary.idle_time += trip.idle_time
-                    summary.distance += trip.distance
+                    summary.distance = _add_trip_distance(
+                        summary.distance, trip.distance
+                    )
                     summary.avg_speed += trip.avg_speed
                     summary.max_speed = max(trip.max_speed, summary.max_speed)
 
@@ -1036,7 +1045,9 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     day_trip_info_count += 1
                     summary.drive_time += trip.drive_time
                     summary.idle_time += trip.idle_time
-                    summary.distance += trip.distance
+                    summary.distance = _add_trip_distance(
+                        summary.distance, trip.distance
+                    )
                     summary.avg_speed += trip.avg_speed
                     summary.max_speed = max(trip.max_speed, summary.max_speed)
 
