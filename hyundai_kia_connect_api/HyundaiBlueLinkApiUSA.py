@@ -278,10 +278,12 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
     _action_service_types: ClassVar[dict[str, str]] = {}
 
     # Cached enrollment/details response. Capabilities, seat configs,
-    # generation and model rarely change, so the response is cached for
-    # the instance lifetime. get_vehicles force-refreshes (vehicle list
-    # can change); _get_vehicle_details uses the cache.
+    # generation and model rarely change, but the response also carries the
+    # odometer, so the cache expires. get_vehicles force-refreshes (vehicle
+    # list can change); _get_vehicle_details uses the cache.
+    _ENROLLMENT_DETAILS_TTL_SECONDS = 3600
     _enrollment_details_cache: dict[str, Any] | None = None
+    _enrollment_details_cached_at: float | None = None
 
     def __init__(self, region: int, brand: int, language: str):
         self.LANGUAGE: str = language
@@ -439,11 +441,19 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         """Return enrollment details for the account, cached on the instance.
 
         Capabilities, seat configs, generation and model change rarely, so
-        the response is cached for the instance lifetime. ``get_vehicles``
-        forces a refresh (the vehicle list can change); ``_get_vehicle_details``
-        uses the cache.
+        the response is cached. It also carries the odometer, which for some
+        vehicles is the only odometer source, so the cache expires after
+        ``_ENROLLMENT_DETAILS_TTL_SECONDS``. ``get_vehicles`` forces a refresh (the
+        vehicle list can change); ``_get_vehicle_details`` uses the cache.
         """
-        if self._enrollment_details_cache is not None and not force_refresh:
+        now = time.monotonic()
+        cached_at = self._enrollment_details_cached_at
+        if (
+            self._enrollment_details_cache is not None
+            and cached_at is not None
+            and now - cached_at < self._ENROLLMENT_DETAILS_TTL_SECONDS
+            and not force_refresh
+        ):
             return self._enrollment_details_cache
         url = self.API_URL + "enrollment/details/" + token.username
         headers = self._get_authenticated_headers(token)
@@ -454,6 +464,7 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         if "enrolledVehicleDetails" not in response_json:
             raise AuthenticationError("Missing enrolledVehicleDetails in response")
         self._enrollment_details_cache = response_json
+        self._enrollment_details_cached_at = now
         return cast(dict[str, Any], response_json)
 
     def _get_vehicle_details(

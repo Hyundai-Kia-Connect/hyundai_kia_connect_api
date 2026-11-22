@@ -12,7 +12,9 @@ import json
 from unittest.mock import MagicMock, patch
 
 from hyundai_kia_connect_api.HyundaiBlueLinkApiUSA import HyundaiBlueLinkApiUSA
+from hyundai_kia_connect_api.Token import Token
 from hyundai_kia_connect_api.Vehicle import Vehicle
+from tests.fixture_helpers import FIXTURES_DIR
 
 
 class _FakeResponse:
@@ -103,3 +105,65 @@ class TestEnrollmentCache:
         # Only one session.get call (from get_vehicles); _get_vehicle_details
         # was a cache hit
         assert api.session.get.call_count == 1
+
+
+class TestEnrollmentCacheExpiry:
+    """The enrollment response carries the odometer, so the cache must expire.
+
+    Real captures from kia_uvo #1455 (2025 GV70 EV): the cached status has no
+    odometer and there are no trip records, so enrollment/details is the only
+    odometer source.
+    """
+
+    @staticmethod
+    def _fixture(name):
+        body = json.loads((FIXTURES_DIR / "updates" / "responses" / name).read_text())
+        body.pop("_fixture_meta", None)
+        return body
+
+    def _api(self, enrollment):
+        bodies = {
+            "enrollment/details": lambda: enrollment,
+            "rcs/rvs/vehicleStatus": lambda: self._fixture(
+                "usa_genesis_vehicle_status_1455.json"
+            ),
+            "evTripDetails": lambda: self._fixture("us_hyundai_evtripdetails.json"),
+            "rcs/rfc/findMyCar": lambda: self._fixture(
+                "us_hyundai_findmycar_feature_off.json"
+            ),
+        }
+
+        def get(url, headers=None):
+            body = next(make() for path, make in bodies.items() if path in url)
+            return _FakeResponse(text=json.dumps(body))
+
+        api = _make_api()
+        api.API_HEADERS = {}
+        api.session.get = MagicMock(side_effect=get)
+        return api
+
+    def _enrollment_fetches(self, api):
+        return sum(
+            "enrollment/details" in call.args[0]
+            for call in api.session.get.call_args_list
+        )
+
+    def test_odometer_follows_enrollment_after_the_cache_expires(self):
+        enrollment = self._fixture("usa_genesis_enrollment_1455.json")
+        details = enrollment["enrolledVehicleDetails"][0]["vehicleDetails"]
+        api = self._api(enrollment)
+        token = Token(username="user", password="pw", access_token="token")
+
+        vehicle = api.get_vehicles(token)[0]
+        api.update_vehicle_with_cached_state(token, vehicle)
+        assert vehicle.odometer == 17332
+
+        details["odometer"] = 17482
+        api.update_vehicle_with_cached_state(token, vehicle)
+        assert vehicle.odometer == 17332
+        assert self._enrollment_fetches(api) == 1
+
+        api._enrollment_details_cached_at -= api._ENROLLMENT_DETAILS_TTL_SECONDS
+        api.update_vehicle_with_cached_state(token, vehicle)
+        assert vehicle.odometer == 17482
+        assert self._enrollment_fetches(api) == 2
