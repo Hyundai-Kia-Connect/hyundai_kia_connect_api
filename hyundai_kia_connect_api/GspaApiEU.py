@@ -1517,7 +1517,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         """
         self._validate_ccs_token(token)
         try:
-            return self._gspa_get(
+            payload = self._gspa_get(
                 token, vehicle, "status/vehicles/{carId}/stored-status"
             )
         except AuthenticationError:
@@ -1525,6 +1525,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA stored-status failed")
             return None
+        _LOGGER.debug(f"{DOMAIN} - GSPA stored-status response: {payload}")
+        return payload
 
     def _request_status_upload(self, token: Token, vehicle: Vehicle) -> None:
         """Ask the car to upload a fresh status (best effort).
