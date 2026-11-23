@@ -7,7 +7,7 @@
             "gspa driving-history (503 answered)",
             "gspa mru ota-updates (live 404-007 wrapper saved; answered 503)"
         ],
-        "description": "PHEV stored-status + the DI reads gated by supportedFeatures (TIRE_PRESSURE, TRIPS present; EV_ENERGY_USAGE absent, so ev-stats is not requested). Stored tire readings are the 255 sentinel, so the DI tire/bound fill applies. Coordinates zeroed; ids redacted.",
+        "description": "PHEV stored-status + the DI reads gated by supportedFeatures (TIRE_PRESSURE, TRIPS present; EV_ENERGY_USAGE absent, so ev-stats is not requested). Stored tire readings are the 255 sentinel, so the DI tire/bound fill applies. Coordinates zeroed; ids redacted. EV_ENERGY_USAGE is not in the feature list, so the ev-stats read is never attempted (pinned by the request list).",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (schrolf 17.10)"
     },
     "implementation": {
@@ -531,9 +531,6 @@
         },
         "GET /v0100/drive-history/trip": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_by_date_tucson.json"
-        },
-        "GET /v0100/drive-history/odometer": {
-            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_odometer_tucson.json"
         },
         "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_carinfo_profile_tucson.json"

@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed here"
+    },
+    "transactionId": "7c8ef9f4-f5f4-4e73-87ce-68da3c75d4eb",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "agreeDt": "2026.05.22 20:32:01",
+        "specType": "ev",
+        "cars": "CE1",
+        "mdy": "2023",
+        "ignOnTime": "20261123115947",
+        "ignOffTime": "20261123115947",
+        "tripLength": 1044,
+        "drvDistance": 8.334175,
+        "normalTime": 43.0,
+        "firstFl": 2.5,
+        "firstFr": 2.5,
+        "firstRl": 2.4,
+        "firstRr": 2.5,
+        "firstUnit": 2,
+        "cstaAvg": 9.995211,
+        "tireTime": "20261123120030",
+        "scoreTime": "20261123153000",
+        "flBound": "inbound",
+        "frBound": "inbound",
+        "rlBound": "inbound",
+        "rrBound": "inbound",
+        "unsupported": false
+    }
+}

@@ -1,0 +1,195 @@
+{
+    "transactionId": "TEST-TRANSACTION-8",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "evStatistics": {
+            "totalPowerConsumption": 148.29,
+            "avrMileage": 7.2,
+            "totalRegenPower": 68.61
+        },
+        "evDrivingInfoList": [
+            {
+                "date": "20261124",
+                "powerConsumption": 1.5,
+                "avrMileage": 6.4,
+                "regenPower": 0.42
+            },
+            {
+                "date": "20261123",
+                "powerConsumption": 6.22,
+                "avrMileage": 5.9,
+                "regenPower": 3.86
+            },
+            {
+                "date": "20261122",
+                "powerConsumption": 7.79,
+                "avrMileage": 7.4,
+                "regenPower": 1.8
+            },
+            {
+                "date": "20261121",
+                "powerConsumption": 1.72,
+                "avrMileage": 9.6,
+                "regenPower": 0.89
+            },
+            {
+                "date": "20261120",
+                "powerConsumption": 5.57,
+                "avrMileage": 6.2,
+                "regenPower": 2.94
+            },
+            {
+                "date": "20261119",
+                "powerConsumption": 2.87,
+                "avrMileage": 6.1,
+                "regenPower": 1.0
+            },
+            {
+                "date": "20261118",
+                "powerConsumption": 4.73,
+                "avrMileage": 6.6,
+                "regenPower": 2.52
+            },
+            {
+                "date": "20261117",
+                "powerConsumption": 5.06,
+                "avrMileage": 6.6,
+                "regenPower": 2.12
+            },
+            {
+                "date": "20261116",
+                "powerConsumption": 10.73,
+                "avrMileage": 9.2,
+                "regenPower": 5.45
+            },
+            {
+                "date": "20261115",
+                "powerConsumption": 4.81,
+                "avrMileage": 6.5,
+                "regenPower": 2.46
+            },
+            {
+                "date": "20261114",
+                "powerConsumption": 2.85,
+                "avrMileage": 8.5,
+                "regenPower": 1.68
+            },
+            {
+                "date": "20261113",
+                "powerConsumption": 4.31,
+                "avrMileage": 6.6,
+                "regenPower": 3.53
+            },
+            {
+                "date": "20261112",
+                "powerConsumption": 2.57,
+                "avrMileage": 7.4,
+                "regenPower": 0.95
+            },
+            {
+                "date": "20261111",
+                "powerConsumption": 5.82,
+                "avrMileage": 6.7,
+                "regenPower": 3.24
+            },
+            {
+                "date": "20261110",
+                "powerConsumption": 6.21,
+                "avrMileage": 6.9,
+                "regenPower": 2.96
+            },
+            {
+                "date": "20261109",
+                "powerConsumption": 19.86,
+                "avrMileage": 5.3,
+                "regenPower": 2.92
+            },
+            {
+                "date": "20261108",
+                "powerConsumption": 3.55,
+                "avrMileage": 6.7,
+                "regenPower": 1.03
+            },
+            {
+                "date": "20261107",
+                "powerConsumption": 6.63,
+                "avrMileage": 6.9,
+                "regenPower": 3.21
+            },
+            {
+                "date": "20261106",
+                "powerConsumption": 0.16,
+                "avrMileage": 65.6,
+                "regenPower": 0.0
+            },
+            {
+                "date": "20261105",
+                "powerConsumption": 2.37,
+                "avrMileage": 8.0,
+                "regenPower": 1.03
+            },
+            {
+                "date": "20261104",
+                "powerConsumption": 3.92,
+                "avrMileage": 6.9,
+                "regenPower": 2.96
+            },
+            {
+                "date": "20261103",
+                "powerConsumption": 2.34,
+                "avrMileage": 8.1,
+                "regenPower": 1.03
+            },
+            {
+                "date": "20261102",
+                "powerConsumption": 1.48,
+                "avrMileage": 6.6,
+                "regenPower": 0.53
+            },
+            {
+                "date": "20261101",
+                "powerConsumption": 3.46,
+                "avrMileage": 6.8,
+                "regenPower": 2.31
+            },
+            {
+                "date": "20261031",
+                "powerConsumption": 4.38,
+                "avrMileage": 9.4,
+                "regenPower": 2.28
+            },
+            {
+                "date": "20261030",
+                "powerConsumption": 4.16,
+                "avrMileage": 7.5,
+                "regenPower": 3.29
+            },
+            {
+                "date": "20261029",
+                "powerConsumption": 7.43,
+                "avrMileage": 8.6,
+                "regenPower": 5.3
+            },
+            {
+                "date": "20261028",
+                "powerConsumption": 4.93,
+                "avrMileage": 7.4,
+                "regenPower": 2.17
+            },
+            {
+                "date": "20261027",
+                "powerConsumption": 3.65,
+                "avrMileage": 7.7,
+                "regenPower": 1.38
+            },
+            {
+                "date": "20261026",
+                "powerConsumption": 7.09,
+                "avrMileage": 8.4,
+                "regenPower": 3.2
+            }
+        ]
+    }
+}

@@ -21,7 +21,14 @@ import requests
 
 from .const import DISTANCE_UNITS, DOMAIN, PressureUnit
 from .utils import float_or_none, parse_datetime
-from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
+from .Vehicle import (
+    DailyDrivingStats,
+    DayTripCounts,
+    DayTripInfo,
+    MonthTripInfo,
+    TripInfo,
+    Vehicle,
+)
 
 if TYPE_CHECKING:
     from .Token import Token
@@ -178,6 +185,10 @@ class DrivingInsightMixin:
             self._update_di_trips(token, vehicle)
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - DI trips update failed")
+        try:
+            self._update_di_ev_stats(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - DI ev-stats update failed")
 
     def get_di_vehicle_info(
         self, token: Token, vehicle: Vehicle
@@ -272,21 +283,15 @@ class DrivingInsightMixin:
                     if isinstance(day_entry, dict)
                 ],
             )
-        odometer_data = self._di_request(
-            token, vehicle, f"/drive-history/odometer?vin={vehicle.VIN}"
-        )
-        if odometer_data and vehicle.odometer is None:
-            odometer_value = float_or_none(odometer_data.get("value"))
+        if vehicle.odometer is None:
+            odometer_data = self._di_request(
+                token, vehicle, f"/drive-history/odometer?vin={vehicle.VIN}"
+            )
+            odometer_value = float_or_none((odometer_data or {}).get("value"))
             if odometer_value is not None:
                 vehicle.odometer = (odometer_value, DISTANCE_UNITS[1])
         recent_day = days.get("recentTripDate")
         if not isinstance(recent_day, str):
-            return
-        # The per-trip list changes on the car's side, not per poll.
-        if (
-            vehicle.day_trip_info is not None
-            and vehicle.day_trip_info.yyyymmdd == recent_day
-        ):
             return
         day_data = self._di_request(
             token,
@@ -308,3 +313,67 @@ class DrivingInsightMixin:
             ),
             trip_list=[_di_trip(entry) for entry in trips if isinstance(entry, dict)],
         )
+
+    def _update_di_ev_stats(self, token: Token, vehicle: Vehicle) -> None:
+        """Fill daily_stats and the EV-energy totals from /ev-stat data.
+
+        The 30-day daily rows carry power and regen in kWh (the captured
+        totals sit at the daily-row scale, close to but not exactly the
+        row sum: 413.48 vs 413.34 and 148.29 vs 148.17, so the server
+        de-wraps the counters);
+        Vehicle-energy fields are in Wh, so x1000. Distance derives per
+        kWh x km/kWh. Consumes the EV_ENERGY_USAGE feature flag.
+        """
+        features = vehicle.driving_insight_supported_features or []
+        if "EV_ENERGY_USAGE" not in features:
+            return
+        data = self._di_request(
+            token, vehicle, f"/drive-history/ev-stats?vin={vehicle.VIN}"
+        )
+        if not data:
+            return
+        totals = data.get("evStatistics")
+        if isinstance(totals, dict):
+            total_consumed = float_or_none(totals.get("totalPowerConsumption"))
+            if total_consumed is not None:
+                vehicle.total_power_consumed = round(total_consumed * 1000, 1)
+            total_regen = float_or_none(totals.get("totalRegenPower"))
+            if total_regen is not None:
+                vehicle.total_power_regenerated = round(total_regen * 1000, 1)
+        rows = data.get("evDrivingInfoList")
+        if not isinstance(rows, list):
+            return
+        daily_stats: list[DailyDrivingStats] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            consumed_wh = float_or_none(row.get("powerConsumption"))
+            mileage = float_or_none(row.get("avrMileage"))
+            regen_wh = float_or_none(row.get("regenPower"))
+            # Legacy daily fields are ints in Wh; the DI rows are kWh floats.
+            consumed = int(consumed_wh * 1000) if consumed_wh is not None else None
+            regen = int(regen_wh * 1000) if regen_wh is not None else None
+            raw_date = row.get("date")
+            try:
+                parsed_date = parse_datetime(
+                    raw_date, vehicle.timezone or self.data_timezone
+                )
+            except (TypeError, ValueError):
+                continue
+            daily_stats.append(
+                DailyDrivingStats(
+                    date=parsed_date,
+                    total_consumed=round(consumed * 1000, 1)
+                    if consumed is not None
+                    else None,
+                    regenerated_energy=round(regen * 1000, 1)
+                    if regen is not None
+                    else None,
+                    distance=round(consumed * mileage, 1)
+                    if consumed is not None and mileage is not None
+                    else None,
+                    distance_unit=DISTANCE_UNITS[1],
+                )
+            )
+        if daily_stats:
+            vehicle.daily_stats = daily_stats
