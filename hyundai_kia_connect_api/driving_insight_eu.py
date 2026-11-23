@@ -207,7 +207,7 @@ class DrivingInsightMixin:
         if "TIRE_PRESSURE" not in features:
             return
         vehicle._tire_bound_checked = True  # set before call — force refresh resets
-        # DI reads route need vin as a query parameter; the captured trip?date
+        # DI reads route a vin query parameter; the captured trip?date
         # without it answers HTTP 500 / 500000 on a Kia (fellek, #1909).
         data = self._di_request(token, vehicle, f"/tire/bound?vin={vehicle.VIN}")
         if not data:

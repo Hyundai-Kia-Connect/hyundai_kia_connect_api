@@ -534,6 +534,9 @@
         },
         "GET /v0100/drive-history/odometer": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_di_odometer_tucson.json"
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_carinfo_profile_tucson.json"
         }
     }
 }

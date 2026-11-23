@@ -1718,45 +1718,127 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
             _LOGGER.debug(f"{DOMAIN} - GSPA carinfo fetch failed")
             return None
 
-    # controlOption wire keys and the VehicleSupports item each feeds. The
-    # first 15 keys are xshield-obfuscated in the app's adapter and were
-    # decoded live (2026-11-23) — the app gates its remote panels by these
-    # booleans (CarInfoListControlOptionResponse).
-    _CARINFO_CONTROL_FLAGS: ClassVar[dict[str, tuple[str, ...]]] = {
-        "door_lock": ("doorLock",),
-        "door_unlock": ("doorUnlock",),
-        "climate_start": ("climateStart",),
-        "climate_stop": ("climateStop",),
-        "engine_start": ("engineStart",),
-        "engine_stop": ("engineStop",),
-        "engine_climate_start": ("engineClimateStart",),
-        "engine_climate_stop": ("engineClimateStop",),
-        "charge_start": ("chargeStart",),
-        "charge_stop": ("chargeStop",),
-        "charge_port_open": ("chargePortOpen",),
-        "charge_port_close": ("chargePortClose",),
-        "hazard": ("hazardOn",),
-        "horn_light": ("hazardHornOn", "lightHornOn"),
-        "lamp_off": ("tailLampOff",),
-        # Any window-action flag turns the window control on.
-        "window_control": (
-            "windowOpen",
-            "windowClose",
-            "windowVentilate",
-            "windowCurtainUp",
-            "windowCurtainDown",
-        ),
-        "frunk_open": ("frunkOpen",),
-        "battery_conditioning": ("batteryConditioningOn", "batteryConditioningOff"),
-    }
+    # The carinfo controlOption booleans the app SDK presents are derived
+    # client-side (CarInfoListApiResponseKt.toCarInfoControlIntoResponse —
+    # the field never rides the wire; RE map:
+    # app/re_to_the_bottom/reports/myhyundai-carinfo-capabilities-1.5.1.md).
+    # Derivation inputs: basic (modelType, country), option flags,
+    # serviceOption flags, appMode (nullable -> the SDK AppMode.find
+    # fallback GEN2).
+
+    # App-mode semantics folded from com.hmg.ccs.sdk.core.AppMode:
+    #   engine-remote panel off for these modes (isSupportRemoteEngineControl
+    #   false), engine-panel EU-production exclusion honored separately.
+    _APP_MODE_ENGINE_OFF: ClassVar[frozenset[str]] = frozenset(
+        {
+            "GEN1",
+            "MOZEN",
+            "GEN2",
+            "FE",
+            "PSEV",
+            "EV2",
+            "EV3",
+            "PHEV4",
+        }
+    )
+
+    @staticmethod
+    def _derive_control_capabilities(vin_info: dict[str, Any]) -> dict[str, bool]:
+        """Derive the vehicle.supports capabilities from a carinfo profile.
+
+        Mirrors the app SDK's toCarInfoControlIntoResponse for the flags
+        with a VehicleManager call home. Inputs are the wire blocks the
+        profile carries (option, serviceOption, basic, appMode); app-mode
+        is nullable on the wire and the SDK falls back to GEN2.
+        """
+        option = vin_info.get("option") or {}
+        service = vin_info.get("serviceOption") or {}
+        basic = vin_info.get("basic") or {}
+        if not isinstance(basic, dict):
+            basic = {}
+        app_mode = vin_info.get("appMode") or "GEN2"
+        model_type = basic.get("modelType")
+        country = basic.get("country")
+        remote_control = option.get("remoteControl")
+        air_control_type = option.get("airControlType")
+        light_block = service.get("remoteLightControlOption")
+
+        def _service_int(name: str) -> int | None:
+            value = service.get(name)
+            return value if isinstance(value, int) else None
+
+        out: dict[str, bool] = {}
+
+        # Engine panel: the app gates it by app-mode, then airControlType +
+        # remoteControl=="1", and the SDK keeps it off for EU-production
+        # outside Turkey regardless of flags.
+        engine_supported = app_mode not in GspaApiEU._APP_MODE_ENGINE_OFF and (
+            app_mode == "FE" or country == "tr"
+        )
+
+        def _engine(air: str) -> bool:
+            return (
+                engine_supported and air_control_type == air and remote_control == "1"
+            )
+
+        out["engine_climate_start"] = _engine("1")
+        out["engine_climate_stop"] = _engine("1")
+        out["engine_start"] = _engine("0")
+        out["engine_stop"] = _engine("0")
+
+        # Climate start: model family EV/ER; PHEV ("PE") only with the
+        # PTC heater option on the EU backend.
+        climate = model_type in ("EV", "ER") or (
+            model_type == "PE" and option.get("ptcOption") == 1
+        )
+        out["climate_start"] = climate
+        out["climate_stop"] = climate
+
+        charge_port = (
+            model_type in ("EV", "ER") and _service_int("chargePortDoorOption") == 1
+        )
+        out["charge_port_open"] = charge_port
+        out["charge_port_close"] = charge_port
+        out["charge_start"] = charge_port
+        out["charge_stop"] = charge_port
+
+        battery = (
+            model_type in ("EV", "ER")
+            and option.get("batteryPreconditioningOption") == 2
+        )
+        out["battery_conditioning"] = battery
+
+        out["hazard"] = option.get("lightOnlyAvailable") != 1 and light_block != 0
+        out["horn_light"] = option.get("hornLightAvailable") != 1 and light_block != 0
+        # tailLampOff is literal true in the app derivation.
+        out["lamp_off"] = True
+
+        window_safety2 = option.get("windowSafetyOption2")
+        window_safety1 = option.get("windowSafetyOption1")
+        if window_safety1 is None:
+            window_safety1 = option.get("windowSafetyOption")
+        window_control_option = service.get("windowControlOption")
+        if window_safety2 in (3, 4):
+            out["window_control"] = option.get("rearWindowCurtainOption") in (0, 1)
+        elif window_safety1 == 1:
+            out["window_control"] = window_control_option is None or (
+                isinstance(window_control_option, int)
+                and 0 <= window_control_option <= 3
+            )
+        else:
+            out["window_control"] = False
+
+        out["frunk_open"] = (
+            model_type in ("EV", "ER") and option.get("frunkOption") == 1
+        )
+        return out
 
     def _update_capabilities_from_carinfo(self, token: Token, vehicle: Vehicle) -> None:
-        """Fill vehicle.supports from the carinfo controlOption block.
+        """Derive vehicle.supports from the carinfo profile.
 
-        The block refines items the per-brand stamps left unknown; a
-        payload without controlOption (live capture) keeps tri-state
-        None, and the None items keep raising at the call gates. One
-        read per cycle; force refresh re-reads it.
+        One read per cycle; force refresh re-reads it. The derived values
+        only refine items left unknown (None) by the per-brand stamps;
+        block values do not clobber brand-level statements.
         """
         if vehicle._carinfo_checked:
             return
@@ -1764,16 +1846,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         data = self.get_carinfo(token, vehicle)
         if not isinstance(data, dict):
             return
-        controls = get_child_value(data, "vinInfo.controlOption")
-        if not isinstance(controls, dict):
+        vin_info = data.get("vinInfo")
+        if not isinstance(vin_info, dict):
             return
-        for item, keys in self._CARINFO_CONTROL_FLAGS.items():
-            if getattr(vehicle.supports, item, None) is not None:
-                continue
-            flags = [controls.get(key) for key in keys]
-            known = [f for f in flags if isinstance(f, bool)]
-            if known:
-                setattr(vehicle.supports, item, any(known))
+        derived = self._derive_control_capabilities(vin_info)
+        for item, value in derived.items():
+            if getattr(vehicle.supports, item, None) is None:
+                setattr(vehicle.supports, item, value)
 
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)

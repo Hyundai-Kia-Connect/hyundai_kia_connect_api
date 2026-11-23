@@ -1,0 +1,110 @@
+{
+    "_fixture_meta": {
+        "source": "live GSPA carinfo read, Kia EV3 2025 EU CCI (IT), dimbeni 24.11 kia_uvo #1909 zip; VIN placeholdered; client-derived controlOption absent on the wire (matches the SDK mirror)",
+        "description": "Positive-pin derivation inputs: appMode EV5 + batteryPreconditioningOption 2 on modelType EV drives battery_conditioning true; lightOnlyAvailable/hornLightAvailable 1 drive hazard/horn false (panel-hide, not server-reject)."
+    },
+    "data": {
+        "vinInfo": {
+            "detailInfo": {
+                "bodyType": "2",
+                "saleCarmdlEnNm": "EV3",
+                "saleCarmdlCd": "9V",
+                "prodCarmdlCd": "9V"
+            },
+            "basic": {
+                "modelName": "EV3",
+                "vin": "TESTVIN0000000001",
+                "modelYear": "2025",
+                "modelType": "EV",
+                "brand": "K",
+                "evDrivingHisSupport": "true",
+                "ecuOtaUpdateSupport": 1,
+                "ecuRemoteOTAUpdateSupport": 0,
+                "ccuCCS2ProtocolSupport": 1,
+                "country": "it",
+                "vehicleCode": 2163
+            },
+            "device": {
+                "simStartDate": "2025-09-09",
+                "simEndDate": "2032-09-09",
+                "naviApplied": 1,
+                "headUnitModelName": "SV1AE.SCBMC.EU",
+                "webManualUrl": "http://webmanual.kia.com/ccNC/AVNT/EUR/English/index.html",
+                "privacySettingSupport": 1,
+                "compPeriodEndYn": "N",
+                "currentHeadUnitVersion": "SV1.EUR.ccNC.001.002.260312",
+                "platform": "ccNC"
+            },
+            "option": {
+                "remoteControlWaitingTime": 336,
+                "heating1": "1",
+                "remoteControl": "0",
+                "drvSeatLoc": "L",
+                "remoteHeatControl": "2",
+                "heatingSteeringWheel": "1",
+                "heatingFrontWindow": "0",
+                "heatingRearWindow": "1",
+                "hornLightAvailable": 1,
+                "lightOnlyAvailable": 1,
+                "hvacTempType": "1",
+                "heatingSideMirror": "1",
+                "seatHeaterVent": {
+                    "frSeatHeat": 2,
+                    "flSeatHeat": 2
+                },
+                "svmOptionInfo": 0,
+                "airPurifierOption": 0,
+                "sunRoofOption": 0,
+                "evAlarmOptionInfo": 1,
+                "windowSafetyOption2": 2,
+                "strgWhlHeatOption": 2,
+                "v2LOption": 0,
+                "batteryPreconditioningOption": 2,
+                "frunkOption": 0,
+                "clmtCtrlOption": 1,
+                "v2XOption": 0,
+                "digitalKey2": 3,
+                "dvrsOption": 0,
+                "ignCtrlOption": 1,
+                "evRoutePlanner": {}
+            },
+            "serviceOption": {
+                "batteryWarningService": 1,
+                "scheduleLinkService": 1,
+                "centerUserProfileOption": 4,
+                "valetServiceOption": 1,
+                "notificationSupport": 1,
+                "engineIdleTimeNotification": 1,
+                "finalDestinationNoti": 1,
+                "chargePortDoorOption": 0,
+                "remoteValetActOption": 1,
+                "alertServiceOption": 1,
+                "v2LSocSetServiceOption": 1,
+                "chargingCurrentSupport": 1,
+                "mediaStreamingService": [4, 6],
+                "mediaStreamingSelectionOption": 1,
+                "calendarOption": "1",
+                "nTrackDataSupport": 0,
+                "send2CarOptionInfo": 11,
+                "inCarPayment": {
+                    "parking": 1,
+                    "fuelStation": 0,
+                    "chargingStation": 0,
+                    "driveThru": 0,
+                    "fidoSupport": 0,
+                    "fdsSupport": 0
+                },
+                "idleAlertSettingService": 1,
+                "evs2Support": 1
+            },
+            "batteryType": {
+                "mainbatteryType": 0
+            },
+            "appMode": "EV5"
+        }
+    },
+    "metaInfo": {
+        "retCode": "S",
+        "resCode": "200-000"
+    }
+}

@@ -629,6 +629,9 @@
         },
         "GET /gspa/v1/valet/vehicles/VEHICLE-1/status": {
             "body": "$fixture:updates/responses/eu_kia_gspa_valet_status_ev3.json"
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
+            "body": "$fixture:updates/responses/eu_kia_gspa_carinfo_profile_ev3.json"
         }
     }
 }

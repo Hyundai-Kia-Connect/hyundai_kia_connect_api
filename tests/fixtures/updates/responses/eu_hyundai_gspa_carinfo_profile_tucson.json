@@ -1,0 +1,95 @@
+{
+    "_fixture_meta": {
+        "source": "live GSPA carinfo read, Hyundai Tucson PHEV 2025 EU CCI (CZ), schrolf 24.11 kia_uvo #1909 zip; VIN placeholdered",
+        "description": "PHEV routing pin: modelType PE without ptcOption keeps climate false (engine-panel convention), and the EU-production exclusion zeroes the engine flags despite remoteControl 1."
+    },
+    "data": {
+        "vinInfo": {
+            "detailInfo": {
+                "bodyType": "2",
+                "saleCarmdlEnNm": "TUCSON",
+                "saleCarmdlCd": "JF",
+                "prodCarmdlCd": "JF"
+            },
+            "basic": {
+                "modelName": "TUCSON",
+                "vin": "TESTVIN0000000001",
+                "modelYear": "2025",
+                "modelType": "PE",
+                "brand": "H",
+                "evDrivingHisSupport": "false",
+                "ecuOtaUpdateSupport": 1,
+                "ecuRemoteOTAUpdateSupport": 0,
+                "ccuCCS2ProtocolSupport": 1,
+                "country": "cz",
+                "vehicleCode": 2512
+            },
+            "device": {
+                "simStartDate": "2025-10-31",
+                "simEndDate": "2035-10-31",
+                "naviApplied": 1,
+                "headUnitModelName": "NX4EAP.SCBMC.EU",
+                "webManualUrl": "http://webmanual.hyundai.com/ccNC/AVNT/EUR/German/index.html",
+                "privacySettingSupport": 1,
+                "compPeriodEndYn": "N",
+                "currentHeadUnitVersion": "NX4E.EUR.ccNC.001.002.260312",
+                "platform": "ccNC"
+            },
+            "option": {
+                "remoteControlWaitingTime": 336,
+                "heating1": "1",
+                "remoteControl": "1",
+                "drvSeatLoc": "L",
+                "remoteHeatControl": "2",
+                "heatingSteeringWheel": "1",
+                "heatingFrontWindow": "0",
+                "heatingRearWindow": "1",
+                "hornLightAvailable": 1,
+                "lightOnlyAvailable": 1,
+                "hvacTempType": "1",
+                "heatingSideMirror": "1",
+                "seatHeaterVent": {
+                    "frSeatHeat": 2,
+                    "flSeatHeat": 2
+                },
+                "svmOptionInfo": 0,
+                "airPurifierOption": 0,
+                "sunRoofOption": 0,
+                "remoteAirCtrlControlOption": 1,
+                "evAlarmOptionInfo": 1,
+                "windowSafetyOption2": 3,
+                "strgWhlHeatOption": 2,
+                "digitalKey2": 0,
+                "dvrsOption": 0,
+                "ignCtrlOption": 0,
+                "evRoutePlanner": {}
+            },
+            "serviceOption": {
+                "batteryWarningService": 1,
+                "scheduleLinkService": 1,
+                "centerUserProfileOption": 4,
+                "valetServiceOption": 1,
+                "notificationSupport": 1,
+                "engineIdleTimeNotification": 1,
+                "finalDestinationNoti": 1,
+                "remoteValetActOption": 1,
+                "alertServiceOption": 1,
+                "mediaStreamingService": [4, 6],
+                "mediaStreamingSelectionOption": 1,
+                "calendarOption": "1",
+                "nTrackDataSupport": 0,
+                "send2CarOptionInfo": 10,
+                "idleAlertSettingService": 1,
+                "evs2Support": 1
+            },
+            "batteryType": {
+                "mainbatteryType": 0,
+                "auxbatteryType": 2
+            }
+        }
+    },
+    "metaInfo": {
+        "retCode": "S",
+        "resCode": "200-000"
+    }
+}
