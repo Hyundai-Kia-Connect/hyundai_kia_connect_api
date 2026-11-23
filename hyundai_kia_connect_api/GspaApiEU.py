@@ -1617,6 +1617,8 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         FORCE_REFRESH_TIMEOUT; the vehicle is left untouched in that case,
         since its state is unknown.
         """
+        vehicle._carinfo_checked = False
+        vehicle._tire_bound_checked = False
         requested_at = int(time() * 1000)
         if self.prewakeup(token, vehicle) is None:
             raise APIError("GSPA prewakeup failed")
@@ -1753,8 +1755,12 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
 
         The block refines items the per-brand stamps left unknown; a
         payload without controlOption (live capture) keeps tri-state
-        None, and the None items keep raising at the call gates.
+        None, and the None items keep raising at the call gates. One
+        read per cycle; force refresh re-reads it.
         """
+        if vehicle._carinfo_checked:
+            return
+        vehicle._carinfo_checked = True  # set before call — force refresh resets
         data = self.get_carinfo(token, vehicle)
         if not isinstance(data, dict):
             return

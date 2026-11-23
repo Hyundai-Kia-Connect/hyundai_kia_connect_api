@@ -245,9 +245,14 @@ class Vehicle:
     # Cached-failure flags for GSPA query endpoints (reset by force refresh).
     # _ota_checked: True after the first OTA check (no re-check until force
     # refresh); _valet_failed: True after a failed valet read, so later
-    # polls skip it until force refresh resets it.
+    # polls skip it until force refresh resets it. _carinfo_checked and
+    # _tire_bound_checked: same one-shot for the carinfo capability read
+    # and the DI tire/bound fallback (config-ish reads; force refresh
+    # re-reads them).
     _ota_checked: bool = False
     _valet_failed: bool = False
+    _carinfo_checked: bool = False
+    _tire_bound_checked: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).

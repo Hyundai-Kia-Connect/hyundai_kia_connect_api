@@ -201,11 +201,14 @@ class DrivingInsightMixin:
         They fill the fields only when the CCS2 display unit matches;
         with no display unit reported the values are filled anyway.
         """
+        if vehicle._tire_bound_checked:
+            return
         features = vehicle.driving_insight_supported_features or []
         if "TIRE_PRESSURE" not in features:
             return
-        # The read route needs vin as a query parameter; without it a Kia
-        # PV5 answers HTTP 500 / 500000 (fellek, discussion #1909).
+        vehicle._tire_bound_checked = True  # set before call — force refresh resets
+        # DI reads route need vin as a query parameter; the captured trip?date
+        # without it answers HTTP 500 / 500000 on a Kia (fellek, #1909).
         data = self._di_request(token, vehicle, f"/tire/bound?vin={vehicle.VIN}")
         if not data:
             return
@@ -278,6 +281,12 @@ class DrivingInsightMixin:
                 vehicle.odometer = (odometer_value, DISTANCE_UNITS[1])
         recent_day = days.get("recentTripDate")
         if not isinstance(recent_day, str):
+            return
+        # The per-trip list changes on the car's side, not per poll.
+        if (
+            vehicle.day_trip_info is not None
+            and vehicle.day_trip_info.yyyymmdd == recent_day
+        ):
             return
         day_data = self._di_request(
             token,
