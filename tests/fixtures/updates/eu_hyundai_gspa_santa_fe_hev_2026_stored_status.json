@@ -449,6 +449,9 @@
         },
         "GET /v0100/drive-history/trip": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_by_date.json"
+        },
+        "GET /gspa/v1/device-info/vehicles/VEHICLE-1/software-version": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_software_version.json"
         }
     }
 }

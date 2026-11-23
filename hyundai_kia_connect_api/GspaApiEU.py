@@ -1666,7 +1666,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         try:
             sw = self.get_software_version(token, vehicle)
             if sw and isinstance(sw, dict):
-                vehicle.software_version = sw.get("softwareVersion")
+                # Live shape (2026-11-23, Santa Fe EU CCI): the endpoint
+                # answers currentHeadUnitVersion/currentMapVersion and has no
+                # "softwareVersion" key — that older key never populated the
+                # field on the GSPA lineage.
+                vehicle.software_version = sw.get("currentHeadUnitVersion") or sw.get(
+                    "softwareVersion"
+                )
+                vehicle.map_version = sw.get("currentMapVersion")
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA software_version update failed")
 

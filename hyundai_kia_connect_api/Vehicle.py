@@ -211,6 +211,8 @@ class Vehicle:
 
     # Software version (GSPA device-info read)
     software_version: str | None = None
+    # Map version from the DI/GSPA software-version read (currentMapVersion).
+    map_version: str | None = None
     ota_update_available: bool | None = None
 
     # Cached-failure flags for GSPA query endpoints (reset by force refresh).
