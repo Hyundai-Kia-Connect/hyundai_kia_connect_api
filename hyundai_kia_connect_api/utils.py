@@ -206,6 +206,14 @@ def parse_distance_unit(raw: Any) -> str | None:
     return unit
 
 
+def distance_with_unit(value: Any, raw_unit: Any) -> tuple[Any, str | None]:
+    """Pair a distance with its unit; an unmapped unit code makes both unknown."""
+    unit = parse_distance_unit(raw_unit)
+    if unit is None and raw_unit not in DISTANCE_UNITS:
+        return None, None
+    return value, unit
+
+
 def refine_dte_distance(value: Any, *, ev: bool = False) -> float | None:
     """Drop 12-bit DTE sentinels and out-of-domain values.
 
