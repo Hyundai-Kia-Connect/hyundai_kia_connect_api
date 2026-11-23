@@ -1,0 +1,32 @@
+{
+    "transactionId": "TEST-TRANSACTION-1",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "puid": "<redacted>",
+        "country": "ch",
+        "ccsMasterCarId": "<redacted>",
+        "specificationId": "TEST-SPECIFICATION-1",
+        "vin": "<redacted>",
+        "parentId": "TEST-PARENT-1",
+        "ccsFullEnrollYn": true,
+        "mainSupportYn": true,
+        "primaryUserYn": true,
+        "ccsAgreedNewTermsYn": true,
+        "ccsNewTermsConsentedDate": "2026-04-02T09:38:11",
+        "grantCcsControlYn": true,
+        "ownershipType": 3,
+        "ccsEnrollmentDate": "2026-04-02T11:42:54",
+        "supportedFeatures": ["TIRE_PRESSURE", "TRIPS"],
+        "availableSelectiveTerms": [],
+        "consentedTerms": [
+            {
+                "termsCode": "DI",
+                "required": true,
+                "consent": true,
+                "consentDate": "2026-04-02T09:43:12"
+            }
+        ]
+    }
+}

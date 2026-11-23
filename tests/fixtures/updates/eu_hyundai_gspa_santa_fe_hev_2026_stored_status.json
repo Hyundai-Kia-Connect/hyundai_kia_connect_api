@@ -440,6 +440,15 @@
         },
         "GET /v0100/tire/bound": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_di_tire_bound.json"
+        },
+        "GET /v0100/drive-history/trip/days/recent": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_days_recent.json"
+        },
+        "GET /v0100/drive-history/odometer": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_odometer.json"
+        },
+        "GET /v0100/drive-history/trip": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_by_date.json"
         }
     }
 }

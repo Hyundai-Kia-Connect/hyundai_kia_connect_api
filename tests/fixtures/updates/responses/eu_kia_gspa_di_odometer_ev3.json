@@ -1,0 +1,9 @@
+{
+    "transactionId": "TEST-TRANSACTION-ODOMETER-KIA",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "value": 13520
+    }
+}

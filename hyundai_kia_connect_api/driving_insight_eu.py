@@ -3,16 +3,12 @@
 
 The EU CCI backend exposes a Driving Insight API family next to GSPA:
 token-exchange ?serviceType=DI, a per-brand gateway
-apigw-eu.hmg-corp.io/di-{brand}-eu/v0100, and reads headered with the DI
-bearer token plus Cci-Access-Token. Reads are feature-gated per vehicle:
-/vehicle/{vin} carries supportedFeatures, and a read whose feature is
-absent answers 400 "Not supported Feature -> <code>". Only calls a
-vehicle's supportedFeatures list names are attempted.
-
-Verified live 2026-11-23 on a Hyundai Santa Fe HEV (token-exchange DI,
-/vehicle/{vin}, tire/bound, tire/recommended, trips, odometer; the
-EV-family reads answer the feature-gate 400). Kia shapes per the issue
-#1319/#1320 reports (live-verified on a PV5 by the reporter).
+apigw-eu.hmg-corp.io/di-{brand}-eu/v0100, reads headered with the DI
+bearer token plus Cci-Access-Token, and per-vehicle feature gating
+(supportedFeatures on /vehicle/{vin}; a read whose feature is absent
+answers 400 "Not supported Feature -> <code>"). Only features the
+vehicle names are attempted. Verified live 2026-11-23 on a Hyundai
+Santa Fe HEV; Kia shapes per the #1319/#1320 reports (live on a PV5).
 """
 
 from __future__ import annotations
@@ -23,12 +19,12 @@ from typing import TYPE_CHECKING, Any
 
 import requests
 
-from .const import DOMAIN, PressureUnit
-from .utils import float_or_none
+from .const import DISTANCE_UNITS, DOMAIN, PressureUnit
+from .utils import float_or_none, parse_datetime
+from .Vehicle import DayTripCounts, DayTripInfo, MonthTripInfo, TripInfo, Vehicle
 
 if TYPE_CHECKING:
     from .Token import Token
-    from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(DOMAIN)
 
@@ -43,23 +39,35 @@ _TIRE_BOUND_KEYS = (
 )
 
 
+def _di_trip(entry: dict[str, Any]) -> TripInfo:
+    """One DI trip content entry -> TripInfo (times in minutes, distance km)."""
+    ign_on = entry.get("ignOnTime")
+    ign_off = entry.get("ignOffTime")
+    return TripInfo(
+        hhmmss=ign_on[8:14] if isinstance(ign_on, str) else None,
+        drive_time=entry.get("drvTime"),
+        idle_time=entry.get("idleTime"),
+        distance=entry.get("drvDist"),
+        avg_speed=entry.get("avgSpeed"),
+        max_speed=entry.get("maxSpeed"),
+        end_hhmmss=ign_off[8:14] if isinstance(ign_off, str) else None,
+    )
+
+
 class DrivingInsightMixin:
     """Driving Insight reads for the EU CCI brand classes.
 
-    Host-class contract: CCI_API_URL and LANGUAGE for the exchange
-    header builders (CciAuthMixin), plus DI_BASE_URL and
-    DRIVING_INSIGHT_VERIFIED — set both on a brand class only after live
-    verification on that brand.
+    Host-class contract: CCI_API_URL + LANGUAGE (CciAuthMixin), plus
+    DI_BASE_URL and DRIVING_INSIGHT_VERIFIED — flip both on a brand
+    class only after live verification on that brand.
     """
 
     DI_BASE_URL: str | None = None
     DRIVING_INSIGHT_VERIFIED: bool = False
 
     if TYPE_CHECKING:
-        # Host-provided state (CciAuthMixin contracts + GspaApiEU.__init__)
-        # that this mixin relies on. data_timezone stays Any so the
-        # declaration composes with the value-typed class attr on
-        # GspaApiEU (dt.UTC) without an MRO mismatch.
+        # Host contract (CciAuthMixin / GspaApiEU). data_timezone stays Any
+        # to compose with the value-typed class attr on GspaApiEU.
         LANGUAGE: str
         data_timezone: Any
 
@@ -138,13 +146,13 @@ class DrivingInsightMixin:
         return data if isinstance(data, dict) else None
 
     def _update_di_data(self, token: Token, vehicle: Vehicle) -> None:
-        """DI reads that follow a cached update; skipped once nothing is missing.
+        """DI tire and trip reads that follow a cached update.
 
-        Runs only when the stored-status carries no tire reading (the
-        CCS2 parked sentinel, kia_uvo #1783); a driving car's own
-        pressure readings are fresher than the DI record, so no extra
-        read happens there. The feature list is read once and cached on
-        the vehicle (None = never read).
+        The tire/bound fallback runs only when the stored-status carries
+        no tire reading (the CCS2 parked sentinel, kia_uvo #1783) — no
+        extra read for a driving car. The trip reads run on the TRIPS
+        feature. The feature list is read once and cached on the
+        vehicle (None = never read).
         """
         if not (self.DI_BASE_URL and self.DRIVING_INSIGHT_VERIFIED):
             return
@@ -166,6 +174,10 @@ class DrivingInsightMixin:
             self._apply_di_tire_bound(token, vehicle)
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - DI tire/bound read failed")
+        try:
+            self._update_di_trips(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - DI trips update failed")
 
     def get_di_vehicle_info(
         self, token: Token, vehicle: Vehicle
@@ -186,10 +198,8 @@ class DrivingInsightMixin:
         """Fill tire_pressure_* from /tire/bound when stored-status has none.
 
         The DI values are display-unit values in the unit of firstUnit.
-        They fill the fields only when the CCS2 display unit matches
-        (a mismatch would label the values with the wrong unit); with no
-        display unit reported (unit None) the values are filled anyway
-        and the sensor renders them without a unit label.
+        They fill the fields only when the CCS2 display unit matches;
+        with no display unit reported the values are filled anyway.
         """
         features = vehicle.driving_insight_supported_features or []
         if "TIRE_PRESSURE" not in features:
@@ -221,3 +231,71 @@ class DrivingInsightMixin:
             value = float_or_none(data.get(key))
             if value is not None:
                 setattr(vehicle, attr, round(value, 1))
+        tire_time = data.get("tireTime")
+        if isinstance(tire_time, str):
+            vehicle.tire_pressure_last_updated_at = parse_datetime(
+                tire_time, vehicle.timezone or self.data_timezone
+            )
+
+    def _update_di_trips(self, token: Token, vehicle: Vehicle) -> None:
+        """Trip reads gated by the DI TRIPS feature.
+
+        month_trip_info from trip/days/recent (per-day counts; the DI
+        month shape carries no aggregate summary), day_trip_info from
+        drive-history/trip?date= recentTripDate, and the DI odometer
+        fills only when the stored-status carried none. On long trips
+        the reported ignOnTime can be the upload time rather than the
+        real start (#1319), same caveat as the legacy drvhistory fields.
+        """
+        features = vehicle.driving_insight_supported_features or []
+        if "TRIPS" not in features:
+            return
+        days = self._di_request(
+            token, vehicle, f"/drive-history/trip/days/recent?vin={vehicle.VIN}"
+        )
+        if not days:
+            return
+        trip_days = days.get("tripDays")
+        if isinstance(trip_days, dict) and isinstance(trip_days.get("month"), str):
+            month = trip_days["month"]
+            vehicle.month_trip_info = MonthTripInfo(
+                yyyymm=month,
+                day_list=[
+                    DayTripCounts(
+                        yyyymmdd=f"{month}{int(day_entry.get('day', 0)):02d}",
+                        trip_count=day_entry.get("tripCnt"),
+                    )
+                    for day_entry in trip_days.get("trips") or []
+                    if isinstance(day_entry, dict)
+                ],
+            )
+        odometer_data = self._di_request(
+            token, vehicle, f"/drive-history/odometer?vin={vehicle.VIN}"
+        )
+        if odometer_data and vehicle.odometer is None:
+            odometer_value = float_or_none(odometer_data.get("value"))
+            if odometer_value is not None:
+                vehicle.odometer = (odometer_value, DISTANCE_UNITS[1])
+        recent_day = days.get("recentTripDate")
+        if not isinstance(recent_day, str):
+            return
+        day_data = self._di_request(
+            token,
+            vehicle,
+            # Kia PV5 answers HTTP 500 / 500000 without vin (fellek, #1909).
+            f"/drive-history/trip?date={recent_day}&vin={vehicle.VIN}",
+        )
+        if not day_data:
+            return
+        summary = day_data.get("summary")
+        trips = day_data.get("content")
+        if not isinstance(summary, dict) or not isinstance(trips, list):
+            return
+        vehicle.day_trip_info = DayTripInfo(
+            yyyymmdd=recent_day,
+            summary=TripInfo(
+                drive_time=summary.get("totalDrvTime"),
+                distance=summary.get("totalDrvDist"),
+            ),
+            trip_list=[_di_trip(entry) for entry in trips if isinstance(entry, dict)],
+        )

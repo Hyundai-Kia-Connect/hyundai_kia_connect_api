@@ -1,0 +1,12 @@
+{
+    "headUnitModelname": "NX4EAP.SCBMC.EU",
+    "currentHeadUnitSWSN": "260312",
+    "currentMapSN": "184747400",
+    "currentHeadUnitVersion": "NX4E.EUR.ccNC.001.002.260312",
+    "currentMapVersion": "EUR.18.47.47.400.941.0",
+    "ecuOtaUpdateSupport": 1,
+    "eventSourceVersionNm": "25.8.1",
+    "eventTargetVersionNm": "25.8.1",
+    "needUpdate": 0,
+    "transactionId": "TEST-TRANSACTION-SW-1"
+}
