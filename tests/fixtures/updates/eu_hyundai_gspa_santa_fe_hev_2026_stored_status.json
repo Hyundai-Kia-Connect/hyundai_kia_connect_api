@@ -452,6 +452,9 @@
         },
         "GET /gspa/v1/device-info/vehicles/VEHICLE-1/software-version": {
             "body": "$fixture:updates/responses/eu_hyundai_gspa_software_version.json"
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_carinfo_profile.json"
         }
     }
 }

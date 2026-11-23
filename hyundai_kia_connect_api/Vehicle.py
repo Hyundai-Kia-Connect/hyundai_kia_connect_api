@@ -98,6 +98,33 @@ class VehicleSupports:
     ota_progress: bool | None = None
     # vehicle.ota.scheduleupdate protocol
     schedule_update: bool | None = None
+    # CCI carinfo controlOption block (EU, issues #1379/#1320) — per-command
+    # booleans the app SDK gates its remote panels by. One item per
+    # VehicleManager call home.
+    door_lock: bool | None = None
+    door_unlock: bool | None = None
+    climate_start: bool | None = None
+    climate_stop: bool | None = None
+    # VehicleManager.start_engine / stop_engine
+    engine_start: bool | None = None
+    engine_stop: bool | None = None
+    # The app's remote-start panel is gated by these two engine flags
+    engine_climate_start: bool | None = None
+    engine_climate_stop: bool | None = None
+    # VehicleManager.start_charge / stop_charge
+    charge_start: bool | None = None
+    charge_stop: bool | None = None
+    charge_port_open: bool | None = None
+    charge_port_close: bool | None = None
+    # VehicleManager.start_hazard_lights / start_hazard_lights_and_horn /
+    # turn_off_lamp
+    hazard: bool | None = None
+    horn_light: bool | None = None
+    lamp_off: bool | None = None
+    # VehicleManager.open_frunk
+    frunk_open: bool | None = None
+    # VehicleManager.start_battery_conditioning
+    battery_conditioning: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:

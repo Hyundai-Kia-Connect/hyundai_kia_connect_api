@@ -1,0 +1,95 @@
+{
+    "_fixture_meta": {
+        "source": "live GSPA carinfo read, Hyundai Santa Fe HEV 2026 EU CCI, blka 2026-11-23; VIN redacted; the vinInfo tree carries no controlOption block on this vehicle"
+    },
+    "data": {
+        "vinInfo": {
+            "detailInfo": {
+                "bodyType": "3",
+                "saleCarmdlEnNm": "SANTA FE",
+                "saleCarmdlCd": "HK",
+                "prodCarmdlCd": "HK"
+            },
+            "basic": {
+                "modelName": "SANTA FE",
+                "vin": "TESTVIN0000000001",
+                "modelYear": "2026",
+                "modelType": "HV",
+                "brand": "H",
+                "evDrivingHisSupport": "false",
+                "ecuOtaUpdateSupport": 1,
+                "ecuRemoteOTAUpdateSupport": 0,
+                "ccuCCS2ProtocolSupport": 1,
+                "country": "pl",
+                "vehicleCode": 2051
+            },
+            "device": {
+                "simStartDate": "2026-01-30",
+                "simEndDate": "2036-01-30",
+                "naviApplied": 1,
+                "headUnitModelName": "MX5AH.SCBMC.EU",
+                "webManualUrl": "http://webmanual.hyundai.com/ccNC/AVNT/EUR/Polish/index.html",
+                "privacySettingSupport": 1,
+                "compPeriodEndYn": "N",
+                "currentHeadUnitVersion": "MX5.EUR.ccNC.001.002.260312",
+                "platform": "ccNC"
+            },
+            "option": {
+                "remoteControlWaitingTime": 336,
+                "heating1": "1",
+                "remoteControl": "0",
+                "drvSeatLoc": "L",
+                "remoteHeatControl": "2",
+                "heatingSteeringWheel": "1",
+                "heatingFrontWindow": "0",
+                "heatingRearWindow": "1",
+                "hornLightAvailable": 1,
+                "lightOnlyAvailable": 1,
+                "hvacTempType": "1",
+                "heatingSideMirror": "1",
+                "seatHeaterVent": {
+                    "frSeatHeat": 6,
+                    "rrSeatHeat": 2,
+                    "flSeatHeat": 6,
+                    "rlSeatHeat": 2
+                },
+                "svmOptionInfo": 1,
+                "airPurifierOption": 0,
+                "sunRoofOption": 1,
+                "remoteAirCtrlControlOption": 1,
+                "evAlarmOptionInfo": 0,
+                "windowSafetyOption2": 3,
+                "strgWhlHeatOption": 2,
+                "digitalKey2": 3,
+                "dvrsOption": 0,
+                "ignCtrlOption": 0,
+                "evRoutePlanner": {}
+            },
+            "serviceOption": {
+                "batteryWarningService": 1,
+                "scheduleLinkService": 1,
+                "centerUserProfileOption": 4,
+                "valetServiceOption": 1,
+                "notificationSupport": 1,
+                "engineIdleTimeNotification": 1,
+                "finalDestinationNoti": 1,
+                "remoteValetActOption": 1,
+                "alertServiceOption": 1,
+                "mediaStreamingService": [4, 6],
+                "mediaStreamingSelectionOption": 1,
+                "calendarOption": "1",
+                "nTrackDataSupport": 0,
+                "send2CarOptionInfo": 10,
+                "idleAlertSettingService": 1
+            },
+            "batteryType": {
+                "mainbatteryType": 0,
+                "auxbatteryType": 2
+            }
+        }
+    },
+    "metaInfo": {
+        "retCode": "S",
+        "resCode": "200-000"
+    }
+}

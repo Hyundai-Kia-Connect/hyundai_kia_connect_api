@@ -1059,3 +1059,40 @@ def test_kia_charging_current_sends_the_level_field():
     _action_id, call = _run_command_on(api, api.set_charging_current, 1)
     body = call.kwargs["json"]
     assert body == {"chargingCurrent": 1, "command": "set"}
+
+
+def test_capabilities_false_gates_the_request():
+    """A carinfo block reporting the feature off stops the command before
+    any request; None (unknown) and True proceed (the block has no
+    capture yet, so these gate combinations are unit-tested deliberately)."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    with patch.object(api, "_gspa_post_for_data") as post:
+        vehicle.supports.climate_start = False
+        with pytest.raises(UnsupportedControlError):
+            api.start_climate(_make_token(), vehicle, ClimateRequestOptions())
+        post.assert_not_called()
+        vehicle.supports.climate_start = None
+        api.start_climate(_make_token(), vehicle, ClimateRequestOptions())
+        assert post.call_count == 1
+        vehicle.supports.climate_start = True
+        api.start_climate(_make_token(), vehicle, ClimateRequestOptions())
+        assert post.call_count == 2
+
+
+def test_capabilities_engine_panel_gate():
+    """The remote-start request stays when either engine flag allows it,
+    mirroring the app panel gate (engineClimateStart || engineStart)."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    with (
+        patch.object(api, "_gspa_post_for_data"),
+        pytest.raises(UnsupportedControlError),
+    ):
+        vehicle.supports.engine_start = False
+        vehicle.supports.engine_climate_start = False
+        api.start_engine(_make_token(), vehicle, ClimateRequestOptions(climate=True))
+    with patch.object(api, "_gspa_post_for_data") as post:
+        vehicle.supports.engine_climate_start = True
+        api.start_engine(_make_token(), vehicle, ClimateRequestOptions(climate=True))
+        assert post.call_count == 1
