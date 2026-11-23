@@ -2,7 +2,10 @@
     "_fixture_meta": {
         "status": "tests/fixtures/ca_kia_niro_ev_2022_cached.json (Kia Niro EV 2022)",
         "follow_up_sources": "nxtsvc, selsoc: kia_uvo #592; vrfypin, fndmcr: kia_uvo #459; gtmvrlst/gtmvrrpt from the read-only capture in kia_uvo #2025 work (PALISADE 2023); getrescharge from a live read on a 2027 Kia EV5 (no Niro capture)",
-        "not_captured": ["POST evTripDetails (no capture with a body)"],
+        "not_captured": [
+            "POST evTripDetails (no capture with a body)",
+            "GET v2/rc/ev/getreshvac (no capture for this car)"
+        ],
         "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses."
     },
     "implementation": {
@@ -49,6 +52,10 @@
         },
         "GET /tods/api/v2/rc/ev/getrescharge": {
             "body": "$fixture:updates/responses/ca_getrescharge.json"
+        },
+        "GET /tods/api/v2/rc/ev/getreshvac": {
+            "status": 503,
+            "body": null
         }
     }
 }

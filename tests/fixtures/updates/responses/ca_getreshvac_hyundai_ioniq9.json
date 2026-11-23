@@ -1,0 +1,38 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "GET tods/api/v2/rc/ev/getreshvac",
+        "source": "Live read on a 2027 Hyundai IONIQ 9 (mybluelink.ca), 2026-11-22, jonrburns in issue #1498",
+        "description": "Both slots configured but disabled (flag 0): [2,3,4] (Tue/Wed/Thu), 07:40 and 14:20, airTemp '17.0' unit 0."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "reservedHVACInfo1": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [2, 3, 4],
+                "time": { "time": "0740", "timeSection": 0 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": false,
+                "airTemp": { "unit": 0, "value": "17.0" }
+            }
+        },
+        "reservedHVACInfo2": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [2, 3, 4],
+                "time": { "time": "0220", "timeSection": 1 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": false,
+                "airTemp": { "unit": 0, "value": "17.0" }
+            }
+        }
+    }
+}

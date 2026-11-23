@@ -311,6 +311,214 @@
     ]),
   })
 # ---
+# name: test_ca_schedule_hvac_payload[climate_toggle]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'reservedHVACInfo1': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '17.0',
+              }),
+              'defrost': False,
+            }),
+            'reservHVACflag': 1,
+            'reservInfo': dict({
+              'day': list([
+                2,
+                3,
+                4,
+              ]),
+              'time': dict({
+                'time': '0740',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+          'reservedHVACInfo2': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '21.0',
+              }),
+              'defrost': False,
+            }),
+            'reservHVACflag': 1,
+            'reservInfo': dict({
+              'day': list([
+                9,
+              ]),
+              'time': dict({
+                'time': '1200',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reshvacset',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_schedule_hvac_payload[explicit_slot]
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'reservedHVACInfo1': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '21.5',
+              }),
+              'defrost': True,
+            }),
+            'reservHVACflag': 1,
+            'reservInfo': dict({
+              'day': list([
+                2,
+                3,
+                4,
+              ]),
+              'time': dict({
+                'time': '0740',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+          'reservedHVACInfo2': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '21.0',
+              }),
+              'defrost': False,
+            }),
+            'reservHVACflag': 0,
+            'reservInfo': dict({
+              'day': list([
+                9,
+              ]),
+              'time': dict({
+                'time': '1200',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reshvacset',
+      }),
+    ]),
+  })
+# ---
+# name: test_ca_schedule_mixed_charge_and_hvac
+  dict({
+    'requests': list([
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'offpeakPowerFlag': 1,
+          'pin': '1234',
+          'reservEndTime': dict({
+            'time': '0400',
+            'timeSection': 1,
+          }),
+          'reservFlag': 1,
+          'reservStartTime': dict({
+            'time': '0800',
+            'timeSection': 1,
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reschargeset',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/vrfypin',
+      }),
+      dict({
+        'body': dict({
+          'pin': '1234',
+          'reservedHVACInfo1': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '21.5',
+              }),
+              'defrost': False,
+            }),
+            'reservHVACflag': 1,
+            'reservInfo': dict({
+              'day': list([
+                9,
+              ]),
+              'time': dict({
+                'time': '0740',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+          'reservedHVACInfo2': dict({
+            'reservHVACSet': dict({
+              'airCtrl': 1,
+              'airTemp': dict({
+                'unit': 0,
+                'value': '21.0',
+              }),
+              'defrost': False,
+            }),
+            'reservHVACflag': 0,
+            'reservInfo': dict({
+              'day': list([
+                9,
+              ]),
+              'time': dict({
+                'time': '1200',
+                'timeSection': 0,
+              }),
+            }),
+          }),
+        }),
+        'method': 'POST',
+        'url': 'https://kiaconnect.ca/tods/api/v2/rc/ev/reshvacset',
+      }),
+    ]),
+  })
+# ---
 # name: test_legacy_climate_seat_options[start_climate-eu_kia-seat_options0]
   dict({
     'requests': list([

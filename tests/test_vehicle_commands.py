@@ -592,12 +592,82 @@ def test_ca_schedule_charge_payload(
     assert {"requests": sent_requests} == snapshot
 
 
-def test_ca_schedule_rejects_climate_scope(
+def test_ca_schedule_rejects_empty_options(
     sent_requests: list[dict[str, Any]],
 ) -> None:
     api, token, vehicle = _ca_kia_ev()
-    with pytest.raises(NotImplementedError):
+    vehicle.ev_schedule_charge_enabled = True
+    vehicle.ev_first_departure_days = [2, 3, 4]
+    vehicle.ev_first_departure_time = dt.time(7, 40)
+    vehicle.ev_first_departure_climate_temperature = (17.0, "°C")
+    vehicle.ev_first_departure_climate_defrost = False
+    with pytest.raises(ValueError, match="no schedule changes"):
         api.schedule_charging_and_climate(
-            token, vehicle, ScheduleChargingClimateRequestOptions(climate_enabled=True)
+            token, vehicle, ScheduleChargingClimateRequestOptions()
         )
     assert sent_requests == []
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ScheduleChargingClimateRequestOptions(
+            first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+                enabled=True,
+                climate_enabled=True,
+                days=[2, 3, 4],
+                time=dt.time(7, 40),
+                temperature=21.5,
+                defrost=True,
+            )
+        ),
+        # Toggle-only: both slots turn on with the vehicle's own days/time/temp.
+        ScheduleChargingClimateRequestOptions(climate_enabled=True),
+    ],
+    ids=["explicit_slot", "climate_toggle"],
+)
+def test_ca_schedule_hvac_payload(
+    options: ScheduleChargingClimateRequestOptions,
+    sent_requests: list[dict[str, Any]],
+    snapshot: SnapshotAssertion,
+) -> None:
+    api, token, vehicle = _ca_kia_ev()
+    vehicle.ev_schedule_charge_enabled = True
+    vehicle.ev_off_peak_charge_only_enabled = True
+    vehicle.ev_off_peak_start_time = dt.time(20, 0)
+    vehicle.ev_off_peak_end_time = dt.time(16, 0)
+    vehicle.ev_first_departure_days = [2, 3, 4]
+    vehicle.ev_first_departure_time = dt.time(7, 40)
+    vehicle.ev_first_departure_climate_temperature = (17.0, "°C")
+    vehicle.ev_first_departure_climate_defrost = False
+    assert api.schedule_charging_and_climate(token, vehicle, options) == "TX-1"
+    assert sent_requests[-1]["url"].endswith("v2/rc/ev/reshvacset")
+    assert {"requests": sent_requests} == snapshot
+
+
+def test_ca_schedule_mixed_charge_and_hvac(
+    sent_requests: list[dict[str, Any]],
+    snapshot: SnapshotAssertion,
+) -> None:
+    api, token, vehicle = _ca_kia_ev()
+    vehicle.ev_off_peak_charge_only_enabled = True
+    vehicle.ev_off_peak_start_time = dt.time(20, 0)
+    vehicle.ev_off_peak_end_time = dt.time(16, 0)
+    vehicle.ev_first_departure_time = dt.time(7, 40)
+    vehicle.ev_first_departure_climate_temperature = (21.5, "°C")
+    vehicle.ev_first_departure_climate_defrost = False
+    options = ScheduleChargingClimateRequestOptions(
+        charging_enabled=True,
+        first_departure=ScheduleChargingClimateRequestOptions.DepartureOptions(
+            climate_enabled=True
+        ),
+    )
+    assert api.schedule_charging_and_climate(token, vehicle, options) == "TX-1"
+    # One vrfypin + POST per scope, charge before climate.
+    assert [r["url"].rsplit("/", 1)[-1] for r in sent_requests] == [
+        "vrfypin",
+        "reschargeset",
+        "vrfypin",
+        "reshvacset",
+    ]
+    assert {"requests": sent_requests} == snapshot
