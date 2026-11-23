@@ -1,0 +1,263 @@
+{
+    "_fixture_meta": {
+        "vehicle": "Kia Niro EV",
+        "year": 2020,
+        "region": "EU",
+        "brand": "Kia",
+        "api_class": "ApiImplType1 (legacy SPA status, flag 0)",
+        "endpoint": "vehicles/{vehicleId}/ccs2/carstatus",
+        "source": "Issue #1616 comment 7099593668 (skinkie HA diagnostics dump); coordinates zeroed, location Timestamp aligned with the body Date (HA redaction)",
+        "description": "EU Kia Niro EV 2020 stored status served for a flag-0 car. Legacy SPA layout with Green.ChargingInformation.TargetSoC.Standard/Quick present (EV6-era captures and niro_2025 lack TargetSoC on this path) and ElectricCurrentLevel absent. Used by updates/eu_kia_niro_ev_2020_legacy.json.",
+        "has_target_soc": true
+    },
+    "Chassis": {
+        "Axle": {
+            "Row1": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                },
+                "Right": {
+                    "Tire": {
+                        "PressureLow": 0
+                    }
+                }
+            },
+            "Tire": {
+                "PressureLow": 0
+            }
+        }
+    },
+    "Cabin": {
+        "HVAC": {
+            "Row1": {
+                "Driver": {
+                    "Temperature": {
+                        "Value": "15.0",
+                        "Unit": 0
+                    },
+                    "Blower": {
+                        "SpeedLevel": 0
+                    }
+                }
+            },
+            "Temperature": {
+                "RangeType": 1
+            }
+        },
+        "SteeringWheel": {
+            "Heat": {
+                "State": 0
+            }
+        },
+        "Door": {
+            "Row1": {
+                "Driver": {
+                    "Open": 0,
+                    "Lock": 0
+                },
+                "Passenger": {
+                    "Open": 0,
+                    "Lock": 0
+                }
+            },
+            "Row2": {
+                "Left": {
+                    "Open": 0,
+                    "Lock": 0
+                },
+                "Right": {
+                    "Lock": 0,
+                    "Open": 0
+                }
+            }
+        }
+    },
+    "Electronics": {
+        "PowerSupply": {
+            "Accessory": 0,
+            "Ignition3": 0
+        },
+        "AutoCut": {
+            "BatteryPreWarning": 0
+        },
+        "Battery": {
+            "Level": 80,
+            "SensorReliability": 0
+        }
+    },
+    "RemoteControl": {
+        "SleepMode": 1
+    },
+    "Drivetrain": {
+        "FuelSystem": {
+            "DTE": {
+                "EV": 168,
+                "Total": 168,
+                "Unit": 1
+            }
+        },
+        "Transmission": {
+            "ParkingPosition": 1
+        },
+        "Odometer": 75145.8
+    },
+    "Body": {
+        "Trunk": {
+            "Open": 0
+        },
+        "Lights": {
+            "TailLamp": {
+                "Alert": 0
+            },
+            "DischargeAlert": {
+                "State": 0
+            },
+            "Hazard": {
+                "Alert": 0
+            }
+        },
+        "Windshield": {
+            "Rear": {
+                "Defog": {
+                    "State": 0
+                }
+            },
+            "Front": {
+                "Defog": {
+                    "State": 0
+                }
+            }
+        },
+        "Hood": {
+            "Open": 0
+        }
+    },
+    "DrivingReady": 0,
+    "Green": {
+        "Reservation": {
+            "OffPeakTime": {
+                "StartHour": 0,
+                "StartMin": 0,
+                "Mode": 0,
+                "EndHour": 0,
+                "EndMin": 0
+            },
+            "Departure": {
+                "Climate": {
+                    "Temperature": "OFF",
+                    "Defrost": 0,
+                    "TemperatureUnit": 0,
+                    "Activation": 0
+                },
+                "Schedule2": {
+                    "Thu": 0,
+                    "Min": 0,
+                    "Tue": 0,
+                    "Hour": 0,
+                    "Wed": 0,
+                    "Sat": 0,
+                    "Enable": 0,
+                    "Fri": 0,
+                    "Sun": 0,
+                    "Mon": 0
+                },
+                "Climate2": {
+                    "Temperature": "OFF",
+                    "Defrost": 0,
+                    "TemperatureUnit": 0,
+                    "Activation": 0
+                },
+                "Schedule1": {
+                    "Thu": 0,
+                    "Min": 0,
+                    "Tue": 0,
+                    "Hour": 0,
+                    "Sat": 0,
+                    "Wed": 0,
+                    "Enable": 0,
+                    "Fri": 0,
+                    "Mon": 0,
+                    "Sun": 0
+                }
+            }
+        },
+        "ChargingInformation": {
+            "EstimatedTime": {
+                "Quick": 27,
+                "Standard": 55,
+                "ICCB": 240
+            },
+            "Charging": {
+                "State": 0,
+                "RemainTimeUnit": 1,
+                "RemainTime": 55
+            },
+            "TargetSoC": {
+                "Quick": 60,
+                "Standard": 50
+            },
+            "SequenceDetails": 501,
+            "DTE": {
+                "TargetSoC": {
+                    "Quick": 168,
+                    "Standard": 168
+                }
+            },
+            "ExpectedTime": {
+                "StartHour": 19,
+                "StartMin": 59,
+                "EndHour": 19,
+                "EndDay": 9,
+                "StartDay": 9,
+                "EndMin": 59
+            },
+            "ConnectorFastening": {
+                "State": 0
+            },
+            "SequenceSubcode": -1
+        },
+        "BatteryManagement": {
+            "BatteryRemain": {
+                "Ratio": 39
+            }
+        }
+    },
+    "Date": "20261122133500.000",
+    "Service": {
+        "ConnectedCar": {
+            "RemoteControl": {
+                "WaitingTime": 168,
+                "Available": 1
+            }
+        }
+    },
+    "Location": {
+        "Speed": {
+            "Value": 0,
+            "Unit": 1
+        },
+        "GeoCoord": {
+            "Type": 0,
+            "Latitude": 0.0,
+            "Longitude": 0.0,
+            "Altitude": 0
+        },
+        "TimeStamp": "20261122133500.000",
+        "Date": "20261122133500.000",
+        "Offset": 1
+    }
+}
