@@ -21,6 +21,51 @@ This package is designed to simplify the complexity of using multiple regions.  
 
 Europe username/password login is supported directly for Kia, Hyundai, and Genesis (EU).  No browser or manual token extraction is needed. The ``pycryptodome`` package (included as a dependency) is used for RSA password encryption during the EU login flow.
 
+Europe (CCI/GSPA, region 9) specifics and command gates
++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Region 9 (Europe (Beta)) vehicles use the CCI login flow and the GSPA REST layer
+(``KiaCciApiEU`` / ``HyundaiCciApiEU`` / ``GenesisCciApiEU``), shared helper modules
+``driving_insight_eu`` and ``cci_auth``.  Notes current on EU (2026-11):
+
+- **Status reads:** the cached update reads the GSPA stored-status tree plus a
+  small set of cheap server reads (software version, OTA, valet, and the Driving
+  Insight family for vehicles whose ``supportedFeatures`` enable them).  The
+  Driving Insight reads are once-per-cycle (force refresh re-reads); the tire
+  ``tire/bound`` fallback for parked cars (stored-status carries the 255
+  "no reading" sentinel) is likewise one-shot per cycle.
+- **Tire pressure while parked:** the stored-status carries a 255 sentinel for
+  all four tires when the car is parked.  Those become ``unknown``, and the
+  last measured values come from the DI ``tire/bound`` read (display-unit
+  values, firstUnit).  ``Vehicle.tire_pressure_last_updated_at`` marks when the
+  DI record was measured.
+- **Trips:** ``month_trip_info``/``day_trip_info`` for Kia EU CCI come from the
+  Driving Insight API (the GSPA ``driving-info``/``driving-history`` endpoints
+  answer 500 server-side on Kia).  Trip times come from the car; on long trips
+  the reported start time can be the upload time.
+- **Command gates:** every remote command is gated twice — at the brand/feature
+  level (``GSPA_VERIFIED_ENDPOINTS`` per brand class; commands raise
+  ``NotImplementedError`` until live-verified) and per-vehicle (the carinfo
+  ``controlOption`` flags derived from ``option``/``serviceOption``, exposed as
+  ``Vehicle.supports.<item>``).  A derived ``False`` raises
+  ``UnsupportedControlError`` before the request is sent; ``None``/``True``
+  proceed.
+- **Error families seen live on EU CCI (2026-11):**
+
+  - ``400-004`` duplicate request — the GSPA command queue holds one command;
+    spacing under ~15 s (longer after ``update-status``) answers 400-004.
+  - ``402-002`` — remote-control subscription/plan lapsed for the VIN (doors,
+    lamp/hazard, horn answer this; the command queue still accepts valet).
+  - ``404-002`` — the endpoint is not routable for this vehicle at all
+    (capability-gated; e.g. climate on ICE/HEV family cars).
+  - ``428-002`` — service not provisioned for the VIN on the push/RCS path.
+  - ``500-000`` on the remote endpoints also answers for wire-shape errors
+    (e.g. a boolean where the app sends an int).
+- ``update-status`` replies with a bare ``{SID}`` acknowledgment — no command
+  result travels on it; outcomes arrive via a fresh stored-status read or push.
+- Full EU error-code reference with the app-side code names:
+  ``EU_ERROR_CODE_TABLE.md`` in the repository root.
+
 China (Hyundai Bluelink / Kia UVO CN)
 -------------------------------------
 
