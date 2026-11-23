@@ -1,0 +1,35 @@
+{
+    "_fixture_meta": {
+        "source": "live DI read on a Hyundai Santa Fe HEV 2026 (EU CCI), blka, 2026-11-23, during issue #1319/#1320 implementation; ids/tokens redacted"
+    },
+    "status": "success",
+    "transactionId": "TEST-TRANSACTION-1",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "puid": "TEST-PUID-1",
+        "country": "pl",
+        "ccsMasterCarId": "VEHICLE-1",
+        "specificationId": "TEST-SPECIFICATION-1",
+        "vin": "TESTVIN0000000001",
+        "parentId": 698696,
+        "ccsFullEnrollYn": true,
+        "mainSupportYn": true,
+        "primaryUserYn": true,
+        "ccsAgreedNewTermsYn": true,
+        "ccsNewTermsConsentedDate": "2026-02-18T11:23:52",
+        "grantCcsControlYn": true,
+        "ownershipType": 3,
+        "ccsEnrollmentDate": "2026-02-20T14:06:32",
+        "supportedFeatures": ["TIRE_PRESSURE", "TRIPS"],
+        "availableSelectiveTerms": [],
+        "consentedTerms": [
+            {
+                "termsCode": "DI",
+                "required": true,
+                "consent": true,
+                "consentDate": "2026-02-20T12:06:53"
+            }
+        ]
+    }
+}

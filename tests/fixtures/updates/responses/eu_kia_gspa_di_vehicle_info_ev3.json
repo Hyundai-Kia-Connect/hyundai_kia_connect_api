@@ -1,0 +1,43 @@
+{
+    "transactionId": "TEST-TRANSACTION-1",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "puid": "<redacted>",
+        "country": "it",
+        "ccsMasterCarId": "<redacted>",
+        "specificationId": "TEST-SPECIFICATION-1",
+        "vin": "<redacted>",
+        "parentId": "TEST-PARENT-1",
+        "ccsFullEnrollYn": true,
+        "mainSupportYn": true,
+        "primaryUserYn": true,
+        "ccsAgreedNewTermsYn": true,
+        "ccsNewTermsConsentedDate": "2025-09-02T14:06:48",
+        "grantCcsControlYn": true,
+        "ownershipType": 3,
+        "ccsEnrollmentDate": "2025-09-10T14:43:50",
+        "supportedFeatures": [
+            "EV_BATTERY",
+            "EV_ENERGY_USAGE",
+            "TRIPS",
+            "SAFETY_SCORE"
+        ],
+        "availableSelectiveTerms": ["SAFETY_SCORE"],
+        "consentedTerms": [
+            {
+                "termsCode": "DI",
+                "required": true,
+                "consent": true,
+                "consentDate": "2025-09-10T13:04:36"
+            },
+            {
+                "termsCode": "SAFETY_SCORE",
+                "required": false,
+                "consent": true,
+                "consentDate": "2025-09-10T16:13:29"
+            }
+        ]
+    }
+}
