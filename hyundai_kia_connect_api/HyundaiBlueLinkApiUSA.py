@@ -1357,7 +1357,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
             url = self.API_URL + "rcs/rsc/start"
 
         headers = self._get_vehicle_headers(token, vehicle)
-        _LOGGER.debug(f"{DOMAIN} - Start engine headers: {headers}")
 
         if options.climate is None:
             options.climate = True
@@ -1434,8 +1433,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         headers = self._get_vehicle_headers(token, vehicle)
 
-        _LOGGER.debug(f"{DOMAIN} - Stop engine headers: {headers}")
-
         response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "stop_climate")
         if response_json is not None:
@@ -1455,7 +1452,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         url = self.API_URL + "evc/charge/start"
         headers = self._get_vehicle_headers(token, vehicle)
-        _LOGGER.debug(f"{DOMAIN} - Start charging headers: {headers}")
 
         response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "start_charge")
@@ -1476,7 +1472,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
 
         url = self.API_URL + "evc/charge/stop"
         headers = self._get_vehicle_headers(token, vehicle)
-        _LOGGER.debug(f"{DOMAIN} - Stop charging headers: {headers}")
 
         response = self.session.post(url, headers=headers)
         response_json = _safe_parse_json(response, "stop_charge")
@@ -1498,7 +1493,6 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
         _LOGGER.debug(f"{DOMAIN} - Setting charge limits..")
         url = self.API_URL + "evc/charge/targetsoc/set"
         headers = self._get_vehicle_headers(token, vehicle)
-        _LOGGER.debug(f"{DOMAIN} - Setting charge limits: {headers}")
 
         data = {
             "targetSOClist": [
