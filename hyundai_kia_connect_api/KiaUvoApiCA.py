@@ -1299,7 +1299,6 @@ class KiaUvoApiCA(ApiImpl):
         headers["vehicleId"] = vehicle.id
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         response_json = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response_json}")
         self._check_response_for_errors(response_json)
         return cast(str, response_json["result"]["pAuth"])
 
@@ -1529,13 +1528,11 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["pAuth"] = self._get_pin_token(token, vehicle)
-        data = json.dumps({"pin": token.pin})
+        data = {"pin": token.pin}
         _LOGGER.debug(
             f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
         )
-        response = self.sessions.post(
-            url, headers=headers, data=json.dumps({"pin": token.pin})
-        )
+        response = self.sessions.post(url, headers=headers, data=json.dumps(data))
         response_headers = response.headers
         response = response.json()
 
@@ -1693,10 +1690,8 @@ class KiaUvoApiCA(ApiImpl):
         self._check_response_for_errors(response_json)
         return response.headers["transactionId"]
 
-    def _mask_sensitive_data(self, data: dict[str, Any] | str) -> dict[str, Any] | str:
+    def _mask_sensitive_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Create a copy of data with sensitive fields masked for logging."""
-        if isinstance(data, str):
-            return data
         import copy
 
         masked = copy.deepcopy(data)
