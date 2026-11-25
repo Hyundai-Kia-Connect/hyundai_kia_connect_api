@@ -18,8 +18,11 @@ from urllib3.util.ssl_ import create_urllib3_context
 
 from hyundai_kia_connect_api.exceptions import (
     APIError,
+    AuthenticationBlockedError,
     AuthenticationError,
+    AuthenticationInvalidCredentialsError,
     DuplicateRequestError,
+    HyundaiKiaException,
     RequestTimeoutError,
     SafetyAcknowledgmentError,
     ServiceTemporaryUnavailable,
@@ -90,7 +93,13 @@ def _check_response_for_errors(response: dict[str, Any]) -> None:
         function = response.get("functionName", "")
         suffix = f" [{system}/{function}]" if system or function else ""
         code = str(response["errorCode"])
-        exc = error_code_mapping.get(code, APIError)
+        exc: type[HyundaiKiaException] = error_code_mapping.get(code, APIError)
+        if system == "IDM" and function == "customerLogin":
+            message = str(response.get("errorMessage", "")).lower()
+            if "incorrect username or password" in message:
+                exc = AuthenticationInvalidCredentialsError
+            elif "locked" in message:
+                exc = AuthenticationBlockedError
         raise exc(f"API Error {code}{suffix}: {response['errorMessage']}")
 
 
@@ -431,6 +440,8 @@ class HyundaiBlueLinkApiUSA(ApiImpl):
                     valid_until=valid_until,
                     pin=token.pin,
                 )
+            except AuthenticationError:
+                raise
             except Exception:
                 _LOGGER.warning(
                     f"{DOMAIN} - Refresh token exchange failed, "
