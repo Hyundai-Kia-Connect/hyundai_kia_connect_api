@@ -497,6 +497,9 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_carinfo_profile_tucson.json"
         }
     }
 }

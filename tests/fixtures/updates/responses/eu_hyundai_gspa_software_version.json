@@ -1,0 +1,20 @@
+{
+    "_fixture_meta": {
+        "source": "live GSPA software-version read, Hyundai Santa Fe HEV 2026 EU CCI, blka 2026-11-23 (session of issue #1319/#1320 implementation)"
+    },
+    "data": {
+        "headUnitModelname": "MX5AH.SCBMC.EU",
+        "currentHeadUnitSWSN": "260312",
+        "currentMapSN": "184357011",
+        "currentHeadUnitVersion": "MX5.EUR.ccNC.001.002.260312",
+        "currentMapVersion": "EUR.18.43.57.011.933.0",
+        "ecuOtaUpdateSupport": 1,
+        "eventSourceVersionNm": "26.2.2",
+        "eventTargetVersionNm": "26.2.2",
+        "needUpdate": 0
+    },
+    "metaInfo": {
+        "retCode": "S",
+        "resCode": "200-000"
+    }
+}

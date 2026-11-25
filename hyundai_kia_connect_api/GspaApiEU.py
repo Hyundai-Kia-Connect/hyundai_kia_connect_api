@@ -1693,6 +1693,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
                 vehicle._valet_failed = True
                 _LOGGER.debug(f"{DOMAIN} - GSPA valet_status update failed")
 
+        try:
+            self._update_capabilities_from_carinfo(token, vehicle)
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA carinfo supports update failed")
+
     # ------------------------------------------------------------------
     # CCS2 property parser (shared by Hyundai and Kia CCI)
     # ------------------------------------------------------------------
@@ -2695,6 +2700,11 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         (202 on a PV5) but the behavioral difference is unverified, so
         the library keeps the plain door-lock/door-unlock surface.
         """
+        self._raise_if_capabilities_say_no(
+            vehicle,
+            "door_lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door_unlock",
+            "door lock/unlock",
+        )
         endpoint = "door-lock" if action == VEHICLE_LOCK_ACTION.LOCK else "door-unlock"
         return self._gspa_control_command(token, vehicle, endpoint, {"command": "set"})
 
@@ -2714,6 +2724,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     def charge_port_action(
         self, token: Token, vehicle: Vehicle, action: CHARGE_PORT_ACTION
     ) -> str:
+        self._raise_if_capabilities_say_no(
+            vehicle,
+            "charge_port_open"
+            if action == CHARGE_PORT_ACTION.OPEN
+            else "charge_port_close",
+            "charge port",
+        )
         command = "open" if action == CHARGE_PORT_ACTION.OPEN else "close"
         return self._gspa_control_command(
             token, vehicle, "portdoor", {"command": command}
@@ -2733,6 +2750,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     def turn_off_lamp(
         self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
+        self._raise_if_capabilities_say_no(vehicle, "lamp_off", "lamp off")
         return self._gspa_control_command(
             token, vehicle, "lamp", {"command": mode.value}
         )
@@ -2798,6 +2816,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     def start_climate(
         self, token: Token, vehicle: Vehicle, options: ClimateRequestOptions
     ) -> str:
+        self._raise_if_capabilities_say_no(vehicle, "climate_start", "climate start")
         body: dict[str, Any] = {"command": "start"}
         if options.set_temp is not None:
             body["hvacTemp"] = str(options.set_temp)
@@ -2850,6 +2869,14 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         Accepts the same climate fields as start_climate plus hvacCtrl
         (options.climate) — confirmed endpoint shape.
         """
+        # The app's remote-start panel needs either engine flag.
+        if (
+            vehicle.supports.engine_start is False
+            and vehicle.supports.engine_climate_start is False
+        ):
+            raise UnsupportedControlError(
+                "Vehicle capability reports remote start unsupported"
+            )
         body: dict[str, Any] = {"command": "start"}
         if options:
             if options.set_temp is not None:
@@ -2888,6 +2915,13 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         return self._gspa_control_command(token, vehicle, "engine", body)
 
     def stop_engine(self, token: Token, vehicle: Vehicle) -> str:
+        if (
+            vehicle.supports.engine_stop is False
+            and vehicle.supports.engine_climate_stop is False
+        ):
+            raise UnsupportedControlError(
+                "Vehicle capability reports remote stop unsupported"
+            )
         return self._gspa_control_command(token, vehicle, "engine", {"command": "stop"})
 
     def start_pet_care(
@@ -3422,6 +3456,168 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA ota-updates GET failed")
             return None
+
+    def _raise_if_capabilities_say_no(
+        self, vehicle: Vehicle, item: str, label: str
+    ) -> None:
+        """Skip the request when the carinfo block reports the feature off.
+
+        Only an explicit False raises; unknown (None) and True proceed.
+        """
+        if getattr(vehicle.supports, item, None) is False:
+            raise UnsupportedControlError(
+                f"Vehicle capability reports {label} unsupported"
+            )
+
+    def get_carinfo(self, token: Token, vehicle: Vehicle) -> dict[str, Any] | None:
+        """GET /gspa/v1/vehicles/{carId}/profile — GSPA carinfo payload."""
+        self._validate_ccs_token(token)
+        try:
+            return self._gspa_get(token, vehicle, "vehicles/{carId}/profile")
+        except AuthenticationError:
+            raise
+        except Exception:
+            _LOGGER.debug(f"{DOMAIN} - GSPA carinfo fetch failed")
+            return None
+
+    # The carinfo controlOption booleans the app SDK presents are derived
+    # client-side (CarInfoListApiResponseKt.toCarInfoControlIntoResponse —
+    # Derivation inputs: basic (modelType, country), option flags,
+    # serviceOption flags, appMode (nullable -> the SDK AppMode.find
+    # fallback GEN2).
+
+    # App-mode semantics folded from com.hmg.ccs.sdk.core.AppMode:
+    #   engine-remote panel off for these modes (isSupportRemoteEngineControl
+    #   false), engine-panel EU-production exclusion honored separately.
+    _APP_MODE_ENGINE_OFF: ClassVar[frozenset[str]] = frozenset(
+        {
+            "GEN1",
+            "MOZEN",
+            "GEN2",
+            "FE",
+            "PSEV",
+            "EV2",
+            "EV3",
+            "PHEV4",
+        }
+    )
+
+    def _update_capabilities_from_carinfo(self, token: Token, vehicle: Vehicle) -> None:
+        """Derive vehicle.supports from the carinfo profile.
+
+        One read per cycle; force refresh re-reads it. The derived values
+        only refine items left unknown (None) by the per-brand stamps;
+        block values do not clobber brand-level statements.
+        """
+        if vehicle._carinfo_checked:
+            return
+        vehicle._carinfo_checked = True  # set before call — force refresh resets
+        data = self.get_carinfo(token, vehicle)
+        if not isinstance(data, dict):
+            return
+        vin_info = data.get("vinInfo")
+        if not isinstance(vin_info, dict):
+            return
+        derived = self._derive_control_capabilities(vin_info)
+        for item, value in derived.items():
+            if getattr(vehicle.supports, item, None) is None:
+                setattr(vehicle.supports, item, value)
+
+    # ------------------------------------------------------------------
+    # CCS2 property parser (shared by Hyundai and Kia CCI)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _derive_control_capabilities(vin_info: dict[str, Any]) -> dict[str, bool]:
+        """Derive the vehicle.supports capabilities from a carinfo profile.
+
+        Mirrors the app SDK's toCarInfoControlIntoResponse for the flags
+        with a VehicleManager call home. Inputs are the wire blocks the
+        profile carries (option, serviceOption, basic, appMode); app-mode
+        is nullable on the wire and the SDK falls back to GEN2.
+        """
+        option = vin_info.get("option") or {}
+        service = vin_info.get("serviceOption") or {}
+        basic = vin_info.get("basic") or {}
+        if not isinstance(basic, dict):
+            basic = {}
+        app_mode = vin_info.get("appMode") or "GEN2"
+        model_type = basic.get("modelType")
+        country = basic.get("country")
+        remote_control = option.get("remoteControl")
+        air_control_type = option.get("airControlType")
+        light_block = service.get("remoteLightControlOption")
+
+        def _service_int(name: str) -> int | None:
+            value = service.get(name)
+            return value if isinstance(value, int) else None
+
+        out: dict[str, bool] = {}
+
+        # Engine panel: the app gates it by app-mode, then airControlType +
+        # remoteControl=="1", and the SDK keeps it off for EU-production
+        # outside Turkey regardless of flags. FE sits inside the engine-off
+        # set; the SDK keeps the engine panel off for FE regardless of flags.
+        engine_supported = (
+            app_mode not in GspaApiEU._APP_MODE_ENGINE_OFF and country == "tr"
+        )
+
+        def _engine(air: str) -> bool:
+            return (
+                engine_supported and air_control_type == air and remote_control == "1"
+            )
+
+        out["engine_climate_start"] = _engine("1")
+        out["engine_climate_stop"] = _engine("1")
+        out["engine_start"] = _engine("0")
+        out["engine_stop"] = _engine("0")
+
+        # Climate start: model family EV/ER; PHEV ("PE") only with the
+        # PTC heater option on the EU backend.
+        climate = model_type in ("EV", "ER") or (
+            model_type == "PE" and option.get("ptcOption") == 1
+        )
+        out["climate_start"] = climate
+        out["climate_stop"] = climate
+
+        charge_port = (
+            model_type in ("EV", "ER") and _service_int("chargePortDoorOption") == 1
+        )
+        out["charge_port_open"] = charge_port
+        out["charge_port_close"] = charge_port
+        out["charge_start"] = charge_port
+        out["charge_stop"] = charge_port
+
+        battery = (
+            model_type in ("EV", "ER")
+            and option.get("batteryPreconditioningOption") == 2
+        )
+        out["battery_conditioning"] = battery
+
+        out["hazard"] = option.get("lightOnlyAvailable") != 1 and light_block != 0
+        out["horn_light"] = option.get("hornLightAvailable") != 1 and light_block != 0
+        # tailLampOff is literal true in the app derivation.
+        out["lamp_off"] = True
+
+        window_safety2 = option.get("windowSafetyOption2")
+        window_safety1 = option.get("windowSafetyOption1")
+        if window_safety1 is None:
+            window_safety1 = option.get("windowSafetyOption")
+        window_control_option = service.get("windowControlOption")
+        if window_safety2 in (3, 4):
+            out["window_control"] = option.get("rearWindowCurtainOption") in (0, 1)
+        elif window_safety1 == 1:
+            out["window_control"] = window_control_option is None or (
+                isinstance(window_control_option, int)
+                and 0 <= window_control_option <= 3
+            )
+        else:
+            out["window_control"] = False
+
+        out["frunk_open"] = (
+            model_type in ("EV", "ER") and option.get("frunkOption") == 1
+        )
+        return out
 
     def get_software_version(
         self, token: Token, vehicle: Vehicle
