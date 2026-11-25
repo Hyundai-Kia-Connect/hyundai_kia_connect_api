@@ -16,6 +16,7 @@ from .const import (
     DOMAIN,
     ENGINE_TYPES,
 )
+from .driving_insight_eu import DrivingInsightMixin
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .mqtt_service_hub_eu import MqttServiceHubMixin
@@ -28,7 +29,7 @@ from .Vehicle import DailyDrivingStats, Vehicle
 _LOGGER = logging.getLogger(__name__)
 
 
-class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
+class HyundaiCciApiEU(DrivingInsightMixin, MqttServiceHubMixin, GspaApiEU):
     """Hyundai EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 4f4953b5) confirmed on
@@ -56,6 +57,12 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
 
     CCSP_CLIENT_SERVICE_ID = "4f4953b5-02e1-4dbc-8599-87e983ee1be5"
     PUSH_PROVIDER_ID = "33258e5f-b8c8-459e-add1-1e94217ba148"
+
+    # Driving Insight reads, live-verified on a Santa Fe HEV
+    # (2026-11-23: token-exchange DI, vehicle info, tire/bound, trips,
+    # odometer; EV-family reads answer the feature-gate 400).
+    DI_BASE_URL = "https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100"
+    DRIVING_INSIGHT_VERIFIED = True
 
     # Hyundai EU CCI remote control is live-verified.
     GSPA_REMOTE_CONTROL_VERIFIED = True
@@ -241,6 +248,7 @@ class HyundaiCciApiEU(MqttServiceHubMixin, GspaApiEU):
             raise APIError("GSPA stored-status returned no data")
         self._apply_stored_status(token, vehicle, data)
         self._update_vehicle_extras(token, vehicle)
+        self._update_di_data(token, vehicle)
 
     def _update_vehicle_extras(self, token: Token, vehicle: Vehicle) -> None:
         """Driving info, history and GSPA reads that follow a stored-status update."""
