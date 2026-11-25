@@ -137,13 +137,26 @@ class VehicleManager:
         self.initialize_vehicles()
 
     def initialize_vehicles(self) -> None:
-        if len(self.vehicles) > 0:
+        reinit = len(self.vehicles) > 0
+        if reinit:
             _LOGGER.warning(
                 "Vehicles already initialized, this will re-initialize and cause data loss mapping errors"
             )
+            for vehicle in self.vehicles.values():
+                vehicle._profile_checked = False
         vehicles = self.api.get_vehicles(self._require_token())
         for vehicle in vehicles:
             self.vehicles[vehicle.id] = vehicle
+        for vehicle in self.vehicles.values():
+            if not vehicle._profile_checked:
+                vehicle._profile_checked = True
+                try:
+                    self.api.parse_vehicle_profile(self._require_token(), vehicle)
+                except Exception:
+                    # The profile only feeds optional capability flags; a
+                    # failed read must not break vehicle setup (login and
+                    # OTP flows call initialize_vehicles).
+                    _LOGGER.debug("vehicle profile read failed", exc_info=True)
 
     def get_vehicle(self, vehicle_id: str) -> Vehicle:
         return self.vehicles[vehicle_id]

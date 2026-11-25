@@ -5,7 +5,10 @@ import logging
 import re
 from collections.abc import Sequence
 from enum import IntEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .Vehicle import Vehicle
 
 from .const import DISTANCE_UNITS
 
@@ -374,3 +377,29 @@ def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime 
             )
 
     return None
+
+
+def parse_vehicle_profile_seat_heaters(vehicle: "Vehicle", profile: Any) -> None:
+    """Set ``vehicle.supports.remote_seat_heater_*`` from a profile payload.
+
+    ``seatHeaterVent`` carries one `SeatHeaterVentOption` value per seat;
+    0 (init) and 7 (invalid) mean the seat cannot be reached through
+    remote climate, and any other value doubles as the legacy command
+    level. An absent block leaves every item ``None`` (unknown).
+    """
+    entries = profile.get("vinInfo") if isinstance(profile, dict) else None
+    option = entries[0].get("option", {}) if entries else {}
+    vent = option.get("seatHeaterVent") if isinstance(option, dict) else None
+    if not isinstance(vent, dict):
+        return
+
+    def _supported(key: str) -> bool:
+        level = vent.get(key)
+        if isinstance(level, str) and level.isdigit():
+            level = int(level)
+        return level is not None and level not in (0, 7)
+
+    vehicle.supports.remote_seat_heater_front_left = _supported("flSeatHeat")
+    vehicle.supports.remote_seat_heater_front_right = _supported("frSeatHeat")
+    vehicle.supports.remote_seat_heater_rear_left = _supported("rlSeatHeat")
+    vehicle.supports.remote_seat_heater_rear_right = _supported("rrSeatHeat")

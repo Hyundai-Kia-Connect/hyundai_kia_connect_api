@@ -601,3 +601,78 @@ def test_ca_schedule_rejects_climate_scope(
             token, vehicle, ScheduleChargingClimateRequestOptions(climate_enabled=True)
         )
     assert sent_requests == []
+
+
+@pytest.mark.parametrize(
+    "impl, options, supports",
+    [
+        # Every seat unsupported (e-Niro 2021 profile): the whole seat
+        # block is dropped, the steering wheel stays.
+        (
+            "eu_kia",
+            ClimateRequestOptions(
+                set_temp=21,
+                duration=10,
+                defrost=False,
+                climate=True,
+                heating=0,
+                front_left_seat=6,
+                front_right_seat=6,
+                steering_wheel=2,
+            ),
+            (False, False, False, False),
+        ),
+        # Partially supported: the rear-left seat stays in the request.
+        (
+            "eu_kia",
+            ClimateRequestOptions(
+                set_temp=21,
+                duration=10,
+                defrost=False,
+                climate=True,
+                heating=0,
+                front_left_seat=6,
+                rear_left_seat=1,
+            ),
+            (False, False, True, False),
+        ),
+    ],
+)
+def test_legacy_climate_seat_options_gated(
+    impl: str,
+    options: ClimateRequestOptions,
+    supports: tuple[bool, bool, bool, bool],
+    sent_requests: list[dict[str, Any]],
+    snapshot: SnapshotAssertion,
+) -> None:
+    vehicle = Vehicle(
+        id="VEHICLE-ID",
+        VIN="VIN0000000000000",
+        year=2024,
+        engine_type=ENGINE_TYPES.EV,
+        ccu_ccs2_protocol_support=0,
+    )
+    (
+        vehicle.supports.remote_seat_heater_front_left,
+        vehicle.supports.remote_seat_heater_front_right,
+        vehicle.supports.remote_seat_heater_rear_left,
+        vehicle.supports.remote_seat_heater_rear_right,
+    ) = supports
+
+    api = VehicleManager.get_implementation_by_region_brand(
+        _key(REGIONS, REGION_EUROPE), _key(BRANDS, BRAND_KIA), "en"
+    )
+    token = Token(
+        username="user",
+        password="password",
+        pin="1234",
+        access_token="Bearer access",
+        refresh_token="refresh",
+        device_id="0123456789abcdef0123456789abcdef",
+        valid_until=dt.datetime.now() + dt.timedelta(hours=1),
+    )
+    action_id = api.start_climate(token, vehicle, options)
+
+    assert isinstance(action_id, str)
+    assert action_id
+    assert {"action_id": action_id, "requests": sent_requests} == snapshot

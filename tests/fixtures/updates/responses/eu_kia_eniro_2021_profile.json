@@ -1,0 +1,154 @@
+{
+    "retCode": "S",
+    "resCode": "0000",
+    "resMsg": {
+        "vinInfo": [
+            {
+                "basic": {
+                    "modelName": "E-NIRO",
+                    "modelYear": "2021",
+                    "modelType": "EV",
+                    "brand": "K",
+                    "country": "gb",
+                    "evDrivingHisSupport": "true",
+                    "ecuOtaUpdateSupport": 0,
+                    "privateModeInfo": "false",
+                    "protocolType": 0,
+                    "ccuCCS2ProtocolSupport": 0,
+                    "vin": "REDACTED",
+                    "fullActivatedDt": "REDACTED"
+                },
+                "device": {
+                    "simStatus": "A",
+                    "simStartDate": "02062021",
+                    "simEndDate": "02062028",
+                    "deviceModemInfo": "true",
+                    "headUnitType": "03",
+                    "naviApplied": 1,
+                    "headUnitModelName": "DEAE.S5BLC.AEU",
+                    "privacySettingSupport": 1,
+                    "compPeriodEndYn": "N",
+                    "currentHeadUnitVersion": "DE_E_PE.EUR.S5W_L.001.001.250604"
+                },
+                "option": {
+                    "drvSeatLoc": "L",
+                    "hvacTempType": "1",
+                    "imsOption": 0,
+                    "windowSafetyOption": 0,
+                    "heating1": "1",
+                    "remoteHeatControl": "0",
+                    "heatingSteeringWheel": "1",
+                    "heatingSideMirror": "1",
+                    "heatingRearWindow": "1",
+                    "heatingFrontWindow": "0",
+                    "svmOptionInfo": 0,
+                    "remoteAirCtrlControlOption": 1,
+                    "V2LOption": 0,
+                    "wirelessChargingOption": 0,
+                    "V2GOption": 0,
+                    "batteryPreconditioningOption": 0,
+                    "cmsOption": 0,
+                    "evAlarmOptionInfo": 1,
+                    "sunRoofOption": 0,
+                    "digitalKey2": 0,
+                    "remoteControlWaitingTime": 168,
+                    "hornLightAvailable": 1,
+                    "lightOnlyAvailable": 1,
+                    "remoteFrontWindowHeatControl": "0",
+                    "remoteControl": "0",
+                    "seatHeaterVent": {
+                        "frSeatHeat": 0,
+                        "flSeatHeat": 0,
+                        "rlSeatHeat": 0,
+                        "rrSeatHeat": 0
+                    }
+                },
+                "serviceOption": {
+                    "batteryWarningService": 0,
+                    "scheduleLinkService": 1,
+                    "centerUserProfileOption": 2,
+                    "ccsPhase": 20,
+                    "finalDestinationNoti": 1,
+                    "valetServiceOption": 1,
+                    "notificationSupport": 1,
+                    "nTrackDataSupport": 0,
+                    "windowControlOption": 0,
+                    "chargePortDoorOption": 1,
+                    "alertServiceOption": 1,
+                    "remoteValetActOption": 1,
+                    "remoteLightControlOption": 1,
+                    "engineIdleTimeNotification": 1
+                },
+                "detailInfo": {
+                    "inColor": "WK",
+                    "outColor": "DU3",
+                    "bodyType": "2",
+                    "prodCarmdlCd": "DQ",
+                    "saleCarmdlCd": "DQ",
+                    "saleCarmdlEnNm": "E-NIRO"
+                },
+                "dtcCategory": [
+                    {
+                        "ecuIdx": "AAF",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ABS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "ACU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "BMS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "EPB",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "LDC",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "LKAS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "MCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "MDPS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "OBC",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "SCC",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "TCU",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "TPMS",
+                        "factoryValue": 1
+                    },
+                    {
+                        "ecuIdx": "VCU",
+                        "factoryValue": 1
+                    }
+                ]
+            }
+        ]
+    },
+    "_fixture_meta": {
+        "source": "kia_uvo#2121 comment timsweb (2026-11-24): legacy-SPA profile GET, EU Kia e-Niro 2021, reporter-scrubbed (VIN redacted, msgId removed)"
+    }
+}
