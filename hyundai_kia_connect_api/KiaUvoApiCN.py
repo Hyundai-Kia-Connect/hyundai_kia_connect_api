@@ -259,8 +259,8 @@ class KiaUvoApiCN(ApiImplType1):
         }
         data = {"deviceId": token.device_id, "pin": token.pin}
         response = self.session.put(url, json=data, headers=headers).json()
-        _LOGGER.debug(f"{DOMAIN} - Get Control Token Response: {response}")
         if response.get("controlToken") is None:
+            _LOGGER.debug(f"{DOMAIN} - Get Control Token Response: {response}")
             raise APIError("PIN verification failed, ensure PIN is entered correctly.")
         control_token = "Bearer " + response["controlToken"]
         control_token_expire_at = math.floor(
