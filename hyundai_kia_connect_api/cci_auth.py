@@ -180,18 +180,22 @@ class CciAuthMixin:
         cci_access_token: str,
         non_ccs_token: str,
         exchangeable_token: str,
+        service_type: str = "CCS",
     ) -> tuple[str, dt.datetime]:
-        """Exchange a CCI access token for a CCS token (token-exchange?serviceType=CCS).
+        """Exchange a CCI access token for a service token (token-exchange).
 
         The token-exchange endpoint is fingerprint-gated like the other /auth
         endpoints (unsigned calls answer 9035, field-verified 2026-10-14 on
         Hyundai): the signed primary carries the CCI token headers on the
         OneApp identity, the legacy domain/api route runs unsigned as
-        fallback.
+        fallback. service_type carries the exchange family: "CCS" (the
+        default CCS token) or "DI" (Driving Insight, live-verified
+        2026-11-23 on Hyundai EU CCI).
 
         The CCS token is accepted as a Bearer access_token by the legacy
         ccapi:8080 endpoints (region 1) and the GSPA REST endpoints
-        (region 9). Returns (ccs_token, valid_until).
+        (region 9). Returns (access_token, valid_until) for the requested
+        service token family.
         """
         headers = self._cci_fp_headers(device_id)
         headers["authorization"] = (
@@ -203,16 +207,16 @@ class CciAuthMixin:
             headers["non-ccs-token"] = non_ccs_token or ""
         resp = requests.post(
             f"{self.CCI_API_URL}/auth/v1/token-exchange",
-            params={"serviceType": "CCS"},
+            params={"serviceType": service_type},
             headers=headers,
             timeout=(5, 30),
         )
         if resp.status_code != 200 and is_gate_rejection(resp.status_code, resp.text):
             _LOGGER.error(
-                f"{DOMAIN} - Fingerprint gate rejected the signed CCS "
-                f"token-exchange (HTTP {resp.status_code}); fell back to the "
-                "legacy route. This fallback is transitional - report this "
-                "log so the fallback can be removed"
+                f"{DOMAIN} - Fingerprint gate rejected the signed "
+                f"{service_type} token-exchange (HTTP {resp.status_code}); fell "
+                "back to the legacy route. This fallback is transitional "
+                "- report this log so the fallback can be removed"
             )
             headers = self._get_cci_headers(
                 device_id,
@@ -222,31 +226,33 @@ class CciAuthMixin:
             )
             resp = requests.post(
                 f"{self.CCI_DOMAIN_API_URL}v1/auth/token-exchange",
-                params={"serviceType": "CCS"},
+                params={"serviceType": service_type},
                 headers=headers,
                 timeout=(5, 30),
             )
         if resp.status_code != 200:
             raise AuthenticationCcsTokenExchangeError(
-                f"CCS token exchange failed: HTTP {resp.status_code} — "
-                f"{resp.text[:200]}. This may indicate an API change."
+                f"{service_type} token exchange failed: HTTP {resp.status_code} "
+                f"with {resp.text[:200]}. This may indicate an API change."
             )
         data = resp.json()
-        ccs_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
-        if not ccs_token:
+        service_token = data.get("accessToken") or data.get("ccsAccessToken") or ""
+        if not service_token:
             raise AuthenticationCcsTokenExchangeError(
-                f"CCS token exchange returned no accessToken: {resp.text[:200]}"
+                f"{service_type} token exchange returned no accessToken: "
+                f"{resp.text[:200]}"
             )
-        # expiresTime is the CCS token TTL in seconds, not an epoch. Treat it
+        # expiresTime is the token TTL in seconds, not an epoch. Treat it
         # as a relative duration from now; fall back to +1h. Observed values:
         # 86400 (24h) in older captures, 3600 (1h) live 2026-10-30 on both EU
-        # regions (Hyundai/Kia).
+        # regions (Hyundai/Kia), and 3600 for serviceType=DI (live
+        # 2026-11-23 on Hyundai).
         expires_in = data.get("expiresTime")
         if expires_in:
             ttl = int(expires_in) - CCI_TOKEN_REFRESH_MARGIN_SECONDS
         else:
             ttl = 3600 - CCI_TOKEN_REFRESH_MARGIN_SECONDS
-        ccs_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
+        service_valid_until = dt.datetime.now(dt.UTC) + dt.timedelta(
             seconds=max(ttl, CCI_TOKEN_ROTATION_FLOOR_SECONDS)
         )
-        return ccs_token, ccs_valid_until
+        return service_token, service_valid_until

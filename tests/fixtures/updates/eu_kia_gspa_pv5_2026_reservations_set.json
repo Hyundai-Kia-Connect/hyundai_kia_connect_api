@@ -2,7 +2,9 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_gspa_pv5_2026_stored_status.json (Kia PV5 Passenger 2026)",
         "follow_up_sources": "none",
-        "not_captured": [],
+        "not_captured": [
+            "DI /vehicle/{vin} supportedFeatures (503 answered \u2014 no capture for this car; the DI-client PR's exchange response is the shared capture)"
+        ],
         "description": "Status response from the PV5 reservations-set status fixture (run-23 Reservation block, kia_uvo discussion #1145); location/stored-status from the reporter capture (lib PR #1331), coordinates redacted before sharing."
     },
     "implementation": {
@@ -37,6 +39,13 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "POST /auth/v1/token-exchange": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_token_exchange.json"
+        },
+        "GET /v0100/vehicle/TESTVIN0000000001": {
+            "status": 503,
+            "body": null
         }
     }
 }
