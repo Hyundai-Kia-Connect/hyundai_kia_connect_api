@@ -228,18 +228,11 @@ class TestGetPinTokenErrors:
             },
         )
         with pytest.raises(expected_class, match="rejected"):
-            api._get_pin_token(
-                Token(username="u", password="p", pin="1234"), Vehicle(id="v1")
-            )
+            api._get_pin_token(Token(username="u", password="p", pin="1234"))
 
     def test_success_returns_pauth(self, api):
         self._pin_response(
             api,
             {"responseHeader": {"responseCode": 0}, "result": {"pAuth": "PT"}},
         )
-        assert (
-            api._get_pin_token(
-                Token(username="u", password="p", pin="1234"), Vehicle(id="v1")
-            )
-            == "PT"
-        )
+        assert api._get_pin_token(Token(username="u", password="p", pin="1234")) == "PT"

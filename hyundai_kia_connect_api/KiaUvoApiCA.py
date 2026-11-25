@@ -250,6 +250,7 @@ _CA_APP_HEADERS: dict[str, str | None] = {
     "Accept-Encoding": "gzip, deflate",
     "Content-Type": "application/json;charset=UTF-8",
     "from": "SPA",
+    "brand": "H",
     "offset": "-5",
     "language": "0",
     "client_id": "HATAHSPACA0232141ED9722C67715A0B",
@@ -1281,7 +1282,7 @@ class KiaUvoApiCA(ApiImpl):
         if BRANDS[self.brand] != BRAND_HYUNDAI:
             headers["Referer"] = f"https://{self.BASE_URL}/remote/"
         try:
-            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            headers["pAuth"] = self._get_pin_token(token)
             response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
             response = response.json()
             _LOGGER.debug(f"{DOMAIN} - Get Vehicle Location {response}")
@@ -1292,11 +1293,12 @@ class KiaUvoApiCA(ApiImpl):
             _LOGGER.warning(f"{DOMAIN} - Get vehicle location failed")
             return None
 
-    def _get_pin_token(self, token: Token, vehicle: Vehicle) -> str:
+    def _get_pin_token(self, token: Token) -> str:
         url = self.API_URL + "vrfypin"
+        # App shape (myHyundai CA getOnlyAccessTokenHeader, Genesis CA c.f):
+        # accessToken only, no vehicleId.
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
         response = self.sessions.post(url, headers=headers, json={"pin": token.pin})
         response_json = response.json()
         _LOGGER.debug(f"{DOMAIN} - Received Pin validation response {response_json}")
@@ -1316,7 +1318,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -1338,7 +1340,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
 
         if options.climate is None:
             options.climate = True
@@ -1456,7 +1458,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -1485,7 +1487,7 @@ class KiaUvoApiCA(ApiImpl):
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
         headers["transactionId"] = action_id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
         response = self.sessions.post(url, headers=headers)
         response = response.json()
 
@@ -1528,7 +1530,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
         data = json.dumps({"pin": token.pin})
         _LOGGER.debug(
             f"{DOMAIN} - Planned start_charge payload {self._mask_sensitive_data(data)}"
@@ -1548,7 +1550,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
 
         response = self.sessions.post(
             url, headers=headers, data=json.dumps({"pin": token.pin})
@@ -1599,7 +1601,7 @@ class KiaUvoApiCA(ApiImpl):
         headers = self.API_HEADERS.copy()
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
+        headers["pAuth"] = self._get_pin_token(token)
         # setsoc expects the SPA channel plus portal extras on kiaconnect (Hyundai-Kia-Connect/kia_uvo#957)
         headers["from"] = "SPA"
         if BRANDS[self.brand] != BRAND_HYUNDAI:
