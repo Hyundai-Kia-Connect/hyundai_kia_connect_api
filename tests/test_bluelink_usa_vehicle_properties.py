@@ -209,3 +209,43 @@ def test_bluelink_trip_without_distance_does_not_abort_update(bluelink_api, vehi
     )
     assert vehicle.daily_stats[0].distance is None
     assert vehicle.data["filled_trips"][0].distance is None
+
+
+def _trip(startdate: str, distance: float | None = None) -> dict:
+    trip = {
+        "startdate": startdate,
+        "mileagetime": {"value": 600},
+        "duration": {"value": 900},
+        "avgspeed": {"value": 30.0},
+        "maxspeed": {"value": 55},
+    }
+    if distance is not None:
+        trip["distance"] = distance
+    return trip
+
+
+@pytest.mark.parametrize(
+    ("distances", "expected"),
+    [
+        ((4.0, None, 2.5), 6.5),
+        ((None, 4.0), 4.0),
+        ((None, None), None),
+    ],
+)
+def test_bluelink_trip_summaries_skip_trips_without_distance(
+    bluelink_api, vehicle, distances, expected
+):
+    """A trip with no `distance` (#1623) must not break the month/day summaries."""
+    trips = [
+        _trip(f"2026-11-19 1{hour}:25:00.0", distance)
+        for hour, distance in enumerate(distances)
+    ]
+    bluelink_api._update_vehicle_properties(
+        vehicle, {"evTripDetails": {"tripdetails": trips}}
+    )
+
+    bluelink_api.update_month_trip_info(None, vehicle, "202611")
+    bluelink_api.update_day_trip_info(None, vehicle, "20261119")
+
+    assert vehicle.month_trip_info.summary.distance == expected
+    assert vehicle.day_trip_info.summary.distance == expected
