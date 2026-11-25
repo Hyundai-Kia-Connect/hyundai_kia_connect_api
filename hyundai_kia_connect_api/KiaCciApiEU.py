@@ -17,6 +17,7 @@ vehicle confirm their payload shapes.
 import logging
 from typing import Any
 
+from .driving_insight_eu import DrivingInsightMixin
 from .exceptions import APIError
 from .GspaApiEU import GspaApiEU
 from .mqtt_service_hub_eu import MqttServiceHubMixin
@@ -26,7 +27,7 @@ from .Vehicle import Vehicle
 _LOGGER = logging.getLogger(__name__)
 
 
-class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
+class KiaCciApiEU(DrivingInsightMixin, MqttServiceHubMixin, GspaApiEU):
     """Kia EU CCI/GSPA API.
 
     Uses the CCI login flow (OneApp client_id 01b36c86) confirmed on
@@ -125,6 +126,11 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
     REQUEST_ID_HEADER = "X-Request-Id"
     DEVICE_ID_HEADER = "X-Userdevice-Id"
 
+    # Driving Insight reads, live-verified on a PV5 by the #1319/#1320
+    # reporter.
+    DI_BASE_URL = "https://apigw-eu.hmg-corp.io/di-kia-eu/v0100"
+    DRIVING_INSIGHT_VERIFIED = True
+
     def update_vehicle_with_cached_state(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch GSPA stored-status and update vehicle properties.
 
@@ -142,6 +148,7 @@ class KiaCciApiEU(MqttServiceHubMixin, GspaApiEU):
         if not data:
             raise APIError("GSPA stored-status returned no data")
         self._apply_stored_status(token, vehicle, data)
+        self._update_di_data(token, vehicle)
 
     # ------------------------------------------------------------------
     # Door control (Kia per-action endpoints)

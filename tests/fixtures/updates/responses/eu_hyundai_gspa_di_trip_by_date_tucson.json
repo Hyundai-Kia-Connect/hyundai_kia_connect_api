@@ -1,0 +1,66 @@
+{
+    "transactionId": "TEST-TRANSACTION-4",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "summary": {
+            "date": "20261115",
+            "totalDrvDist": 57.400146484375,
+            "totalDrvTime": 64,
+            "safetyDrvScore": null,
+            "safetyDrvScoreDiff": 0
+        },
+        "content": [
+            {
+                "id": 3095631213,
+                "ignOnTime": "2026-11-15T12:58:38+02:00",
+                "ignOffTime": "2026-11-15T13:02:46+02:00",
+                "drvDist": 2.0,
+                "drvTime": 4,
+                "avgSpeed": 32.0,
+                "maxSpeed": 68.0,
+                "idleTime": 0,
+                "evEnergyUsage": null,
+                "tags": []
+            },
+            {
+                "id": 3095445279,
+                "ignOnTime": "2026-11-15T12:12:20+02:00",
+                "ignOffTime": "2026-11-15T12:36:32+02:00",
+                "drvDist": 26.300048828125,
+                "drvTime": 24,
+                "avgSpeed": 73.0,
+                "maxSpeed": 127.0,
+                "idleTime": 1,
+                "evEnergyUsage": null,
+                "tags": []
+            },
+            {
+                "id": 3095197451,
+                "ignOnTime": "2026-11-15T11:34:54+02:00",
+                "ignOffTime": "2026-11-15T12:10:53+02:00",
+                "drvDist": 29.10009765625,
+                "drvTime": 35,
+                "avgSpeed": 52.0,
+                "maxSpeed": 132.0,
+                "idleTime": 0,
+                "evEnergyUsage": null,
+                "tags": []
+            },
+            {
+                "id": 3094984191,
+                "ignOnTime": "2026-11-15T11:20:51+02:00",
+                "ignOffTime": "2026-11-15T11:21:02+02:00",
+                "drvDist": 0.0,
+                "drvTime": 0,
+                "avgSpeed": 1.0,
+                "maxSpeed": 3.0,
+                "idleTime": 0,
+                "evEnergyUsage": null,
+                "tags": []
+            }
+        ],
+        "pageInfo": null
+    }
+}

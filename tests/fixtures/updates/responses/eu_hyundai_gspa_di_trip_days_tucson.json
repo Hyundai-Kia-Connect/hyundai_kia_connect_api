@@ -1,0 +1,134 @@
+{
+    "transactionId": "TEST-TRANSACTION-3",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "recentTripDate": "20261115",
+        "tripDays": {
+            "month": "202611",
+            "trips": [
+                {
+                    "day": 1,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 2,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 3,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 4,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 5,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 6,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 7,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 8,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 9,
+                    "tripCnt": 5
+                },
+                {
+                    "day": 10,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 11,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 12,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 13,
+                    "tripCnt": 5
+                },
+                {
+                    "day": 14,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 15,
+                    "tripCnt": 4
+                },
+                {
+                    "day": 16,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 17,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 18,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 19,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 20,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 21,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 22,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 23,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 24,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 25,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 26,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 27,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 28,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 29,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 30,
+                    "tripCnt": 0
+                }
+            ]
+        }
+    }
+}

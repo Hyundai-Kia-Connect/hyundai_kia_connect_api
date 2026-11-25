@@ -238,6 +238,12 @@ class Vehicle:
     tire_pressure_front_right: float | None = None
     tire_pressure_rear_left: float | None = None
     tire_pressure_rear_right: float | None = None
+    # Driving Insight (DI) supportedFeatures (/vehicle/{vin}, EU CCI) —
+    # None = never read; [] = read, no features enabled for the vehicle.
+    driving_insight_supported_features: list[str] | None = None
+    # When the DI tire/bound read filled the pressures (the car's own
+    # TPMS upload time, car-local clock); only set alongside DI values.
+    tire_pressure_last_updated_at: datetime.datetime | None = None
     # Tire-pressure display unit (PressureUnit IntEnum). Single source of truth;
     # the per-tire *_unit properties below derive the label from this (no
     # duplicate storage). HA entities read tire_pressure_<pos>_unit for

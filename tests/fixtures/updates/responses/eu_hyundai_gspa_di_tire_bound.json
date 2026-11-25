@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "source": "live DI read on a Hyundai Santa Fe HEV 2026 (EU CCI), blka, 2026-11-23, during issue #1319/#1320 implementation; ids/tokens redacted"
+    },
+    "status": "success",
+    "transactionId": "269766e5-afa3-480f-b689-7faf24323d5b",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "agreeDt": "2026.05.23 09:57:53",
+        "specType": "hev",
+        "cars": "MX5",
+        "mdy": "2026",
+        "ignOnTime": "20261117120333",
+        "ignOffTime": "20261117121629",
+        "tripLength": 540,
+        "drvDistance": 3.7017188,
+        "normalTime": 72.0,
+        "firstFl": 2.3,
+        "firstFr": 2.3,
+        "firstRl": 2.3,
+        "firstRr": 2.3,
+        "firstUnit": 2,
+        "cstaAvg": 8.180222,
+        "tireTime": "20261117120445",
+        "scoreTime": "20261123131000",
+        "flBound": "inbound",
+        "frBound": "inbound",
+        "rlBound": "inbound",
+        "rrBound": "inbound",
+        "unsupported": false
+    }
+}

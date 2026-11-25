@@ -1,0 +1,12 @@
+{
+    "_fixture_meta": {
+        "source": "trip captures from the same live DI session (Hyundai Santa Fe HEV 2026 EU CCI, blka 2026-11-23); trip ids redacted"
+    },
+    "transactionId": "4a76f1d2-3313-48fe-8cdc-e73ac0ddd738",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "value": 4356
+    }
+}

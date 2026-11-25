@@ -1,0 +1,30 @@
+{
+    "transactionId": "TEST-TRANSACTION-2",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "agreeDt": "2026.05.25 20:48:41",
+        "specType": "phev",
+        "cars": "NX4",
+        "mdy": "2025",
+        "ignOnTime": "20261115115835",
+        "ignOffTime": "20261115120245",
+        "tripLength": 247,
+        "drvDistance": 2.020599,
+        "normalTime": 85.0,
+        "firstFl": 2.3,
+        "firstFr": 2.2,
+        "firstRl": 2.3,
+        "firstRr": 2.3,
+        "firstUnit": 2,
+        "cstaAvg": 8.59879,
+        "tireTime": "20261115120000",
+        "scoreTime": "20261124145000",
+        "flBound": "inbound",
+        "frBound": "inbound",
+        "rlBound": "inbound",
+        "rrBound": "inbound",
+        "unsupported": false
+    }
+}

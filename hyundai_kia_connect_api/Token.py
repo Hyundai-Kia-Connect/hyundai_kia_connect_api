@@ -39,6 +39,10 @@ class Token:
     #   Token.mqtt_client_id    = device/client registration id (token level)
     #   Vehicle.mqtt_vehicle_id = per-vehicle topic id (vehicle level)
     mqtt_client_id: str | None = None
+    # Driving Insight (DI) token — token-exchange ?serviceType=DI (EU CCI).
+    # Separate token family from the CCS token; same exchange endpoint.
+    di_access_token: str | None = None
+    di_token_valid_until: dt.datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert Token to a JSON‑serializable dict."""
@@ -46,6 +50,8 @@ class Token:
 
         # Convert datetimes to ISO strings
         data["valid_until"] = self.valid_until.isoformat()
+        if self.di_token_valid_until:
+            data["di_token_valid_until"] = self.di_token_valid_until.isoformat()
 
         return data
 
@@ -56,6 +62,9 @@ class Token:
         valid_until = data.get("valid_until", dt.datetime.min)
         if isinstance(valid_until, str):
             valid_until = dt.datetime.fromisoformat(valid_until)
+        di_token_valid_until = data.get("di_token_valid_until")
+        if isinstance(di_token_valid_until, str):
+            di_token_valid_until = dt.datetime.fromisoformat(di_token_valid_until)
 
         return cls(
             username=data["username"],
@@ -76,4 +85,6 @@ class Token:
             id_token=data.get("id_token"),
             user_id=data.get("user_id"),
             mqtt_client_id=data.get("mqtt_client_id"),
+            di_access_token=data.get("di_access_token"),
+            di_token_valid_until=di_token_valid_until,
         )
