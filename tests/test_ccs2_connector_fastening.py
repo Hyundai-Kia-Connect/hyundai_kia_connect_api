@@ -119,3 +119,12 @@ class TestHyundaiLegacyNoLockBlock:  # trio gated to Hyundai, see module docstri
         )
         _type1_api_of_brand(2)._update_vehicle_properties_ccs2(vehicle, state)
         assert vehicle.ev_battery_is_plugged_in is None
+
+    def test_absent_charging_state_reads_unplugged(self, state):
+        # IONIQ 5 Green profile omits Charging.State
+        # (Hyundai-Kia-Connect/kia_uvo#2143); Fastening 0 still tracks the
+        # cable on Hyundai legacy CCS2.
+        state["Green"]["ChargingInformation"]["Charging"].pop("State", None)
+        vehicle = Vehicle(id="test-id")
+        _type1_api_of_brand(2)._update_vehicle_properties_ccs2(vehicle, state)
+        assert vehicle.ev_battery_is_plugged_in is False

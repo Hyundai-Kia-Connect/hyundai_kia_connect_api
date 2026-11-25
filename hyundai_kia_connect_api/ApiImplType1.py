@@ -1101,13 +1101,16 @@ class ApiImplType1(ApiImpl):
             vehicle.ev_connector_fastening_state
             is CONNECTOR_FASTENING_STATE.DISCONNECTED
             and lock_raw is None
-            and get_child_value(state, "Green.ChargingInformation.Charging.State") == 0
+            and get_child_value(state, "Green.ChargingInformation.Charging.State")
+            in (0, None)
             and BRANDS.get(getattr(self, "brand", 0)) == BRAND_HYUNDAI
         ):
             # Hyundai EU legacy CCS2 omits Green.ChargingConnector; on this
             # platform Fastening 0 tracks the cable (Tucson PHEV, #1613).
-            # Kia reads 0 for a plugged idle connector (Hyundai-Kia-Connect/
-            # kia_uvo#1495), so the Hyundai brand gate stays.
+            # Charging.State is absent on the IONIQ 5 profile too
+            # (Hyundai-Kia-Connect/kia_uvo#2143). Kia reads 0 for a plugged
+            # idle connector (Hyundai-Kia-Connect/kia_uvo#1495), so the
+            # Hyundai brand gate stays.
             vehicle.ev_battery_is_plugged_in = False
         else:
             vehicle.ev_battery_is_plugged_in = None
