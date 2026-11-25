@@ -2,8 +2,10 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_gspa_pv5_2026_stored_status.json (Kia PV5 Passenger 2026)",
         "follow_up_sources": "none",
-        "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. The PV5 status tree carries no Location node, so the cached update also reads location/stored-status — response from the reporter capture (lib PR #1331), coordinates redacted before sharing."
+        "not_captured": [
+            "DI /vehicle/{vin} supportedFeatures (503 answered \u2014 no capture for this car; the DI-client PR's exchange response is the shared capture)"
+        ],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. The PV5 status tree carries no Location node, so the cached update also reads location/stored-status \u2014 response from the reporter capture (lib PR #1331), coordinates redacted before sharing."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -37,6 +39,13 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "POST /auth/v1/token-exchange": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_token_exchange.json"
+        },
+        "GET /v0100/vehicle/TESTVIN0000000001": {
+            "status": 503,
+            "body": null
         }
     }
 }

@@ -3,10 +3,11 @@
         "status": "captured in kia_uvo discussion #1909; eu_hyundai_gspa_ioniq_6_2023_stored_status",
         "follow_up_sources": "none",
         "not_captured": [
-            "gspa driving-info/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa driving-history/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa device-info/vehicles/{carId}/software-version (no capture — answered 503; the update path logs and continues)",
-            "gspa mru/vehicles/{carId}/ota-updates (no capture — answered 503; the update path logs and continues)"
+            "gspa driving-info/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa driving-history/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa device-info/vehicles/{carId}/software-version (no capture \u2014 answered 503; the update path logs and continues)",
+            "gspa mru/vehicles/{carId}/ota-updates (no capture \u2014 answered 503; the update path logs and continues)",
+            "DI /vehicle/{vin} supportedFeatures (503 answered \u2014 no capture for this car; the DI-client PR's exchange response is the shared capture)"
         ],
         "description": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Hyundai Ioniq 6 2023, ?, EU), captured by the kia_uvo #1909 volunteer diagnostic runs (snigehere 17.10). Coordinates zeroed and VIN-like ids replaced with placeholders; the data/metaInfo envelope is rebuilt because the script saved the unwrapped payload.",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/discussions/1909 (snigehere 17.10)"
@@ -398,6 +399,13 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "POST /auth/v1/token-exchange": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_token_exchange.json"
+        },
+        "GET /v0100/vehicle/TESTVIN0000000001": {
+            "status": 503,
+            "body": null
         }
     }
 }

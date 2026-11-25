@@ -2,8 +2,10 @@
     "_fixture_meta": {
         "status": "tests/fixtures/eu_kia_gspa_ev6_2024_stored_status.json (Kia EV6 2024)",
         "follow_up_sources": "none",
-        "not_captured": [],
-        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. Location.GeoCoord is overridden with synthetic coordinates to reflect the real EV6 payload — the base fixture redacts it wholesale, and without a location the cached update would take the location stored-status fallback read."
+        "not_captured": [
+            "DI /vehicle/{vin} supportedFeatures (503 answered \u2014 no capture for this car; the DI-client PR's exchange response is the shared capture)"
+        ],
+        "description": "Status response from the existing status fixture; follow-up reads from real captures in updates/responses. Location.GeoCoord is overridden with synthetic coordinates to reflect the real EV6 payload \u2014 the base fixture redacts it wholesale, and without a location the cached update would take the location stored-status fallback read."
     },
     "implementation": {
         "region": "Europe (CCI/GSPA)",
@@ -44,6 +46,13 @@
                     "resCode": "200-000"
                 }
             }
+        },
+        "POST /auth/v1/token-exchange": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_token_exchange.json"
+        },
+        "GET /v0100/vehicle/TESTVIN0000000001": {
+            "status": 503,
+            "body": null
         }
     }
 }

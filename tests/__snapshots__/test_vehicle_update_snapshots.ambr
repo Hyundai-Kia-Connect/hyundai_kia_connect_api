@@ -1779,6 +1779,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2037,6 +2042,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
@@ -2297,6 +2307,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -2554,6 +2569,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
@@ -2813,6 +2833,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
@@ -3077,6 +3102,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -3330,6 +3360,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.hyundai.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-hyundai-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
@@ -11219,6 +11254,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.kia.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-kia-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -11461,6 +11501,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.kia.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-kia-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -11688,6 +11733,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.kia.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-kia-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
@@ -11938,6 +11988,11 @@
         'method': 'POST',
         'url': 'https://cci-api-eu.kia.com/auth/v1/token-exchange',
       }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-kia-eu/v0100/vehicle/TESTVIN0000000001',
+      }),
     ]),
     'vehicle': dict({
       'VIN': 'TESTVIN0000000001',
@@ -12176,6 +12231,11 @@
         'json': None,
         'method': 'POST',
         'url': 'https://cci-api-eu.kia.com/auth/v1/token-exchange',
+      }),
+      dict({
+        'json': None,
+        'method': 'GET',
+        'url': 'https://apigw-eu.hmg-corp.io/di-kia-eu/v0100/vehicle/TESTVIN0000000001',
       }),
     ]),
     'vehicle': dict({
