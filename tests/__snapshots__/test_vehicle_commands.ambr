@@ -338,6 +338,54 @@
     ]),
   })
 # ---
+# name: test_legacy_climate_seat_options_gated[eu_kia-options0-supports0]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'wheelHeating': 2,
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
+# name: test_legacy_climate_seat_options_gated[eu_kia-options1-supports1]
+  dict({
+    'action_id': 'MSG-1',
+    'requests': list([
+      dict({
+        'body': dict({
+          'action': 'start',
+          'hvacType': 0,
+          'options': dict({
+            'defrost': False,
+            'heating1': 0,
+            'igniOnDuration': 10,
+            'seatHeaterVentCMD': dict({
+              'rlSeatOptCmd': 1,
+            }),
+          }),
+          'tempCode': '0EH',
+          'unit': 'C',
+        }),
+        'method': 'POST',
+        'url': 'https://prd.eu-ccapi.kia.com:8080/api/v1/spa/vehicles/VEHICLE-ID/control/temperature',
+      }),
+    ]),
+  })
+# ---
 # name: test_vehicle_command[au_hyundai-lock]
   dict({
     'action_id': 'MSG-1',

@@ -49,12 +49,15 @@ from .exceptions import (
 )
 from .Token import Token
 from .utils import (
+    LEGACY_SPA_APPS,
     distance_with_unit,
     get_child_value,
     get_hex_temp_into_index,
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
+    parse_vehicle_profile_duration,
+    parse_vehicle_profile_seat_heaters,
 )
 from .Vehicle import (
     Vehicle,
@@ -101,36 +104,20 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
         self.LANGUAGE: str = language
         self.brand: int = brand
 
-        if BRANDS[self.brand] == BRAND_KIA:
-            self.BASE_DOMAIN: str = "prd.eu-ccapi.kia.com"
-            self.PORT: int = 8080
-            self.CCSP_SERVICE_ID: str = "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a"
-            self.APP_ID: str = "a2b8469b-30a3-4361-8e13-6fceea8fbe74"
-            self.CFB = base64.b64decode(
-                "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
-            )
-            self.LOGIN_FORM_HOST = "https://idpconnect-eu.kia.com"
-            self.PUSH_TYPE = "APNS"
-        elif BRANDS[self.brand] == BRAND_HYUNDAI:
-            self.BASE_DOMAIN = "prd.eu-ccapi.hyundai.com"
-            self.PORT = 8080
-            self.CCSP_SERVICE_ID = "6d477c38-3ca4-4cf3-9557-2a1929a94654"
-            self.APP_ID = "014d2225-8495-4735-812d-2616334fd15d"
-            self.CFB = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
-            )
-            self.LOGIN_FORM_HOST = "https://idpconnect-eu.hyundai.com"
-            self.PUSH_TYPE = "GCM"
-        elif BRANDS[self.brand] == BRAND_GENESIS:
-            self.BASE_DOMAIN = "prd-eu-ccapi.genesis.com"
-            self.PORT = 443
-            self.CCSP_SERVICE_ID = "3020afa2-30ff-412a-aa51-d28fbe901e10"
-            self.APP_ID = "f11f2b86-e0e7-4851-90df-5600b01d8b70"
-            self.CFB = base64.b64decode(
-                "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
-            )
-            self.LOGIN_FORM_HOST = "https://idpconnect-eu.genesis.com"
-            self.PUSH_TYPE = "GCM"
+        (
+            self.CCSP_SERVICE_ID,
+            self.APP_ID,
+            self.CFB,
+            self.PUSH_TYPE,
+            self.BASE_DOMAIN,
+            self.PORT,
+        ) = LEGACY_SPA_APPS[BRANDS[self.brand]]
+        login_form_hosts: dict[str, str] = {
+            BRAND_KIA: "https://idpconnect-eu.kia.com",
+            BRAND_HYUNDAI: "https://idpconnect-eu.hyundai.com",
+            BRAND_GENESIS: "https://idpconnect-eu.genesis.com",
+        }
+        self.LOGIN_FORM_HOST = login_form_hosts[BRANDS[self.brand]]
 
         self.BASE_URL: str = self.BASE_DOMAIN + ":" + str(self.PORT)
         self.USER_API_URL: str = "https://" + self.BASE_URL + "/api/v1/user/"
@@ -532,6 +519,25 @@ class KiaUvoApiEU(CciAuthMixin, ApiImplType1):
                 )
             else:
                 self._update_vehicle_drive_info(vehicle, state)
+
+    def parse_vehicle_profile(self, token: Token, vehicle: Vehicle) -> None:
+        """Legacy-SPA vehicle profile — the only source of clmtCtrlOption."""
+        url = self.SPA_API_URL + "vehicles/" + vehicle.id + "/profile"
+        response = self.session.get(
+            url,
+            headers=self._get_authenticated_headers(
+                token, vehicle.ccu_ccs2_protocol_support
+            ),
+        )
+        if response.status_code != 200:
+            _LOGGER.debug(
+                f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
+            )
+            return
+        profile = response.json()
+        _check_response_for_errors(profile)
+        parse_vehicle_profile_duration(vehicle, profile.get("resMsg"))
+        parse_vehicle_profile_seat_heaters(vehicle, profile.get("resMsg"))
 
     @_retry_on_device_id_error
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:

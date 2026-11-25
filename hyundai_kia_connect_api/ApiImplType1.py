@@ -1,6 +1,5 @@
 """ApiImplType1.py"""
 
-import base64
 import datetime as dt
 import functools
 import logging
@@ -8,7 +7,6 @@ import math
 import random
 import threading
 import time
-import uuid
 from collections.abc import Callable, Sequence
 from time import sleep
 from typing import Any, cast
@@ -41,6 +39,7 @@ from .const import (
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    USER_AGENT_OK_HTTP,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     PressureUnit,
@@ -67,6 +66,8 @@ from .utils import (
     get_hex_temp_into_index,
     get_index_into_hex_temp,
     int_or_none,
+    legacy_spa_registration_request,
+    legacy_spa_stamp,
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
@@ -83,8 +84,6 @@ from .Vehicle import (
     TripInfo,
     Vehicle,
 )
-
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1973,14 +1972,43 @@ class ApiImplType1(ApiImpl):
             if options.side_rear_mirror_heating is not None:
                 options_map["sideRearMirrorHeating"] = options.side_rear_mirror_heating
             seat_cmds = {}
-            for seat, level in (
-                ("drvSeatOptCmd", options.front_left_seat),
-                ("astSeatOptCmd", options.front_right_seat),
-                ("rlSeatOptCmd", options.rear_left_seat),
-                ("rrSeatOptCmd", options.rear_right_seat),
+            skipped: list[str] = []
+            for seat, level, support in (
+                (
+                    "drvSeatOptCmd",
+                    options.front_left_seat,
+                    vehicle.supports.remote_seat_heater_front_left,
+                ),
+                (
+                    "astSeatOptCmd",
+                    options.front_right_seat,
+                    vehicle.supports.remote_seat_heater_front_right,
+                ),
+                (
+                    "rlSeatOptCmd",
+                    options.rear_left_seat,
+                    vehicle.supports.remote_seat_heater_rear_left,
+                ),
+                (
+                    "rrSeatOptCmd",
+                    options.rear_right_seat,
+                    vehicle.supports.remote_seat_heater_rear_right,
+                ),
             ):
-                if level is not None:
-                    seat_cmds[seat] = level
+                if level is None:
+                    continue
+                # A False support flag comes from the vehicle profile
+                # (seatHeaterVent); None means unknown and the request
+                # keeps the pre-profile behavior.
+                if support is False:
+                    skipped.append(seat)
+                    continue
+                seat_cmds[seat] = level
+            if skipped:
+                _LOGGER.warning(
+                    f"{DOMAIN} - vehicle profile blocks remote control of "
+                    f"{', '.join(skipped)}; climate starts without them"
+                )
             if seat_cmds:
                 options_map["seatHeaterVentCMD"] = seat_cmds
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")
@@ -2252,30 +2280,21 @@ class ApiImplType1(ApiImpl):
         _ = self.session.post(url, json=payload, headers=headers, cookies=cookies)
 
     def _get_stamp(self) -> str:
-        raw_data = f"{self.APP_ID}:{int(dt.datetime.now().timestamp())}".encode()
-        result = bytes(b1 ^ b2 for b1, b2 in zip(self.CFB, raw_data))
-        return base64.b64encode(result).decode("utf-8")
+        return legacy_spa_stamp(self.CFB, self.APP_ID)
 
     def _get_device_id(self, stamp: str) -> str:
         my_hex = f"{random.randrange(10**80):064x}"
         registration_id = my_hex[:64]
         url = self.SPA_API_URL + "notifications/register"
-        payload = {
-            "pushRegId": registration_id,
-            "pushType": self.PUSH_TYPE,
-            "uuid": str(uuid.uuid4()),
-        }
-
-        headers = {
-            "ccsp-service-id": self.CCSP_SERVICE_ID,
-            "ccsp-application-id": self.APP_ID,
-            "Stamp": stamp,
-            "Content-Type": "application/json;charset=UTF-8",
-            "Host": self.BASE_URL,
-            "Connection": "Keep-Alive",
-            "Accept-Encoding": "gzip",
-            "User-Agent": USER_AGENT_OK_HTTP,
-        }
+        headers, payload = legacy_spa_registration_request(
+            self.BASE_URL,
+            self.APP_ID,
+            self.CFB,
+            self.CCSP_SERVICE_ID,
+            self.PUSH_TYPE,
+            registration_id,
+            stamp=stamp,
+        )
 
         _LOGGER.debug(f"{DOMAIN} - Get Device ID request: {url} {headers} {payload}")
         response = self.session.post(url, headers=headers, json=payload)

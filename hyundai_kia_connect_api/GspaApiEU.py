@@ -33,6 +33,7 @@ from .ApiImpl import (
     WindowRequestOptions,
     _fill_schedule_options_from_vehicle,
 )
+from .ApiImplType1 import _check_response_for_errors
 from .cci_auth import CciAuthMixin
 
 if TYPE_CHECKING:
@@ -42,6 +43,8 @@ from .cci_fingerprint import (
     is_gate_rejection,
 )
 from .const import (
+    BRAND_HYUNDAI,
+    BRAND_KIA,
     BRANDS,
     CHARGE_PORT_ACTION,
     CHARGING_CONNECTOR_LOCK_STATE,
@@ -55,6 +58,7 @@ from .const import (
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    USER_AGENT_OK_HTTP,
     VALET_MODE_ACTION,
     VEHICLE_LOCK_ACTION,
     WINDOW_STATE,
@@ -89,16 +93,20 @@ from .svm import (
 )
 from .Token import Token
 from .utils import (
+    LEGACY_SPA_APPS,
     bool_or_none,
     ccs2_reservation_time_or_none,
     flag_or_none,
     float_or_none,
     get_child_value,
     int_or_none,
+    legacy_spa_registration_request,
+    legacy_spa_stamp,
     normalize_battery_soc,
     normalize_battery_soh,
     parse_datetime,
     parse_distance_unit,
+    parse_vehicle_profile_duration,
     pressure_or_none,
     refine_dte_distance,
 )
@@ -106,7 +114,6 @@ from .Vehicle import Vehicle
 
 _LOGGER = logging.getLogger(__name__)
 
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 USER_AGENT_MOZILLA: str = (
     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -377,6 +384,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # requests.Session keeping cookies across the Service Hub calls.
         self._service_hub_tid: str | None = None
         self._service_hub_session: requests.Session | None = None
+
+        # Legacy-SPA device id (registered on prd.eu-ccapi.*), needed by
+        # get_vehicle_profile; the CCI uuid is unknown to ccapi:8080.
+        self._legacy_spa_device_id: str = ""
 
         self.session = ApiImplSession()
 
@@ -1553,6 +1564,75 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         # stored-status endpoint is the only location source (#1331).
         if get_child_value(state, "Location.GeoCoord.Latitude") is None:
             self._update_vehicle_gspa_location(token, vehicle)
+
+    def parse_vehicle_profile(self, token: Token, vehicle: Vehicle) -> None:
+        """Legacy-SPA vehicle profile — the only source of clmtCtrlOption.
+
+        Served with a legacy-SPA device id (registered lazily on
+        prd.eu-ccapi.*) and the CCS token, which ccapi:8080 accepts after
+        the exchange in the CCI login chain. Genesis has no verified
+        legacy-SPA profile read, so those cars are skipped.
+        """
+        if BRANDS[self.brand] not in (BRAND_KIA, BRAND_HYUNDAI):
+            return
+        params = LEGACY_SPA_APPS[BRANDS[self.brand]]
+        host, port = params[4], params[5]
+        response = self.session.get(
+            f"https://{host}:{port}/api/v1/spa/vehicles/{vehicle.id}/profile",
+            headers=self._get_legacy_profile_headers(token, vehicle, params),
+        )
+        if response.status_code != 200:
+            _LOGGER.debug(
+                f"{DOMAIN} - vehicle profile failed: HTTP {response.status_code}"
+            )
+            return
+        profile = response.json()
+        _check_response_for_errors(profile)
+        parse_vehicle_profile_duration(vehicle, profile.get("resMsg"))
+
+    def _get_legacy_profile_headers(
+        self,
+        token: Token,
+        vehicle: Vehicle,
+        params: tuple[str, str, bytes, str, str, int],
+    ) -> dict[str, Any]:
+        legacy_service_id, legacy_app_id, cfb, _push_type, host, port = params
+        return {
+            "Authorization": token.access_token,
+            "ccsp-service-id": legacy_service_id,
+            "ccsp-application-id": legacy_app_id,
+            "Stamp": legacy_spa_stamp(cfb, legacy_app_id),
+            "ccsp-device-id": self._get_legacy_spa_device_id(),
+            "Host": f"{host}:{port}",
+            "Connection": "Keep-Alive",
+            "Accept-Encoding": "gzip",
+            "Ccuccs2protocolsupport": str(vehicle.ccu_ccs2_protocol_support or 0),
+            "User-Agent": USER_AGENT_OK_HTTP,
+        }
+
+    def _get_legacy_spa_device_id(self) -> str:
+        if not self._legacy_spa_device_id:
+            params = LEGACY_SPA_APPS[BRANDS[self.brand]]
+            host, port = params[4], params[5]
+            base_url = f"{host}:{port}"
+            headers, payload = legacy_spa_registration_request(
+                base_url,
+                params[1],
+                params[2],
+                params[0],
+                params[3],
+                str(uuid.uuid4())[:64],
+            )
+            response = self.session.post(
+                f"https://{base_url}/api/v1/spa/notifications/register",
+                headers=headers,
+                json=payload,
+            )
+            response_json = response.json() if response.status_code == 200 else {}
+            self._legacy_spa_device_id = response_json.get("resMsg", {}).get(
+                "deviceId", ""
+            )
+        return self._legacy_spa_device_id
 
     def _get_location_stored_status(
         self, token: Token, vehicle: Vehicle

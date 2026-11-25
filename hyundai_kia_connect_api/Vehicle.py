@@ -80,7 +80,11 @@ class DailyDrivingStats:
 
 @dataclass
 class VehicleSupports:
-    """Whether the vehicle supports each VehicleManager call; ``None`` is unknown."""
+    """Whether the vehicle supports a feature; ``None`` is unknown.
+
+    Mostly gates :class:`VehicleManager` calls, but some items exist for
+    the Home Assistant integration to gate entities on; those say so.
+    """
 
     # VehicleManager.set_windows_state
     window_control: bool | None = None
@@ -88,6 +92,8 @@ class VehicleSupports:
     valet_mode: bool | None = None
     # VehicleManager.get_svm_details / request_svm_capture
     svm: bool | None = None
+    # From the legacy-SPA profile option: clmtCtrlOption == 1.
+    climate_duration_setting: bool | None = None
     # Service Hub registration + the receive-only MQTT broker
     mqtt_push: bool | None = None
     # device.closeremote.precondition protocol (push metadata hu entry)
@@ -98,6 +104,13 @@ class VehicleSupports:
     ota_progress: bool | None = None
     # vehicle.ota.scheduleupdate protocol
     schedule_update: bool | None = None
+    # From the legacy-SPA profile option seatHeaterVent: a seat value of
+    # 0 or 7 means the seat cannot be reached by remote climate; any
+    # other value doubles as the legacy command level (kia_uvo #2121).
+    remote_seat_heater_front_left: bool | None = None
+    remote_seat_heater_front_right: bool | None = None
+    remote_seat_heater_rear_left: bool | None = None
+    remote_seat_heater_rear_right: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -217,8 +230,10 @@ class Vehicle:
     # _ota_checked: True after the first OTA check (no re-check until force
     # refresh); _valet_failed: True after a failed valet read, so later
     # polls skip it until force refresh resets it.
+    # _profile_checked: one-shot legacy-SPA profile read (stable per car).
     _ota_checked: bool = False
     _valet_failed: bool = False
+    _profile_checked: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).

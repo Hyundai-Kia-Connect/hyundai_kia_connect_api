@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions
 from .ApiImplType1 import (
-    USER_AGENT_OK_HTTP,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -26,6 +25,7 @@ from .const import (
     SEAT_LOCATION,
     SEAT_STATUS,
     TEMPERATURE_UNITS,
+    USER_AGENT_OK_HTTP,
 )
 from .exceptions import AuthenticationError
 from .Token import Token

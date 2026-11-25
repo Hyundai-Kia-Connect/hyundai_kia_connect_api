@@ -26,6 +26,7 @@ from .const import (
     CCI_TOKEN_REFRESH_MARGIN_SECONDS,
     CCI_TOKEN_ROTATION_FLOOR_SECONDS,
     DOMAIN,
+    USER_AGENT_OK_HTTP,
 )
 from .exceptions import (
     AuthenticationCciTokenExchangeError,
@@ -33,8 +34,6 @@ from .exceptions import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-USER_AGENT_OK_HTTP: str = "okhttp/3.12.0"
 
 
 class CciAuthMixin:
