@@ -1,8 +1,10 @@
 """utils.py"""
 
+import base64
 import datetime
 import logging
 import re
+import uuid
 from collections.abc import Sequence
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any
@@ -10,9 +12,91 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .Vehicle import Vehicle
 
-from .const import DISTANCE_UNITS
+from .const import (
+    BRAND_GENESIS,
+    BRAND_HYUNDAI,
+    BRAND_KIA,
+    DISTANCE_UNITS,
+    USER_AGENT_OK_HTTP,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+# Legacy-SPA ccapi identity per brand — service id, app id, CFB, push type,
+# host, port. Single source for the KiaUvoApiEU login/profile headers and
+# the GSPA reads that mint a legacy-SPA device id on ccapi:8080; one place
+# to fix an app-key rotation (kia_uvo#2063, kia_uvo#2121).
+LEGACY_SPA_APPS: dict[str, tuple[str, str, bytes, str, str, int]] = {
+    BRAND_KIA: (
+        "fdc85c00-0a2f-4c64-bcb4-2cfb1500730a",
+        "a2b8469b-30a3-4361-8e13-6fceea8fbe74",
+        base64.b64decode(
+            "wLTVxwidmH8CfJYBWSnHD6E0huk0ozdiuygB4hLkM5XCgzAL1Dk5sE36d/bx5PFMbZs="
+        ),
+        "APNS",
+        "prd.eu-ccapi.kia.com",
+        8080,
+    ),
+    BRAND_HYUNDAI: (
+        "6d477c38-3ca4-4cf3-9557-2a1929a94654",
+        "014d2225-8495-4735-812d-2616334fd15d",
+        base64.b64decode(
+            "RFtoRq/vDXJmRndoZaZQyfOot7OrIqGVFj96iY2WL3yyH5Z/pUvlUhqmCxD2t+D65SQ="
+        ),
+        "GCM",
+        "prd.eu-ccapi.hyundai.com",
+        8080,
+    ),
+    BRAND_GENESIS: (
+        "3020afa2-30ff-412a-aa51-d28fbe901e10",
+        "f11f2b86-e0e7-4851-90df-5600b01d8b70",
+        base64.b64decode(
+            "RFtoRq/vDXJmRndoZaZQyYo3/qFLtVReW8P7utRPcc0ZxOzOELm9mexvviBk/qqIp4A="
+        ),
+        "GCM",
+        "prd-eu-ccapi.genesis.com",
+        443,
+    ),
+}
+
+
+def legacy_spa_stamp(cfb: bytes, app_id: str) -> str:
+    """Stamp header value: base64 of CFB XOR app-id:epoch."""
+    raw_data = f"{app_id}:{int(datetime.datetime.now().timestamp())}".encode()
+    result = bytes(a ^ b for a, b in zip(cfb, raw_data))
+    return base64.b64encode(result).decode()
+
+
+def legacy_spa_registration_request(
+    base_url: str,
+    app_id: str,
+    cfb: bytes,
+    service_id: str,
+    push_type: str,
+    push_reg_id: str,
+    stamp: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Headers and payload for the legacy-SPA device register POST.
+
+    Callers own the POST and its error contract: KiaUvoApiEU._get_device_id
+    raises on a bad envelope, GspaApiEU falls back to an empty device id.
+    """
+    headers = {
+        "ccsp-service-id": service_id,
+        "ccsp-application-id": app_id,
+        "Stamp": stamp or legacy_spa_stamp(cfb, app_id),
+        "Content-Type": "application/json;charset=UTF-8",
+        "Host": base_url,
+        "Connection": "Keep-Alive",
+        "Accept-Encoding": "gzip",
+        "User-Agent": USER_AGENT_OK_HTTP,
+    }
+    payload = {
+        "pushRegId": push_reg_id,
+        "pushType": push_type,
+        "uuid": str(uuid.uuid4()),
+    }
+    return headers, payload
 
 
 def to_int_enum[T: IntEnum](
@@ -377,6 +461,31 @@ def parse_date_br(date_string: str, tz: datetime.timezone) -> datetime.datetime 
             )
 
     return None
+
+
+def parse_vehicle_profile_duration(vehicle: "Vehicle", profile: Any) -> None:
+    """Set ``vehicle.supports.climate_duration_setting`` from a profile payload.
+
+    The app gates the remote-climate duration picker on option
+    ``clmtCtrlOption == 1``; an absent key means unsupported. The option
+    block mixes string and int values between keys, so the level coerces
+    through ``int_or_none`` — an unparsable value logs and reads False.
+    """
+    entries = profile.get("vinInfo") if isinstance(profile, dict) else None
+    option = entries[0].get("option", {}) if entries else {}
+    if not isinstance(option, dict):
+        return
+    raw = option.get("clmtCtrlOption")
+    if raw is None:
+        # Absent key = unsupported, as the app gates the picker on it.
+        vehicle.supports.climate_duration_setting = False
+    else:
+        level = int_or_none(raw)
+        if level is None:
+            _LOGGER.debug("clmtCtrlOption unparsable (%r)", raw)
+            vehicle.supports.climate_duration_setting = None
+        else:
+            vehicle.supports.climate_duration_setting = level == 1
 
 
 def parse_vehicle_profile_seat_heaters(vehicle: "Vehicle", profile: Any) -> None:

@@ -27,8 +27,8 @@ from .const import (
     BRANDS,
     DOMAIN,
     MQTT_PUSH_CONNECTION_STATE,
+    USER_AGENT_OK_HTTP,
 )
-from .GspaApiEU import USER_AGENT_OK_HTTP
 from .mqtt_service_hub import (
     MQTT_PROTOCOL_ID_CCU_UPDATE,
     MQTT_PROTOCOL_ID_CONNECTION,

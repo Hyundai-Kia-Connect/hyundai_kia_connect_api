@@ -9,7 +9,6 @@ from zoneinfo import ZoneInfo
 
 from .ApiImpl import ApiImplSession, ClimateRequestOptions
 from .ApiImplType1 import (
-    USER_AGENT_OK_HTTP,
     ApiImplType1,
     _check_response_for_errors,
     _retry_on_device_id_error,
@@ -27,6 +26,7 @@ from .const import (
     REGION_NZ,
     REGIONS,
     SEAT_LOCATION,
+    USER_AGENT_OK_HTTP,
 )
 from .exceptions import AuthenticationError
 from .Token import Token
@@ -46,6 +46,12 @@ class KiaUvoApiAU(ApiImplType1):
     temperature_range = tuple(x * 0.5 for x in range(34, 54))
 
     DRIVING_INFO_ALLTIME_KEY: str = "drivingInfoDetail"
+
+    def _vehicle_from_spa_entry(self, entry: dict[str, Any]) -> Vehicle:
+        vehicle = super()._vehicle_from_spa_entry(entry)
+        # The AU backend applies ignitionDuration (kia_uvo#2063 reporter log).
+        vehicle.supports.climate_duration_setting = True
+        return vehicle
 
     def __init__(self, region: int, brand: int, language: str) -> None:
         super().__init__()
