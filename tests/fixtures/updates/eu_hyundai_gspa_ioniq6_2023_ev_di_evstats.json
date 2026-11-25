@@ -1,0 +1,397 @@
+{
+    "_fixture_meta": {
+        "status": "GSPA stored-status domain payload, Ioniq 6 2023 EV, EU CCI (UK)",
+        "follow_up_sources": "DI reads (token-exchange serviceType=DI) from the same live session",
+        "not_captured": [
+            "gspa mru ota-updates (live 404-007 for this car; the sweep saved the error wrapper only - answered 503)"
+        ],
+        "description": "EV stored-status + the DI energy/tire/trip reads gated by supportedFeatures (EV_BATTERY, EV_ENERGY_USAGE, TIRE_PRESSURE, TRIPS). Coordinates zeroed; ids redacted. The trip?date read answered a live 500 for this car and is answered from the capture."
+    },
+    "implementation": {
+        "region": "Europe (CCI/GSPA)",
+        "brand": "Hyundai"
+    },
+    "vehicle": {
+        "id": "VEHICLE-1",
+        "VIN": "TESTVIN0000000001",
+        "engine_type": "EV",
+        "ccu_ccs2_protocol_support": 0
+    },
+    "responses": {
+        "GET /gspa/v1/status/vehicles/VEHICLE-1/stored-status": {
+            "body": {
+                "data": {
+                    "serviceNo": "RVS-K",
+                    "lastUpdateTime": "1795436180618",
+                    "state": {
+                        "Vehicle": {
+                            "DrivingReady": 0,
+                            "Location": {
+                                "GeoCoord": {
+                                    "Latitude": 0.0,
+                                    "Longitude": 0.0,
+                                    "Type": 0,
+                                    "Altitude": 0
+                                },
+                                "Speed": {
+                                    "Value": 0,
+                                    "Unit": 0
+                                },
+                                "TimeStamp": {
+                                    "Year": 2026,
+                                    "Mon": 11,
+                                    "Day": 23,
+                                    "Hour": 12,
+                                    "Min": 16,
+                                    "Sec": 19
+                                },
+                                "Date": "20261123121619.000",
+                                "Offset": 0
+                            },
+                            "Body": {
+                                "Windshield": {
+                                    "Front": {
+                                        "Defog": {
+                                            "State": 0
+                                        },
+                                        "WasherFluid": {
+                                            "LevelLow": 0
+                                        }
+                                    },
+                                    "Rear": {
+                                        "Defog": {
+                                            "State": 0
+                                        }
+                                    }
+                                },
+                                "Hood": {
+                                    "Open": 0
+                                },
+                                "Lights": {
+                                    "Rear": {
+                                        "Right": {
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            },
+                                            "StopLamp": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "Left": {
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            },
+                                            "StopLamp": {
+                                                "Warning": 0
+                                            }
+                                        }
+                                    },
+                                    "Front": {
+                                        "Right": {
+                                            "High": {
+                                                "Warning": 0
+                                            },
+                                            "Low": {
+                                                "Warning": 0
+                                            },
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "Left": {
+                                            "High": {
+                                                "Warning": 0
+                                            },
+                                            "Low": {
+                                                "Warning": 0
+                                            },
+                                            "TurnSignal": {
+                                                "Warning": 0
+                                            }
+                                        },
+                                        "HeadLamp": {
+                                            "SystemWarning": 0
+                                        }
+                                    },
+                                    "DischargeAlert": {
+                                        "State": 0
+                                    },
+                                    "TailLamp": {
+                                        "Alert": 0
+                                    },
+                                    "Hazard": {
+                                        "Alert": 0
+                                    }
+                                },
+                                "Trunk": {
+                                    "Open": 0
+                                }
+                            },
+                            "Cabin": {
+                                "Window": {
+                                    "Row2": {
+                                        "Right": {
+                                            "Open": 0
+                                        },
+                                        "Left": {
+                                            "Open": 0
+                                        }
+                                    },
+                                    "Row1": {
+                                        "Passenger": {
+                                            "Open": 0
+                                        },
+                                        "Driver": {
+                                            "Open": 0
+                                        }
+                                    }
+                                },
+                                "SteeringWheel": {
+                                    "Heat": {
+                                        "State": 0
+                                    }
+                                },
+                                "HVAC": {
+                                    "Row1": {
+                                        "Driver": {
+                                            "Temperature": {
+                                                "Value": "15.0",
+                                                "Unit": 0
+                                            },
+                                            "Blower": {
+                                                "SpeedLevel": 0
+                                            }
+                                        }
+                                    },
+                                    "Temperature": {
+                                        "RangeType": 1
+                                    }
+                                },
+                                "Door": {
+                                    "Row2": {
+                                        "Right": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        },
+                                        "Left": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        }
+                                    },
+                                    "Row1": {
+                                        "Passenger": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        },
+                                        "Driver": {
+                                            "Open": 0,
+                                            "Lock": 0
+                                        }
+                                    }
+                                }
+                            },
+                            "Chassis": {
+                                "Axle": {
+                                    "Tire": {
+                                        "PressureLow": 0
+                                    }
+                                },
+                                "Brake": {
+                                    "Fluid": {
+                                        "Warning": 0
+                                    }
+                                }
+                            },
+                            "Drivetrain": {
+                                "Transmission": {
+                                    "ParkingPosition": 1
+                                },
+                                "FuelSystem": {
+                                    "DTE": {
+                                        "EV": 210.01941747572815,
+                                        "Unit": 2,
+                                        "Total": 210.01941747572815
+                                    },
+                                    "FuelLevel": 0
+                                },
+                                "Odometer": 66527.2
+                            },
+                            "Electronics": {
+                                "PowerSupply": {
+                                    "Ignition3": 0,
+                                    "Accessory": 0
+                                },
+                                "Battery": {
+                                    "Charging": {
+                                        "WarningLevel": 65
+                                    },
+                                    "Level": 73,
+                                    "SensorReliability": 0
+                                },
+                                "FOB": {
+                                    "LowBattery": 0
+                                },
+                                "AutoCut": {
+                                    "DeliveryMode": 0,
+                                    "PowerMode": 2,
+                                    "BatteryPreWarning": 0
+                                }
+                            },
+                            "Green": {
+                                "Reservation": {
+                                    "OffPeakTime": {
+                                        "Mode": 0,
+                                        "EndMin": 0,
+                                        "EndHour": 0,
+                                        "StartMin": 0,
+                                        "StartHour": 0
+                                    },
+                                    "Departure": {
+                                        "Climate": {
+                                            "TemperatureUnit": 0,
+                                            "Temperature": "OFF",
+                                            "Activation": 0,
+                                            "Defrost": 0
+                                        },
+                                        "Climate2": {
+                                            "TemperatureUnit": 0,
+                                            "Temperature": "OFF",
+                                            "Activation": 0,
+                                            "Defrost": 0
+                                        },
+                                        "Schedule2": {
+                                            "Min": 0,
+                                            "Hour": 0,
+                                            "Sun": 0,
+                                            "Sat": 0,
+                                            "Fri": 0,
+                                            "Thu": 0,
+                                            "Wed": 0,
+                                            "Tue": 0,
+                                            "Mon": 0,
+                                            "Enable": 0
+                                        },
+                                        "Schedule1": {
+                                            "Min": 0,
+                                            "Hour": 0,
+                                            "Sun": 0,
+                                            "Sat": 0,
+                                            "Fri": 0,
+                                            "Thu": 0,
+                                            "Wed": 0,
+                                            "Tue": 0,
+                                            "Mon": 0,
+                                            "Enable": 0
+                                        }
+                                    }
+                                },
+                                "BatteryManagement": {
+                                    "BatteryRemain": {
+                                        "Ratio": 76
+                                    },
+                                    "BatteryConditioning": 0,
+                                    "SoH": {
+                                        "Ratio": 100
+                                    }
+                                },
+                                "ChargingDoor": {
+                                    "State": 2
+                                },
+                                "ChargingInformation": {
+                                    "TargetSoC": {
+                                        "Standard": 80,
+                                        "Quick": 80
+                                    },
+                                    "ExpectedTime": {
+                                        "EndMin": 0,
+                                        "EndHour": 0,
+                                        "EndDay": 0,
+                                        "StartMin": 0,
+                                        "StartHour": 0,
+                                        "StartDay": 0
+                                    },
+                                    "Charging": {
+                                        "RemainTime": 0,
+                                        "State": 0,
+                                        "RemainTimeUnit": 1
+                                    },
+                                    "SequenceDetails": 501,
+                                    "SequenceSubcode": -1,
+                                    "ConnectorFastening": {
+                                        "State": 0
+                                    },
+                                    "EstimatedTime": {
+                                        "Quick": 5,
+                                        "ICCB": 60,
+                                        "Standard": 15
+                                    },
+                                    "DTE": {
+                                        "TargetSoC": {
+                                            "Standard": 224.93203883495147,
+                                            "Quick": 224.93203883495147
+                                        }
+                                    }
+                                },
+                                "Electric": {
+                                    "SmartGrid": {
+                                        "RealTimePower": 0
+                                    }
+                                }
+                            },
+                            "Service": {
+                                "ConnectedCar": {
+                                    "RemoteControl": {
+                                        "Available": 1,
+                                        "WaitingTime": 168
+                                    }
+                                }
+                            },
+                            "RemoteControl": {
+                                "SleepMode": 1
+                            },
+                            "Date": "20261123121619.000"
+                        }
+                    }
+                },
+                "metaInfo": {
+                    "retCode": "S",
+                    "resCode": "200-000"
+                }
+            }
+        },
+        "POST /auth/v1/token-exchange": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_token_exchange_ioniq6.json"
+        },
+        "GET /v0100/vehicle/TESTVIN0000000001": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_vehicle_info_ioniq6.json"
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_carinfo_profile_ioniq6.json"
+        },
+        "GET /v0100/tire/bound": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_tire_bound_ioniq6.json"
+        },
+        "GET /v0100/drive-history/trip/days/recent": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_days_ioniq6.json"
+        },
+        "GET /v0100/drive-history/trip": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_trip_date_500_ioniq6.json"
+        },
+        "GET /v0100/drive-history/ev-stats": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_di_ev_stats_ioniq6.json"
+        },
+        "GET /gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_breakdowns_ioniq6.json"
+        },
+        "GET /gspa/v1/device-info/vehicles/VEHICLE-1/software-version": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_software_version_ioniq6.json"
+        },
+        "GET /gspa/v1/valet/vehicles/VEHICLE-1/status": {
+            "body": "$fixture:updates/responses/eu_hyundai_gspa_valet_status_ioniq6.json"
+        },
+        "GET /gspa/v1/mru/vehicles/VEHICLE-1/ota-updates": {
+            "status": 503,
+            "body": null
+        }
+    }
+}

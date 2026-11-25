@@ -1,0 +1,198 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed here"
+    },
+    "transactionId": "e17e6f1a-f6fd-4171-a7c4-0273d68b94cc",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "evStatistics": {
+            "totalPowerConsumption": 413.48,
+            "avrMileage": 6.5,
+            "totalRegenPower": 134.54
+        },
+        "evDrivingInfoList": [
+            {
+                "date": "20261123",
+                "powerConsumption": 2.55,
+                "avrMileage": 5.1,
+                "regenPower": 1.5
+            },
+            {
+                "date": "20261122",
+                "powerConsumption": 5.52,
+                "avrMileage": 5.1,
+                "regenPower": 2.35
+            },
+            {
+                "date": "20261121",
+                "powerConsumption": 3.92,
+                "avrMileage": 5.4,
+                "regenPower": 1.98
+            },
+            {
+                "date": "20261120",
+                "powerConsumption": 3.41,
+                "avrMileage": 4.7,
+                "regenPower": 1.32
+            },
+            {
+                "date": "20261119",
+                "powerConsumption": 9.78,
+                "avrMileage": 5.4,
+                "regenPower": 4.55
+            },
+            {
+                "date": "20261118",
+                "powerConsumption": 14.61,
+                "avrMileage": 6.4,
+                "regenPower": 7.77
+            },
+            {
+                "date": "20261117",
+                "powerConsumption": 7.49,
+                "avrMileage": 5.6,
+                "regenPower": 4.63
+            },
+            {
+                "date": "20261116",
+                "powerConsumption": 64.98,
+                "avrMileage": 6.1,
+                "regenPower": 10.11
+            },
+            {
+                "date": "20261115",
+                "powerConsumption": 3.34,
+                "avrMileage": 4.8,
+                "regenPower": 1.36
+            },
+            {
+                "date": "20261114",
+                "powerConsumption": 3.11,
+                "avrMileage": 5.1,
+                "regenPower": 1.24
+            },
+            {
+                "date": "20261113",
+                "powerConsumption": 14.85,
+                "avrMileage": 5.9,
+                "regenPower": 5.66
+            },
+            {
+                "date": "20261112",
+                "powerConsumption": 2.76,
+                "avrMileage": 3.6,
+                "regenPower": 1.35
+            },
+            {
+                "date": "20261111",
+                "powerConsumption": 3.22,
+                "avrMileage": 5.0,
+                "regenPower": 1.19
+            },
+            {
+                "date": "20261110",
+                "powerConsumption": 4.65,
+                "avrMileage": 4.7,
+                "regenPower": 2.04
+            },
+            {
+                "date": "20261109",
+                "powerConsumption": 14.33,
+                "avrMileage": 5.8,
+                "regenPower": 5.47
+            },
+            {
+                "date": "20261108",
+                "powerConsumption": 4.33,
+                "avrMileage": 5.3,
+                "regenPower": 2.19
+            },
+            {
+                "date": "20261107",
+                "powerConsumption": 6.26,
+                "avrMileage": 5.9,
+                "regenPower": 3.46
+            },
+            {
+                "date": "20261106",
+                "powerConsumption": 4.46,
+                "avrMileage": 6.7,
+                "regenPower": 2.42
+            },
+            {
+                "date": "20261105",
+                "powerConsumption": 9.75,
+                "avrMileage": 5.5,
+                "regenPower": 4.55
+            },
+            {
+                "date": "20261104",
+                "powerConsumption": 15.09,
+                "avrMileage": 5.9,
+                "regenPower": 6.19
+            },
+            {
+                "date": "20261103",
+                "powerConsumption": 5.65,
+                "avrMileage": 5.7,
+                "regenPower": 3.21
+            },
+            {
+                "date": "20261102",
+                "powerConsumption": 2.91,
+                "avrMileage": 5.5,
+                "regenPower": 1.26
+            },
+            {
+                "date": "20261101",
+                "powerConsumption": 3.27,
+                "avrMileage": 5.2,
+                "regenPower": 1.23
+            },
+            {
+                "date": "20261031",
+                "powerConsumption": 49.09,
+                "avrMileage": 7.6,
+                "regenPower": 12.39
+            },
+            {
+                "date": "20261030",
+                "powerConsumption": 17.8,
+                "avrMileage": 6.8,
+                "regenPower": 12.27
+            },
+            {
+                "date": "20261029",
+                "powerConsumption": 39.78,
+                "avrMileage": 8.4,
+                "regenPower": 8.41
+            },
+            {
+                "date": "20261028",
+                "powerConsumption": 10.33,
+                "avrMileage": 6.2,
+                "regenPower": 6.78
+            },
+            {
+                "date": "20261027",
+                "powerConsumption": 0.0,
+                "avrMileage": 0.0,
+                "regenPower": 0.0
+            },
+            {
+                "date": "20261026",
+                "powerConsumption": 5.82,
+                "avrMileage": 5.8,
+                "regenPower": 3.4
+            },
+            {
+                "date": "20261025",
+                "powerConsumption": 80.28,
+                "avrMileage": 6.8,
+                "regenPower": 14.14
+            }
+        ]
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter"
+    },
+    "data": {
+        "headUnitModelname": "CEAE.S5BLC.AEU",
+        "currentHeadUnitSWSN": "260128",
+        "currentMapSN": "185270012",
+        "currentHeadUnitVersion": "CE_E.EUR.S5W_L.001.001.260128",
+        "currentMapVersion": "EUR.18.52.70.012.632.5",
+        "ecuOtaUpdateSupport": 1,
+        "eventSourceVersionNm": "26.3.1",
+        "eventTargetVersionNm": "26.3.1",
+        "needUpdate": 0
+    },
+    "metaInfo": {
+        "retCode": "S",
+        "resCode": "200-000"
+    }
+}

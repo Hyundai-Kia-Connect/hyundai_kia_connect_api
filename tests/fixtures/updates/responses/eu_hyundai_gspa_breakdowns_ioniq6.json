@@ -1,0 +1,63 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed"
+    },
+    "breakdown": [
+        {
+            "title": "ACU",
+            "ecuID": "05a2",
+            "failureStatus": 0,
+            "systemName": "Airbag",
+            "message": ""
+        },
+        {
+            "title": "ADAS_DRV/ADAS_PRK_Master/FR_CMR/FR_RDR/RR_C_RDR",
+            "ecuID": "0738",
+            "failureStatus": 0,
+            "systemName": "Driver Assist",
+            "message": ""
+        },
+        {
+            "title": "TPMS",
+            "ecuID": "07a8",
+            "failureStatus": 0,
+            "systemName": "Tyre monitor",
+            "message": ""
+        },
+        {
+            "title": "ABS/ESC",
+            "ecuID": "07d9",
+            "failureStatus": 0,
+            "systemName": "Braking/Body, ESC",
+            "message": ""
+        },
+        {
+            "title": "MDPS",
+            "ecuID": "07dc",
+            "failureStatus": 0,
+            "systemName": "Steering",
+            "message": ""
+        },
+        {
+            "title": "VCU",
+            "ecuID": "07ea",
+            "failureStatus": 0,
+            "systemName": "Vehicle control",
+            "message": ""
+        },
+        {
+            "title": "MCU",
+            "ecuID": "07eb",
+            "failureStatus": 0,
+            "systemName": "Motor",
+            "message": ""
+        },
+        {
+            "title": "BMS",
+            "ecuID": "07ec",
+            "failureStatus": 0,
+            "systemName": "EV battery",
+            "message": ""
+        }
+    ]
+}

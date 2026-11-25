@@ -1,0 +1,33 @@
+{
+    "_fixture_meta": {
+        "source": "trip captures from the same live DI session (Hyundai Santa Fe HEV 2026 EU CCI, blka 2026-11-23); trip ids redacted"
+    },
+    "transactionId": "16cab1f4-3bd0-4e33-bd6c-61ca647f666c",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "summary": {
+            "date": "20261120",
+            "totalDrvDist": 66.5,
+            "totalDrvTime": 128,
+            "safetyDrvScore": null,
+            "safetyDrvScoreDiff": 0
+        },
+        "content": [
+            {
+                "id": "TEST-TRIP-1",
+                "ignOnTime": "2026-11-20T15:04:07+01:00",
+                "ignOffTime": "2026-11-20T17:12:47+01:00",
+                "drvDist": 66.5,
+                "drvTime": 128,
+                "avgSpeed": 46.0,
+                "maxSpeed": 137.0,
+                "idleTime": 38,
+                "evEnergyUsage": null,
+                "tags": []
+            }
+        ],
+        "pageInfo": null
+    }
+}

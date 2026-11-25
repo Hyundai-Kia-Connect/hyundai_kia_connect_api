@@ -1,0 +1,137 @@
+{
+    "_fixture_meta": {
+        "source": "trip captures from the same live DI session (Hyundai Santa Fe HEV 2026 EU CCI, blka 2026-11-23); trip ids redacted"
+    },
+    "transactionId": "657e1ecf-d3c3-44d6-be55-79bd11f4630e",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "recentTripDate": "20261120",
+        "tripDays": {
+            "month": "202611",
+            "trips": [
+                {
+                    "day": 1,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 2,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 3,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 4,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 5,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 6,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 7,
+                    "tripCnt": 1
+                },
+                {
+                    "day": 8,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 9,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 10,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 11,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 12,
+                    "tripCnt": 6
+                },
+                {
+                    "day": 13,
+                    "tripCnt": 1
+                },
+                {
+                    "day": 14,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 15,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 16,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 17,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 18,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 19,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 20,
+                    "tripCnt": 1
+                },
+                {
+                    "day": 21,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 22,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 23,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 24,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 25,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 26,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 27,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 28,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 29,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 30,
+                    "tripCnt": 0
+                }
+            ]
+        }
+    }
+}

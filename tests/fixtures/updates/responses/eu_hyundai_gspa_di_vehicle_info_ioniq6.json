@@ -1,0 +1,40 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed here"
+    },
+    "transactionId": "<redacted>",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "puid": "<redacted>",
+        "country": "gb",
+        "ccsMasterCarId": "<redacted>",
+        "specificationId": "TEST-SPECIFICATION-1",
+        "vin": "<redacted>",
+        "parentId": "TEST-PARENT-1",
+        "ccsFullEnrollYn": true,
+        "mainSupportYn": true,
+        "primaryUserYn": true,
+        "ccsAgreedNewTermsYn": true,
+        "ccsNewTermsConsentedDate": "2025-03-19T14:58:36",
+        "grantCcsControlYn": true,
+        "ownershipType": 3,
+        "ccsEnrollmentDate": "2025-03-19T17:59:45",
+        "supportedFeatures": [
+            "EV_BATTERY",
+            "EV_ENERGY_USAGE",
+            "TIRE_PRESSURE",
+            "TRIPS"
+        ],
+        "availableSelectiveTerms": [],
+        "consentedTerms": [
+            {
+                "termsCode": "DI",
+                "required": true,
+                "consent": true,
+                "consentDate": "2025-10-15T12:18:19"
+            }
+        ]
+    }
+}

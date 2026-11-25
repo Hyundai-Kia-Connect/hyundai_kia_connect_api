@@ -1,0 +1,82 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed here; the profile carries no controlOption block (client-derived in the app SDK)"
+    },
+    "vinInfo": {
+        "detailInfo": {
+            "bodyType": "0",
+            "saleCarmdlEnNm": "IONIQ 6",
+            "saleCarmdlCd": "AL",
+            "prodCarmdlCd": "AL"
+        },
+        "basic": {
+            "modelName": "IONIQ 6",
+            "vin": "<redacted>",
+            "modelYear": "2023",
+            "modelType": "EV",
+            "brand": "H",
+            "privateModeInfo": "false",
+            "evDrivingHisSupport": "true",
+            "ecuOtaUpdateSupport": 1,
+            "ccuCCS2ProtocolSupport": 0,
+            "country": "gb"
+        },
+        "device": {
+            "simStartDate": "2023-09-18",
+            "simEndDate": "2033-09-18",
+            "naviApplied": 1,
+            "headUnitModelName": "CEAE.S5BLC.AEU",
+            "privacySettingSupport": 1,
+            "compPeriodEndYn": "N",
+            "currentHeadUnitVersion": "CE_E.EUR.S5W_L.001.001.260128"
+        },
+        "option": {
+            "remoteControlWaitingTime": 168,
+            "imsOption": 0,
+            "heating1": "1",
+            "remoteControl": "1",
+            "drvSeatLoc": "R",
+            "remoteHeatControl": "2",
+            "heatingSteeringWheel": "1",
+            "heatingFrontWindow": "0",
+            "heatingRearWindow": "0",
+            "hornLightAvailable": 1,
+            "lightOnlyAvailable": 1,
+            "hvacTempType": "1",
+            "heatingSideMirror": "1",
+            "remoteFrontWindowHeatControl": "0",
+            "seatHeaterVent": {
+                "frSeatHeat": 0,
+                "rrSeatHeat": 0,
+                "flSeatHeat": 0,
+                "rlSeatHeat": 0
+            },
+            "windowSafetyOption": 1,
+            "svmOptionInfo": 0,
+            "sunRoofOption": 0,
+            "remoteAirCtrlControlOption": 1,
+            "evAlarmOptionInfo": 1,
+            "cmsOption": 0,
+            "wirelessChargingOption": 0,
+            "batteryPreconditioningOption": 1,
+            "digitalKey2": 0
+        },
+        "serviceOption": {
+            "ccsPhase": 20,
+            "batteryWarningService": 1,
+            "scheduleLinkService": 1,
+            "centerUserProfileOption": 2,
+            "valetServiceOption": 1,
+            "notificationSupport": 1,
+            "engineIdleTimeNotification": 1,
+            "finalDestinationNoti": 1,
+            "chargePortDoorOption": 1,
+            "windowControlOption": 0,
+            "remoteValetActOption": 1,
+            "alertServiceOption": 1,
+            "nTrackDataSupport": 0,
+            "evs2Support": 0,
+            "remoteLightControlOption": 1
+        }
+    }
+}

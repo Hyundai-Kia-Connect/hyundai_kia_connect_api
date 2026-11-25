@@ -1,0 +1,137 @@
+{
+    "_fixture_meta": {
+        "source": "Ioniq 6 2023 EV (EU CCI, UK), full capture sweep run by the #1909 tester (snigehere, 2026-11-23); VIN/ids redacted by the reporter, coordinates zeroed here"
+    },
+    "transactionId": "9df11031-0518-4c02-9773-92445ec3a3b7",
+    "status": "success",
+    "resultCode": 200000,
+    "resultMessage": "success",
+    "data": {
+        "recentTripDate": "20261123",
+        "tripDays": {
+            "month": "202611",
+            "trips": [
+                {
+                    "day": 1,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 2,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 3,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 4,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 5,
+                    "tripCnt": 6
+                },
+                {
+                    "day": 6,
+                    "tripCnt": 4
+                },
+                {
+                    "day": 7,
+                    "tripCnt": 5
+                },
+                {
+                    "day": 8,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 9,
+                    "tripCnt": 7
+                },
+                {
+                    "day": 10,
+                    "tripCnt": 4
+                },
+                {
+                    "day": 11,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 12,
+                    "tripCnt": 5
+                },
+                {
+                    "day": 13,
+                    "tripCnt": 7
+                },
+                {
+                    "day": 14,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 15,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 16,
+                    "tripCnt": 4
+                },
+                {
+                    "day": 17,
+                    "tripCnt": 6
+                },
+                {
+                    "day": 18,
+                    "tripCnt": 6
+                },
+                {
+                    "day": 19,
+                    "tripCnt": 4
+                },
+                {
+                    "day": 20,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 21,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 22,
+                    "tripCnt": 3
+                },
+                {
+                    "day": 23,
+                    "tripCnt": 2
+                },
+                {
+                    "day": 24,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 25,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 26,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 27,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 28,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 29,
+                    "tripCnt": 0
+                },
+                {
+                    "day": 30,
+                    "tripCnt": 0
+                }
+            ]
+        }
+    }
+}

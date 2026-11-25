@@ -1,0 +1,8 @@
+{
+    "status": 200,
+    "_fixture_meta": {
+        "source": "live DI token-exchange, Hyundai EU CCI 2026-11-23 (same session); accessToken redacted"
+    },
+    "accessToken": "<redacted>",
+    "expiresTime": 3600
+}
