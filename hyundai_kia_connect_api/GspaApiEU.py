@@ -1666,7 +1666,10 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         try:
             sw = self.get_software_version(token, vehicle)
             if sw and isinstance(sw, dict):
-                vehicle.software_version = sw.get("softwareVersion")
+                # Live response has currentHeadUnitVersion, not softwareVersion.
+                vehicle.software_version = sw.get("currentHeadUnitVersion") or sw.get(
+                    "softwareVersion"
+                )
         except Exception:
             _LOGGER.debug(f"{DOMAIN} - GSPA software_version update failed")
 
