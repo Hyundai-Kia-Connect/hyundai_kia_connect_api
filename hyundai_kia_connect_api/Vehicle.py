@@ -98,6 +98,33 @@ class VehicleSupports:
     ota_progress: bool | None = None
     # vehicle.ota.scheduleupdate protocol
     schedule_update: bool | None = None
+    # CCI carinfo controlOption block (EU, issues #1379/#1320) — per-command
+    # booleans the app SDK gates its remote panels by. One item per
+    # VehicleManager call home.
+    door_lock: bool | None = None
+    door_unlock: bool | None = None
+    climate_start: bool | None = None
+    climate_stop: bool | None = None
+    # VehicleManager.start_engine / stop_engine
+    engine_start: bool | None = None
+    engine_stop: bool | None = None
+    # The app's remote-start panel is gated by these two engine flags
+    engine_climate_start: bool | None = None
+    engine_climate_stop: bool | None = None
+    # VehicleManager.start_charge / stop_charge
+    charge_start: bool | None = None
+    charge_stop: bool | None = None
+    charge_port_open: bool | None = None
+    charge_port_close: bool | None = None
+    # VehicleManager.start_hazard_lights / start_hazard_lights_and_horn /
+    # turn_off_lamp
+    hazard: bool | None = None
+    horn_light: bool | None = None
+    lamp_off: bool | None = None
+    # VehicleManager.open_frunk
+    frunk_open: bool | None = None
+    # VehicleManager.start_battery_conditioning
+    battery_conditioning: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -211,14 +238,21 @@ class Vehicle:
 
     # Software version (GSPA device-info read)
     software_version: str | None = None
+    # Map version from the DI/GSPA software-version read (currentMapVersion).
+    map_version: str | None = None
     ota_update_available: bool | None = None
 
     # Cached-failure flags for GSPA query endpoints (reset by force refresh).
     # _ota_checked: True after the first OTA check (no re-check until force
     # refresh); _valet_failed: True after a failed valet read, so later
-    # polls skip it until force refresh resets it.
+    # polls skip it until force refresh resets it. _carinfo_checked and
+    # _tire_bound_checked: same one-shot for the carinfo capability read
+    # and the DI tire/bound fallback (config-ish reads; force refresh
+    # re-reads them).
     _ota_checked: bool = False
     _valet_failed: bool = False
+    _carinfo_checked: bool = False
+    _tire_bound_checked: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).

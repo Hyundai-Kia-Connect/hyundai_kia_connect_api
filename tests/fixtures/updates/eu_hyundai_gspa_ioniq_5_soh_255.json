@@ -3,12 +3,12 @@
         "status": "GSPA stored-status domain payload as returned by GET /gspa/v1/status/vehicles/{carId}/stored-status (Hyundai IONIQ 5, EU), captured by the kia_uvo #1935 reporter run of gist fb99ef2558eeb58ae580486b39dd91db (scripts/probe_soh_raw.py)",
         "follow_up_sources": "none",
         "not_captured": [
-            "gspa driving-info/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa driving-history/vehicles/{carId} (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa device-info/vehicles/{carId}/software-version (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa mru/vehicles/{carId}/ota-updates (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa valet/vehicles/{carId}/status (no capture in the dump — answered 503; the update path logs and continues)",
-            "gspa diagnostics/vehicles/{carId}/breakdowns (no capture in the dump — answered 503; the update path logs and continues)"
+            "gspa driving-info/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa driving-history/vehicles/{carId} (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa device-info/vehicles/{carId}/software-version (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa mru/vehicles/{carId}/ota-updates (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa valet/vehicles/{carId}/status (no capture in the dump \u2014 answered 503; the update path logs and continues)",
+            "gspa diagnostics/vehicles/{carId}/breakdowns (no capture in the dump \u2014 answered 503; the update path logs and continues)"
         ],
         "description": "Hyundai IONIQ 5 (EU) GSPA stored status showing Green.BatteryManagement.SoH.{Ratio: 255}, the sentinel value from kia_uvo #1935; data/metaInfo envelope rebuilt because the probe printed the unwrapped payload.",
         "source": "https://github.com/Hyundai-Kia-Connect/kia_uvo/issues/1935#issuecomment-6664420474 (probe run posted by the reporter)"
@@ -593,6 +593,10 @@
             "body": null
         },
         "GET /gspa/v1/diagnostics/vehicles/VEHICLE-1/breakdowns": {
+            "status": 503,
+            "body": null
+        },
+        "GET /gspa/v1/vehicles/VEHICLE-1/profile": {
             "status": 503,
             "body": null
         }

@@ -863,6 +863,7 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
             return_value={"otaUpdateList": [{"id": "x"}]},
         ),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "get_carinfo", return_value=None),
         patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
@@ -881,6 +882,7 @@ def test_update_vehicle_gspa_data_failure_sets_unknown():
         patch.object(api, "get_software_version", side_effect=APIError("boom")),
         patch.object(api, "get_ota_updates", side_effect=APIError("boom")),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "get_carinfo", return_value=None),
         patch.object(api, "_get_valet_status", return_value={"valetMode": 2}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
@@ -971,6 +973,7 @@ def test_update_vehicle_gspa_data_populates_valet_mode():
         patch.object(api, "get_software_version", return_value=None),
         patch.object(api, "get_ota_updates", return_value=None),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "get_carinfo", return_value=None),
         patch.object(api, "_get_valet_status", return_value={"valetMode": 0}),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
@@ -1006,6 +1009,7 @@ def test_update_vehicle_gspa_data_valet_failure_circuits():
         patch.object(api, "get_software_version", return_value=None),
         patch.object(api, "get_ota_updates", return_value=None),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "get_carinfo", return_value=None),
         patch.object(api, "_get_valet_status", side_effect=APIError("boom")),
     ):
         api._update_vehicle_gspa_data(token, vehicle)
@@ -1016,6 +1020,7 @@ def test_update_vehicle_gspa_data_valet_failure_circuits():
         patch.object(api, "get_software_version", return_value=None),
         patch.object(api, "get_ota_updates", return_value=None),
         patch.object(api, "get_breakdowns", return_value=None),
+        patch.object(api, "get_carinfo", return_value=None),
         patch.object(api, "_get_valet_status") as queued,
     ):
         api._update_vehicle_gspa_data(token, vehicle)
