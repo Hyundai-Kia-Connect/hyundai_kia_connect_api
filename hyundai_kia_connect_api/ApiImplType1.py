@@ -1973,14 +1973,43 @@ class ApiImplType1(ApiImpl):
             if options.side_rear_mirror_heating is not None:
                 options_map["sideRearMirrorHeating"] = options.side_rear_mirror_heating
             seat_cmds = {}
-            for seat, level in (
-                ("drvSeatOptCmd", options.front_left_seat),
-                ("astSeatOptCmd", options.front_right_seat),
-                ("rlSeatOptCmd", options.rear_left_seat),
-                ("rrSeatOptCmd", options.rear_right_seat),
+            skipped: list[str] = []
+            for seat, level, support in (
+                (
+                    "drvSeatOptCmd",
+                    options.front_left_seat,
+                    vehicle.supports.remote_seat_heater_front_left,
+                ),
+                (
+                    "astSeatOptCmd",
+                    options.front_right_seat,
+                    vehicle.supports.remote_seat_heater_front_right,
+                ),
+                (
+                    "rlSeatOptCmd",
+                    options.rear_left_seat,
+                    vehicle.supports.remote_seat_heater_rear_left,
+                ),
+                (
+                    "rrSeatOptCmd",
+                    options.rear_right_seat,
+                    vehicle.supports.remote_seat_heater_rear_right,
+                ),
             ):
-                if level is not None:
-                    seat_cmds[seat] = level
+                if level is None:
+                    continue
+                # A False support flag comes from the vehicle profile
+                # (seatHeaterVent); None means unknown and the request
+                # keeps the pre-profile behavior.
+                if support is False:
+                    skipped.append(seat)
+                    continue
+                seat_cmds[seat] = level
+            if skipped:
+                _LOGGER.warning(
+                    f"{DOMAIN} - vehicle profile blocks remote control of "
+                    f"{', '.join(skipped)}; climate starts without them"
+                )
             if seat_cmds:
                 options_map["seatHeaterVentCMD"] = seat_cmds
             _LOGGER.debug(f"{DOMAIN} - Start Climate Action Request: {payload}")

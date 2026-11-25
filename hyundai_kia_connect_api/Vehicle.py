@@ -98,6 +98,13 @@ class VehicleSupports:
     ota_progress: bool | None = None
     # vehicle.ota.scheduleupdate protocol
     schedule_update: bool | None = None
+    # From the legacy-SPA profile option seatHeaterVent: a seat value of
+    # 0 or 7 means the seat cannot be reached by remote climate; any
+    # other value doubles as the legacy command level (kia_uvo #2121).
+    remote_seat_heater_front_left: bool | None = None
+    remote_seat_heater_front_right: bool | None = None
+    remote_seat_heater_rear_left: bool | None = None
+    remote_seat_heater_rear_right: bool | None = None
 
 
 def _deprecated_supports_alias(alias: str, item: str) -> property:
@@ -219,6 +226,8 @@ class Vehicle:
     # polls skip it until force refresh resets it.
     _ota_checked: bool = False
     _valet_failed: bool = False
+    # _profile_checked: one-shot legacy-SPA profile read (stable per car).
+    _profile_checked: bool = False
 
     # Push identity (per-vehicle level). mqtt_vehicle_id = topic infix,
     # distinct from Token.mqtt_client_id (the device-level registration id).
