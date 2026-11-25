@@ -1120,3 +1120,15 @@ def test_engine_gate_drops_the_dead_fe_branch():
     }
     caps = GspaApiEU._derive_control_capabilities(gen_profile)
     assert caps["engine_start"] is True
+
+
+def test_lamp_off_gates_turn_off_lamp_not_the_valet_action():
+    """The lamp capability gates turn_off_lamp; the valet action carries no
+    capability gate (it is stamped by serviceOption.remoteValetActOption)."""
+    api = _make_api()
+    vehicle = _make_vehicle()
+    vehicle.supports.lamp_off = False
+    with patch.object(api, "_gspa_control_command") as post:
+        with pytest.raises(UnsupportedControlError):
+            api.turn_off_lamp(_make_token(), vehicle)
+        post.assert_not_called()

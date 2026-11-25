@@ -2750,6 +2750,7 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
     def turn_off_lamp(
         self, token: Token, vehicle: Vehicle, mode: LAMP_MODE = LAMP_MODE.ALL_OFF
     ) -> str:
+        self._raise_if_capabilities_say_no(vehicle, "lamp_off", "lamp off")
         return self._gspa_control_command(
             token, vehicle, "lamp", {"command": mode.value}
         )
@@ -2783,7 +2784,6 @@ class GspaApiEU(CciAuthMixin, ApiImpl):
         getGspaValetVehiclesPath = "gspa/v1/valet/vehicles"):
         POST /gspa/v1/valet/vehicles/{carId}/control.
         """
-        self._raise_if_capabilities_say_no(vehicle, "lamp_off", "lamp off")
         command = "activate" if action == VALET_MODE_ACTION.ACTIVATE else "deactivate"
         return self._gspa_control_command(
             token,
