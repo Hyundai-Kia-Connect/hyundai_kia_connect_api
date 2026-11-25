@@ -870,6 +870,22 @@ def test_update_vehicle_gspa_data_populates_sw_ota():
     assert vehicle.ota_update_available is True
 
 
+def test_update_vehicle_gspa_data_reads_live_software_key():
+    """The live response answers currentHeadUnitVersion, not softwareVersion
+    (Santa Fe EU CCI 2026-11) — the parse must read the live key."""
+    api = _make_hyundai_api()
+    token = _make_token()
+    vehicle = Vehicle(id="test-id")
+    vehicle.id = "car-123"
+    with patch.object(
+        api,
+        "get_software_version",
+        return_value={"currentHeadUnitVersion": "SV1.EUR.ccNC.001.002.260312"},
+    ):
+        api._update_vehicle_gspa_data(token, vehicle)
+    assert vehicle.software_version == "SV1.EUR.ccNC.001.002.260312"
+
+
 def test_update_vehicle_gspa_data_failure_sets_unknown():
     """HA convention: a failed sw/ota read leaves the field as unknown
     (None), not stale."""
