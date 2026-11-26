@@ -1,0 +1,24 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "GET tods/api/v2/rc/ev/getrescharge",
+        "source": "Live read on a 2027 Hyundai IONIQ 9 (mybluelink.ca), 2026-11-22, jonrburns in issue #1498",
+        "description": "Active charge window: reservFlag 1, offpeakPowerFlag 1, 19:00 to 07:00."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "reservFlag": 1,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {
+            "time": "0700",
+            "timeSection": 1
+        },
+        "reservEndTime": {
+            "time": "0700",
+            "timeSection": 0
+        }
+    }
+}

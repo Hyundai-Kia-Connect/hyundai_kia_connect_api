@@ -1,0 +1,38 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "GET tods/api/v2/rc/ev/getreshvac",
+        "source": "Live read on a 2026 Hyundai IONIQ 5 (mybluelink.ca, genType G3), 2026-11-19, emckibben in issue #1498; schedules never configured",
+        "description": "Factory state: [9] + '0000' times and airTemp 'OFF' on both slots."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "reservedHVACInfo1": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [9],
+                "time": { "time": "0000", "timeSection": 0 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": false,
+                "airTemp": { "unit": 0, "value": "OFF" }
+            }
+        },
+        "reservedHVACInfo2": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [9],
+                "time": { "time": "0000", "timeSection": 0 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": false,
+                "airTemp": { "unit": 0, "value": "OFF" }
+            }
+        }
+    }
+}

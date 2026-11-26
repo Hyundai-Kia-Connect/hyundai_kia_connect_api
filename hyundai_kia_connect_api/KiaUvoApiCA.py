@@ -27,7 +27,10 @@ from .ApiImpl import (
     OTPRequest,
     ScheduleChargingClimateRequestOptions,
     _fill_schedule_options_from_vehicle,
+    _guard_schedule_temperature,
+    _rounded_climate_temperature,
     _schedule_charging_scopes,
+    _vehicle_temperature_unit,
 )
 from .const import (
     BRAND_GENESIS,
@@ -766,6 +769,7 @@ class KiaUvoApiCA(ApiImpl):
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
             self._update_charge_schedule(token, vehicle)
+            self._update_hvac_schedule(token, vehicle)
 
     def force_refresh_vehicle_state(self, token: Token, vehicle: Vehicle) -> None:
         state = self._get_forced_vehicle_state(token, vehicle)
@@ -831,6 +835,7 @@ class KiaUvoApiCA(ApiImpl):
             self._update_vehicle_properties_charge(vehicle, charge)
             self._update_vehicle_properties_trip_details(token, vehicle)
             self._update_charge_schedule(token, vehicle)
+            self._update_hvac_schedule(token, vehicle)
 
     def _update_maintenance_report(self, token: Token, vehicle: Vehicle) -> None:
         """Fetch the newest monthly maintenance report when a new one appears.
@@ -1654,41 +1659,145 @@ class KiaUvoApiCA(ApiImpl):
         )
         vehicle.ev_off_peak_end_time = _reservation_time(result.get("reservEndTime"))
 
+    def _update_hvac_schedule(self, token: Token, vehicle: Vehicle) -> None:
+        """Scheduled HVAC slots (v2/rc/ev/getreshvac); reservHVACflag enables one slot."""
+        url = self.API_URL + "v2/rc/ev/getreshvac"
+        headers = self.API_HEADERS.copy()
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = vehicle.id
+        response = self.sessions.get(url, headers=headers)
+        if not response.ok:
+            _LOGGER.debug(f"{DOMAIN} - getreshvac failed: {response.text}")
+            return
+        response_json = response.json()
+        _LOGGER.debug(f"{DOMAIN} - Received getreshvac response {response_json}")
+        if get_child_value(response_json, "responseHeader.responseCode") != 0:
+            return  # not every CA EV offers the schedule reads; keep the update
+        result = response_json.get("result") or {}
+        for number, prefix in ((1, "ev_first_departure"), (2, "ev_second_departure")):
+            slot = result.get(f"reservedHVACInfo{number}") or {}
+            # Day 9 is the apps' no-days marker (0 = Sunday); an unconfigured
+            # slot carries exactly [9] plus the "0000" time.
+            days = get_child_value(slot, "reservInfo.day")
+            setattr(vehicle, prefix + "_days", None if days == [9] else days or None)
+            setattr(
+                vehicle,
+                prefix + "_time",
+                _reservation_time(get_child_value(slot, "reservInfo.time")),
+            )
+            flag = slot.get("reservHVACflag")
+            setattr(
+                vehicle,
+                prefix + "_climate_enabled",
+                None if flag is None else flag == 1,
+            )
+            hvac_set = slot.get("reservHVACSet") or {}
+            air_temp = hvac_set.get("airTemp") or {}
+            # "OFF" (factory state) becomes None through the setter.
+            setattr(
+                vehicle,
+                prefix + "_climate_temperature",
+                (
+                    air_temp.get("value"),
+                    TEMPERATURE_UNITS.get(air_temp.get("unit")),
+                ),
+            )
+            setattr(vehicle, prefix + "_climate_defrost", hvac_set.get("defrost"))
+
     def schedule_charging_and_climate(
         self,
         token: Token,
         vehicle: Vehicle,
         options: ScheduleChargingClimateRequestOptions,
     ) -> str:
-        """Set the charge window (v2/rc/ev/reschargeset); departures are not supported."""
+        """Set the charge window (v2/rc/ev/reschargeset) and HVAC slots (v2/rc/ev/reshvacset)."""
         charge_active, climate_active = _schedule_charging_scopes(options)
-        if climate_active:
-            raise NotImplementedError("Departure/climate schedules are not supported")
-        if not charge_active:
+        if not charge_active and not climate_active:
             raise ValueError("no schedule changes requested")
-        _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
-        start, end = options.off_peak_start_time, options.off_peak_end_time
-        assert start is not None and end is not None
-        url = self.API_URL + "v2/rc/ev/reschargeset"
-        headers = self.API_HEADERS.copy()
-        headers["accessToken"] = token.access_token
-        headers["vehicleId"] = vehicle.id
-        headers["pAuth"] = self._get_pin_token(token, vehicle)
-        payload = {
-            "reservFlag": 1 if options.charging_enabled else 0,
-            "offpeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
-            "reservStartTime": _reservation_time_body(start),
-            "reservEndTime": _reservation_time_body(end),
-            "pin": token.pin,
-        }
-        _LOGGER.debug(
-            f"{DOMAIN} - Planned reschargeset payload {self._mask_sensitive_data(payload)}"
-        )
-        response = self.sessions.post(url, headers=headers, data=json.dumps(payload))
-        response_json = response.json()
-        _LOGGER.debug(f"{DOMAIN} - Received reschargeset response {response_json}")
-        self._check_response_for_errors(response_json)
-        return response.headers["transactionId"]
+        transaction_id = ""
+        if charge_active:
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("charge",))
+            start, end = options.off_peak_start_time, options.off_peak_end_time
+            assert start is not None and end is not None
+            url = self.API_URL + "v2/rc/ev/reschargeset"
+            headers = self.API_HEADERS.copy()
+            headers["accessToken"] = token.access_token
+            headers["vehicleId"] = vehicle.id
+            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            payload = {
+                "reservFlag": 1 if options.charging_enabled else 0,
+                "offpeakPowerFlag": 1 if options.off_peak_charge_only_enabled else 2,
+                "reservStartTime": _reservation_time_body(start),
+                "reservEndTime": _reservation_time_body(end),
+                "pin": token.pin,
+            }
+            _LOGGER.debug(
+                f"{DOMAIN} - Planned reschargeset payload {self._mask_sensitive_data(payload)}"
+            )
+            response = self.sessions.post(
+                url, headers=headers, data=json.dumps(payload)
+            )
+            response_json = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Received reschargeset response {response_json}")
+            self._check_response_for_errors(response_json)
+            transaction_id = response.headers["transactionId"]
+        if climate_active:
+            _guard_schedule_temperature(options, vehicle)
+            _fill_schedule_options_from_vehicle(options, vehicle, scopes=("climate",))
+            departures = []
+            for departure in (options.first_departure, options.second_departure):
+                assert departure is not None  # the climate fill creates both
+                departures.append(departure)
+            temperature_unit = _vehicle_temperature_unit(vehicle) or 0
+
+            def _hvac_set(
+                dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
+            ) -> dict[str, Any]:
+                temp = _rounded_climate_temperature(
+                    dep.temperature if dep.temperature is not None else 21.0,
+                    temperature_unit,
+                )
+                # airCtrl: the app sends the car's stored value back (1 in
+                # every capture); reservHVACflag is the enable.
+                return {
+                    "airCtrl": 1,
+                    "defrost": bool(dep.defrost),
+                    "airTemp": {"value": f"{temp:.1f}", "unit": temperature_unit},
+                }
+
+            url = self.API_URL + "v2/rc/ev/reshvacset"
+            headers = self.API_HEADERS.copy()
+            headers["accessToken"] = token.access_token
+            headers["vehicleId"] = vehicle.id
+            headers["pAuth"] = self._get_pin_token(token, vehicle)
+            payload = {
+                "pin": token.pin,
+                **{
+                    key: {
+                        "reservHVACflag": 1 if dep.climate_enabled else 0,
+                        "reservInfo": {
+                            "day": dep.days,
+                            "time": _reservation_time_body(cast("dt.time", dep.time)),
+                        },
+                        "reservHVACSet": _hvac_set(dep),
+                    }
+                    for key, dep in (
+                        ("reservedHVACInfo1", departures[0]),
+                        ("reservedHVACInfo2", departures[1]),
+                    )
+                },
+            }
+            _LOGGER.debug(
+                f"{DOMAIN} - Planned reshvacset payload {self._mask_sensitive_data(payload)}"
+            )
+            response = self.sessions.post(
+                url, headers=headers, data=json.dumps(payload)
+            )
+            response_json = response.json()
+            _LOGGER.debug(f"{DOMAIN} - Received reshvacset response {response_json}")
+            self._check_response_for_errors(response_json)
+            transaction_id = response.headers["transactionId"]
+        return transaction_id
 
     def _mask_sensitive_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Create a copy of data with sensitive fields masked for logging."""

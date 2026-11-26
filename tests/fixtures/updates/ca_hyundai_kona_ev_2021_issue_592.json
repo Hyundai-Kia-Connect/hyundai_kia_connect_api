@@ -2,10 +2,10 @@
     "_fixture_meta": {
         "vehicles": "2021 Kona EV (EV)",
         "source": "kia_uvo #592 (status, nxtsvc, selsoc) and #459 (vrfypin, fndmcr), same owner and car",
-        "follow_up_sources": "same car; gtmvrlst/gtmvrrpt from the read-only capture in kia_uvo #2025 work (PALISADE 2023)",
+        "follow_up_sources": "same car; gtmvrlst/gtmvrrpt from the read-only capture in kia_uvo #2025 work (PALISADE 2023); getrescharge from a live read on a 2027 IONIQ 9 and getreshvac on a 2026 IONIQ 5 (both mybluelink.ca, no Kona capture)",
         "not_captured": [
             "POST evTripDetails (no capture with a body)",
-            "GET v2/rc/ev/getrescharge (no capture for this car)"
+            "GET v2/rc/ev/getrescharge + getreshvac answered from IONIQ 9 / IONIQ 5 reads (no Kona capture)"
         ],
         "description": "Whole update chain from one car; identifiers and coordinates replaced."
     },
@@ -46,8 +46,10 @@
             "body": "$fixture:updates/responses/ca_gtmvrrpt.json"
         },
         "GET /tods/api/v2/rc/ev/getrescharge": {
-            "status": 503,
-            "body": null
+            "body": "$fixture:updates/responses/ca_getrescharge_hyundai_ioniq9.json"
+        },
+        "GET /tods/api/v2/rc/ev/getreshvac": {
+            "body": "$fixture:updates/responses/ca_getreshvac_hyundai_ioniq5.json"
         }
     }
 }

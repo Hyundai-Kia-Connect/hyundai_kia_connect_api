@@ -1,0 +1,38 @@
+{
+    "_fixture_meta": {
+        "region": "CA",
+        "endpoint": "GET tods/api/v2/rc/ev/getreshvac",
+        "source": "Live read on a 2027 Kia EV5 (kiaconnect.ca), 2026-11-17, sircharlo in issue #1498",
+        "description": "Two configured-but-disabled slots (flag 0): slot1 [3,6] (Wed/Sat) 09:00 defrost on, slot2 [9] no-repeat 12:00 defrost off; airTemp '21.5' unit 0."
+    },
+    "responseHeader": {
+        "responseCode": 0,
+        "responseDesc": "Success"
+    },
+    "result": {
+        "reservedHVACInfo1": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [3, 6],
+                "time": { "time": "0900", "timeSection": 0 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": true,
+                "airTemp": { "value": "21.5", "unit": 0 }
+            }
+        },
+        "reservedHVACInfo2": {
+            "reservHVACflag": 0,
+            "reservInfo": {
+                "day": [9],
+                "time": { "time": "1200", "timeSection": 0 }
+            },
+            "reservHVACSet": {
+                "airCtrl": 1,
+                "defrost": false,
+                "airTemp": { "value": "21.5", "unit": 0 }
+            }
+        }
+    }
+}
