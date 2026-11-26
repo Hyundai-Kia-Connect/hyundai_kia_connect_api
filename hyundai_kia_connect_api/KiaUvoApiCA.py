@@ -28,6 +28,7 @@ from .ApiImpl import (
     ScheduleChargingClimateRequestOptions,
     _fill_schedule_options_from_vehicle,
     _guard_schedule_temperature,
+    _rounded_climate_temperature,
     _schedule_charging_scopes,
     _vehicle_temperature_unit,
 )
@@ -1752,17 +1753,12 @@ class KiaUvoApiCA(ApiImpl):
             def _hvac_set(
                 dep: ScheduleChargingClimateRequestOptions.DepartureOptions,
             ) -> dict[str, Any]:
-                temp: float = dep.temperature if dep.temperature is not None else 21.0
-                if temperature_unit == 0:
-                    temp = round(temp * 2.0) / 2.0
-                    if temp > 27.0:
-                        temp = 27.0
-                    elif temp < 17.0:
-                        temp = 17.0
-                slot_time = dep.time
-                assert slot_time is not None
-                # airCtrl is the car's stored echo (1 in every capture); the app
-                # passes the read value back, reservHVACflag is the enable.
+                temp = _rounded_climate_temperature(
+                    dep.temperature if dep.temperature is not None else 21.0,
+                    temperature_unit,
+                )
+                # airCtrl: the app sends the car's stored value back (1 in
+                # every capture); reservHVACflag is the enable.
                 return {
                     "airCtrl": 1,
                     "defrost": bool(dep.defrost),

@@ -224,6 +224,23 @@ def _guard_schedule_temperature(
         )
 
 
+def _rounded_climate_temperature(temp: float, unit: int | None) -> float:
+    """Round a departure-climate temperature to the car's step.
+
+    Celsius takes 0.5 steps over the 17-27 range the cars expose, so
+    out-of-range values clamp instead of being rejected. Fahrenheit
+    passes through unchanged.
+    """
+    if unit != 0:
+        return temp
+    temp = round(temp * 2.0) / 2.0
+    if temp > 27.0:
+        return 27.0
+    if temp < 17.0:
+        return 17.0
+    return temp
+
+
 def _fill_option_value[T](
     current: T | None,
     source: T | None,
