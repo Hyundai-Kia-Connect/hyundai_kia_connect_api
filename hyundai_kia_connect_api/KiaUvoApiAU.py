@@ -322,17 +322,21 @@ class KiaUvoApiAU(ApiImplType1):
             and vehicle.ccu_ccs2_protocol_support
         ):
             return super().start_climate(token, vehicle, options)
-        return self._post_engine_command(
-            token,
-            vehicle,
-            {
-                "command": "start",
-                "ignitionDuration": 5 if options.duration is None else options.duration,
-                "hvacCtrl": 0 if options.climate is False else 1,
-                "windshieldFrontDefogState": bool(options.defrost),
-                "drvSeatLoc": self._get_drv_seat_loc(vehicle),
-            },
-        )
+        payload: dict[str, Any] = {
+            "command": "start",
+            "ignitionDuration": 5 if options.duration is None else options.duration,
+            "hvacCtrl": 0 if options.climate is False else 1,
+            "windshieldFrontDefogState": bool(options.defrost),
+            "drvSeatLoc": self._get_drv_seat_loc(vehicle),
+        }
+        # The app sends the setpoint as a string, and only with HVAC on.
+        if options.set_temp is not None and options.climate is not False:
+            payload["hvacTemp"] = str(float(options.set_temp))
+            payload["hvacTempType"] = (
+                1 if options.hvac_temp_type is None else options.hvac_temp_type
+            )
+            payload["tempUnit"] = "C"
+        return self._post_engine_command(token, vehicle, payload)
 
     def stop_climate(self, token: Token, vehicle: Vehicle) -> str:
         if not (
